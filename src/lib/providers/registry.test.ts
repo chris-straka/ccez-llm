@@ -60,10 +60,9 @@ describe("registry", () => {
 	});
 
 	it("narrows OpenCode Zen's model list and marks its free models", () => {
-		expect(pickedModels("opencode-zen", ["gpt-6-sol", "glm-5.3", "exo-free"])).toEqual([
-			"exo-free",
-			"glm-5.3"
-		]);
+		expect(
+			pickedModels("opencode-zen", ["gpt-6-sol", "glm-5.3", "exo-free"])
+		).toEqual(["exo-free", "glm-5.3"]);
 		// Other providers keep the list as fetched.
 		expect(pickedModels("deepseek", ["b", "a"])).toEqual(["b", "a"]);
 		expect(isFreeModel("opencode-zen", "big-pickle")).toBe(true);

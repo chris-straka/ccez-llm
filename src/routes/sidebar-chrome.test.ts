@@ -22,10 +22,16 @@ function pageStyle(): string {
 describe("sidebar chrome selection", () => {
 	it("pins user-select none on the chat list, new-chat, and settings", () => {
 		const css = pageStyle();
-		for (const selector of ["aside ul", "aside button.new", "aside button.side-settings"]) {
+		for (const selector of [
+			"aside ul",
+			"aside button.new",
+			"aside button.side-settings"
+		]) {
 			expect(css).toContain(selector);
 		}
-		const rules = [...css.matchAll(/([^{}]+)\{([^}]*user-select:\s*none[^}]*)}/g)];
+		const rules = [
+			...css.matchAll(/([^{}]+)\{([^}]*user-select:\s*none[^}]*)}/g)
+		];
 		const covered = rules.some(
 			(rule) =>
 				rule[1]!.includes("aside ul") &&

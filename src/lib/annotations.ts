@@ -231,9 +231,7 @@ export function canPinAnnotation(ann: { answer?: string }): boolean {
  * waiting badge's delete attach to nothing (see
  * attachAnnotationAnswer), so deleting early is safe. Pure.
  */
-export function canHoldDeleteBadge(
-	ann: { id: string } | undefined
-): boolean {
+export function canHoldDeleteBadge(ann: { id: string } | undefined): boolean {
 	return ann !== undefined;
 }
 

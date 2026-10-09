@@ -127,7 +127,8 @@ export function resolveThinkingId(
 	support: ThinkingSupport,
 	saved: string | undefined
 ): string {
-	if (saved === LOWEST_THINKING) return support.options[0]?.id ?? support.defaultId;
+	if (saved === LOWEST_THINKING)
+		return support.options[0]?.id ?? support.defaultId;
 	if (saved !== undefined && support.options.some((o) => o.id === saved))
 		return saved;
 	return support.defaultId;

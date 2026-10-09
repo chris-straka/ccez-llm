@@ -448,9 +448,7 @@ for (const t of THEMES) {
 		await expect(pop).toHaveCSS("border-color", v.overlayLine);
 		// The open box dims the thread: its first shadow is the
 		// full-screen scrim ring.
-		expect(
-			await pop.evaluate((el) => getComputedStyle(el).boxShadow)
-		).toMatch(
+		expect(await pop.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(
 			L
 				? /^rgba\(0, 0, 0, 0\.15\) 0px 0px 0px \d+(\.\d+)?px/
 				: /^rgba\(0, 0, 0, 0\.45\) 0px 0px 0px \d+(\.\d+)?px/

@@ -27,8 +27,7 @@ export interface ProviderResolution {
 
 export function resolveProviderFor(r: ProviderResolution): ChatProvider | null {
 	if (r.useMock) return new MockProvider();
-	if (isOnDeviceProvider(r.activeProviderId))
-		return new OnDeviceChatProvider();
+	if (isOnDeviceProvider(r.activeProviderId)) return new OnDeviceChatProvider();
 	const conf = r.providers[r.activeProviderId];
 	const keyless =
 		getProviderDef(r.activeProviderId, r.customProviders).keyless === true;

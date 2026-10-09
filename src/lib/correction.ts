@@ -60,7 +60,8 @@ export type CorrectionOp =
 	| { type: "del"; text: string }
 	| { type: "ins"; text: string };
 
-const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const CJK =
+	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
 /**
  * Word tokens for Latin scripts (each carrying its trailing spaces,

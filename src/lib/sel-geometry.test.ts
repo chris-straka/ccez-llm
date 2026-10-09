@@ -459,18 +459,18 @@ describe("selMenuDragTarget", () => {
 	const drag = { mx: 10, my: 10, x0: 100, y0: 200 };
 
 	it("holds still inside the tap slop", () => {
-		expect(
-			selMenuDragTarget(drag, { x: 12, y: 12 }, 400, 800)
-		).toBeNull();
+		expect(selMenuDragTarget(drag, { x: 12, y: 12 }, 400, 800)).toBeNull();
 	});
 
 	it("follows the finger past the slop, clamped to the viewport", () => {
-		expect(
-			selMenuDragTarget(drag, { x: 30, y: 40 }, 400, 800)
-		).toEqual({ x: 120, y: 230 });
-		expect(
-			selMenuDragTarget(drag, { x: -500, y: -500 }, 400, 800)
-		).toEqual({ x: 8, y: 8 });
+		expect(selMenuDragTarget(drag, { x: 30, y: 40 }, 400, 800)).toEqual({
+			x: 120,
+			y: 230
+		});
+		expect(selMenuDragTarget(drag, { x: -500, y: -500 }, 400, 800)).toEqual({
+			x: 8,
+			y: 8
+		});
 	});
 });
 describe("pressExpandedSelection", () => {

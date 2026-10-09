@@ -1,10 +1,6 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
-import {
-	MAX_FEED_ITEMS,
-	parseFeedItems,
-	type FeedItem
-} from "./tools";
+import { MAX_FEED_ITEMS, parseFeedItems, type FeedItem } from "./tools";
 import type { KeyValueStore } from "./settings";
 import { CEFR_LEVELS, type CefrLevel } from "./cefr";
 
@@ -187,16 +183,28 @@ export const NEWS_FEEDS: Record<string, NewsFeed> = {
 	akk: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
 	lzh: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
 	hbo: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
-	ur: { hl: "en-PK", regions: [{ gl: "PK", label: "Pakistan" }], fallback: true },
+	ur: {
+		hl: "en-PK",
+		regions: [{ gl: "PK", label: "Pakistan" }],
+		fallback: true
+	},
 	tl: {
 		hl: "en-PH",
 		regions: [{ gl: "PH", label: "Philippines" }],
 		fallback: true
 	},
-	am: { hl: "en-ET", regions: [{ gl: "ET", label: "Ethiopia" }], fallback: true },
+	am: {
+		hl: "en-ET",
+		regions: [{ gl: "ET", label: "Ethiopia" }],
+		fallback: true
+	},
 	sw: { hl: "en-KE", regions: [{ gl: "KE", label: "Kenya" }], fallback: true },
 	sa: { hl: "en-IN", regions: [{ gl: "IN", label: "India" }], fallback: true },
-	ang: { hl: "en-GB", regions: [{ gl: "GB", label: "Britain" }], fallback: true }
+	ang: {
+		hl: "en-GB",
+		regions: [{ gl: "GB", label: "Britain" }],
+		fallback: true
+	}
 };
 
 /** True when the language has a Google News edition. */
@@ -211,7 +219,10 @@ export function isNewsFallback(code: string): boolean {
 
 /** Editions for a language, default first; null when unsupported. */
 /** A Google edition as a merge target (single-sourced URL shape). */
-const editionTarget = (hl: string, gl: string): { url: string; lang: string } => ({
+const editionTarget = (
+	hl: string,
+	gl: string
+): { url: string; lang: string } => ({
 	url: feedUrl(hl, gl),
 	lang: hl.split("-")[0]!
 });
@@ -300,7 +311,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.S.",
 			icon: "🇺🇸",
 			merge: [
-				{ url: "https://www.france24.com/fr/am%C3%A9riques/rss", source: "France 24" },
+				{
+					url: "https://www.france24.com/fr/am%C3%A9riques/rss",
+					source: "France 24"
+				},
 				{ url: "https://www.rfi.fr/fr/am%C3%A9riques/rss", source: "RFI" }
 			]
 		},
@@ -327,7 +341,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.K.",
 			icon: "🇬🇧",
 			merge: [
-				{ url: "https://www.france24.com/fr/tag/royaume-uni/rss", source: "France 24" },
+				{
+					url: "https://www.france24.com/fr/tag/royaume-uni/rss",
+					source: "France 24"
+				},
 				{ url: "https://www.rfi.fr/fr/tag/royaume-uni/rss", source: "RFI" }
 			]
 		},
@@ -336,7 +353,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Australia",
 			icon: "🇦🇺",
 			merge: [
-				{ url: "https://www.france24.com/fr/tag/australie/rss", source: "France 24" },
+				{
+					url: "https://www.france24.com/fr/tag/australie/rss",
+					source: "France 24"
+				},
 				{ url: "https://www.rfi.fr/fr/tag/australie/rss", source: "RFI" }
 			]
 		},
@@ -345,14 +365,22 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Latin America",
 			icon: "🌎",
 			merge: [
-				{ url: "https://www.france24.com/fr/tag/am%C3%A9rique-latine/rss", source: "France 24" }
+				{
+					url: "https://www.france24.com/fr/tag/am%C3%A9rique-latine/rss",
+					source: "France 24"
+				}
 			]
 		},
 		ASI: {
 			gl: "ASI",
 			label: "Asia",
 			icon: "🌏",
-			merge: [{ url: "https://www.france24.com/fr/asie-pacifique/rss", source: "France 24" }]
+			merge: [
+				{
+					url: "https://www.france24.com/fr/asie-pacifique/rss",
+					source: "France 24"
+				}
+			]
 		}
 	},
 	es: {
@@ -370,7 +398,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Latin America",
 			icon: "🌎",
 			merge: [
-				{ url: "https://www.france24.com/es/am%C3%A9rica-latina/rss", source: "France 24" }
+				{
+					url: "https://www.france24.com/es/am%C3%A9rica-latina/rss",
+					source: "France 24"
+				}
 			]
 		},
 		EUR: {
@@ -387,7 +418,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.K.",
 			icon: "🇬🇧",
 			merge: [
-				{ url: "https://www.france24.com/es/tag/reino-unido/rss", source: "France 24" },
+				{
+					url: "https://www.france24.com/es/tag/reino-unido/rss",
+					source: "France 24"
+				},
 				{ url: "https://www.rfi.fr/es/tag/reino-unido/rss", source: "RFI" }
 			]
 		},
@@ -396,7 +430,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Australia",
 			icon: "🇦🇺",
 			merge: [
-				{ url: "https://www.france24.com/es/tag/australia/rss", source: "France 24" },
+				{
+					url: "https://www.france24.com/es/tag/australia/rss",
+					source: "France 24"
+				},
 				{ url: "https://www.rfi.fr/es/tag/australia/rss", source: "RFI" }
 			]
 		},
@@ -404,13 +441,20 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "CA",
 			label: "Canada",
 			icon: "🇨🇦",
-			merge: [{ url: "https://www.france24.com/es/tag/canad%C3%A1/rss", source: "France 24" }]
+			merge: [
+				{
+					url: "https://www.france24.com/es/tag/canad%C3%A1/rss",
+					source: "France 24"
+				}
+			]
 		},
 		ASI: {
 			gl: "ASI",
 			label: "Asia",
 			icon: "🌏",
-			merge: [{ url: "https://www.france24.com/es/tag/asia/rss", source: "France 24" }]
+			merge: [
+				{ url: "https://www.france24.com/es/tag/asia/rss", source: "France 24" }
+			]
 		}
 	},
 	ar: {
@@ -419,7 +463,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" },
+				{
+					url: "https://feeds.bbci.co.uk/arabic/rss.xml",
+					source: "BBC Arabic"
+				},
 				{ url: "https://www.france24.com/ar/rss", source: "France 24" }
 			]
 		},
@@ -428,14 +475,22 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Europe",
 			icon: "🇪🇺",
 			merge: [
-				{ url: "https://www.france24.com/ar/%D8%A3%D9%88%D8%B1%D9%88%D8%A8%D8%A7/rss", source: "France 24" }
+				{
+					url: "https://www.france24.com/ar/%D8%A3%D9%88%D8%B1%D9%88%D8%A8%D8%A7/rss",
+					source: "France 24"
+				}
 			]
 		},
 		ASI: {
 			gl: "ASI",
 			label: "Asia",
 			icon: "🌏",
-			merge: [{ url: "https://www.france24.com/ar/%D8%A2%D8%B3%D9%8A%D8%A7/rss", source: "France 24" }]
+			merge: [
+				{
+					url: "https://www.france24.com/ar/%D8%A2%D8%B3%D9%8A%D8%A7/rss",
+					source: "France 24"
+				}
+			]
 		}
 	},
 	ru: {
@@ -444,7 +499,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://feeds.bbci.co.uk/russian/rss.xml", source: "BBC Russian" },
+				{
+					url: "https://feeds.bbci.co.uk/russian/rss.xml",
+					source: "BBC Russian"
+				},
 				{ url: "https://www.rfi.fr/ru/rss", source: "RFI" }
 			]
 		},
@@ -453,7 +511,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.S.",
 			icon: "🇺🇸",
 			merge: [
-				{ url: "https://www.golosameriki.com/api/zjj_rl-vomx-tpeb_to", source: "VOA" }
+				{
+					url: "https://www.golosameriki.com/api/zjj_rl-vomx-tpeb_to",
+					source: "VOA"
+				}
 			]
 		},
 		GB: {
@@ -461,7 +522,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.K.",
 			icon: "🇬🇧",
 			merge: [
-				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B2%D0%B5%D0%BB%D0%B8%D0%BA%D0%BE%D0%B1%D1%80%D0%B8%D1%82%D0%B0%D0%BD%D0%B8%D1%8F/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B2%D0%B5%D0%BB%D0%B8%D0%BA%D0%BE%D0%B1%D1%80%D0%B8%D1%82%D0%B0%D0%BD%D0%B8%D1%8F/rss",
+					source: "RFI"
+				}
 			]
 		},
 		AU: {
@@ -469,7 +533,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Australia",
 			icon: "🇦🇺",
 			merge: [
-				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B0%D0%B2%D1%81%D1%82%D1%80%D0%B0%D0%BB%D0%B8%D1%8F/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B0%D0%B2%D1%81%D1%82%D1%80%D0%B0%D0%BB%D0%B8%D1%8F/rss",
+					source: "RFI"
+				}
 			]
 		},
 		EUR: {
@@ -477,7 +544,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Europe",
 			icon: "🇪🇺",
 			merge: [
-				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B5%D0%B2%D1%80%D0%BE%D0%BF%D0%B0/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B5%D0%B2%D1%80%D0%BE%D0%BF%D0%B0/rss",
+					source: "RFI"
+				}
 			]
 		},
 		CA: {
@@ -485,7 +555,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Canada",
 			icon: "🇨🇦",
 			merge: [
-				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%BA%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%BA%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0/rss",
+					source: "RFI"
+				}
 			]
 		}
 	},
@@ -495,7 +568,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://feeds.bbci.co.uk/persian/rss.xml", source: "BBC Persian" },
+				{
+					url: "https://feeds.bbci.co.uk/persian/rss.xml",
+					source: "BBC Persian"
+				},
 				{ url: "https://www.rfi.fr/fa/rss", source: "RFI" }
 			]
 		},
@@ -510,7 +586,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.K.",
 			icon: "🇬🇧",
 			merge: [
-				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A8%D8%B1%DB%8C%D8%AA%D8%A7%D9%86%DB%8C%D8%A7/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A8%D8%B1%DB%8C%D8%AA%D8%A7%D9%86%DB%8C%D8%A7/rss",
+					source: "RFI"
+				}
 			]
 		},
 		EUR: {
@@ -518,7 +597,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Europe",
 			icon: "🇪🇺",
 			merge: [
-				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A7%D8%B1%D9%88%D9%BE%D8%A7/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A7%D8%B1%D9%88%D9%BE%D8%A7/rss",
+					source: "RFI"
+				}
 			]
 		},
 		AU: {
@@ -526,7 +608,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Australia",
 			icon: "🇦🇺",
 			merge: [
-				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A7%D8%B3%D8%AA%D8%B1%D8%A7%D9%84%DB%8C%D8%A7/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A7%D8%B3%D8%AA%D8%B1%D8%A7%D9%84%DB%8C%D8%A7/rss",
+					source: "RFI"
+				}
 			]
 		},
 		CA: {
@@ -534,7 +619,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Canada",
 			icon: "🇨🇦",
 			merge: [
-				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%DA%A9%D8%A7%D9%86%D8%A7%D8%AF%D8%A7/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%DA%A9%D8%A7%D9%86%D8%A7%D8%AF%D8%A7/rss",
+					source: "RFI"
+				}
 			]
 		},
 		ASI: {
@@ -542,7 +630,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Asia",
 			icon: "🌏",
 			merge: [
-				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A2%D8%B3%DB%8C%D8%A7/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A2%D8%B3%DB%8C%D8%A7/rss",
+					source: "RFI"
+				}
 			]
 		},
 		LAT: {
@@ -550,7 +641,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Latin America",
 			icon: "🌎",
 			merge: [
-				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A2%D9%85%D8%B1%DB%8C%DA%A9%D8%A7%DB%8C-%D9%84%D8%A7%D8%AA%DB%8C%D9%86/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A2%D9%85%D8%B1%DB%8C%DA%A9%D8%A7%DB%8C-%D9%84%D8%A7%D8%AA%DB%8C%D9%86/rss",
+					source: "RFI"
+				}
 			]
 		}
 	},
@@ -560,7 +654,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://feeds.bbci.co.uk/vietnamese/rss.xml", source: "BBC Vietnamese" },
+				{
+					url: "https://feeds.bbci.co.uk/vietnamese/rss.xml",
+					source: "BBC Vietnamese"
+				},
 				{ url: "https://www.rfi.fr/vi/rss", source: "RFI" }
 			]
 		},
@@ -569,27 +666,48 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.S.",
 			icon: "🇺🇸",
 			merge: [
-				{ url: "https://www.voatiengviet.com/api/zruyyl-vomx-tpeoiut", source: "VOA" },
-				{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/m%E1%BB%B9/rss", source: "RFI" }
+				{
+					url: "https://www.voatiengviet.com/api/zruyyl-vomx-tpeoiut",
+					source: "VOA"
+				},
+				{
+					url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/m%E1%BB%B9/rss",
+					source: "RFI"
+				}
 			]
 		},
 		EUR: {
 			gl: "EUR",
 			label: "Europe",
 			icon: "🇪🇺",
-			merge: [{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/ch%C3%A2u-%C3%A2u/rss", source: "RFI" }]
+			merge: [
+				{
+					url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/ch%C3%A2u-%C3%A2u/rss",
+					source: "RFI"
+				}
+			]
 		},
 		AU: {
 			gl: "AU",
 			label: "Australia",
 			icon: "🇦🇺",
-			merge: [{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/%C3%BAc/rss", source: "RFI" }]
+			merge: [
+				{
+					url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/%C3%BAc/rss",
+					source: "RFI"
+				}
+			]
 		},
 		CA: {
 			gl: "CA",
 			label: "Canada",
 			icon: "🇨🇦",
-			merge: [{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/canada/rss", source: "RFI" }]
+			merge: [
+				{
+					url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/canada/rss",
+					source: "RFI"
+				}
+			]
 		}
 	},
 	sw: {
@@ -598,7 +716,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://feeds.bbci.co.uk/swahili/rss.xml", source: "BBC Swahili" },
+				{
+					url: "https://feeds.bbci.co.uk/swahili/rss.xml",
+					source: "BBC Swahili"
+				},
 				{ url: "https://www.rfi.fr/sw/rss", source: "RFI" }
 			]
 		},
@@ -612,7 +733,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GB",
 			label: "U.K.",
 			icon: "🇬🇧",
-			merge: [{ url: "https://www.rfi.fr/sw/lebo/uingereza/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/sw/lebo/uingereza/rss", source: "RFI" }
+			]
 		},
 		EUR: {
 			gl: "EUR",
@@ -624,7 +747,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "AU",
 			label: "Australia",
 			icon: "🇦🇺",
-			merge: [{ url: "https://www.rfi.fr/sw/lebo/australia/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/sw/lebo/australia/rss", source: "RFI" }
+			]
 		},
 		CA: {
 			gl: "CA",
@@ -638,7 +763,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/urdu/rss.xml", source: "BBC Urdu" }]
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/urdu/rss.xml", source: "BBC Urdu" }
+			]
 		}
 	},
 	hi: {
@@ -646,7 +773,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/hindi/rss.xml", source: "BBC Hindi" }]
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/hindi/rss.xml", source: "BBC Hindi" }
+			]
 		}
 	},
 	id: {
@@ -654,13 +783,23 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/indonesia/rss.xml", source: "BBC Indonesia" }]
+			merge: [
+				{
+					url: "https://feeds.bbci.co.uk/indonesia/rss.xml",
+					source: "BBC Indonesia"
+				}
+			]
 		},
 		US: {
 			gl: "US",
 			label: "U.S.",
 			icon: "🇺🇸",
-			merge: [{ url: "https://www.voaindonesia.com/api/z_qroml-vomx-tpevuoom", source: "VOA" }]
+			merge: [
+				{
+					url: "https://www.voaindonesia.com/api/z_qroml-vomx-tpevuoom",
+					source: "VOA"
+				}
+			]
 		}
 	},
 	uk: {
@@ -668,7 +807,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/ukrainian/rss.xml", source: "BBC Ukrainian" }]
+			merge: [
+				{
+					url: "https://feeds.bbci.co.uk/ukrainian/rss.xml",
+					source: "BBC Ukrainian"
+				}
+			]
 		}
 	},
 	bn: {
@@ -676,7 +820,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/bengali/rss.xml", source: "BBC Bengali" }]
+			merge: [
+				{
+					url: "https://feeds.bbci.co.uk/bengali/rss.xml",
+					source: "BBC Bengali"
+				}
+			]
 		}
 	},
 	pa: {
@@ -684,7 +833,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/punjabi/rss.xml", source: "BBC Punjabi" }]
+			merge: [
+				{
+					url: "https://feeds.bbci.co.uk/punjabi/rss.xml",
+					source: "BBC Punjabi"
+				}
+			]
 		}
 	},
 	ta: {
@@ -692,7 +846,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/tamil/rss.xml", source: "BBC Tamil" }]
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/tamil/rss.xml", source: "BBC Tamil" }
+			]
 		}
 	},
 	th: {
@@ -700,13 +856,20 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/thai/rss.xml", source: "BBC Thai" }]
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/thai/rss.xml", source: "BBC Thai" }
+			]
 		},
 		US: {
 			gl: "US",
 			label: "U.S.",
 			icon: "🇺🇸",
-			merge: [{ url: "https://www.voathai.com/api/zgkyvl-vomx-tpe-put", source: "VOA" }]
+			merge: [
+				{
+					url: "https://www.voathai.com/api/zgkyvl-vomx-tpe-put",
+					source: "VOA"
+				}
+			]
 		}
 	},
 	pt: {
@@ -715,7 +878,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://feeds.bbci.co.uk/portuguese/rss.xml", source: "BBC Brasil" },
+				{
+					url: "https://feeds.bbci.co.uk/portuguese/rss.xml",
+					source: "BBC Brasil"
+				},
 				{ url: "https://www.rfi.fr/br/rss", source: "RFI Brasil" }
 			]
 		},
@@ -735,19 +901,28 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GB",
 			label: "U.K.",
 			icon: "🇬🇧",
-			merge: [{ url: "https://www.rfi.fr/br/tag/reino-unido/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/br/tag/reino-unido/rss", source: "RFI" }
+			]
 		},
 		AU: {
 			gl: "AU",
 			label: "Australia",
 			icon: "🇦🇺",
-			merge: [{ url: "https://www.rfi.fr/br/tag/austr%C3%A1lia/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/br/tag/austr%C3%A1lia/rss", source: "RFI" }
+			]
 		},
 		LAT: {
 			gl: "LAT",
 			label: "Latin America",
 			icon: "🌎",
-			merge: [{ url: "https://www.rfi.fr/br/tag/am%C3%A9rica-latina/rss", source: "RFI" }]
+			merge: [
+				{
+					url: "https://www.rfi.fr/br/tag/am%C3%A9rica-latina/rss",
+					source: "RFI"
+				}
+			]
 		},
 		ASI: {
 			gl: "ASI",
@@ -759,7 +934,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "CA",
 			label: "Canada",
 			icon: "🇨🇦",
-			merge: [{ url: "https://www.rfi.fr/br/tag/canad%C3%A1/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/br/tag/canad%C3%A1/rss", source: "RFI" }
+			]
 		}
 	},
 	de: {
@@ -780,7 +957,9 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "US",
 			label: "U.S.",
 			icon: "🇺🇸",
-			merge: [{ url: "https://www.rfi.fr/cn/%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/cn/%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }
+			]
 		},
 		GBL: {
 			gl: "GBL",
@@ -792,14 +971,19 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "ASI",
 			label: "Asia",
 			icon: "🌏",
-			merge: [{ url: "https://www.rfi.fr/cn/%E4%BA%9A%E6%B4%B2/rss", source: "RFI" }]
+			merge: [
+				{ url: "https://www.rfi.fr/cn/%E4%BA%9A%E6%B4%B2/rss", source: "RFI" }
+			]
 		},
 		GB: {
 			gl: "GB",
 			label: "U.K.",
 			icon: "🇬🇧",
 			merge: [
-				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E8%8B%B1%E5%9B%BD/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E8%8B%B1%E5%9B%BD/rss",
+					source: "RFI"
+				}
 			]
 		},
 		AU: {
@@ -807,7 +991,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Australia",
 			icon: "🇦🇺",
 			merge: [
-				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%BE%B3%E5%A4%A7%E5%88%A9%E4%BA%9A/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%BE%B3%E5%A4%A7%E5%88%A9%E4%BA%9A/rss",
+					source: "RFI"
+				}
 			]
 		},
 		EUR: {
@@ -815,7 +1002,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Europe",
 			icon: "🇪🇺",
 			merge: [
-				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%AC%A7%E6%B4%B2/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%AC%A7%E6%B4%B2/rss",
+					source: "RFI"
+				}
 			]
 		},
 		LAT: {
@@ -823,7 +1013,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Latin America",
 			icon: "🌎",
 			merge: [
-				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%8B%89%E4%B8%81%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%8B%89%E4%B8%81%E7%BE%8E%E6%B4%B2/rss",
+					source: "RFI"
+				}
 			]
 		},
 		CA: {
@@ -831,7 +1024,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Canada",
 			icon: "🇨🇦",
 			merge: [
-				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E5%8A%A0%E6%8B%BF%E5%A4%A7/rss", source: "RFI" }
+				{
+					url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E5%8A%A0%E6%8B%BF%E5%A4%A7/rss",
+					source: "RFI"
+				}
 			]
 		}
 	},
@@ -842,7 +1038,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			icon: "🌐",
 			merge: [
 				{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" },
-				{ url: "https://feeds.bbci.co.uk/japanese/rss.xml", source: "BBC Japanese" }
+				{
+					url: "https://feeds.bbci.co.uk/japanese/rss.xml",
+					source: "BBC Japanese"
+				}
 			]
 		}
 	},
@@ -852,7 +1051,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [
-				{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" },
+				{
+					url: "https://www.yna.co.kr/rss/international.xml",
+					source: "Yonhap"
+				},
 				{ url: "https://feeds.bbci.co.uk/korean/rss.xml", source: "BBC Korean" }
 			]
 		},
@@ -860,7 +1062,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "US",
 			label: "U.S.",
 			icon: "🇺🇸",
-			merge: [{ url: "https://www.voakorea.com/api/zkboq_l-vomx-tpejvmqv", source: "VOA" }]
+			merge: [
+				{
+					url: "https://www.voakorea.com/api/zkboq_l-vomx-tpejvmqv",
+					source: "VOA"
+				}
+			]
 		}
 	},
 	am: {
@@ -868,13 +1075,23 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/amharic/rss.xml", source: "BBC Amharic" }]
+			merge: [
+				{
+					url: "https://feeds.bbci.co.uk/amharic/rss.xml",
+					source: "BBC Amharic"
+				}
+			]
 		},
 		US: {
 			gl: "US",
 			label: "U.S.",
 			icon: "🇺🇸",
-			merge: [{ url: "https://amharic.voanews.com/api/zqbjqpl-vomx-tpeivro_", source: "VOA" }]
+			merge: [
+				{
+					url: "https://amharic.voanews.com/api/zqbjqpl-vomx-tpeivro_",
+					source: "VOA"
+				}
+			]
 		}
 	},
 	tr: {
@@ -896,7 +1113,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml", source: "ANSA" }]
+			merge: [
+				{
+					url: "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
+					source: "ANSA"
+				}
+			]
 		}
 	}
 };
@@ -1046,12 +1268,7 @@ export type NewsKind = "talk" | "read";
 
 /** News panel fetch state. */
 export type NewsStatus =
-	| "loading"
-	| "translating"
-	| "ready"
-	| "error"
-	| "unsupported"
-	| "needs-shell";
+	"loading" | "translating" | "ready" | "error" | "unsupported" | "needs-shell";
 
 /** Everything the news panel renders (page-owned). */
 export interface NewsPanelState {
@@ -1117,8 +1334,7 @@ export function newsSummaryInstruction(
 	level: CefrLevel,
 	langName: string
 ): string {
-	const words =
-		SUMMARY_SIZES.find((s) => s.size === size)?.words ?? 200;
+	const words = SUMMARY_SIZES.find((s) => s.size === size)?.words ?? 200;
 	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
 	const byline = story.source ? ` (${story.source})` : "";
 	return (
@@ -1180,7 +1396,10 @@ export function jinaUrl(url: string): string {
  * Best preview image out of raw article HTML: og:image, then
  * twitter:image, resolved against the page URL. Pure (needs DOM).
  */
-export function articleImageFromHtml(html: string, baseUrl: string): string | null {
+export function articleImageFromHtml(
+	html: string,
+	baseUrl: string
+): string | null {
 	let doc: Document;
 	try {
 		doc = new DOMParser().parseFromString(html, "text/html");
@@ -1188,8 +1407,12 @@ export function articleImageFromHtml(html: string, baseUrl: string): string | nu
 		return null;
 	}
 	const content = (attr: "property" | "name", key: string): string =>
-		doc.querySelector(`meta[${attr}="${key}"]`)?.getAttribute("content")?.trim() ?? "";
-	const raw = content("property", "og:image") || content("name", "twitter:image");
+		doc
+			.querySelector(`meta[${attr}="${key}"]`)
+			?.getAttribute("content")
+			?.trim() ?? "";
+	const raw =
+		content("property", "og:image") || content("name", "twitter:image");
 	if (!raw) return null;
 	try {
 		return new URL(raw, baseUrl).href;
@@ -1348,7 +1571,8 @@ export async function resolveStoryImage(
 		if (!deps.fresh()) return { found: null, complete: false };
 		// Blown quota: skip the doomed reader leg (no gate wait,
 		// no burn) — the hidden leg still runs, it spends no quota.
-		if (deps.jinaQuotaBlown()) return webviewOr({ found: null, complete: true });
+		if (deps.jinaQuotaBlown())
+			return webviewOr({ found: null, complete: true });
 		await deps.gateJina();
 		if (!deps.fresh()) return { found: null, complete: false };
 		try {
@@ -1448,7 +1672,8 @@ export function extractArticleText(html: string): string {
 		return "";
 	}
 	doc.querySelectorAll(ARTICLE_DROP).forEach((el) => el.remove());
-	const scope = doc.querySelector("article") ?? doc.querySelector("main") ?? doc.body;
+	const scope =
+		doc.querySelector("article") ?? doc.querySelector("main") ?? doc.body;
 	if (!scope) return "";
 	const blocks: string[] = [];
 	scope.querySelectorAll("h1, h2, h3, p").forEach((el) => {
@@ -1597,7 +1822,10 @@ export function mergeNewsStories(
  * three times, and the pre-translation dedupe can't see across
  * languages. Keeps the first of each pair.
  */
-export function withTranslatedTitles(stories: NewsStory[], translated: string[]): NewsStory[] {
+export function withTranslatedTitles(
+	stories: NewsStory[],
+	translated: string[]
+): NewsStory[] {
 	const seen = new Set<string>();
 	const out: NewsStory[] = [];
 	for (let i = 0; i < stories.length; i++) {
@@ -1644,7 +1872,10 @@ export async function loadNewsStories(
  * or splits lines fails loudly instead of mislabeling cards).
  * Pure.
  */
-export function parseTranslatedLines(text: string, count: number): string[] | null {
+export function parseTranslatedLines(
+	text: string,
+	count: number
+): string[] | null {
 	const lines = text
 		.split("\n")
 		.map((line) => line.replace(/^\s*\d+[.)]\s*/, "").trim())
@@ -1693,7 +1924,10 @@ export function newsErrorCopy(error: unknown): string {
 	if (message.includes("news-empty") || message.includes("unreadable")) {
 		return "That story wouldn't open — try another one.";
 	}
-	if (message.includes("news-decode-failed") || message.includes("no-decoded-url")) {
+	if (
+		message.includes("news-decode-failed") ||
+		message.includes("no-decoded-url")
+	) {
 		return "Google wouldn't give up that link — try another story.";
 	}
 	if (message.includes("no-signature")) {
@@ -1796,13 +2030,20 @@ function readNewsUrls(store: KeyValueStore): Record<string, string> {
 }
 
 /** Cached publisher URL for a Google link, else null. Never throws. */
-export function cachedNewsUrl(store: KeyValueStore, link: string): string | null {
+export function cachedNewsUrl(
+	store: KeyValueStore,
+	link: string
+): string | null {
 	const found = readNewsUrls(store)[link];
 	return typeof found === "string" && found.startsWith("http") ? found : null;
 }
 
 /** File a decoded mapping (oldest evicted past the cap). Never throws. */
-export function storeNewsUrl(store: KeyValueStore, link: string, url: string): void {
+export function storeNewsUrl(
+	store: KeyValueStore,
+	link: string,
+	url: string
+): void {
 	try {
 		const urls = readNewsUrls(store);
 		delete urls[link];
@@ -1833,19 +2074,29 @@ function readNewsImages(store: KeyValueStore): Record<string, string> {
 }
 
 /** Cached preview image for a story link, else null. Never throws. */
-export function cachedNewsImage(store: KeyValueStore, link: string): string | null {
+export function cachedNewsImage(
+	store: KeyValueStore,
+	link: string
+): string | null {
 	const found = readNewsImages(store)[link];
 	return typeof found === "string" && found.startsWith("http") ? found : null;
 }
 
 /** File a preview image (oldest evicted past the cap). Never throws. */
-export function storeNewsImage(store: KeyValueStore, link: string, image: string): void {
+export function storeNewsImage(
+	store: KeyValueStore,
+	link: string,
+	image: string
+): void {
 	try {
 		const images = readNewsImages(store);
 		delete images[link];
 		images[link] = image;
 		const keys = Object.keys(images);
-		for (const key of keys.slice(0, Math.max(0, keys.length - NEWS_IMAGE_MAX))) {
+		for (const key of keys.slice(
+			0,
+			Math.max(0, keys.length - NEWS_IMAGE_MAX)
+		)) {
 			delete images[key];
 		}
 		store.setItem(NEWS_IMAGE_KEY, JSON.stringify(images));
@@ -1905,7 +2156,8 @@ export function cachedFeed(
 	now = Date.now()
 ): NewsStory[] | null {
 	const entry = readNewsFeeds(store)[`${code}|${region}`];
-	if (!entry || !Array.isArray(entry.stories) || entry.stories.length === 0) return null;
+	if (!entry || !Array.isArray(entry.stories) || entry.stories.length === 0)
+		return null;
 	if (now - entry.at > NEWS_FEED_TTL_MS || now < entry.at) return null;
 	return entry.stories;
 }
@@ -1949,10 +2201,17 @@ export function loadNewsPicks(store: KeyValueStore): NewsPicks {
 	try {
 		const raw = store.getItem(NEWS_PICKS_KEY);
 		if (!raw) return fallback;
-		const parsed = JSON.parse(raw) as { kind?: unknown; level?: unknown; size?: unknown };
+		const parsed = JSON.parse(raw) as {
+			kind?: unknown;
+			level?: unknown;
+			size?: unknown;
+		};
 		const kind: NewsKind = parsed.kind === "read" ? "read" : "talk";
-		const level = CEFR_LEVELS.find((l) => l.level === parsed.level)?.level ?? fallback.level;
-		const size = SUMMARY_SIZES.find((s) => s.size === parsed.size)?.size ?? fallback.size;
+		const level =
+			CEFR_LEVELS.find((l) => l.level === parsed.level)?.level ??
+			fallback.level;
+		const size =
+			SUMMARY_SIZES.find((s) => s.size === parsed.size)?.size ?? fallback.size;
 		return { kind, level, size };
 	} catch {
 		return fallback;
@@ -1990,10 +2249,13 @@ export function parseNewsLaunch(content: string): NewsLaunchTag | null {
 	const body = content.slice(head[0].length);
 	const lead =
 		kind === "talk"
-			? body.startsWith("Two named locals open a substantial discussion of the pasted article")
+			? body.startsWith(
+					"Two named locals open a substantial discussion of the pasted article"
+				)
 			: body.startsWith("Summarize the pasted article");
 	if (!lead) return null;
-	const level = /CEFR (A1|A2|B1|B2|C1|C2)\b/.exec(body)?.[1] as CefrLevel | undefined;
+	const level = /CEFR (A1|A2|B1|B2|C1|C2)\b/.exec(body)?.[1] as
+		CefrLevel | undefined;
 	if (!level) return null;
 	// Conversation openers from before the length choice name no
 	// words: no length on their tag.
@@ -2009,10 +2271,15 @@ const NEWS_LAUNCH_IMAGE_KEY = "ccez-news-launch-images-v1";
 const NEWS_LAUNCH_IMAGE_MAX = 300;
 
 /** Picture a sent opener shows beside its headline (by headline). */
-export function newsLaunchImage(store: KeyValueStore, title: string): string | null {
+export function newsLaunchImage(
+	store: KeyValueStore,
+	title: string
+): string | null {
 	try {
 		const raw = store.getItem(NEWS_LAUNCH_IMAGE_KEY);
-		const found = raw ? (JSON.parse(raw) as Record<string, unknown>)[title] : undefined;
+		const found = raw
+			? (JSON.parse(raw) as Record<string, unknown>)[title]
+			: undefined;
 		return typeof found === "string" && found.startsWith("http") ? found : null;
 	} catch {
 		return null;
@@ -2020,14 +2287,21 @@ export function newsLaunchImage(store: KeyValueStore, title: string): string | n
 }
 
 /** File a launched story's picture (oldest evicted past the cap). */
-export function storeNewsLaunchImage(store: KeyValueStore, title: string, image: string): void {
+export function storeNewsLaunchImage(
+	store: KeyValueStore,
+	title: string,
+	image: string
+): void {
 	try {
 		const raw = store.getItem(NEWS_LAUNCH_IMAGE_KEY);
 		const images = (raw ? JSON.parse(raw) : {}) as Record<string, string>;
 		delete images[title];
 		images[title] = image;
 		const keys = Object.keys(images);
-		for (const key of keys.slice(0, Math.max(0, keys.length - NEWS_LAUNCH_IMAGE_MAX))) {
+		for (const key of keys.slice(
+			0,
+			Math.max(0, keys.length - NEWS_LAUNCH_IMAGE_MAX)
+		)) {
 			delete images[key];
 		}
 		store.setItem(NEWS_LAUNCH_IMAGE_KEY, JSON.stringify(images));
@@ -2046,7 +2320,15 @@ export function relevelNewsOpener(
 	content: string,
 	folds: Array<{ start: number; end: number; chars: number; open?: boolean }>,
 	level: CefrLevel
-): { content: string; pasteFolds: Array<{ start: number; end: number; chars: number; open?: boolean }> } | null {
+): {
+	content: string;
+	pasteFolds: Array<{
+		start: number;
+		end: number;
+		chars: number;
+		open?: boolean;
+	}>;
+} | null {
 	const m = /CEFR (A1|A2|B1|B2|C1|C2) \(([^)]*)\)/.exec(content);
 	if (!m) return null;
 	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
@@ -2056,7 +2338,9 @@ export function relevelNewsOpener(
 	return {
 		content: content.slice(0, at) + next + content.slice(at + m[0].length),
 		pasteFolds: folds.map((f) =>
-			f.start >= at + m[0].length ? { ...f, start: f.start + delta, end: f.end + delta } : f
+			f.start >= at + m[0].length
+				? { ...f, start: f.start + delta, end: f.end + delta }
+				: f
 		)
 	};
 }

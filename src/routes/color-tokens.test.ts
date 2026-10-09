@@ -156,9 +156,7 @@ describe("own-message ink", () => {
 		for (const [choice, light] of OWN_INKS) {
 			expect(style).toContain(`main[data-own-ink="${choice}"]`);
 			expect(style).toMatch(
-				new RegExp(
-					`color: ${light};\\s*color: var\\(--own-${choice}\\);`
-				)
+				new RegExp(`color: ${light};\\s*color: var\\(--own-${choice}\\);`)
 			);
 		}
 		// Off has no rule — plain ink.

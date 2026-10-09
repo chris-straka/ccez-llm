@@ -836,11 +836,17 @@ describe("chat", () => {
 			[4, 0],
 			[6, 900]
 		]);
-		const offsets = waypointOffsets([0, 2, 4, 6], 3, (p) => tops.get(p) ?? null);
+		const offsets = waypointOffsets(
+			[0, 2, 4, 6],
+			3,
+			(p) => tops.get(p) ?? null
+		);
 		expect(waypointIndexAt(offsets, 1000)).toBe(4);
 		expect(waypointIndexAt(offsets, 0)).toBe(3);
 		// No trim: a missing node still ends the run.
-		expect(waypointOffsets([0, 2], -1, (p) => (p === 0 ? 10 : null))).toEqual([10]);
+		expect(waypointOffsets([0, 2], -1, (p) => (p === 0 ? 10 : null))).toEqual([
+			10
+		]);
 	});
 
 	it("labels waypoint targets with a collapsed excerpt", () => {
@@ -865,7 +871,12 @@ describe("chat", () => {
 
 	it("drill clips saved with their English in the body load as the transcript alone", () => {
 		const store = freshStore();
-		const clip = (i: number, heard?: number) => ({ i, heard, translation: "Let's talk.", grade: "done" });
+		const clip = (i: number, heard?: number) => ({
+			i,
+			heard,
+			translation: "Let's talk.",
+			grade: "done"
+		});
 		store.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
@@ -873,9 +884,19 @@ describe("chat", () => {
 					id: "c1",
 					createdAt: 1,
 					replyLang: "fr",
-					listen: { clips: [{ i: 0, start: 0, end: 2, text: "Parlons." }, { i: 1, start: 2, end: 4, text: "Bon." }] },
+					listen: {
+						clips: [
+							{ i: 0, start: 0, end: 2, text: "Parlons." },
+							{ i: 1, start: 2, end: 4, text: "Bon." }
+						]
+					},
 					messages: [
-						{ id: "m1", role: "assistant", content: "Parlons.\n\n*Let's talk.*", clip: clip(0, 1) },
+						{
+							id: "m1",
+							role: "assistant",
+							content: "Parlons.\n\n*Let's talk.*",
+							clip: clip(0, 1)
+						},
 						{ id: "m2", role: "assistant", content: "", clip: clip(1) }
 					]
 				}
@@ -1271,9 +1292,9 @@ describe("replyPhase", () => {
 	});
 	it("fetches while a page downloads, started or not", () => {
 		expect(replyPhase({ ...base, fetching: true })).toBe("fetch");
-		expect(
-			replyPhase({ ...base, fetching: true, started: true })
-		).toBe("fetch");
+		expect(replyPhase({ ...base, fetching: true, started: true })).toBe(
+			"fetch"
+		);
 	});
 	it("waits before the first token", () => {
 		expect(replyPhase(base)).toBe("waiting");
@@ -1793,9 +1814,9 @@ describe("manual trim", () => {
 		const head = chat.messages[0];
 		if (!head) throw new Error("seed short");
 		expect(await refreshTrimSummary(state, chat, provider, head.id)).toBe(0);
-		expect(await refreshTrimSummary(state, chat, provider, newChatMsgId())).toBe(
-			0
-		);
+		expect(
+			await refreshTrimSummary(state, chat, provider, newChatMsgId())
+		).toBe(0);
 		expect(chats).toHaveLength(0);
 		expect(chat.summary).toBeUndefined();
 	});
@@ -1843,7 +1864,14 @@ describe("manual trim", () => {
 describe("chat titles", () => {
 	async function answered(reply = "Über means over.") {
 		const { state, store } = stateWith(freshStore());
-		await sendMessage(state, scriptedProvider([reply]), "sys", "Was heißt über?", {}, store);
+		await sendMessage(
+			state,
+			scriptedProvider([reply]),
+			"sys",
+			"Was heißt über?",
+			{},
+			store
+		);
 		return { state, store, chat: activeChat(state) };
 	}
 
@@ -1863,23 +1891,35 @@ describe("chat titles", () => {
 		const ask = messages?.[1]?.content;
 		expect(typeof ask === "string" ? ask : "").toContain("Was heißt über?");
 		expect(typeof ask === "string" ? ask : "").toContain("Über means over.");
-		expect(buildTitleMessages({ ...chat, messages: chat.messages.slice(0, 1) })).toBeNull();
+		expect(
+			buildTitleMessages({ ...chat, messages: chat.messages.slice(0, 1) })
+		).toBeNull();
 	});
 
 	it("names an untitled chat and persists it", async () => {
 		const { state, store, chat } = await answered();
-		await generateChatTitle(state, chat, scriptedProvider(["Bedeutung von über."]), store);
+		await generateChatTitle(
+			state,
+			chat,
+			scriptedProvider(["Bedeutung von über."]),
+			store
+		);
 		expect(activeChat(state).title).toBe("Bedeutung von über");
 		expect(activeChat(state).titleBy).toBe("ai");
-		expect(createChatState(store).chats.find((c) => c.id === chat.id)?.title).toBe(
-			"Bedeutung von über"
-		);
+		expect(
+			createChatState(store).chats.find((c) => c.id === chat.id)?.title
+		).toBe("Bedeutung von über");
 	});
 
 	it("never overwrites a rename, and stays silent on failure", async () => {
 		const { state, store, chat } = await answered();
 		renameChat(state, chat.id, "  My German  ", store);
-		await generateChatTitle(state, chat, scriptedProvider(["Model name"]), store);
+		await generateChatTitle(
+			state,
+			chat,
+			scriptedProvider(["Model name"]),
+			store
+		);
 		expect(activeChat(state).title).toBe("My German");
 		expect(activeChat(state).titleBy).toBe("user");
 		const failing: ChatProvider = {
@@ -1900,7 +1940,10 @@ describe("chat titles", () => {
 			...scriptedProvider([]),
 			async chat(): Promise<ChatResult> {
 				renameChat(state, chat.id, "Mine", store);
-				return { content: "Model name", usage: { prompt: 1, completion: 1, total: 2 } };
+				return {
+					content: "Model name",
+					usage: { prompt: 1, completion: 1, total: 2 }
+				};
 			}
 		};
 		await generateChatTitle(state, chat, slow, store);

@@ -35,25 +35,24 @@ static SENDING: AtomicBool = AtomicBool::new(false);
 
 pub fn install(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-    let result = app.global_shortcut().on_shortcut(
-        SEND_SELECTION_SHORTCUT,
-        |app, _shortcut, event| {
-            if event.state != ShortcutState::Pressed || SENDING.swap(true, Ordering::SeqCst) {
-                return;
-            }
-            // Now, while Alt is still held: the hotkey swallows the
-            // Space, so releasing Alt would read as a lone Alt tap and
-            // open the foreground app's menu bar, which then eats the
-            // Ctrl+C. Seen in the test VM with Notepad.
-            mask_alt_release();
-            // Off the event loop: the copy waits on other apps.
-            let app = app.clone();
-            std::thread::spawn(move || {
-                send(&app);
-                SENDING.store(false, Ordering::SeqCst);
+    let result =
+        app.global_shortcut()
+            .on_shortcut(SEND_SELECTION_SHORTCUT, |app, _shortcut, event| {
+                if event.state != ShortcutState::Pressed || SENDING.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+                // Now, while Alt is still held: the hotkey swallows the
+                // Space, so releasing Alt would read as a lone Alt tap and
+                // open the foreground app's menu bar, which then eats the
+                // Ctrl+C. Seen in the test VM with Notepad.
+                mask_alt_release();
+                // Off the event loop: the copy waits on other apps.
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    send(&app);
+                    SENDING.store(false, Ordering::SeqCst);
+                });
             });
-        },
-    );
     if let Err(error) = result {
         eprintln!("[send-selection] global shortcut unavailable: {error}");
     }
@@ -101,7 +100,10 @@ fn wait_for_keys_up(limit: Duration) {
 /// so Windows sees Alt combined with something and skips menu
 /// activation on release. Apps ignore the key itself.
 fn mask_alt_release() {
-    send_keys(&[(VK_MENU_MASK, KEYBD_EVENT_FLAGS(0)), (VK_MENU_MASK, KEYEVENTF_KEYUP)]);
+    send_keys(&[
+        (VK_MENU_MASK, KEYBD_EVENT_FLAGS(0)),
+        (VK_MENU_MASK, KEYEVENTF_KEYUP),
+    ]);
 }
 
 fn press_ctrl_c() {

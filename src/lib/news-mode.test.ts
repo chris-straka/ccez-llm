@@ -43,7 +43,7 @@ function harness(phone = false): {
 		getEditor: () =>
 			editorText === null
 				? null
-				: ({ getText: () => editorText }) as unknown as PromptEditor,
+				: ({ getText: () => editorText } as unknown as PromptEditor),
 		getAttachments: () => attachments,
 		setAttachments: (next) => {
 			attachments = next;
@@ -135,7 +135,10 @@ describe("enterNewsMode", () => {
 describe("staging a story", () => {
 	it("puts the picked story in the chat with remembered picks", () => {
 		const { mode, calls, storage } = harness();
-		storage.setItem("ccez-news-picks-v1", JSON.stringify({ level: "C1", size: "long" }));
+		storage.setItem(
+			"ccez-news-picks-v1",
+			JSON.stringify({ level: "C1", size: "long" })
+		);
 		mode.news = readyPanel();
 		mode.actions.pick("link-1");
 		expect(mode.staged).toMatchObject({
@@ -183,7 +186,11 @@ describe("staging a story", () => {
 		mode.actions.kind("read");
 		mode.actions.level("A2");
 		mode.actions.size("short");
-		expect(mode.staged).toMatchObject({ kind: "read", level: "A2", size: "short" });
+		expect(mode.staged).toMatchObject({
+			kind: "read",
+			level: "A2",
+			size: "short"
+		});
 		expect(JSON.parse(storage.getItem("ccez-news-picks-v1") ?? "{}")).toEqual({
 			kind: "read",
 			level: "A2",
@@ -204,7 +211,9 @@ describe("staging a story", () => {
 describe("feed cache", () => {
 	it("opens a cached region instantly, no fetch", async () => {
 		const { mode, storage } = harness();
-		const stories = [{ title: "Cached", source: "Desk", link: "c-1", snippet: "" }];
+		const stories = [
+			{ title: "Cached", source: "Desk", link: "c-1", snippet: "" }
+		];
 		storage.setItem(
 			"ccez-news-feeds-v1",
 			JSON.stringify({ "fr|FR": { stories, at: Date.now() } })
@@ -271,12 +280,17 @@ describe("switchNewsRegion", () => {
 	it("refuses a translated region without a key", async () => {
 		const { mode, calls } = harness();
 		mode.news = readyPanel({
-			regions: [...readyPanel().regions, { gl: "US", label: "U.S.", translate: true }]
+			regions: [
+				...readyPanel().regions,
+				{ gl: "US", label: "U.S.", translate: true }
+			]
 		});
 		await mode.switchNewsRegion("US");
 		expect(mode.news?.region).toBe("FR");
 		expect(mode.news?.status).toBe("ready");
-		expect(calls.toasts).toEqual(["Set an API key to translate U.S. headlines."]);
+		expect(calls.toasts).toEqual([
+			"Set an API key to translate U.S. headlines."
+		]);
 		expect(calls.denials).toBe(1);
 		expect(calls.ticks).toBe(0);
 	});

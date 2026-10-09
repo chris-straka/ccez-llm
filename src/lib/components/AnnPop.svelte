@@ -135,8 +135,7 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		aria-label="Annotation text. Enter or clicking away saves, Escape cancels."
 		use:growPill
 		onkeydown={actions.key}
-		onblur={fieldBlur}
-	></textarea>
+		onblur={fieldBlur}></textarea>
 	{#if pop.fresh}
 		{#if micEnabled}
 			<button

@@ -188,7 +188,8 @@ describe("phone highlight dock", () => {
 	});
 
 	it("stands the hint down while the dock owns the row", () => {
-		const css = composerStyle();
+		// Whitespace-blind: the formatter may wrap long selectors.
+		const css = composerStyle().replace(/\s+/g, " ");
 		expect(css).toContain(
 			":global(.app[data-android]) .prompt:has(.ann-dock) :global(.ta-input::placeholder)"
 		);

@@ -9,11 +9,7 @@ this markup). Data lookups already live in `$lib/inspect` and
 `$lib/reading` (unit-pinned). -->
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
-	import {
-		decomposeTree,
-		onKunLine,
-		type InspectData
-	} from "$lib/inspect";
+	import { decomposeTree, onKunLine, type InspectData } from "$lib/inspect";
 	import {
 		HAN_OVERLAY_LANG_TAG,
 		isHanOverlayLangUncertain,
@@ -144,8 +140,7 @@ this markup). Data lookups already live in `$lib/inspect` and
 						onpointercancel={actions.holdStop}
 						onclick={() => actions.step(-1)}>‹</button
 					>
-					<span class="inspect-count" aria-live="polite"
-						>{shown} / {total}</span
+					<span class="inspect-count" aria-live="polite">{shown} / {total}</span
 					>
 					<button
 						type="button"
@@ -175,9 +170,7 @@ this markup). Data lookups already live in `$lib/inspect` and
 			{#if data.strokeCount !== null}
 				<p><strong>Strokes:</strong> {data.strokeCount}</p>
 			{:else}
-				<p class="note">
-					Stroke count unavailable offline for this character.
-				</p>
+				<p class="note">Stroke count unavailable offline for this character.</p>
 			{/if}
 			{#if data.radical !== null && data.radicalRest !== null}
 				<p>
@@ -221,9 +214,7 @@ this markup). Data lookups already live in `$lib/inspect` and
 					<span class="inspect-decomp-char">{child.char}</span>
 					{#if child.children.length > 0}
 						<span class="inspect-decomp-sub">
-							<span class="inspect-decomp-arrow" aria-hidden="true"
-								>→</span
-							>
+							<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
 							{#each child.children as grand, gi (gi)}
 								<span class="inspect-decomp-char sub">{grand.char}</span
 								>{#if gi < child.children.length - 1}<span

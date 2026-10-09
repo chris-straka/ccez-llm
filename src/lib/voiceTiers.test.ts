@@ -194,7 +194,12 @@ describe("voiceLangOptions", () => {
 
 	it("leads with follow, then installed, collapsing duplicates", () => {
 		expect(
-			voiceLangOptions(["en-US", "ja-JP"], "en-US", { tag: "ja-JP", name: "Japanese" }, label)
+			voiceLangOptions(
+				["en-US", "ja-JP"],
+				"en-US",
+				{ tag: "ja-JP", name: "Japanese" },
+				label
+			)
 		).toEqual([
 			{ value: "ja-JP", label: "Follow chat language (Japanese)" },
 			{ value: "en-US", label: "en-US-label" }

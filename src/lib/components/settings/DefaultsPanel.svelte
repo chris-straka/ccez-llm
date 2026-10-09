@@ -139,7 +139,10 @@
 				<span>Show message buttons only when tapped</span>
 			</label>
 			<label class="check">
-				<input type="checkbox" bind:checked={settings.annotationAnswersInPassageLang} />
+				<input
+					type="checkbox"
+					bind:checked={settings.annotationAnswersInPassageLang}
+				/>
 				<span>Answer annotations in the passage's language</span>
 			</label>
 		</fieldset>
@@ -254,7 +257,10 @@
 			<span>Scale message icons with text size</span>
 		</label>
 		<label class="check">
-			<input type="checkbox" bind:checked={settings.annotationAnswersInPassageLang} />
+			<input
+				type="checkbox"
+				bind:checked={settings.annotationAnswersInPassageLang}
+			/>
 			<span>Answer annotations in the passage's language</span>
 		</label>
 	{/if}
@@ -310,7 +316,9 @@
 					settings.voiceVolume = Number(e.currentTarget.value);
 				}}
 			/>
-			<output style="min-width: 3.6rem;">{Math.round(settings.voiceVolume * 100)}%</output>
+			<output style="min-width: 3.6rem;"
+				>{Math.round(settings.voiceVolume * 100)}%</output
+			>
 		</span>
 	</label>
 	<!-- Drill audio level, here rather than beside the clip so a stray
@@ -338,7 +346,9 @@
 					settings.listenVolume = Number(e.currentTarget.value);
 				}}
 			/>
-			<output style="min-width: 3.6rem;">{Math.round(settings.listenVolume * 100)}%</output>
+			<output style="min-width: 3.6rem;"
+				>{Math.round(settings.listenVolume * 100)}%</output
+			>
 		</span>
 	</label>
 	<fieldset>
@@ -498,7 +508,10 @@
 					aria-label="Prompt width in rem"
 					onpointerdown={noteSliderPress}
 					onpointerup={(e) =>
-						sliderRelease(e, () => (settings.promptWidth = PROMPT_WIDTH_BASE_REM))}
+						sliderRelease(
+							e,
+							() => (settings.promptWidth = PROMPT_WIDTH_BASE_REM)
+						)}
 					oninput={(e) => {
 						settings.promptWidth = Number(e.currentTarget.value);
 					}}

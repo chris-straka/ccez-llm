@@ -46,7 +46,9 @@ describe("selectionSlices", () => {
 		const slices = selectionSlices(range);
 		expect(slices?.length).toBe(1);
 		expect(
-			slices?.map((s) => (s.node.textContent ?? "").slice(s.start, s.end)).join("")
+			slices
+				?.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
+				.join("")
 		).toBe("world");
 	});
 
@@ -73,7 +75,9 @@ describe("scopeSlices", () => {
 		const slices = scopeSlices(div);
 		expect(slices.map((s) => s.base)).toEqual([0, 2, 4]);
 		expect(
-			slices.map((s) => (s.node.textContent ?? "").slice(s.start, s.end)).join("")
+			slices
+				.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
+				.join("")
 		).toBe("abcdef");
 	});
 });

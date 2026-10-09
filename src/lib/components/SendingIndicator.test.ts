@@ -8,7 +8,10 @@ import { describe, it, expect } from "vitest";
  * priority (fetch first, then waiting, else nothing).
  */
 function componentSource(): string {
-	return readFileSync(new URL("./SendingIndicator.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("./SendingIndicator.svelte", import.meta.url),
+		"utf8"
+	);
 }
 
 describe("sending indicator contract", () => {

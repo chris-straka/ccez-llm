@@ -16,14 +16,17 @@
 use std::sync::OnceLock;
 
 use jni::{
-    JNIEnv,
     objects::{GlobalRef, JClass, JObject, JValue},
+    JNIEnv,
 };
 
 static VM: OnceLock<jni::JavaVM> = OnceLock::new();
 static SECRETS_CLASS: OnceLock<GlobalRef> = OnceLock::new();
 
-fn with_env<T>(ctx: &str, f: impl FnOnce(&mut JNIEnv, &GlobalRef) -> Result<T, String>) -> Result<T, String> {
+fn with_env<T>(
+    ctx: &str,
+    f: impl FnOnce(&mut JNIEnv, &GlobalRef) -> Result<T, String>,
+) -> Result<T, String> {
     let vm = VM
         .get()
         .ok_or_else(|| format!("{ctx}: secrets bridge not initialized"))?;

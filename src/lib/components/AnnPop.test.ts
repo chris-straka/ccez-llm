@@ -36,6 +36,9 @@ describe("annotation pill", () => {
 		);
 		// The var is set on .app from settings (same track as the
 		// prompt font), never hardcoded in the component.
-		expect(pageSource()).toContain("--annpop-scale: {settings.annPopScale ?? 1}");
+		// Whitespace-blind: the formatter may wrap the style string.
+		expect(pageSource().replace(/\s+/g, " ")).toContain(
+			"--annpop-scale: {settings.annPopScale ?? 1}"
+		);
 	});
 });

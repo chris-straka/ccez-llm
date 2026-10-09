@@ -114,10 +114,17 @@ export function stageOwnedByOverlay(flags: StageOwnerFlags): boolean {
 export function pointInRect(
 	x: number,
 	y: number,
-	rect: { left: number; right: number; top: number; bottom: number } | null | undefined
+	rect:
+		| { left: number; right: number; top: number; bottom: number }
+		| null
+		| undefined
 ): boolean {
 	return (
-		!!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+		!!rect &&
+		x >= rect.left &&
+		x <= rect.right &&
+		y >= rect.top &&
+		y <= rect.bottom
 	);
 }
 

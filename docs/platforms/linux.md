@@ -17,7 +17,7 @@ How it was run on `f-ms-7917` (Ubuntu 26.04, no root):
    [System dependencies](#system-dependencies) instead.
 2. Rust: `cd src-tauri && cargo test --locked --lib` (all pass).
 3. Desktop app: `bun run tauri build --bundles deb -c
-   '{"bundle":{"createUpdaterArtifacts":false}}'` (the override skips
+'{"bundle":{"createUpdaterArtifacts":false}}'` (the override skips
    updater signing, which needs the release key). About 18 min at
    `-j2` on an i7-4790K. Output:
    `src-tauri/target/release/bundle/deb/Ccez LLM_<ver>_amd64.deb` and

@@ -22,8 +22,7 @@ import { validCaptureArea } from "./settings";
 
 /** One-shot composer source: fullscreen, or the OS picker kind. */
 export type CaptureOneShot =
-	| { kind: "fullscreen" }
-	| { kind: "interactive"; mode: "window" | "area" };
+	{ kind: "fullscreen" } | { kind: "interactive"; mode: "window" | "area" };
 
 /** Saved chord source: an explicit window, the saved pick, or the
 frontmost window — the global chord's non-area path. */
@@ -36,7 +35,10 @@ export interface ChordWindowSource {
 /** Resolved pixel source: a one-shot wins outright, else the saved
 square, else the chord window source. Pure and unit-tested. */
 export type CaptureSource =
-	| { kind: "rect"; area: { x: number; y: number; width: number; height: number } }
+	| {
+			kind: "rect";
+			area: { x: number; y: number; width: number; height: number };
+	  }
 	| { kind: "window"; source: ChordWindowSource }
 	| { kind: "fullscreen" }
 	| { kind: "interactive"; mode: "window" | "area" };
@@ -215,9 +217,8 @@ export const OCR_CJK_STAGE_BELOW = 0.4;
  * the text is likely a misread, so the caller stages it for a check
  * instead of spending the round trip. Pure and unit-tested.
  */
-export function shouldStageCapture(
-	text: string,
-	confidence: number
-): boolean {
-	return confidence < (hasCjkText(text) ? OCR_CJK_STAGE_BELOW : OCR_RETRY_BELOW);
+export function shouldStageCapture(text: string, confidence: number): boolean {
+	return (
+		confidence < (hasCjkText(text) ? OCR_CJK_STAGE_BELOW : OCR_RETRY_BELOW)
+	);
 }

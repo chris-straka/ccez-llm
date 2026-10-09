@@ -62,7 +62,10 @@ test("news mode lists from the top: uncentered pane, strip clearance, tail room"
 	page
 }) => {
 	await page.locator('.lang-menu button:has-text("Europe")').click();
-	await page.locator(".lang-list").getByRole("menuitem", { name: "French" }).click();
+	await page
+		.locator(".lang-list")
+		.getByRole("menuitem", { name: "French" })
+		.click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	// The thread stops being a centered hero: full-height list.
@@ -106,15 +109,19 @@ test("news mode lists from the top: uncentered pane, strip clearance, tail room"
 	await expect.poll(boxPad, { timeout: 5_000 }).toBe("0px");
 });
 
-test("picking a second language switches the panel over", async ({
-	page
-}) => {
+test("picking a second language switches the panel over", async ({ page }) => {
 	await page.locator('.lang-menu button:has-text("Europe")').click();
-	await page.locator(".lang-list").getByRole("menuitem", { name: "French" }).click();
+	await page
+		.locator(".lang-list")
+		.getByRole("menuitem", { name: "French" })
+		.click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toContainText("français", { timeout: 10_000 });
 	await page.locator('.lang-menu button:has-text("Asia")').click();
-	await page.locator(".lang-list").getByRole("menuitem", { name: "Japanese" }).click();
+	await page
+		.locator(".lang-list")
+		.getByRole("menuitem", { name: "Japanese" })
+		.click();
 	await expect(panel).toContainText("日本語");
 });
 
@@ -122,7 +129,10 @@ test("headlines park the composer; summon brings it back over them", async ({
 	page
 }) => {
 	await page.locator('.lang-menu button:has-text("Europe")').click();
-	await page.locator(".lang-list").getByRole("menuitem", { name: "French" }).click();
+	await page
+		.locator(".lang-list")
+		.getByRole("menuitem", { name: "French" })
+		.click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	const prompt = page.locator(".prompt");
@@ -205,14 +215,18 @@ test.describe("mock shell feed", () => {
 		// Word labels: the session kind picks, Start names it, and
 		// both kinds pick a length (its words follow the kind). No
 		// "Article ready" line once the fetch lands.
-		await expect(stage.getByRole("button", { name: "Start conversation" })).toBeVisible();
+		await expect(
+			stage.getByRole("button", { name: "Start conversation" })
+		).toBeVisible();
 		await expect(stage.getByRole("group", { name: "Length" })).toBeVisible();
 		await expect(stage).toContainText("about 250 words");
 		await expect(stage).not.toContainText("Article ready");
 		await stage.getByRole("button", { name: "Summary", exact: true }).click();
 		await expect(stage.getByRole("group", { name: "Length" })).toBeVisible();
 		await expect(stage).toContainText("about 200 words");
-		await expect(stage.getByRole("button", { name: "Start summary" })).toBeVisible();
+		await expect(
+			stage.getByRole("button", { name: "Start summary" })
+		).toBeVisible();
 		// Esc takes the story back out; headlines return.
 		await page.keyboard.press("Escape");
 		await expect(stage).toHaveCount(0);
@@ -228,7 +242,9 @@ test.describe("mock shell feed", () => {
 		// The rule sits right after the last word chip.
 		const before = await chips
 			.locator(".news-sep")
-			.evaluate((el) => (el.previousElementSibling as HTMLElement).classList.contains("icon"));
+			.evaluate((el) =>
+				(el.previousElementSibling as HTMLElement).classList.contains("icon")
+			);
 		expect(before).toBe(false);
 	});
 
@@ -271,28 +287,46 @@ test.describe("sent news opener", () => {
 		const tag = page.locator("article.user .news-launch");
 		await expect(tag).toBeVisible({ timeout: 60_000 });
 		await expect(tag).toContainText("Soupçons de peste en Russie");
-		await expect(tag.locator(".launch-meta")).toContainText(/Conversation\s*·\s*B2/);
-		await expect(page.locator("article.user")).not.toContainText("Two named locals");
+		await expect(tag.locator(".launch-meta")).toContainText(
+			/Conversation\s*·\s*B2/
+		);
+		await expect(page.locator("article.user")).not.toContainText(
+			"Two named locals"
+		);
 		// The headline is a normal message body: his text size, selectable.
 		const title = tag.locator(".launch-title .rendered");
 		await expect(title).toHaveText("Soupçons de peste en Russie");
 		const sizes = await page.evaluate(() => ({
-			title: getComputedStyle(document.querySelector(".launch-title .rendered")!).fontSize,
-			reply: getComputedStyle(document.querySelector("article.assistant .rendered")!).fontSize
+			title: getComputedStyle(
+				document.querySelector(".launch-title .rendered")!
+			).fontSize,
+			reply: getComputedStyle(
+				document.querySelector("article.assistant .rendered")!
+			).fontSize
 		}));
 		expect(sizes.title).toBe(sizes.reply);
 		// Unfold shows what was sent; fold returns to the tag.
 		await page.locator("article.user").hover();
-		await page.locator("article.user").getByRole("button", { name: "Unfold this message" }).click();
-		await expect(page.locator("article.user")).toContainText("Two named locals");
+		await page
+			.locator("article.user")
+			.getByRole("button", { name: "Unfold this message" })
+			.click();
+		await expect(page.locator("article.user")).toContainText(
+			"Two named locals"
+		);
 		await expect(page.locator("article.user .news-launch")).toHaveCount(0);
-		await page.locator("article.user").getByRole("button", { name: "Fold this message" }).click();
+		await page
+			.locator("article.user")
+			.getByRole("button", { name: "Fold this message" })
+			.click();
 		await expect(page.locator("article.user .news-launch")).toBeVisible();
 		// Title words annotate like any message: select, then A.
 		await dragQuote(page, 0, "peste", ".launch-title .rendered");
 		await page.mouse.move(2, 2);
 		await page.keyboard.press("a");
-		await expect(tag.locator("button.ccez-ann-badge")).toHaveCount(1, { timeout: 10_000 });
+		await expect(tag.locator("button.ccez-ann-badge")).toHaveCount(1, {
+			timeout: 10_000
+		});
 	});
 });
 
@@ -322,14 +356,21 @@ test.describe("news session tag controls", () => {
 		// Everything below the tag is replaced by a fresh opener.
 		await expect(tag).toContainText("B1 Intermediate");
 		await expect(page.locator("article")).toHaveCount(2, { timeout: 30_000 });
-		await expect(page.locator(".messages")).not.toContainText("Deuxième réponse.");
-		await expect(page.locator("article.assistant")).toContainText("Mock reply", {
-			timeout: 30_000
-		});
+		await expect(page.locator(".messages")).not.toContainText(
+			"Deuxième réponse."
+		);
+		await expect(page.locator("article.assistant")).toContainText(
+			"Mock reply",
+			{
+				timeout: 30_000
+			}
+		);
 		// Undo puts the old level and replies back.
 		await page.locator(".toast").click();
 		await expect(page.locator(".messages")).toContainText("Deuxième réponse.");
 		await expect(tag).toContainText("B2 Upper intermediate");
-		await expect(tag.getByRole("button", { name: /^Article at/ })).toHaveCount(0);
+		await expect(tag.getByRole("button", { name: /^Article at/ })).toHaveCount(
+			0
+		);
 	});
 });

@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { activeChat, createChatState } from "./chat";
 import type { ListenEntry, ListenSession } from "./listen";
 import type { ListenBackend } from "./listenBackend";
-import { ListenMode, type NativeGradeResult, type NativeGrader } from "./listen-mode.svelte";
+import {
+	ListenMode,
+	type NativeGradeResult,
+	type NativeGrader
+} from "./listen-mode.svelte";
 import { startDrill } from "./listenChat";
 import type { KeyValueStore } from "./settings";
 
@@ -16,13 +20,19 @@ const session: ListenSession = {
 	audio: "dub",
 	clips: [
 		{ i: 0, start: 0, end: 8, text: "Parlons de la peste." },
-		{ i: 1, start: 8, end: 10.7, text: "Nous couvrons ce sujet de manière approfondie." },
+		{
+			i: 1,
+			start: 8,
+			end: 10.7,
+			text: "Nous couvrons ce sujet de manière approfondie."
+		},
 		{ i: 2, start: 10.7, end: 16, text: "Ce qui est incroyable." },
 		{ i: 3, start: 16, end: 20, text: "Nous avons déjà entendu cela." }
 	]
 };
 
-const reply = (translation: string) => JSON.stringify({ translation, notes: [] });
+const reply = (translation: string) =>
+	JSON.stringify({ translation, notes: [] });
 
 /** A drill on clip 1 with a fake native grader that records starts. */
 function harness() {
@@ -56,7 +66,8 @@ function harness() {
 		openUrl: () => Promise.resolve(),
 		nativeGrader: () => native
 	});
-	const clip = (i: number) => activeChat(state).messages.find((m) => m.clip?.i === i)?.clip;
+	const clip = (i: number) =>
+		activeChat(state).messages.find((m) => m.clip?.i === i)?.clip;
 	const result = (i: number, content: string | null): NativeGradeResult => ({
 		chat_id: chatId,
 		i,
@@ -82,7 +93,9 @@ describe("native grading", () => {
 		const items = h.starts.flat();
 		expect(items.map((x) => x.i).sort()).toEqual([0, 1, 2, 3]);
 		expect(items.every((x) => !x.retry)).toBe(true);
-		expect(items.find((x) => x.i === 1)?.prompt).toContain("Nous couvrons ce sujet");
+		expect(items.find((x) => x.i === 1)?.prompt).toContain(
+			"Nous couvrons ce sujet"
+		);
 		// Rows on screen show the grading as in flight.
 		expect(h.clip(0)?.grade).toBe("pending");
 		expect(h.clip(1)?.grade).toBe("pending");
@@ -103,7 +116,10 @@ describe("native grading", () => {
 	it("reads back what finished while the page was paused", async () => {
 		const h = harness();
 		h.mode.submit("parlons");
-		h.store([h.result(0, reply("Let's talk about the plague.")), h.result(1, reply("We cover it."))]);
+		h.store([
+			h.result(0, reply("Let's talk about the plague.")),
+			h.result(1, reply("We cover it."))
+		]);
 		await h.mode.resync();
 		expect(h.clip(0)?.translation).toBe("Let's talk about the plague.");
 		expect(h.clip(1)?.translation).toBe("We cover it.");
@@ -163,7 +179,11 @@ describe("search box", () => {
 		});
 		mode.searchKind = "channel";
 		mode.enter("fr");
-		return { mode, land: (rows: ListenEntry[]) => pending.shift()?.(rows), calls: () => queries };
+		return {
+			mode,
+			land: (rows: ListenEntry[]) => pending.shift()?.(rows),
+			calls: () => queries
+		};
 	}
 
 	it("emptying the box drops the results", async () => {

@@ -98,7 +98,8 @@ test.describe("desktop", () => {
 		await seedChat(page, [
 			{
 				role: "assistant",
-				content: "First sentence here. Second sentence there.\n\nNext paragraph follows."
+				content:
+					"First sentence here. Second sentence there.\n\nNext paragraph follows."
 			}
 		]);
 		await page.goto("/");
@@ -117,7 +118,8 @@ test.describe("desktop", () => {
 		await seedChat(page, [
 			{
 				role: "assistant",
-				content: "First sentence here. Second sentence there.\n\nNext paragraph follows."
+				content:
+					"First sentence here. Second sentence there.\n\nNext paragraph follows."
 			}
 		]);
 		await page.goto("/");
@@ -208,13 +210,12 @@ test.describe("desktop", () => {
 	the neighbor: native double-click rounds boundaries
 	engine-dependently (塔 lands や), so a point-anchored CJK pick
 	replaces it — other scripts keep the native selection. */
-	test("double-clicking CJK keeps the clicked character", async ({
-		page
-	}) => {
+	test("double-clicking CJK keeps the clicked character", async ({ page }) => {
 		await seedChat(page, [
 			{
 				role: "assistant",
-				content: "エッフェル塔やルーブル美術館などの観光名所がたくさんあります。"
+				content:
+					"エッフェル塔やルーブル美術館などの観光名所がたくさんあります。"
 			}
 		]);
 		await page.goto("/");
@@ -733,7 +734,10 @@ test.describe("ios", () => {
 		await dock.click();
 		const composer = page.locator(".prompt textarea");
 		await expect(composer).toHaveValue("");
-		await expect(composer).not.toHaveAttribute("placeholder", "Add an annotation");
+		await expect(composer).not.toHaveAttribute(
+			"placeholder",
+			"Add an annotation"
+		);
 		await composer.click();
 		await page.keyboard.type("nice point", { delay: 10 });
 		await page.locator(".send-btn").click();
@@ -790,7 +794,10 @@ test.describe("ios", () => {
 		await page.locator(".prompt-tools .ann-dock").click();
 		const composer = page.locator(".prompt textarea");
 		await expect(composer).toHaveValue("");
-		await expect(composer).not.toHaveAttribute("placeholder", "Add an annotation");
+		await expect(composer).not.toHaveAttribute(
+			"placeholder",
+			"Add an annotation"
+		);
 		await composer.click();
 		await page.keyboard.type("go", { delay: 10 });
 		await page.locator(".send-btn").click();
@@ -829,31 +836,30 @@ test.describe("ios", () => {
 		// The trailing click must not toggle the dock straight back
 		// shut: the review stays open on the tapped row afterwards,
 		// and the composer never transplants the filed note.
-		await expect(page.locator(".ann-wrap .review")).toHaveCSS(
-			"opacity",
-			"1"
-		);
+		await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 		await expect(page.locator(".review-item.highlight")).toBeVisible();
 		await expect(composer).not.toHaveAttribute(
 			"placeholder",
 			"Edit annotation"
 		);
 		await page.waitForTimeout(400);
-		await expect(page.locator(".ann-wrap .review")).toHaveCSS(
-			"opacity",
-			"1"
-		);
+		await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 	});
 });
 
 /** Select, then C: a new message of his, the selection quoted and
 the ask in the chat's language, focused so Enter sends it. */
-test("select + C drafts an expand-on-this ask in the chat's language", async ({ page }) => {
+test("select + C drafts an expand-on-this ask in the chat's language", async ({
+	page
+}) => {
 	await seedChat(
 		page,
 		[
 			{ role: "user", content: "Salut" },
-			{ role: "assistant", content: "Les prix à la pompe n'ont fait que monter depuis février." }
+			{
+				role: "assistant",
+				content: "Les prix à la pompe n'ont fait que monter depuis février."
+			}
 		],
 		"fr"
 	);
@@ -866,6 +872,10 @@ test("select + C drafts an expand-on-this ask in the chat's language", async ({ 
 	await expect(input).toBeFocused();
 	await expect(input).toHaveValue(/> prix à la pompe\s+Développe ce passage\./);
 	await page.keyboard.press("Enter");
-	await expect(page.locator("article.user").last()).toContainText("Développe ce passage.");
-	await expect(page.locator("article.user").last()).toContainText("prix à la pompe");
+	await expect(page.locator("article.user").last()).toContainText(
+		"Développe ce passage."
+	);
+	await expect(page.locator("article.user").last()).toContainText(
+		"prix à la pompe"
+	);
 });

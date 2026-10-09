@@ -22,8 +22,8 @@
 use std::sync::{Mutex, OnceLock};
 
 use jni::{
-    JNIEnv,
     objects::{GlobalRef, JClass, JObject, JValue},
+    JNIEnv,
 };
 
 static VM: OnceLock<jni::JavaVM> = OnceLock::new();
@@ -34,7 +34,10 @@ fn live_count() -> &'static Mutex<u32> {
     LIVE.get_or_init(|| Mutex::new(0))
 }
 
-fn with_env<T>(ctx: &str, f: impl FnOnce(&mut JNIEnv, &GlobalRef) -> Result<T, String>) -> Result<T, String> {
+fn with_env<T>(
+    ctx: &str,
+    f: impl FnOnce(&mut JNIEnv, &GlobalRef) -> Result<T, String>,
+) -> Result<T, String> {
     let vm = VM
         .get()
         .ok_or_else(|| format!("{ctx}: turn service not initialized"))?;

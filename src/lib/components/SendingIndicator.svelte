@@ -22,26 +22,20 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 	working, never stalled. -->
 	<p class="sending" role="status" aria-label="Fetching a page">
 		<span class="sending-chip"
-			>Fetching<span
-				class="tdots"
-				aria-hidden="true"
+			>Fetching<span class="tdots" aria-hidden="true"
 				><span>.</span><span>.</span><span>.</span></span
-			>{#if elapsed > 0}<span
-					class="sending-elapsed"
-					aria-hidden="true">· {elapsed}s</span
+			>{#if elapsed > 0}<span class="sending-elapsed" aria-hidden="true"
+					>· {elapsed}s</span
 				>{/if}</span
 		>
 	</p>
 {:else if phase === "waiting"}
 	<p class="sending" role="status" aria-label="Waiting for a reply">
 		<span class="sending-chip"
-			>{waitingLabel}<span
-				class="tdots"
-				aria-hidden="true"
+			>{waitingLabel}<span class="tdots" aria-hidden="true"
 				><span>.</span><span>.</span><span>.</span></span
-			>{#if elapsed > 0}<span
-					class="sending-elapsed"
-					aria-hidden="true">· {elapsed}s</span
+			>{#if elapsed > 0}<span class="sending-elapsed" aria-hidden="true"
+					>· {elapsed}s</span
 				>{/if}</span
 		>
 	</p>

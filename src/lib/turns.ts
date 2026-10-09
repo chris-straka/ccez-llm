@@ -19,10 +19,7 @@ import {
 	type KeyValueStore
 } from "./settings";
 import { getProviderDef } from "./providers/registry";
-import {
-	resolveThinkingId,
-	thinkingFor
-} from "./providers/thinking";
+import { resolveThinkingId, thinkingFor } from "./providers/thinking";
 
 /**
  * Native-turn bridge: the TypeScript side of the Rust turn runner

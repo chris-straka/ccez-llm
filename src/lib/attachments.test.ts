@@ -580,9 +580,9 @@ describe("splicePastedText", () => {
 	it("strips region brackets with no texts (edit-save normalization)", () => {
 		// Regions dissolve to inner prose even with nothing stored;
 		// tags stay literal exactly as typed.
-		expect(
-			splicePastedText(`a ${PASTE_OPEN}EDIT${PASTE_CLOSE} b`, [])
-		).toBe("a EDIT b");
+		expect(splicePastedText(`a ${PASTE_OPEN}EDIT${PASTE_CLOSE} b`, [])).toBe(
+			"a EDIT b"
+		);
 		expect(
 			splicePastedText(
 				`${pastedTextMarker(3)} ${PASTE_OPEN}x${PASTE_CLOSE}`,
@@ -614,7 +614,9 @@ describe("splicePastedFolds", () => {
 		const doc = `intro ${pastedTextMarker(prose.length)} end`;
 		const { text, folds } = splicePastedFolds(doc, [prose]);
 		expect(text).toBe(`intro ${prose} end`);
-		expect(folds).toEqual([{ start: 6, end: 6 + prose.length, chars: prose.length }]);
+		expect(folds).toEqual([
+			{ start: 6, end: 6 + prose.length, chars: prose.length }
+		]);
 	});
 
 	it("leaves textless tags literal with no fold and ignores tagless docs", () => {
@@ -684,10 +686,7 @@ describe("paste slots", () => {
 		expect(splicePastedText(`${tag} ${region("EDIT")}`, ["AAA"])).toBe(
 			"AAA EDIT"
 		);
-		const { text, folds } = splicePastedFolds(
-			`a ${region("EDIT")} b`,
-			[]
-		);
+		const { text, folds } = splicePastedFolds(`a ${region("EDIT")} b`, []);
 		expect(text).toBe("a EDIT b");
 		expect(folds).toEqual([{ start: 2, end: 6, chars: 4 }]);
 	});
@@ -814,15 +813,15 @@ describe("reconcileTagRemovals", () => {
 	});
 	it("drops orphan attachments newest-first", () => {
 		const list = [img("a"), img("b"), file("c")];
-		expect(ids(reconcileTagRemovals(list, 1, 1, 1, 1, undefined, 0, 0))).toEqual(
-			["a", "c"]
-		);
+		expect(
+			ids(reconcileTagRemovals(list, 1, 1, 1, 1, undefined, 0, 0))
+		).toEqual(["a", "c"]);
 	});
 	it("drops orphan pastes newest-first", () => {
 		const list = [pasted("a"), pasted("b")];
-		expect(ids(reconcileTagRemovals(list, 0, 0, 0, 0, undefined, 1, 1))).toEqual(
-			["a"]
-		);
+		expect(
+			ids(reconcileTagRemovals(list, 0, 0, 0, 0, undefined, 1, 1))
+		).toEqual(["a"]);
 	});
 });
 
@@ -872,9 +871,7 @@ describe("sentTagModelsFor", () => {
 			testAttachment({ id: "a", kind: "image" }),
 			testAttachment({ id: "b", kind: "text", text: "hello" })
 		];
-		const models = sentTagModelsFor(atts, "no literals here", "m1", [
-			"m1:b"
-		]);
+		const models = sentTagModelsFor(atts, "no literals here", "m1", ["m1:b"]);
 		expect(models.map((m) => [m.id, m.open])).toEqual([
 			["a", false],
 			["b", true]
@@ -888,10 +885,7 @@ describe("toggleTagKey", () => {
 		expect(toggleTagKey([], "m1", "a")).toEqual(["m1:a"]);
 		expect(toggleTagKey(["m1:a"], "m1", "a")).toEqual([]);
 		expect(toggleTagKey(["m1:a"], "m1", "b")).toEqual(["m1:b"]);
-		expect(toggleTagKey(["m1:a", "m2:x"], "m1", "b")).toEqual([
-			"m2:x",
-			"m1:b"
-		]);
+		expect(toggleTagKey(["m1:a", "m2:x"], "m1", "b")).toEqual(["m2:x", "m1:b"]);
 	});
 });
 

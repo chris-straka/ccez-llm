@@ -18,13 +18,8 @@
  * store) and unit-tested in `flashcards.test.ts`.
  */
 import type { Annotation } from "./annotations";
-import {
-	findQuotedMessage,
-	paragraphForQuote
-} from "./quote-match";
-import {
-	annRefsFor
-} from "./annotation-block";
+import { findQuotedMessage, paragraphForQuote } from "./quote-match";
+import { annRefsFor } from "./annotation-block";
 import type { ChatId, ChatMsgId } from "./chat";
 import { identifyLangShort } from "./langId";
 

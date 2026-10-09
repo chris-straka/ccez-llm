@@ -257,9 +257,7 @@ describe("langMenuAnchorFor", () => {
 	});
 
 	it("keeps the left edge on-screen", () => {
-		expect(
-			langMenuAnchorFor({ ...base, btnLeft: 1200 }).left
-		).toBe(1092);
+		expect(langMenuAnchorFor({ ...base, btnLeft: 1200 }).left).toBe(1092);
 		expect(langMenuAnchorFor({ ...base, btnLeft: -50 }).left).toBe(8);
 	});
 });
@@ -381,6 +379,8 @@ describe("language menu order and typeahead", () => {
 		const a = typeaheadBuffer({ query: "", at: 0 }, "p", 1000);
 		const b = typeaheadBuffer(a, "o", 1300);
 		expect(b.query).toBe("po");
-		expect(typeaheadBuffer(b, "d", 1300 + TYPEAHEAD_RESET_MS + 1).query).toBe("d");
+		expect(typeaheadBuffer(b, "d", 1300 + TYPEAHEAD_RESET_MS + 1).query).toBe(
+			"d"
+		);
 	});
 });

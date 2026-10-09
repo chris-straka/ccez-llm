@@ -130,7 +130,10 @@ export function holdNotice(state: NoticeState, kind: NoticeKind): void {
  * when the notice's own timer already ran out meanwhile, else null
  * (its timer is still pending and clears it on schedule).
  */
-export function releaseNotice(state: NoticeState, kind: NoticeKind): number | null {
+export function releaseNotice(
+	state: NoticeState,
+	kind: NoticeKind
+): number | null {
 	const slot = state[kind];
 	slot.held = false;
 	if (!slot.expired || slot.message === null) return null;

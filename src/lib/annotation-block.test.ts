@@ -115,19 +115,25 @@ describe("commitRefsEdit", () => {
 });
 describe("planClearSentRefs", () => {
 	it("skips non-user messages silently", () => {
-		expect(planClearSentRefs("assistant", "anything")).toEqual({ kind: "skip" });
+		expect(planClearSentRefs("assistant", "anything")).toEqual({
+			kind: "skip"
+		});
 	});
 
 	it("reports gone blocks, deletes refs-only, rewrites the rest", () => {
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
-		expect(planClearSentRefs("user", "just a prompt")).toEqual({ kind: "gone" });
+		expect(planClearSentRefs("user", "just a prompt")).toEqual({
+			kind: "gone"
+		});
 		expect(planClearSentRefs("user", withAnnotations("", list))).toEqual({
 			kind: "delete"
 		});
-		expect(planClearSentRefs("user", withAnnotations("explain", list))).toEqual({
-			kind: "rewrote",
-			bare: "explain"
-		});
+		expect(planClearSentRefs("user", withAnnotations("explain", list))).toEqual(
+			{
+				kind: "rewrote",
+				bare: "explain"
+			}
+		);
 	});
 });
 describe("annotation block", () => {
@@ -162,9 +168,7 @@ describe("annotation block", () => {
 		);
 		// Nothing pinned: the prompt goes out bare (no omit state —
 		// creating never includes).
-		expect(withAnnotations("explain", promptInclusions(filed))).toBe(
-			"explain"
-		);
+		expect(withAnnotations("explain", promptInclusions(filed))).toBe("explain");
 		const list = setPromptPinned(
 			setPromptPinned(filed, filed[0]!.id, true),
 			filed[1]!.id,

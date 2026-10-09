@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { thinkingFor, resolveThinkingId, cycleThinkingId, LOWEST_THINKING } from "./thinking";
+import {
+	thinkingFor,
+	resolveThinkingId,
+	cycleThinkingId,
+	LOWEST_THINKING
+} from "./thinking";
 
 describe("thinking", () => {
 	it("offers the full effort dial on Muse Spark", () => {
@@ -68,8 +73,20 @@ describe("thinking", () => {
 
 describe("lowest thinking", () => {
 	it("maps to each provider's bottom rung", () => {
-		expect(resolveThinkingId(thinkingFor("muse", "muse-spark-1.3-contributor"), LOWEST_THINKING)).toBe("minimal");
-		expect(resolveThinkingId(thinkingFor("deepseek", "deepseek-flash"), LOWEST_THINKING)).toBe("off");
-		expect(resolveThinkingId(thinkingFor("custom:x", "any"), LOWEST_THINKING)).toBe("low");
+		expect(
+			resolveThinkingId(
+				thinkingFor("muse", "muse-spark-1.3-contributor"),
+				LOWEST_THINKING
+			)
+		).toBe("minimal");
+		expect(
+			resolveThinkingId(
+				thinkingFor("deepseek", "deepseek-flash"),
+				LOWEST_THINKING
+			)
+		).toBe("off");
+		expect(
+			resolveThinkingId(thinkingFor("custom:x", "any"), LOWEST_THINKING)
+		).toBe("low");
 	});
 });

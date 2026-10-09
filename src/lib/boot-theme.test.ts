@@ -28,7 +28,8 @@ function boot(opts: {
 	const dataset: Record<string, string> = {};
 	const store = new Map<string, string>();
 	if (opts.stored !== null) store.set("ccez-llm-settings-v1", opts.stored);
-	if (opts.legacyStored) store.set("ccez-studio-settings-v1", opts.legacyStored);
+	if (opts.legacyStored)
+		store.set("ccez-studio-settings-v1", opts.legacyStored);
 	const sandbox: Record<string, unknown> = {
 		document: { documentElement: { dataset } }
 	};
@@ -38,12 +39,13 @@ function boot(opts: {
 				getItem: (key: string): string | null => store.get(key) ?? null
 			},
 			matchMedia:
-				opts.media === false
-					? undefined
-					: () => ({ matches: opts.systemDark })
+				opts.media === false ? undefined : () => ({ matches: opts.systemDark })
 		};
 	} else {
-		sandbox.window = opts.media === false ? {} : { matchMedia: () => ({ matches: opts.systemDark }) };
+		sandbox.window =
+			opts.media === false
+				? {}
+				: { matchMedia: () => ({ matches: opts.systemDark }) };
 	}
 	runInNewContext(bootThemeScript(), sandbox);
 	return dataset;
@@ -116,14 +118,16 @@ describe("boot theme paint", () => {
 		const stored = JSON.stringify({ theme: "light", lightStyle: "sepia" });
 		expect(boot({ stored, systemDark: true })["lightStyle"]).toBe("sepia");
 		expect(
-			boot({ stored: JSON.stringify({ lightStyle: "neon" }), systemDark: false })[
-				"lightStyle"
-			]
+			boot({
+				stored: JSON.stringify({ lightStyle: "neon" }),
+				systemDark: false
+			})["lightStyle"]
 		).toBe("paper");
 		expect(
-			boot({ stored: JSON.stringify({ darkStyle: "contrast" }), systemDark: true })[
-				"darkStyle"
-			]
+			boot({
+				stored: JSON.stringify({ darkStyle: "contrast" }),
+				systemDark: true
+			})["darkStyle"]
 		).toBe("contrast");
 	});
 

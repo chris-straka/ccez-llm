@@ -150,7 +150,11 @@ describe("ocrFallbackLangs", () => {
 describe("ocrScriptLangs", () => {
 	it("maps the user's failing scripts to their traineddata", () => {
 		expect(ocrScriptLangs("Japanese", 90)).toEqual(["jpn", "eng"]);
-		expect(ocrScriptLangs("Chinese", 90)).toEqual(["chi_sim", "chi_tra", "eng"]);
+		expect(ocrScriptLangs("Chinese", 90)).toEqual([
+			"chi_sim",
+			"chi_tra",
+			"eng"
+		]);
 		expect(ocrScriptLangs("Cyrillic", 90)).toEqual(["rus", "ukr", "eng"]);
 		expect(ocrScriptLangs("Arabic", 90)).toEqual(["ara", "eng"]);
 		expect(ocrScriptLangs("Devanagari", 90)).toEqual(["hin", "eng"]);
@@ -207,7 +211,17 @@ describe("visionSupports", () => {
 			expect(visionSupports(code)).toBe(true);
 		}
 		// Latin without its own model reads through English …
-		for (const code of ["hu", "fi", "sk", "tl", "sw", "la", "is", "non", "ang"]) {
+		for (const code of [
+			"hu",
+			"fi",
+			"sk",
+			"tl",
+			"sw",
+			"la",
+			"is",
+			"non",
+			"ang"
+		]) {
 			expect(visionSupports(code)).toBe(true);
 		}
 		// … as does unmodeled Cyrillic through the shared base.

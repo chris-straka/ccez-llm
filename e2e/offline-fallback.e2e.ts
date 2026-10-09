@@ -57,9 +57,9 @@ test("android browser without the shell hides the Gemma pill", async ({
 		const pills = page.locator(
 			'.settings-panel [role="radiogroup"][aria-label="Active provider"] button'
 		);
-		await expect(
-			pills.filter({ hasText: "ML Kit (on-device)" })
-		).toHaveCount(0);
+		await expect(pills.filter({ hasText: "ML Kit (on-device)" })).toHaveCount(
+			0
+		);
 		// The keyed cloud options still list.
 		await expect(pills.first()).toBeVisible();
 		// Offline narrows to Gemma alone, which stays hidden without

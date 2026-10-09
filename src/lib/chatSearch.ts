@@ -85,7 +85,8 @@ export function foldText(text: string): string {
 came from (null when folding kept every offset). */
 function foldWithMap(text: string): { folded: string; map: number[] | null } {
 	// eslint-disable-next-line no-control-regex
-	if (/^[\x00-\x7f]*$/.test(text)) return { folded: text.toLowerCase(), map: null };
+	if (/^[\x00-\x7f]*$/.test(text))
+		return { folded: text.toLowerCase(), map: null };
 	let folded = "";
 	const map: number[] = [];
 	let at = 0;
@@ -270,7 +271,8 @@ function pinyinSpans(runs: PinyinRun[], term: string): Array<[number, number]> {
 	return spans;
 }
 
-const SPACED_SCRIPT_RE = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{N}]/u;
+const SPACED_SCRIPT_RE =
+	/^[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{N}]/u;
 const WORD_CHAR_RE = /[\p{L}\p{N}]/u;
 
 /** Every [start, end) occurrence of needle in folded text. Words in
@@ -323,7 +325,11 @@ function matchDoc(
 	return { score, spans };
 }
 
-function toSource(map: number[] | null, at: number, sourceLength: number): number {
+function toSource(
+	map: number[] | null,
+	at: number,
+	sourceLength: number
+): number {
 	if (!map) return at;
 	return at < map.length ? (map[at] ?? sourceLength) : sourceLength;
 }
@@ -347,7 +353,8 @@ function snippetWithMarks(
 	const start = Math.max(0, first[0] - radius);
 	const end = Math.min(p.flat.length, Math.max(first[1], first[0] + radius));
 	const lead = start > 0 ? "…" : "";
-	const snippet = lead + p.flat.slice(start, end) + (end < p.flat.length ? "…" : "");
+	const snippet =
+		lead + p.flat.slice(start, end) + (end < p.flat.length ? "…" : "");
 	const marks: Array<[number, number]> = [];
 	for (const [a, b] of src) {
 		const ms = Math.max(a, start);
@@ -376,7 +383,11 @@ export function querySearch(
 		if (q.from && p.doc.role !== q.from) continue;
 		const match = matchDoc(p, q);
 		if (!match) continue;
-		hits.push({ doc: p.doc, score: match.score, ...snippetWithMarks(p, match.spans) });
+		hits.push({
+			doc: p.doc,
+			score: match.score,
+			...snippetWithMarks(p, match.spans)
+		});
 	}
 	hits.sort((a, b) => b.score - a.score || (b.doc.at ?? 0) - (a.doc.at ?? 0));
 	return hits.slice(0, Math.max(0, limit));
@@ -420,8 +431,7 @@ export function collectSearchAnnotations(
 	for (const chat of chats) {
 		let drafts: IndexableAnnotation[];
 		try {
-			drafts =
-				chat.id === activeChatId ? liveAnnotations : loadDraft(chat.id);
+			drafts = chat.id === activeChatId ? liveAnnotations : loadDraft(chat.id);
 		} catch {
 			drafts = [];
 		}
@@ -570,7 +580,10 @@ export function matchedText(content: string, query: string): string | null {
 		const at = folded.indexOf(needle);
 		if (at < 0) continue;
 		const start = toSource(map, at, content.length);
-		const end = Math.max(toSource(map, at + needle.length, content.length), start + 1);
+		const end = Math.max(
+			toSource(map, at + needle.length, content.length),
+			start + 1
+		);
 		return content.slice(start, end);
 	}
 	return null;

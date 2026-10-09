@@ -143,7 +143,7 @@ describe("diffCorrection", () => {
 
 describe("escapeCorrection", () => {
 	it("escapes HTML metacharacters", () => {
-		expect(escapeCorrection('<b>"a" & \'b\'</b>')).toBe(
+		expect(escapeCorrection("<b>\"a\" & 'b'</b>")).toBe(
 			"&lt;b&gt;&quot;a&quot; &amp; 'b'&lt;/b&gt;"
 		);
 	});
@@ -154,9 +154,9 @@ describe("correctionHtmlFor", () => {
 		`Bien sûr !\n\n\`\`\`correction\n${text}\n\`\`\``;
 
 	it("renders del struck and ins underlined", () => {
-		expect(correctionHtmlFor("Je vais au le parc", block("Je vais au parc"))).toBe(
-			'Je vais au <span class="corr-del">le </span>parc'
-		);
+		expect(
+			correctionHtmlFor("Je vais au le parc", block("Je vais au parc"))
+		).toBe('Je vais au <span class="corr-del">le </span>parc');
 	});
 
 	it("returns null without a following assistant message", () => {
@@ -168,7 +168,9 @@ describe("correctionHtmlFor", () => {
 	});
 
 	it("returns null when the correction matches the user text", () => {
-		expect(correctionHtmlFor("Je vais au parc", block("Je vais au parc"))).toBeNull();
+		expect(
+			correctionHtmlFor("Je vais au parc", block("Je vais au parc"))
+		).toBeNull();
 	});
 
 	it("returns null for refs-only user content", () => {

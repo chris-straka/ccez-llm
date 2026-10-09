@@ -31,7 +31,11 @@
 		followVoice?: VoiceLangFollow | null;
 	}
 
-	let { settings = $bindable(), androidUI, followVoice = null }: Props = $props();
+	let {
+		settings = $bindable(),
+		androidUI,
+		followVoice = null
+	}: Props = $props();
 	/** Native macOS voice engine present (Tauri shell on macOS). */
 	let nativeVoice = $state(false);
 	/** Plain browser on a Mac: no inventory API, but download guidance applies. */
@@ -292,8 +296,10 @@
 	{/if}
 	<p class="note voice-add">
 		You can add voices in the
-		<button type="button" title="Open text-to-speech settings" onclick={openVoiceSetup}
-			>Text-to-speech</button
+		<button
+			type="button"
+			title="Open text-to-speech settings"
+			onclick={openVoiceSetup}>Text-to-speech</button
 		>
 		settings.
 		{#if voiceSetupError}<span role="alert">
@@ -307,8 +313,8 @@
 	<fieldset class="voice-engine">
 		<legend>System voice</legend>
 		<p class="note">
-			Messages always read with system voices (web voices only ever step in
-			when the native bridge is unavailable).
+			Messages always read with system voices (web voices only ever step in when
+			the native bridge is unavailable).
 			{#if isWindowsShell}
 				To add voices on Windows: open
 				<button
@@ -316,8 +322,7 @@
 					title="Open Speech settings"
 					onclick={openVoiceSetup}>Speech settings</button
 				>
-				→ Manage voices → Add voices, then reload this page so the new voices
-				appear.
+				→ Manage voices → Add voices, then reload this page so the new voices appear.
 				{#if voiceSetupError}<span role="alert">
 						(couldn't open it automatically)</span
 					>{/if}
@@ -409,13 +414,13 @@
 			{:else if voicesLoaded}
 				{#if isWindowsShell || isLinuxShell}
 					<p class="note voice-note">
-						No {voiceLangName} voices installed — Auto uses the system default.
-						Install one following the steps above, then check again.
+						No {voiceLangName} voices installed — Auto uses the system default. Install
+						one following the steps above, then check again.
 					</p>
 				{:else}
 					<p class="note voice-note">
-						No premium or enhanced voices installed for {voiceLangTag} — Auto uses your
-						System Voice.
+						No premium or enhanced voices installed for {voiceLangTag} — Auto uses
+						your System Voice.
 					</p>
 				{/if}
 			{/if}

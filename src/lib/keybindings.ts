@@ -121,9 +121,22 @@ export function messageKeyAction(
 	// same way; Shift+A opens the create box empty instead
 	// (selection or hover). Bare message A over anything else still
 	// toggles aids below.
-	if (facts.key === "a" && (hovered || facts.selInMessage) && facts.hasSelection && bare(facts) && !facts.inField)
+	if (
+		facts.key === "a" &&
+		(hovered || facts.selInMessage) &&
+		facts.hasSelection &&
+		bare(facts) &&
+		!facts.inField
+	)
 		return "annotate-selection";
-	if (facts.key === "a" && hovered && !facts.hasSelection && facts.hoverWord && bare(facts) && !facts.inField)
+	if (
+		facts.key === "a" &&
+		hovered &&
+		!facts.hasSelection &&
+		facts.hoverWord &&
+		bare(facts) &&
+		!facts.inField
+	)
 		return "annotate-hovered-instant";
 	// Key spelling, not the shift flag: real Shift+A, CapsLock+A,
 	// and synthetic presses all read key "A" (same convention as
@@ -175,7 +188,13 @@ export function messageKeyAction(
 		!facts.inField
 	)
 		return "edit-hovered";
-	if (facts.code === "KeyR" && hovered && bare(facts) && !facts.inField && !facts.inEditable)
+	if (
+		facts.code === "KeyR" &&
+		hovered &&
+		bare(facts) &&
+		!facts.inField &&
+		!facts.inEditable
+	)
 		return "rerun-hovered";
 	if (
 		(facts.key === "t" || facts.key === "T") &&

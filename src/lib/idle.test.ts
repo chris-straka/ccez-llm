@@ -76,7 +76,12 @@ describe("idleTapAction", () => {
 });
 
 describe("shouldParkForNews", () => {
-	const base = { newsOpen: true, phone: false, inPrompt: false, hasText: false };
+	const base = {
+		newsOpen: true,
+		phone: false,
+		inPrompt: false,
+		hasText: false
+	};
 	it("parks an unfocused, empty composer over desktop headlines", () => {
 		expect(shouldParkForNews(base)).toBe(true);
 	});

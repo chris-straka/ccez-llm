@@ -63,9 +63,7 @@ export interface ReleaseAsset {
  */
 export function pickApkAsset(assets: ReleaseAsset[]): string | null {
 	const exact = assets.find((a) => a.name === APK_ASSET_NAME);
-	const fallback = assets.find((a) =>
-		a.name.toLowerCase().endsWith(".apk")
-	);
+	const fallback = assets.find((a) => a.name.toLowerCase().endsWith(".apk"));
 	const url = (exact ?? fallback)?.browser_download_url ?? "";
 	return url || null;
 }

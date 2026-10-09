@@ -46,9 +46,7 @@ async function selectAll(page: Page) {
 }
 
 /** Highlight just the き (kana only, no Han). */
-async function selectKanaOnly(
-	page: Page
-) {
+async function selectKanaOnly(page: Page) {
 	return page.evaluate(() => {
 		const p = document.querySelector("article.assistant .rendered p");
 		const text = p?.firstChild;
@@ -102,15 +100,15 @@ test("right-clicking a mixed highlight shows one panel per kanji group", async (
 		const reading = document.querySelector(".sel-pinyin .srt");
 		if (!(tint instanceof Element) || !(reading instanceof Element))
 			return false;
-		return (
-			getComputedStyle(tint).color === getComputedStyle(reading).color
-		);
+		return getComputedStyle(tint).color === getComputedStyle(reading).color;
 	});
 	expect(match).toBe(true);
 	// The tint surgery keeps the live highlight: splits and wraps
 	// preserve the range (no removeAllRanges), so the selection — and
 	// on phones its handles — survives the popup.
-	const kept = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const kept = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(kept).toBe(selected);
 	// Escape dismisses the panels and unwraps the tint.
 	await page.keyboard.press("Escape");
@@ -150,8 +148,7 @@ test("creating an annotation keeps its furigana panel", async ({ page }) => {
 		const nodes: Text[] = [];
 		let n: Node | null;
 		while ((n = walker.nextNode())) {
-			if (n instanceof Text && n.parentElement?.tagName !== "RT")
-				nodes.push(n);
+			if (n instanceof Text && n.parentElement?.tagName !== "RT") nodes.push(n);
 		}
 		const full = nodes.map((t) => t.textContent ?? "").join("");
 		const i = full.indexOf("咲き誇る");
@@ -342,12 +339,9 @@ test("scrolling carries every group panel with the highlight", async ({
 panel scales with the chat size (never toy-fixed) and hangs right
 above the highlight, never stranded far away. */
 test("furigana panel hugs the word at large type", async ({ page }) => {
-	await seedChat(
-		page,
-		[{ role: "assistant", content: "今日は春です" }],
-		null,
-		{ fontScale: 4 }
-	);
+	await seedChat(page, [{ role: "assistant", content: "今日は春です" }], null, {
+		fontScale: 4
+	});
 	await page.goto("/");
 	await expect(
 		page.locator("article.assistant .rendered p").first()
@@ -377,9 +371,9 @@ test("furigana panel hugs the word at large type", async ({ page }) => {
 		.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
 	expect(msgSize).toBeGreaterThan(48);
 	// Panel type scales with the chat (0.85rem at 4x ≈ 54px).
-	const size = await panels.first().evaluate(
-		(el) => parseFloat(getComputedStyle(el).fontSize)
-	);
+	const size = await panels
+		.first()
+		.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
 	expect(size).toBeGreaterThan(40);
 	// The above panel's bottom sits a hair above the word's top.
 	const gap = await page.evaluate(() => {
@@ -443,10 +437,9 @@ test("pinned panels re-anchor past highlight death on scroll", async ({
 }) => {
 	const JA =
 		"フランスは西ヨーロッパに位置する国で、首都はパリです。芸術や文化、美食で世界的に有名です。エッフェル塔やルーブル美術館などの観光名所がたくさんあります。";
-	const filler = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(120);
-	await seedChat(page, [
-		{ role: "assistant", content: `${JA}\n\n${filler}` }
-	]);
+	const filler =
+		"lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(120);
+	await seedChat(page, [{ role: "assistant", content: `${JA}\n\n${filler}` }]);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-annotations-v1",

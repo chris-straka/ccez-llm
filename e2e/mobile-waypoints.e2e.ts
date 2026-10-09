@@ -54,7 +54,9 @@ test("sheet item jumps and closes", async ({ page }) => {
 	await page.locator('.wp-menu button[role="menuitem"]').first().tap();
 	await expect(page.locator(".wp-menu")).toBeHidden();
 	// The landed message pulses once, then the class clears.
-	await expect(page.locator("article.landed")).toHaveCount(1, { timeout: 3_000 });
+	await expect(page.locator("article.landed")).toHaveCount(1, {
+		timeout: 3_000
+	});
 	await page.waitForTimeout(250);
 	await page.screenshot({ path: ".screenshots/waypoint-pulse.png" });
 	const tint = await page
@@ -62,7 +64,9 @@ test("sheet item jumps and closes", async ({ page }) => {
 		.evaluate((el) => getComputedStyle(el).backgroundColor)
 		.catch(() => "gone");
 	expect(tint).not.toBe("rgba(0, 0, 0, 0)");
-	await expect(page.locator("article.landed")).toHaveCount(0, { timeout: 4_000 });
+	await expect(page.locator("article.landed")).toHaveCount(0, {
+		timeout: 4_000
+	});
 	// Picking an item moves focus out, parking the tools: tapping back
 	// into the composer returns the trigger.
 	await page.locator(".prompt .ta-input").click();

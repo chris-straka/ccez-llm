@@ -6,13 +6,8 @@ import {
 	type AnnotationMark,
 	type AnnotationId
 } from "./annotations";
-import {
-	locateQuote
-} from "./quote-match";
-import {
-	edgeOffsetForAnchor,
-	gapOffsetForAnchor
-} from "./sel-geometry";
+import { locateQuote } from "./quote-match";
+import { edgeOffsetForAnchor, gapOffsetForAnchor } from "./sel-geometry";
 import {
 	applyMarks,
 	lockSelectionToMessage,

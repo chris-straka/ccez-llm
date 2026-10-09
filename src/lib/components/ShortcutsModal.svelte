@@ -7,6 +7,9 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 (unit-pinned); the close-button title rides a prop so the page's
 `tip()` helper stays paged with its other users. -->
 <script lang="ts">
+	/** Chip separator: a bare " · " in markup loses its spaces to
+	 * Svelte's whitespace trim, so it rides an expression. */
+	const SEP = " · ";
 	import ActionIcon from "./ActionIcon.svelte";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { currentPlatform } from "$lib/platform";
@@ -73,9 +76,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	onVeilClick={veilClick}
 >
 	<div class="modal-head">
-		{#if !android}<h2 id="shortcuts-heading">
-				Keyboard shortcuts
-			</h2>{/if}
+		{#if !android}<h2 id="shortcuts-heading">Keyboard shortcuts</h2>{/if}
 		<input
 			type="search"
 			class="shortcuts-filter"
@@ -86,7 +87,12 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 			autocomplete="off"
 			spellcheck={false}
 		/>
-		<button type="button" aria-label="Close shortcuts" title={closeTitle} onclick={onClose}>
+		<button
+			type="button"
+			aria-label="Close shortcuts"
+			title={closeTitle}
+			onclick={onClose}
+		>
 			<ActionIcon kind="close" />
 		</button>
 	</div>
@@ -102,8 +108,9 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 						<div>
 							<dt>{row.name}</dt>
 							<dd>
-								<!-- eslint-disable-next-line svelte/no-useless-mustaches -- a bare " · " loses its spaces to Svelte's whitespace trim -->
-								{#each keyChips(row.keys) as chip, i (i)}{#if i > 0}<span class="sep">{" · "}</span>{/if}<span class="chip">{chip}</span>{/each}
+								{#each keyChips(row.keys) as chip, i (i)}{#if i > 0}<span
+											class="sep">{SEP}</span
+										>{/if}<span class="chip">{chip}</span>{/each}
 							</dd>
 						</div>
 					{/each}

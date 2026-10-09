@@ -33,5 +33,8 @@ export function zenFreeModel(id: string): boolean {
 /** The picker's list: chat models only, free ones first, each run sorted. */
 export function zenModelList(ids: readonly string[]): string[] {
 	const chat = [...new Set(ids)].filter(zenChatModel).sort();
-	return [...chat.filter(zenFreeModel), ...chat.filter((id) => !zenFreeModel(id))];
+	return [
+		...chat.filter(zenFreeModel),
+		...chat.filter((id) => !zenFreeModel(id))
+	];
 }

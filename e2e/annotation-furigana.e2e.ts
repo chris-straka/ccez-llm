@@ -31,13 +31,10 @@ test("answer card leaves the furigana panel on top", async ({ page }) => {
 	await pop.locator("textarea").fill("what does this mean?");
 	await page.keyboard.press("Enter");
 	await expect(pop).toHaveCount(0);
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toBeVisible({ timeout: 30_000 });
-	await page
-		.locator("button.ccez-ann-badge.ans-ready")
-		.first()
-		.focus();
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({
+		timeout: 30_000
+	});
+	await page.locator("button.ccez-ann-badge.ans-ready").first().focus();
 	await page.keyboard.press("Enter");
 	await expect(
 		page.locator(".ann-wrap.pinned .review, .ann-answer")

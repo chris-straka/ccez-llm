@@ -435,9 +435,7 @@ describe("pasted-tag copy/cut expansion", () => {
 		ta.dispatchEvent(event);
 		expect(event.defaultPrevented).toBe(true);
 		expect(take).toHaveBeenCalledWith([0]);
-		await vi.waitFor(() =>
-			expect(writeText).toHaveBeenCalledWith(`${PROSE} `)
-		);
+		await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(`${PROSE} `));
 		expect(ta.value).toBe(`see ${TAG}end`);
 	});
 
@@ -452,9 +450,7 @@ describe("pasted-tag copy/cut expansion", () => {
 		ta.dispatchEvent(event);
 		expect(event.defaultPrevented).toBe(true);
 		expect(ta.value).toBe("");
-		await vi.waitFor(() =>
-			expect(writeText).toHaveBeenCalledWith(`${PROSE} `)
-		);
+		await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(`${PROSE} `));
 		await vi.waitFor(() =>
 			expect(options.onDocChange).toHaveBeenCalledWith("", {
 				image: [],

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Annotation, AnnotationId } from "./annotations";
 import type { ChatId, ChatMsgId } from "./chat";
-import { FlashcardsMode, type FlashcardsModeDeps } from "./flashcards-mode.svelte";
+import {
+	FlashcardsMode,
+	type FlashcardsModeDeps
+} from "./flashcards-mode.svelte";
 import type { DeckKeyFacts, HarvestChat, ScheduleStore } from "./flashcards";
 
 const chatA = "chat-a" as ChatId;
@@ -62,7 +65,11 @@ function harness(
 		{
 			id: chatA,
 			messages: [
-				{ id: "m1" as ChatMsgId, role: "assistant", content: "Der Bahnhof ist groß. Das Haus ist alt." }
+				{
+					id: "m1" as ChatMsgId,
+					role: "assistant",
+					content: "Der Bahnhof ist groß. Das Haus ist alt."
+				}
 			]
 		}
 	];
@@ -93,7 +100,8 @@ function harness(
 				calls.copied.push(text);
 			}),
 		downloadText: (_text, filename) => void calls.downloads.push(filename),
-		isDismissal: (error) => error instanceof Error && error.message === "dismissed",
+		isDismissal: (error) =>
+			error instanceof Error && error.message === "dismissed",
 		toast: (m) => void calls.toasts.push(m),
 		toastError: (m) => void calls.errors.push(m),
 		store
@@ -113,7 +121,10 @@ describe("FlashcardsMode", () => {
 		expect(deck.isOpen).toBe(false);
 		deck.open();
 		expect(deck.isOpen).toBe(true);
-		expect(deck.session?.queue.map((c) => c.quote)).toEqual(["Bahnhof", "Haus"]);
+		expect(deck.session?.queue.map((c) => c.quote)).toEqual([
+			"Bahnhof",
+			"Haus"
+		]);
 		expect(deck.total).toBe(2);
 	});
 
@@ -143,7 +154,10 @@ describe("FlashcardsMode", () => {
 		deck.open();
 		expect(deck.speaking).toBe(false);
 		deck.speak();
-		expect(calls.spoken[0]).toMatchObject({ quote: "Bahnhof", context: "Der Bahnhof ist groß." });
+		expect(calls.spoken[0]).toMatchObject({
+			quote: "Bahnhof",
+			context: "Der Bahnhof ist groß."
+		});
 		expect(deck.speaking).toBe(true);
 	});
 
@@ -187,13 +201,17 @@ describe("FlashcardsMode", () => {
 			expect(deck.key(keyFacts({ code: "KeyS", key: "s" }))).toBe(true);
 			expect(calls.spoken).toHaveLength(1);
 			expect(deck.key(keyFacts({ code: "KeyJ", key: "j" }))).toBe(true);
-			expect(deck.key(keyFacts({ code: "KeyC", key: "c", metaKey: true }))).toBe(false);
+			expect(
+				deck.key(keyFacts({ code: "KeyC", key: "c", metaKey: true }))
+			).toBe(false);
 			expect(deck.key(keyFacts({ key: "Escape" }))).toBe(true);
 			expect(deck.isOpen).toBe(false);
 		});
 
 		it("closed, ordinary keys pass", () => {
-			expect(harness().deck.key(keyFacts({ code: "KeyJ", key: "j" }))).toBe(false);
+			expect(harness().deck.key(keyFacts({ code: "KeyJ", key: "j" }))).toBe(
+				false
+			);
 		});
 	});
 

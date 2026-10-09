@@ -3,9 +3,7 @@ import DOMPurify from "dompurify";
 import { createHighlighter, type Highlighter } from "shiki";
 import { RUBY_SCRIPT_RE } from "./reading";
 import { runnerFor } from "./coderun";
-import {
-	redactedCopyText
-} from "./annotation-block";
+import { redactedCopyText } from "./annotation-block";
 import { extractCorrection } from "./correction";
 import {
 	ATTACH_TAG_RE,

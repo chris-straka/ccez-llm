@@ -5,16 +5,14 @@ import { seedChat } from "./helpers";
 badge floats above the message, and its float offset tracks the text
 size like the count itself (a fixed rem parks the grown number on the
 frame's top edge). */
-test("the refs badge clears the edit frame at huge type", async ({
-	page
-}) => {
+test("the refs badge clears the edit frame at huge type", async ({ page }) => {
 	await seedChat(
 		page,
 		[
 			{
 				role: "user",
 				content:
-					"ما هي الأفكار؟\n\nAnnotated selections:\n1. \"الأفكار\" — ما معناها؟"
+					'ما هي الأفكار؟\n\nAnnotated selections:\n1. "الأفكار" — ما معناها؟'
 			},
 			{ role: "assistant", content: "رد" }
 		],
@@ -43,7 +41,9 @@ async function startEdit(page: Page, index = 0): Promise<void> {
 	const article = page.locator("article.user").nth(index);
 	await expect(article).toBeVisible();
 	await article.hover();
-	await article.locator('.actions button[aria-label="Edit this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Edit this message"]')
+		.click();
 	await expect(page.locator(".msg-edit")).toHaveCount(1);
 }
 
@@ -103,9 +103,7 @@ test("checkmark commits the edit and confirms with a toast", async ({
 	await expect(page.locator("article.user .rendered")).toContainText(
 		"hello world"
 	);
-	await expect(page.locator(".toast:not(.error)")).toHaveText(
-		"Message edited"
-	);
+	await expect(page.locator(".toast:not(.error)")).toHaveText("Message edited");
 });
 
 test("the editor reads at the message size", async ({ page }) => {

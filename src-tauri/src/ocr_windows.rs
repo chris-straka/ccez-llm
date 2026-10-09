@@ -36,10 +36,7 @@ pub fn ocr_supported() -> bool {
 /// in `languages` (BCP-47, as produced by
 /// [`super::ocr::recognition_languages`]). Returns top candidates shaped
 /// by the caller.
-pub fn ocr_recognize(
-    bytes: &[u8],
-    languages: &[String],
-) -> Result<Vec<(String, f32)>, String> {
+pub fn ocr_recognize(bytes: &[u8], languages: &[String]) -> Result<Vec<(String, f32)>, String> {
     #[cfg(target_os = "windows")]
     return imp::recognize(bytes, languages);
     #[cfg(not(target_os = "windows"))]
@@ -52,11 +49,11 @@ pub fn ocr_recognize(
 #[cfg(target_os = "windows")]
 mod imp {
     use windows::{
-        Graphics::Imaging::{BitmapDecoder, BitmapPixelFormat, SoftwareBitmap},
+        core::HSTRING,
         Globalization::Language,
+        Graphics::Imaging::{BitmapDecoder, BitmapPixelFormat, SoftwareBitmap},
         Media::Ocr::OcrEngine,
         Storage::Streams::{DataWriter, InMemoryRandomAccessStream},
-        core::HSTRING,
     };
 
     use super::missing_pack_message;
@@ -112,10 +109,7 @@ mod imp {
         Err(missing_pack_message(languages))
     }
 
-    pub fn recognize(
-        bytes: &[u8],
-        languages: &[String],
-    ) -> Result<Vec<(String, f32)>, String> {
+    pub fn recognize(bytes: &[u8], languages: &[String]) -> Result<Vec<(String, f32)>, String> {
         let bitmap = bitmap_for(bytes)?;
         let engine = engine_for(languages)?;
         let result = engine
@@ -156,8 +150,7 @@ mod pack_message_tests {
 
     #[test]
     fn names_languages_and_matches_frontend_fallback() {
-        let message =
-            missing_pack_message(&["zh-Hans".to_string(), "en-US".to_string()]);
+        let message = missing_pack_message(&["zh-Hans".to_string(), "en-US".to_string()]);
         assert!(message.contains("zh-Hans"));
         // The frontend routes on /requires macos|not supported|no on-device ocr/i.
         assert!(message.to_lowercase().contains("not supported"));

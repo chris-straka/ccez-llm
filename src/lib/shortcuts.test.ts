@@ -162,9 +162,7 @@ describe("shortcuts menu copy", () => {
 		}
 		// Shell keeps the full list either way (default included).
 		expect(desktopShortcuts(true).map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(desktopShortcuts(true, true).map((r) => r.name)).toEqual(
-			MAC_NAMES
-		);
+		expect(desktopShortcuts(true, true).map((r) => r.name)).toEqual(MAC_NAMES);
 	});
 
 	it("hides the Flashcards row when flashcards are off", () => {
@@ -297,12 +295,18 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
 		expect(byName.get("Copy")).toBe("Select text, then Copy");
 		expect(byName.get("Pin / unpin annotation")).toBe("Double-tap badge");
-		const all = touchShortcuts().map((r) => r.keys).join("\n");
+		const all = touchShortcuts()
+			.map((r) => r.keys)
+			.join("\n");
 		expect(all).not.toMatch(/\bgg\b|hover/i);
 	});
 
 	it("splits keys into chips on the middle dot", () => {
-		expect(keyChips("⌘B · ⇧⌘H · J / K walk")).toEqual(["⌘B", "⇧⌘H", "J / K walk"]);
+		expect(keyChips("⌘B · ⇧⌘H · J / K walk")).toEqual([
+			"⌘B",
+			"⇧⌘H",
+			"J / K walk"
+		]);
 	});
 
 	it("filters case-insensitively on name, keys, or section", () => {

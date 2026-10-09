@@ -62,12 +62,7 @@ its quote, question, and answer. -->
 	>
 		{annotationCountLabel(items.length)}
 	</button>
-	<div
-		class="review"
-		role="dialog"
-		aria-label="Annotations"
-		data-fade-scroll
-	>
+	<div class="review" role="dialog" aria-label="Annotations" data-fade-scroll>
 		<div class="review-tools">
 			<button
 				type="button"
@@ -83,10 +78,7 @@ its quote, question, and answer. -->
 			annotation, on the text itself. The note stays
 			selectable, buttons keep their clicks (see
 			reviewQuoteClick), drag-selects stay picks. -->
-			<div
-				class="review-item"
-				class:highlight={highlightId === ann.id}
-			>
+			<div class="review-item" class:highlight={highlightId === ann.id}>
 				<div class="review-head">
 					<span class="review-num">{n + 1}.</span>
 					<button
@@ -365,13 +357,22 @@ its quote, question, and answer. -->
 	:global(.app[data-android]) .review-label {
 		font-size: calc(0.75rem * var(--font-scale, 1));
 	}
-	:global(.app[data-android]) .review-head button.review-copy :global(.action-glyph) {
+	:global(.app[data-android])
+		.review-head
+		button.review-copy
+		:global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
-	:global(.app[data-android]) .review-head button.review-pencil :global(.action-glyph) {
+	:global(.app[data-android])
+		.review-head
+		button.review-pencil
+		:global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
-	:global(.app[data-android]) .review-head button.review-del :global(.action-glyph) {
+	:global(.app[data-android])
+		.review-head
+		button.review-del
+		:global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
 	:global(.app[data-android]) .review-answer {

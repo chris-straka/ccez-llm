@@ -52,9 +52,7 @@ describe("android JNI keeps", () => {
 			expect(
 				rules,
 				`missing -keep for studio.ccez.app.${kt} (called from ${rs})`
-			).toMatch(
-				new RegExp(`-keep class studio\\.ccez\\.app\\.${kt} \\{`)
-			);
+			).toMatch(new RegExp(`-keep class studio\\.ccez\\.app\\.${kt} \\{`));
 		}
 	});
 });

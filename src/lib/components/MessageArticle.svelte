@@ -21,13 +21,8 @@ where the text sat, like the composer's promptEl pattern). -->
 	import { fade } from "svelte/transition";
 	import type { LocalAid } from "$lib/reading";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
-	import type {
-	AnnotationId,
-	AnnotationMark
-} from "$lib/annotations";
-import type {
-	AnnotationRef
-} from "$lib/annotation-block";
+	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
+	import type { AnnotationRef } from "$lib/annotation-block";
 	import SentAttachments, {
 		type SentAttachmentsActions
 	} from "./SentAttachments.svelte";
@@ -175,7 +170,9 @@ import type {
 	}: Props = $props();
 	/* A news session opener reads as one tag (story, mode, level):
 	its instructions are for the model, not the learner. */
-	const launch = $derived(msg.role === "user" ? parseNewsLaunch(msg.content) : null);
+	const launch = $derived(
+		msg.role === "user" ? parseNewsLaunch(msg.content) : null
+	);
 	const launchImage = $derived(
 		launch && typeof localStorage !== "undefined"
 			? newsLaunchImage(localStorage, launch.title)
@@ -184,12 +181,17 @@ import type {
 	let launchImageBroken = $state(false);
 	const shownLevel = $derived<CefrLevel>(launch?.level ?? "B2");
 	const metaKey = $derived(
-		launch ? `${launch.kind}|${shownLevel}|${launch.size ?? ""}|${launch.source}` : ""
+		launch
+			? `${launch.kind}|${shownLevel}|${launch.size ?? ""}|${launch.source}`
+			: ""
 	);
 	/** Hide a meta dot left at the end of a line (its next item
 	wrapped below): re-checks on every resize and content change. */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- a new key re-runs `update`.
-	function endDots(node: HTMLElement, _key: string): { update: () => void; destroy: () => void } {
+	function endDots(
+		node: HTMLElement,
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- a new key re-runs `update`.
+		_key: string
+	): { update: () => void; destroy: () => void } {
 		const run = (): void => {
 			const items = [...node.children] as HTMLElement[];
 			items.forEach((item, i) => {
@@ -199,7 +201,8 @@ import type {
 				const next = items[i + 1];
 				if (!next) return;
 				const wrapped =
-					next.getBoundingClientRect().top >= item.getBoundingClientRect().bottom - 1;
+					next.getBoundingClientRect().top >=
+					item.getBoundingClientRect().bottom - 1;
 				if (wrapped) sep.style.visibility = "hidden";
 			});
 		};
@@ -220,7 +223,11 @@ import type {
 	});
 </script>
 
-{#snippet body(override: string | null | undefined, isFolded: boolean, content: string | null | undefined)}
+{#snippet body(
+	override: string | null | undefined,
+	isFolded: boolean,
+	content: string | null | undefined
+)}
 	<MessageBody
 		message={msg}
 		{streaming}
@@ -308,7 +315,10 @@ import type {
 		<!-- A news opener reads folded as one tag: the article's picture,
 		the headline (a normal annotatable body at the message size),
 		and the mode line. Unfolding shows what was sent. -->
-		<div class="bubble news-launch" class:has-thumb={launchImage && !launchImageBroken}>
+		<div
+			class="bubble news-launch"
+			class:has-thumb={launchImage && !launchImageBroken}
+		>
 			{#if launchImage && !launchImageBroken}
 				<img
 					class="launch-thumb"
@@ -318,10 +328,14 @@ import type {
 					onerror={() => (launchImageBroken = true)}
 				/>
 			{:else}
-				<span class="launch-icon" aria-hidden="true">{launch.kind === "talk" ? "🗣️" : "📰"}</span>
+				<span class="launch-icon" aria-hidden="true"
+					>{launch.kind === "talk" ? "🗣️" : "📰"}</span
+				>
 			{/if}
 			<span class="launch-text">
-				<span class="launch-title">{@render body(launch.title, false, null)}</span>
+				<span class="launch-title"
+					>{@render body(launch.title, false, null)}</span
+				>
 				<!-- Each dot rides the end of the item before it, so a wrap
 				never starts a line with one; `endDots` hides a dot left at
 				a line's end. -->
@@ -335,7 +349,10 @@ import type {
 					<span class="meta-item">
 						{#if news}
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<span class="level-wrap" onpointerdown={(e) => e.stopPropagation()}>
+							<span
+								class="level-wrap"
+								onpointerdown={(e) => e.stopPropagation()}
+							>
 								<button
 									type="button"
 									class="launch-level"
@@ -348,7 +365,11 @@ import type {
 									}}>{shownLevel} {cefrTag(shownLevel)} ▾</button
 								>
 								{#if levelOpen}
-									<span class="level-menu" role="menu" transition:fade={{ duration: 120 }}>
+									<span
+										class="level-menu"
+										role="menu"
+										transition:fade={{ duration: 120 }}
+									>
 										{#each CEFR_LEVELS as l (l.level)}
 											<button
 												type="button"
@@ -369,13 +390,16 @@ import type {
 						{:else}
 							<span>{shownLevel} {cefrTag(shownLevel)}</span>
 						{/if}
-						{#if launch.size || launch.source}<span class="sep" aria-hidden="true">·</span>{/if}
+						{#if launch.size || launch.source}<span
+								class="sep"
+								aria-hidden="true">·</span
+							>{/if}
 					</span>
 					{#if launch.size}
 						<span class="meta-item"
-							>{SUMMARY_SIZES.find((sz) => sz.size === launch.size)?.label ?? ""}{#if launch.source}<span
-									class="sep"
-									aria-hidden="true">·</span
+							>{SUMMARY_SIZES.find((sz) => sz.size === launch.size)?.label ??
+								""}{#if launch.source}<span class="sep" aria-hidden="true"
+									>·</span
 								>{/if}</span
 						>
 					{/if}
@@ -392,9 +416,12 @@ import type {
 		remounts its body once (empty → text) so it eases in rather than
 		popping. Every other message keeps one body for life. -->
 		{#key msg.clip ? msg.content !== "" : false}
-			<div class:bubble={msg.role === "user"} class:clip-text={msg.clip && msg.content !== ""}
-				>{@render body(textOverride, folded, contentOverride)}</div
+			<div
+				class:bubble={msg.role === "user"}
+				class:clip-text={msg.clip && msg.content !== ""}
 			>
+				{@render body(textOverride, folded, contentOverride)}
+			</div>
 		{/key}
 	{/if}
 	{#if footer}

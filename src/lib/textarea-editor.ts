@@ -652,8 +652,7 @@ export function createTextareaEditor(
 			options.onPasteSlotCollapsed?.(hit.index, collapsed.inner);
 			return;
 		}
-		const prose =
-			options.onCopyPastedTexts?.([hit.index])[0] ?? "";
+		const prose = options.onCopyPastedTexts?.([hit.index])[0] ?? "";
 		const expanded = expandPasteSlot(doc, hit.index, prose);
 		if (!expanded) return;
 		if (!undoableReplace(expanded.from, expanded.to, expanded.insert)) {

@@ -189,9 +189,7 @@ export function resolveSentRefTarget(
 	messageId: ChatMsgId,
 	quote: string
 ): SentRefTarget {
-	const hit = live.find(
-		(a) => a.messageId === messageId && a.quote === quote
-	);
+	const hit = live.find((a) => a.messageId === messageId && a.quote === quote);
 	if (hit) return { kind: "live", id: hit.id, messageId };
 	const quotedId = findQuotedMessage(messages, messageId, quote);
 	if (quotedId) return { kind: "quoted", messageId: quotedId };

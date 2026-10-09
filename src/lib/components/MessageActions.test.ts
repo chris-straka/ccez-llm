@@ -7,9 +7,11 @@ import { describe, it, expect } from "vitest";
  * rules still match.
  */
 function componentSource(): string {
-	return readFileSync(new URL("./MessageActions.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("./MessageActions.svelte", import.meta.url),
+		"utf8"
+	);
 }
-
 
 describe("message actions surfaces", () => {
 	it("keeps paged reveal ancestors global", () => {

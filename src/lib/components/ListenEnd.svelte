@@ -18,7 +18,8 @@ ready to replay. No score beyond that. -->
 
 <div class="end">
 	<p class="lead">
-		End of the video. You heard {summary.got} of {summary.total} words{summary.perfect > 0
+		End of the video. You heard {summary.got} of {summary.total} words{summary.perfect >
+		0
 			? `, ${summary.perfect} ${summary.perfect === 1 ? "clip" : "clips"} all of it`
 			: ""}.
 	</p>
@@ -39,7 +40,9 @@ ready to replay. No score beyond that. -->
 						}}
 					>
 						<svg viewBox="0 0 16 16" aria-hidden="true"
-							><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z" /></svg
+							><path
+								d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z"
+							/></svg
 						>
 					</button>
 					<button

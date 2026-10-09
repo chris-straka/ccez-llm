@@ -406,7 +406,9 @@ test("long-press on a chat row renames it", async ({ page }) => {
 		touches: [{ identifier: 1, clientX: at.x, clientY: at.y }]
 	});
 	await page.waitForTimeout(700);
-	await row.dispatchEvent("touchend", { touches: [], changedTouches: [] }).catch(() => {});
+	await row
+		.dispatchEvent("touchend", { touches: [], changedTouches: [] })
+		.catch(() => {});
 	const field = page.getByLabel("Chat name");
 	await expect(field).toBeFocused();
 	await field.fill("Renamed on phone");
@@ -421,7 +423,10 @@ capped so nothing runs off a 412px screen. */
 test("switcher and search grow with giant text", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ fontScale: 4 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ fontScale: 4 })
+		);
 		const msg = (id: string, role: string, content: string) => ({
 			id,
 			role,
@@ -432,29 +437,63 @@ test("switcher and search grow with giant text", async ({ page }) => {
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "g1", createdAt: 1, replyLang: null, messages: [msg("a", "user", "Was heißt über?"), msg("b", "assistant", "Über means over.")] },
-				{ id: "g2", createdAt: 2, replyLang: null, messages: [msg("c", "user", "Hi")] }
+				{
+					id: "g1",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						msg("a", "user", "Was heißt über?"),
+						msg("b", "assistant", "Über means over.")
+					]
+				},
+				{
+					id: "g2",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("c", "user", "Hi")]
+				}
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// Giant text leaves no dead space to double-tap: a two-finger
 	// hold on the thread opens the switcher instead.
 	await page.evaluate(() => {
 		const main = document.querySelector("main .messages") ?? document.body;
 		const r = main.getBoundingClientRect();
 		const touch = (id: number, x: number) =>
-			new Touch({ identifier: id, target: main, clientX: x, clientY: r.top + r.height / 2 });
+			new Touch({
+				identifier: id,
+				target: main,
+				clientX: x,
+				clientY: r.top + r.height / 2
+			});
 		const fingers = [touch(1, r.left + 120), touch(2, r.left + 220)];
 		window.dispatchEvent(
-			new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: fingers, changedTouches: fingers })
+			new TouchEvent("touchstart", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				touches: fingers,
+				changedTouches: fingers
+			})
 		);
 	});
-	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({ timeout: 3_000 });
+	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({
+		timeout: 3_000
+	});
 	await page.evaluate(() => {
 		window.dispatchEvent(
-			new TouchEvent("touchend", { bubbles: true, cancelable: true, composed: true, touches: [], changedTouches: [] })
+			new TouchEvent("touchend", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				touches: [],
+				changedTouches: []
+			})
 		);
 	});
 	const titleSize = await page
@@ -476,7 +515,9 @@ test("switcher and search grow with giant text", async ({ page }) => {
 		}, sel);
 	const field = page.getByLabel("Search chats and annotations");
 	await field.fill("uber");
-	await expect(page.locator(".search-hit").first()).toBeVisible({ timeout: 8_000 });
+	await expect(page.locator(".search-hit").first()).toBeVisible({
+		timeout: 8_000
+	});
 	const size = await page
 		.locator(".search-hit")
 		.first()

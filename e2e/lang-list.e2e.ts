@@ -83,7 +83,9 @@ test("europe sheet drops capped under its pill", async ({ page }) => {
 	const pillBox = await pill.boundingBox();
 	const box = await list.boundingBox();
 	expect(box, "language list has a box").toBeTruthy();
-	expect(box!.height, "long sheet caps instead of stretching").toBeLessThan(915);
+	expect(box!.height, "long sheet caps instead of stretching").toBeLessThan(
+		915
+	);
 	expect(box!.y, "sheet hugs its pill").toBeGreaterThanOrEqual(
 		pillBox!.y + pillBox!.height + 2
 	);
@@ -94,9 +96,7 @@ test("europe sheet drops capped under its pill", async ({ page }) => {
 
 /** Short sheets drop under their own pill like a plain menu instead
 of floating mid-screen away from the button that opened them. */
-test("africa sheet drops shrink-wrapped under its pill", async ({
-	page
-}) => {
+test("africa sheet drops shrink-wrapped under its pill", async ({ page }) => {
 	const pill = page.locator('.lang-menu button:has-text("Africa")');
 	await pill.click();
 	const list = page.locator(".lang-list");

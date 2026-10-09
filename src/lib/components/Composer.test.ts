@@ -19,7 +19,10 @@ function componentStyle(): string {
 }
 
 function pageSource(): string {
-	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("../../routes/+page.svelte", import.meta.url),
+		"utf8"
+	);
 }
 
 function reviewDockStyle(): string {
@@ -58,7 +61,9 @@ describe("composer surfaces", () => {
 		// The missing-key banner stays paged above the strip, so it
 		// keeps its own error pairing here (the composer's banner
 		// pairing lives with its markup).
-		expect(css).toMatch(/\.error-banner\s*\{[^}]*background:\s*var\(--error-bg\)/);
+		expect(css).toMatch(
+			/\.error-banner\s*\{[^}]*background:\s*var\(--error-bg\)/
+		);
 		// The in-place message editor moved with the row: its field
 		// rules live in `MessageArticle.svelte` now.
 		expect(css).not.toContain(".msg-edit-box");
@@ -132,13 +137,17 @@ describe("composer text reservation", () => {
 
 	it("composes the jump trigger on top instead of restating tiers", () => {
 		const css = componentStyle();
-		expect(css).toMatch(/\.prompt:has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*1\.8rem/);
+		expect(css).toMatch(
+			/\.prompt:has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*1\.8rem/
+		);
 		expect(css).toContain("calc(var(--tools-pad) + var(--tools-extra))");
 	});
 
 	it("reserves the correction toggle's seat, stacking with the jump trigger", () => {
 		const css = componentStyle();
-		expect(css).toMatch(/\.prompt:has\(\.correct-btn\)\s*\{[^}]*--tools-extra:\s*1\.8rem/);
+		expect(css).toMatch(
+			/\.prompt:has\(\.correct-btn\)\s*\{[^}]*--tools-extra:\s*1\.8rem/
+		);
 		expect(css).toMatch(
 			/\.prompt:has\(\.correct-btn\):has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*3\.6rem/
 		);

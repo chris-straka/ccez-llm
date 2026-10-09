@@ -678,10 +678,7 @@ export function bakeEditedMessage(
  *: fresh marker tags then ride the same line, one
  * space apart, instead of taking the usual prefix.
  */
-export function caretAfterPaste(
-	pastes: PasteSpan[],
-	caret: number
-): boolean {
+export function caretAfterPaste(pastes: PasteSpan[], caret: number): boolean {
 	return pastes.some((s) => caret === s.to);
 }
 

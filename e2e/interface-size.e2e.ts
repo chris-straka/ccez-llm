@@ -123,10 +123,7 @@ async function interfaceSizeFlow(
 	await page.keyboard.press("Meta+,");
 	await expect(drawer).not.toHaveClass(/closed/);
 	await settledOpen(page, ".settings-panel");
-	const drawerText100 = await textHeight(
-		page,
-		".settings-panel .reset-width"
-	);
+	const drawerText100 = await textHeight(page, ".settings-panel .reset-width");
 	const drawerBox100 = await boxInViewport(page, ".settings-panel", vw, vh);
 	await toggleSidebar(page);
 	await expect(list).not.toHaveClass(/collapsed/);
@@ -165,10 +162,7 @@ async function interfaceSizeFlow(
 	await expect(out).toHaveText("250%");
 	// Drawer: text at 2.5x. Desktop boxes grow with the zoom; the
 	// phone sheet keeps filling the screen exactly.
-	const drawerText250 = await textHeight(
-		page,
-		".settings-panel .reset-width"
-	);
+	const drawerText250 = await textHeight(page, ".settings-panel .reset-width");
 	// ±4% bands: zoom is exact but small-box text metrics round to
 	// whole pixels (the drawer button reads 2.5625x, not 2.5x).
 	expect(drawerText250 / drawerText100).toBeGreaterThanOrEqual(2.4);
@@ -290,9 +284,7 @@ test.describe("phone", () => {
 		viewport: { width: 412, height: 915 }
 	});
 
-	test("phone chrome zooms to 250% inside the viewport", async ({
-		page
-	}) => {
+	test("phone chrome zooms to 250% inside the viewport", async ({ page }) => {
 		await interfaceSizeFlow(page, 412, 915, true);
 	});
 });

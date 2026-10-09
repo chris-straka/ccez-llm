@@ -273,8 +273,7 @@ export function probeFacts(status: OnDeviceStatus): string | null {
  */
 export function onDeviceNotReadyCopy(status: OnDeviceStatus): string {
 	if (status.reason) return onDeviceErrorCopy(status.reason);
-	if (status.state === "downloading")
-		return onDeviceErrorCopy("downloading");
+	if (status.state === "downloading") return onDeviceErrorCopy("downloading");
 	return onDeviceErrorCopy("unsupported");
 }
 

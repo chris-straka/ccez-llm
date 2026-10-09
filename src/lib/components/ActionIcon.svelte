@@ -122,8 +122,12 @@
 		<path d="M5.5 14H4a2 2 0 0 1-2-2v-1.5" />
 	{:else if kind === "converse"}
 		<!-- Two overlapping bubbles: a back-and-forth, not one utterance. -->
-		<path d="M6.2 2.2h5.6a2 2 0 0 1 2 2v3.2H8.4l-2.2 2.1v-2.1a2 2 0 0 1 0-.4V4.2a2 2 0 0 1 2-2z" />
-		<path d="M9.8 13.8H4.2a2 2 0 0 1-2-2V8.6h5.4l2.2 2.1V8.6a2 2 0 0 1 0-.4v3.6a2 2 0 0 1-2 2z" />
+		<path
+			d="M6.2 2.2h5.6a2 2 0 0 1 2 2v3.2H8.4l-2.2 2.1v-2.1a2 2 0 0 1 0-.4V4.2a2 2 0 0 1 2-2z"
+		/>
+		<path
+			d="M9.8 13.8H4.2a2 2 0 0 1-2-2V8.6h5.4l2.2 2.1V8.6a2 2 0 0 1 0-.4v3.6a2 2 0 0 1-2 2z"
+		/>
 	{/if}
 </svg>
 

@@ -27,7 +27,8 @@ channel or start a video. State lives in `ListenMode`. -->
 
 	let searchBox = $state<HTMLInputElement | null>(null);
 	const reduceMotion =
-		typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+		typeof matchMedia === "function" &&
+		matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 	/** Videos of a channel row worth showing: drillable first, three. */
 	function channelRows(url: string): ListenEntry[] {
@@ -70,7 +71,13 @@ channel or start a video. State lives in `ListenMode`. -->
 		onclick={() => void mode.start(v.id)}
 	>
 		{#if v.thumbnail}
-			<img class="thumb" src={v.thumbnail} alt="" loading="lazy" draggable="false" />
+			<img
+				class="thumb"
+				src={v.thumbnail}
+				alt=""
+				loading="lazy"
+				draggable="false"
+			/>
 		{:else}
 			<span class="thumb"></span>
 		{/if}
@@ -91,153 +98,176 @@ channel or start a video. State lives in `ListenMode`. -->
 {/snippet}
 
 <section class="listen-panel" aria-label="Listen">
-		<div class="search">
-			<span class="box">
-				<input
-					bind:this={searchBox}
-					type="search"
-					placeholder={mode.searchKind === "channel" ? "Find a channel" : "Find a video by name or topic"}
-					bind:value={() => mode.query, (v: string) => mode.setQuery(v)}
-					onkeydown={onSearchKey}
-					aria-label="Search YouTube"
-				/>
-				{#if mode.query}
-					<button
-						type="button"
-						class="clear"
-						aria-label="Clear search"
-						title="Clear (Esc)"
-						onclick={() => {
-							mode.setQuery("");
-							searchBox?.focus();
-						}}
+	<div class="search">
+		<span class="box">
+			<input
+				bind:this={searchBox}
+				type="search"
+				placeholder={mode.searchKind === "channel"
+					? "Find a channel"
+					: "Find a video by name or topic"}
+				bind:value={() => mode.query, (v: string) => mode.setQuery(v)}
+				onkeydown={onSearchKey}
+				aria-label="Search YouTube"
+			/>
+			{#if mode.query}
+				<button
+					type="button"
+					class="clear"
+					aria-label="Clear search"
+					title="Clear (Esc)"
+					onclick={() => {
+						mode.setQuery("");
+						searchBox?.focus();
+					}}
+				>
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><path d="M5 5l6 6M11 5l-6 6" /></svg
 					>
-						<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6" /></svg>
-					</button>
-				{/if}
-			</span>
-			<div class="kinds" role="radiogroup" aria-label="Search for">
-				<button
-					type="button"
-					role="radio"
-					aria-checked={mode.searchKind === "video"}
-					onclick={() => setKind("video")}>Videos</button
-				>
-				<button
-					type="button"
-					role="radio"
-					aria-checked={mode.searchKind === "channel"}
-					onclick={() => setKind("channel")}>Channels</button
-				>
-			</div>
-			<button type="button" class="close search-close" aria-label="Close" onclick={onClose}>×</button>
-		</div>
-		<label class="filter">
-			<input type="checkbox" bind:checked={mode.onlyAvailable} />
-			Only with {langName} audio
-		</label>
-
-		{#if mode.error}
-			<p class="error" role="alert">{mode.error}</p>
-		{/if}
-
-		{#if mode.searching}
-			<p class="quiet">Searching…</p>
-		{:else if mode.results}
-			<div class="results">
-				{#each mode.shownResults() as r (r.id)}
-					{#if r.kind === "video"}
-						{@render videoRow(r)}
-					{:else}
-						{@const view = mode.channelViews.get(r.id)}
-						<div class="channel-hit">
-							{#if r.thumbnail}
-								<img class="avatar" src={r.thumbnail} alt="" loading="lazy" draggable="false" />
-							{:else}
-								<span class="avatar"></span>
-							{/if}
-							<span class="channel-text">
-								<span class="channel-name">{r.title}</span>
-								<span class="video-meta">
-									{#if view?.status === "ready"}
-										{channelLabel(mode.channelVideos(r.id), langName) || "no videos"}
-									{:else if view?.status === "error"}
-										{view.error}
-									{:else}
-										<span class="busy">checking…</span>
-									{/if}
-								</span>
-							</span>
-							<button
-								type="button"
-								class="add"
-								disabled={mode.hasChannel(r.id)}
-								onclick={() => mode.addChannel({ url: r.id, name: r.title })}
-							>
-								{mode.hasChannel(r.id) ? "Added" : "Add"}
-							</button>
-						</div>
-					{/if}
-				{:else}
-					<p class="quiet">Nothing with {langName} audio there.</p>
-				{/each}
-			</div>
-		{/if}
-
-		<h3>Your channels</h3>
-		{#if channels.length === 0}
-			<p class="quiet">Search for a channel you watch, then add it here.</p>
-		{/if}
-		{#each channels as c (c.url)}
-			{@const view = mode.channelViews.get(c.url)}
-			{@const rows = channelRows(c.url)}
-			<div
-				class="channel"
-				role="group"
-				aria-label={c.name}
-				onmouseenter={() => (mode.hoveredChannel = c.url)}
-				onmouseleave={() => {
-					if (mode.hoveredChannel === c.url) mode.hoveredChannel = null;
-				}}
+				</button>
+			{/if}
+		</span>
+		<div class="kinds" role="radiogroup" aria-label="Search for">
+			<button
+				type="button"
+				role="radio"
+				aria-checked={mode.searchKind === "video"}
+				onclick={() => setKind("video")}>Videos</button
 			>
-				<div class="channel-head">
-					<button
-						type="button"
-						class="fold"
-						aria-expanded={!c.folded}
-						aria-label={c.folded ? `Show ${c.name}'s videos` : `Fold ${c.name}'s videos`}
-						title="Fold (F)"
-						onclick={() => mode.toggleFold(c.url)}
-					>
-						<svg class:open={!c.folded} viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
-					</button>
-					<span class="channel-name">{view?.page?.name ?? c.name}</span>
-					<span class="video-meta">
-						{#if view?.status === "ready"}
-							{channelLabel(mode.channelVideos(c.url), langName)}
-						{:else if view?.status === "error"}
-							{view.error}
+			<button
+				type="button"
+				role="radio"
+				aria-checked={mode.searchKind === "channel"}
+				onclick={() => setKind("channel")}>Channels</button
+			>
+		</div>
+		<button
+			type="button"
+			class="close search-close"
+			aria-label="Close"
+			onclick={onClose}>×</button
+		>
+	</div>
+	<label class="filter">
+		<input type="checkbox" bind:checked={mode.onlyAvailable} />
+		Only with {langName} audio
+	</label>
+
+	{#if mode.error}
+		<p class="error" role="alert">{mode.error}</p>
+	{/if}
+
+	{#if mode.searching}
+		<p class="quiet">Searching…</p>
+	{:else if mode.results}
+		<div class="results">
+			{#each mode.shownResults() as r (r.id)}
+				{#if r.kind === "video"}
+					{@render videoRow(r)}
+				{:else}
+					{@const view = mode.channelViews.get(r.id)}
+					<div class="channel-hit">
+						{#if r.thumbnail}
+							<img
+								class="avatar"
+								src={r.thumbnail}
+								alt=""
+								loading="lazy"
+								draggable="false"
+							/>
 						{:else}
-							<span class="busy">checking…</span>
+							<span class="avatar"></span>
 						{/if}
-					</span>
-					<button
-						type="button"
-						class="remove"
-						aria-label={`Remove ${c.name}`}
-						title="Remove from your channels"
-						onclick={() => mode.removeChannel(c.url)}>×</button
-					>
-				</div>
-				{#if !c.folded}
-					<div class="channel-videos" transition:slide={{ duration: reduceMotion ? 0 : 180 }}>
-						{#each rows as v (v.id)}
-							{@render videoRow(v)}
-						{/each}
+						<span class="channel-text">
+							<span class="channel-name">{r.title}</span>
+							<span class="video-meta">
+								{#if view?.status === "ready"}
+									{channelLabel(mode.channelVideos(r.id), langName) ||
+										"no videos"}
+								{:else if view?.status === "error"}
+									{view.error}
+								{:else}
+									<span class="busy">checking…</span>
+								{/if}
+							</span>
+						</span>
+						<button
+							type="button"
+							class="add"
+							disabled={mode.hasChannel(r.id)}
+							onclick={() => mode.addChannel({ url: r.id, name: r.title })}
+						>
+							{mode.hasChannel(r.id) ? "Added" : "Add"}
+						</button>
 					</div>
 				{/if}
+			{:else}
+				<p class="quiet">Nothing with {langName} audio there.</p>
+			{/each}
+		</div>
+	{/if}
+
+	<h3>Your channels</h3>
+	{#if channels.length === 0}
+		<p class="quiet">Search for a channel you watch, then add it here.</p>
+	{/if}
+	{#each channels as c (c.url)}
+		{@const view = mode.channelViews.get(c.url)}
+		{@const rows = channelRows(c.url)}
+		<div
+			class="channel"
+			role="group"
+			aria-label={c.name}
+			onmouseenter={() => (mode.hoveredChannel = c.url)}
+			onmouseleave={() => {
+				if (mode.hoveredChannel === c.url) mode.hoveredChannel = null;
+			}}
+		>
+			<div class="channel-head">
+				<button
+					type="button"
+					class="fold"
+					aria-expanded={!c.folded}
+					aria-label={c.folded
+						? `Show ${c.name}'s videos`
+						: `Fold ${c.name}'s videos`}
+					title="Fold (F)"
+					onclick={() => mode.toggleFold(c.url)}
+				>
+					<svg class:open={!c.folded} viewBox="0 0 16 16" aria-hidden="true"
+						><path d="M6 4l4 4-4 4" /></svg
+					>
+				</button>
+				<span class="channel-name">{view?.page?.name ?? c.name}</span>
+				<span class="video-meta">
+					{#if view?.status === "ready"}
+						{channelLabel(mode.channelVideos(c.url), langName)}
+					{:else if view?.status === "error"}
+						{view.error}
+					{:else}
+						<span class="busy">checking…</span>
+					{/if}
+				</span>
+				<button
+					type="button"
+					class="remove"
+					aria-label={`Remove ${c.name}`}
+					title="Remove from your channels"
+					onclick={() => mode.removeChannel(c.url)}>×</button
+				>
 			</div>
-		{/each}
+			{#if !c.folded}
+				<div
+					class="channel-videos"
+					transition:slide={{ duration: reduceMotion ? 0 : 180 }}
+				>
+					{#each rows as v (v.id)}
+						{@render videoRow(v)}
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/each}
 </section>
 
 <style>

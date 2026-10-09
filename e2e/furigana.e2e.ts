@@ -479,12 +479,12 @@ test.describe("keyboard", () => {
 		await expect(actions).toBeVisible({ timeout: 60_000 });
 		const gapPoint = () =>
 			page.evaluate(() => {
-				const text = document.querySelector(
-					"article.assistant .rendered"
-				)?.getBoundingClientRect();
-				const row = document.querySelector(
-					"article.assistant .actions"
-				)?.getBoundingClientRect();
+				const text = document
+					.querySelector("article.assistant .rendered")
+					?.getBoundingClientRect();
+				const row = document
+					.querySelector("article.assistant .actions")
+					?.getBoundingClientRect();
 				if (!text || !row) return null;
 				// Between the last glyph and the action row: inside the
 				// article (hover index set), on no word at all.

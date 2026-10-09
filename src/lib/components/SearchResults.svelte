@@ -46,7 +46,9 @@ the hits, cursor, and what a pick does. -->
 	{:else}
 		{#each hits as hit, n (hit.doc.chatId + (hit.doc.msgId ?? "") + hit.doc.kind + n)}
 			{#if n === 0 || hits[n - 1]?.doc.chatId !== hit.doc.chatId}
-				<div class="search-chat" role="presentation">{chatTitle(hit.doc.chatId)}</div>
+				<div class="search-chat" role="presentation">
+					{chatTitle(hit.doc.chatId)}
+				</div>
 			{/if}
 			<button
 				type="button"

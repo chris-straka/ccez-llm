@@ -141,8 +141,7 @@ renders paged for now). -->
 												onclick={(e) => {
 													e.stopPropagation();
 													actions.recognize(att);
-												}}
-												>{ocrBusyId === att.id ? "…" : "OCR"}</button
+												}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
 											>
 										{/if}
 										<button

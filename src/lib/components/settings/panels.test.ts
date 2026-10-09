@@ -143,9 +143,7 @@ describe("desktop voice copy and controls", () => {
 		if (android === -1) throw new Error("no android branch");
 		const desktop = defaults.indexOf("{:else}", android);
 		if (desktop === -1) throw new Error("no desktop branch");
-		expect(defaults.slice(android, desktop)).toMatch(
-			/Microphone dictation/
-		);
+		expect(defaults.slice(android, desktop)).toMatch(/Microphone dictation/);
 		expect(defaults.slice(desktop)).toMatch(/Microphone dictation/);
 	});
 	it("offers the message-buttons master switch on both platforms", () => {
@@ -201,10 +199,17 @@ describe("own-ink swatches", () => {
 	});
 	it("previews every swatch through its themed token, off hollow", () => {
 		const css = panelsCss();
-		for (const choice of ["pink", "blue", "green", "amber", "purple", "white"]) {
-			expect(
-				ruleBody(css, `.segmented .dot[data-choice="${choice}"]`)
-			).toMatch(new RegExp(`background:\\s*var\\(--own-${choice}\\)`));
+		for (const choice of [
+			"pink",
+			"blue",
+			"green",
+			"amber",
+			"purple",
+			"white"
+		]) {
+			expect(ruleBody(css, `.segmented .dot[data-choice="${choice}"]`)).toMatch(
+				new RegExp(`background:\\s*var\\(--own-${choice}\\)`)
+			);
 		}
 		expect(ruleBody(css, '.segmented .dot[data-choice="off"]')).toMatch(
 			/background:\s*transparent/

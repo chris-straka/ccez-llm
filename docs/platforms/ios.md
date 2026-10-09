@@ -43,25 +43,25 @@ the project from it on every build.
 Android is the reference mobile build. "Same" means the shared web code
 covers it on both.
 
-| Feature | Android | iOS |
-| --- | --- | --- |
-| Share text in from other apps | `ACTION_SEND` share target (`MainActivity.handleSend`) | **Share extension** "Ccez LLM" (`gen/apple/ShareExtension`): opens `ccez-llm://send?text=…`, which prefills a new prompt through the same `annotate-external` path |
-| Select text in another app → Annotate / Speak / Inspect | `PROCESS_TEXT` aliases | **No OS equivalent.** iOS has no third-party entries in other apps' text menus. Select → Share → Ccez LLM sends the text instead (it lands as a prompt, like Android's shares from other apps) |
-| Deep links | Notification taps only | `ccez-llm://new`, `chat/<id>`, `send/annotate/speak/inspect?text=` (URL type in Info.plist, deep-link plugin). Links from outside an app show iOS's "Open in Ccez LLM?" prompt |
-| Layout, gestures, text size, sheets | Shared web UI (`androidUI`) | Same: iOS takes the touch UI; iOS-specific: docked Annotate button (Apple's callout can't be hidden), two-finger double-tap toggles the sidebar |
-| Orientation | Portrait | iPhone portrait; iPad all four |
-| Safe areas / keyboard | Edge-to-edge + IME padding bridge | `viewport-fit=cover` + `env(safe-area-*)`; visualViewport keyboard pin |
-| Read aloud (native voices) | `Tts.kt` | AVSpeechSynthesizer (`tts.rs`). Saving speech to a file is macOS/Android only |
-| Dictation | `Dictation.kt` | Web Speech in WKWebView where iOS offers it; no native recognizer yet (gap) |
-| OCR (images, captures) | Tesseract WASM | Tesseract WASM (same) |
-| API keys | Android Keystore | iOS Keychain (`keyring` apple-native), debug builds too |
-| Page fetch (`fetch_url`) TLS | System CA dirs loaded into BoringSSL | Mozilla roots bundled (`webpki-root-certs`), since iOS exposes no CA files |
-| Background replies | Foreground service keeps a reply running | Runs while the app is open; iOS suspends it about 30 s after backgrounding, and the turn resumes or shows as interrupted on return (gap: no background task claim yet) |
-| "Reply ready" notification | Notification channel, tap opens the chat | Notification plugin sends it; the permission prompt shows at first launch, as on Android (iOS guidance prefers asking in context); tap-to-open-chat not wired (gap) |
-| In-app update | APK download + installer | None: iOS updates through the App Store / TestFlight. The panel hides the update route |
-| Haptics | Haptics plugin | Haptics plugin (Taptic Engine) |
-| On-device model | Gemini Nano (ML Kit) | None (Apple Foundation Models would be a separate provider) |
-| Hardware keyboard | Android keyboards: desktop chords | iPad keyboards: the same chords with ⌘ (WKWebView reports a Mac platform) |
+| Feature                                                 | Android                                                | iOS                                                                                                                                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Share text in from other apps                           | `ACTION_SEND` share target (`MainActivity.handleSend`) | **Share extension** "Ccez LLM" (`gen/apple/ShareExtension`): opens `ccez-llm://send?text=…`, which prefills a new prompt through the same `annotate-external` path                             |
+| Select text in another app → Annotate / Speak / Inspect | `PROCESS_TEXT` aliases                                 | **No OS equivalent.** iOS has no third-party entries in other apps' text menus. Select → Share → Ccez LLM sends the text instead (it lands as a prompt, like Android's shares from other apps) |
+| Deep links                                              | Notification taps only                                 | `ccez-llm://new`, `chat/<id>`, `send/annotate/speak/inspect?text=` (URL type in Info.plist, deep-link plugin). Links from outside an app show iOS's "Open in Ccez LLM?" prompt                 |
+| Layout, gestures, text size, sheets                     | Shared web UI (`androidUI`)                            | Same: iOS takes the touch UI; iOS-specific: docked Annotate button (Apple's callout can't be hidden), two-finger double-tap toggles the sidebar                                                |
+| Orientation                                             | Portrait                                               | iPhone portrait; iPad all four                                                                                                                                                                 |
+| Safe areas / keyboard                                   | Edge-to-edge + IME padding bridge                      | `viewport-fit=cover` + `env(safe-area-*)`; visualViewport keyboard pin                                                                                                                         |
+| Read aloud (native voices)                              | `Tts.kt`                                               | AVSpeechSynthesizer (`tts.rs`). Saving speech to a file is macOS/Android only                                                                                                                  |
+| Dictation                                               | `Dictation.kt`                                         | Web Speech in WKWebView where iOS offers it; no native recognizer yet (gap)                                                                                                                    |
+| OCR (images, captures)                                  | Tesseract WASM                                         | Tesseract WASM (same)                                                                                                                                                                          |
+| API keys                                                | Android Keystore                                       | iOS Keychain (`keyring` apple-native), debug builds too                                                                                                                                        |
+| Page fetch (`fetch_url`) TLS                            | System CA dirs loaded into BoringSSL                   | Mozilla roots bundled (`webpki-root-certs`), since iOS exposes no CA files                                                                                                                     |
+| Background replies                                      | Foreground service keeps a reply running               | Runs while the app is open; iOS suspends it about 30 s after backgrounding, and the turn resumes or shows as interrupted on return (gap: no background task claim yet)                         |
+| "Reply ready" notification                              | Notification channel, tap opens the chat               | Notification plugin sends it; the permission prompt shows at first launch, as on Android (iOS guidance prefers asking in context); tap-to-open-chat not wired (gap)                            |
+| In-app update                                           | APK download + installer                               | None: iOS updates through the App Store / TestFlight. The panel hides the update route                                                                                                         |
+| Haptics                                                 | Haptics plugin                                         | Haptics plugin (Taptic Engine)                                                                                                                                                                 |
+| On-device model                                         | Gemini Nano (ML Kit)                                   | None (Apple Foundation Models would be a separate provider)                                                                                                                                    |
+| Hardware keyboard                                       | Android keyboards: desktop chords                      | iPad keyboards: the same chords with ⌘ (WKWebView reports a Mac platform)                                                                                                                      |
 
 ## What still needs an Apple account
 

@@ -14,8 +14,7 @@ import { tauriBackendAvailable } from "./secrets";
  */
 export async function readClipboardText(
 	shellRead: () => Promise<string> = readShellText,
-	webRead: () => Promise<string> = () =>
-		navigator.clipboard.readText(),
+	webRead: () => Promise<string> = () => navigator.clipboard.readText(),
 	inShell: boolean = tauriBackendAvailable()
 ): Promise<string | null> {
 	if (inShell) {

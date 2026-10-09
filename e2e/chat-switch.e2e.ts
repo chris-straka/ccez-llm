@@ -120,9 +120,8 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 			proto.startViewTransition = function (): {
 				finished: Promise<unknown>;
 			} {
-				(window as unknown as Record<string, unknown>).__vtCalls = Number(
-					(window as unknown as Record<string, unknown>).__vtCalls
-				) + 1;
+				(window as unknown as Record<string, unknown>).__vtCalls =
+					Number((window as unknown as Record<string, unknown>).__vtCalls) + 1;
 				throw new Error("view transitions are gone");
 			};
 		}
@@ -318,7 +317,9 @@ test("sidebar rows read the opening question over the time", async ({
 					id: "c-fr",
 					createdAt: 1,
 					replyLang: null,
-					messages: [msg("3", "user", "Comment dit-on « window » en français ?")]
+					messages: [
+						msg("3", "user", "Comment dit-on « window » en français ?")
+					]
 				}
 			])
 		);
@@ -346,12 +347,17 @@ test("model titles a chat; the pencil renames it", async ({ page }) => {
 	await page.locator(".ta-input").click();
 	await page.keyboard.type("Was heißt über bitte");
 	await page.keyboard.press("Enter");
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply", {
-		timeout: 15_000
-	});
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply",
+		{
+			timeout: 15_000
+		}
+	);
 	await toggleSidebar(page);
 	const title = page.locator("aside ul li .side-title").first();
-	await expect(title).toHaveText("Mock title Was heißt über", { timeout: 10_000 });
+	await expect(title).toHaveText("Mock title Was heißt über", {
+		timeout: 10_000
+	});
 	const row = page.locator("aside ul li").first();
 	await row.hover();
 	await row.getByRole("button", { name: "Rename chat" }).click();
@@ -367,7 +373,9 @@ test("model titles a chat; the pencil renames it", async ({ page }) => {
 	await expect(title).toHaveText("German prepositions");
 	// Persisted with the chat (the seed init script re-runs on a
 	// reload, so read storage instead of reloading).
-	const stored = await page.evaluate(() => localStorage.getItem("ccez-llm-chats-v1") ?? "");
+	const stored = await page.evaluate(
+		() => localStorage.getItem("ccez-llm-chats-v1") ?? ""
+	);
 	expect(stored).toContain('"title":"German prepositions"');
 	expect(stored).toContain('"titleBy":"user"');
 });
@@ -381,7 +389,10 @@ test("Shift+R reads the hovered chat's name", async ({ page }) => {
 		if (synth) {
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
 				spoken.push(utterance.text);
-				window.setTimeout(() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent), 50);
+				window.setTimeout(
+					() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent),
+					50
+				);
 			}) as typeof synth.speak;
 		}
 	});
@@ -395,7 +406,11 @@ test("Shift+R reads the hovered chat's name", async ({ page }) => {
 	await page.locator("aside ul li .side-chat").first().hover();
 	await page.keyboard.press("Shift+R");
 	await expect
-		.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken.join("|")))
+		.poll(() =>
+			page.evaluate(() =>
+				(window as unknown as { __spoken: string[] }).__spoken.join("|")
+			)
+		)
 		.toContain("Comment dit-on window");
 });
 

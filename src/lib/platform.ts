@@ -299,8 +299,7 @@ export function switcherVeilStep(
 ): 1 | -1 | null {
 	const dx = endX - startX;
 	const dy = endY - startY;
-	if (Math.abs(dx) < minDistance || Math.abs(dy) > Math.abs(dx))
-		return null;
+	if (Math.abs(dx) < minDistance || Math.abs(dy) > Math.abs(dx)) return null;
 	return dx > 0 ? -1 : 1;
 }
 
@@ -482,7 +481,10 @@ export function multiTapOwnsRelease(
 	windowMs = 800
 ): boolean {
 	return (
-		seq !== null && seq.count >= 2 && now - seq.at >= 0 && now - seq.at < windowMs
+		seq !== null &&
+		seq.count >= 2 &&
+		now - seq.at >= 0 &&
+		now - seq.at < windowMs
 	);
 }
 
@@ -498,8 +500,7 @@ export function stepCyclicId<T>(
 	direction: 1 | -1
 ): T | undefined {
 	if (ids.length === 0) return undefined;
-	const next =
-		(ids.indexOf(current) + direction + ids.length) % ids.length;
+	const next = (ids.indexOf(current) + direction + ids.length) % ids.length;
 	return ids[next];
 }
 

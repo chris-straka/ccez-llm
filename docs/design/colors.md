@@ -52,41 +52,41 @@ platforms can't share one vendor's identity. So the palette is
 
 ## The palette (roles, not hues)
 
-| Token          | Light                 | Dark                  | Role                                                                                                                                                                             |
-| -------------- | --------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--accent`     | `#007aff`             | `#0a84ff`             | Links, badge fill, pencil hover, active markers, primary fills on light                                                                                                          |
-| `--accent-ink` | `#fff`                | `#fff`                | Glyph on accent fills (badge count)                                                                                                                                              |
-| `--ans-ready`  | `#1c1c1e`             | `#ff9f0a`             | Annotation answer-ready badge (near-black on light — orange melted into the yellow wash; orange on dark where black would vanish; waiting rides `--accent`)                      |
-| `--ink`        | `#1c1c1e`             | `#f2f2f7`             | Body text                                                                                                                                                                        |
-| `--muted`      | `#6e6e73`             | `#98989f`             | Quiet voice: notes, cancel, icon buttons at rest                                                                                                                                 |
-| `--ok`         | `#1f7a4d`             | `#7cc3a3`             | Success / TTS-active states                                                                                                                                                      |
-| `--ok-wash`    | `#e6f4ea`             | `#12351f`             | Success surface (settings result wash)                                                                                                                                           |
-| `--alarm`      | `#ff3b30`             | `#ff6b62`             | Live signals: recording states (popover tools, mic button)                                                                                                                       |
-| `--danger`     | `#94250a`             | `#e89a90`             | All deletes: Clear-all, per-draft delete, sidebar chat delete. Deeper cut than alarm — small text needs the contrast                                                             |
-| `--error-bg`   | `#fdecea`             | `#3d1008`             | Error toast / banner surface                                                                                                                                                     |
-| `--error-ink`  | `#94250a`             | `#ffb4a2`             | Error toast / banner text (light value happens to equal danger — roles differ, keep both)                                                                                        |
-| `--error-line` | `#e0a392`             | `#7a2a1c`             | Error toast border                                                                                                                                                               |
-| `--sel-tint`   | `rgba(0,122,255,.28)` | `rgba(10,132,255,.4)` | `::selection` wash: the accent as plain rgba, not `color-mix` (Chromium serializes `color-mix()` unresolved, which breaks pins). Was indigo — the most AI-looking color we owned |
-| `--hl`         | `#eef4ff`             | `#12233d`             | Attachment pills, jump highlight wash                                                                                                                                            |
-| `--hover-wash` | `#ececf1`             | `#2c2c2e`             | Row hovers                                                                                                                                                                       |
-| `--focus`      | `#3a3a3c`             | `#aeaeb2`             | Focus rings, selected-row marker                                                                                                                                                 |
-| `--bg-overlay` | `#fff` | `#2a2a2f` | Floating overlay surface: annotation box, answer card, sent and draft cards. One clear step above the page on dark (`#1c1c1e` on `#17171a` read as page) |
-| `--line-overlay` | `#e5e5ea` | `#4a4a50` | Overlay hairline edge, also the selection menu's dividers |
-| `--overlay-hover` | `#f1f1f4` | `#36363c` | Hover wash on overlay buttons (`--bg-wash` equals the dark overlay) |
-| `--overlay-glass` | `rgba(255,255,255,.88)` | `rgba(42,42,47,.92)` | Frosted overlays: selection menu, readings panels |
-| `--shadow-overlay` | `0 12px 40px` at `.18` | two layers, `.65` + `.4` | Overlay drop shadow; dark needs the heavier stack to show at all |
-| `--selected-wash` | `#e5f0ff` | (inverted fill instead) | Settings selected pills on light |
-| `--scrim` | `rgba(0,0,0,.15)` | `rgba(0,0,0,.45)` | Thread dim while the annotation box or answer card is open, painted as a `100vmax` spread ring on the overlay's own shadow (no element, click-off still lands) |
-| `--bg-chrome` | `#fff` | `#19191c` | Drawers (chat list, settings): one step off the thread on dark |
-| `--shadow-raised` | `none` | `0 10px 30px` at `.35` | The composer floats on dark; light stays flat |
-| `--thinking-2` | `#5ac8fa`             | `#64d2ff`             | Thinking dots middle step (sky; dot 1 rides `--accent`)                                                                                                                          |
-| `--thinking-3` | `#34c759`             | `#30d158`             | Thinking dots last step (green)                                                                                                                                                  |
-| `--own-pink`   | `#be185d`             | `#f9a8d4`             | Own-message ink: default swatch (deep rose / pink), wired via `main[data-own-ink]`                                                                                               |
-| `--own-blue`   | `#1d4ed8`             | `#93c5fd`             | Own-message ink swatch                                                                                                                                                           |
-| `--own-green`  | `#15803d`             | `#86efac`             | Own-message ink swatch                                                                                                                                                           |
-| `--own-amber`  | `#b45309`             | `#fcd34d`             | Own-message ink swatch                                                                                                                                                           |
-| `--own-purple` | `#7e22ce`             | `#d8b4fe`             | Own-message ink swatch                                                                                                                                                           |
-| `--own-white`  | `#1c1c1e`             | `#ffffff`             | Own-message ink swatch: white on dark, theme ink on light (white reads nowhere on light)                                                                                         |
+| Token              | Light                   | Dark                     | Role                                                                                                                                                                             |
+| ------------------ | ----------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--accent`         | `#007aff`               | `#0a84ff`                | Links, badge fill, pencil hover, active markers, primary fills on light                                                                                                          |
+| `--accent-ink`     | `#fff`                  | `#fff`                   | Glyph on accent fills (badge count)                                                                                                                                              |
+| `--ans-ready`      | `#1c1c1e`               | `#ff9f0a`                | Annotation answer-ready badge (near-black on light — orange melted into the yellow wash; orange on dark where black would vanish; waiting rides `--accent`)                      |
+| `--ink`            | `#1c1c1e`               | `#f2f2f7`                | Body text                                                                                                                                                                        |
+| `--muted`          | `#6e6e73`               | `#98989f`                | Quiet voice: notes, cancel, icon buttons at rest                                                                                                                                 |
+| `--ok`             | `#1f7a4d`               | `#7cc3a3`                | Success / TTS-active states                                                                                                                                                      |
+| `--ok-wash`        | `#e6f4ea`               | `#12351f`                | Success surface (settings result wash)                                                                                                                                           |
+| `--alarm`          | `#ff3b30`               | `#ff6b62`                | Live signals: recording states (popover tools, mic button)                                                                                                                       |
+| `--danger`         | `#94250a`               | `#e89a90`                | All deletes: Clear-all, per-draft delete, sidebar chat delete. Deeper cut than alarm — small text needs the contrast                                                             |
+| `--error-bg`       | `#fdecea`               | `#3d1008`                | Error toast / banner surface                                                                                                                                                     |
+| `--error-ink`      | `#94250a`               | `#ffb4a2`                | Error toast / banner text (light value happens to equal danger — roles differ, keep both)                                                                                        |
+| `--error-line`     | `#e0a392`               | `#7a2a1c`                | Error toast border                                                                                                                                                               |
+| `--sel-tint`       | `rgba(0,122,255,.28)`   | `rgba(10,132,255,.4)`    | `::selection` wash: the accent as plain rgba, not `color-mix` (Chromium serializes `color-mix()` unresolved, which breaks pins). Was indigo — the most AI-looking color we owned |
+| `--hl`             | `#eef4ff`               | `#12233d`                | Attachment pills, jump highlight wash                                                                                                                                            |
+| `--hover-wash`     | `#ececf1`               | `#2c2c2e`                | Row hovers                                                                                                                                                                       |
+| `--focus`          | `#3a3a3c`               | `#aeaeb2`                | Focus rings, selected-row marker                                                                                                                                                 |
+| `--bg-overlay`     | `#fff`                  | `#2a2a2f`                | Floating overlay surface: annotation box, answer card, sent and draft cards. One clear step above the page on dark (`#1c1c1e` on `#17171a` read as page)                         |
+| `--line-overlay`   | `#e5e5ea`               | `#4a4a50`                | Overlay hairline edge, also the selection menu's dividers                                                                                                                        |
+| `--overlay-hover`  | `#f1f1f4`               | `#36363c`                | Hover wash on overlay buttons (`--bg-wash` equals the dark overlay)                                                                                                              |
+| `--overlay-glass`  | `rgba(255,255,255,.88)` | `rgba(42,42,47,.92)`     | Frosted overlays: selection menu, readings panels                                                                                                                                |
+| `--shadow-overlay` | `0 12px 40px` at `.18`  | two layers, `.65` + `.4` | Overlay drop shadow; dark needs the heavier stack to show at all                                                                                                                 |
+| `--selected-wash`  | `#e5f0ff`               | (inverted fill instead)  | Settings selected pills on light                                                                                                                                                 |
+| `--scrim`          | `rgba(0,0,0,.15)`       | `rgba(0,0,0,.45)`        | Thread dim while the annotation box or answer card is open, painted as a `100vmax` spread ring on the overlay's own shadow (no element, click-off still lands)                   |
+| `--bg-chrome`      | `#fff`                  | `#19191c`                | Drawers (chat list, settings): one step off the thread on dark                                                                                                                   |
+| `--shadow-raised`  | `none`                  | `0 10px 30px` at `.35`   | The composer floats on dark; light stays flat                                                                                                                                    |
+| `--thinking-2`     | `#5ac8fa`               | `#64d2ff`                | Thinking dots middle step (sky; dot 1 rides `--accent`)                                                                                                                          |
+| `--thinking-3`     | `#34c759`               | `#30d158`                | Thinking dots last step (green)                                                                                                                                                  |
+| `--own-pink`       | `#be185d`               | `#f9a8d4`                | Own-message ink: default swatch (deep rose / pink), wired via `main[data-own-ink]`                                                                                               |
+| `--own-blue`       | `#1d4ed8`               | `#93c5fd`                | Own-message ink swatch                                                                                                                                                           |
+| `--own-green`      | `#15803d`               | `#86efac`                | Own-message ink swatch                                                                                                                                                           |
+| `--own-amber`      | `#b45309`               | `#fcd34d`                | Own-message ink swatch                                                                                                                                                           |
+| `--own-purple`     | `#7e22ce`               | `#d8b4fe`                | Own-message ink swatch                                                                                                                                                           |
+| `--own-white`      | `#1c1c1e`               | `#ffffff`                | Own-message ink swatch: white on dark, theme ink on light (white reads nowhere on light)                                                                                         |
 
 ## Theme styles
 
@@ -97,16 +97,16 @@ tiles per side. The styles are `lightStyle` / `darkStyle` in
 side shows) and pinned before first paint by the `app.html` boot
 script. While following the system, the toggle only browses sides.
 
-| Side  | Style      | Page      | Ink       | Note                                         |
-| ----- | ---------- | --------- | --------- | -------------------------------------------- |
-| Light | Paper      | `#fff`    | `#1c1c1e` | Default: the plain light block               |
-| Light | Mist       | `#f2f2f4` | `#26262a` | Soft gray, less glare                        |
-| Light | Sepia      | `#f6eedb` | `#3a2e21` | Book page for long reading                   |
-| Light | Contrast   | `#fff`    | `#000`    | Low vision: dark hairlines, deeper accent and swatches |
-| Dark  | Graphite   | `#121214` | `#f2f2f7` | Default: the plain dark block                |
-| Dark  | Ink        | `#000`    | `#e6e4df` | OLED black, warm ink; composer lifts by a hairline |
-| Dark  | Warm       | `#171412` | `#ece4d8` | Lamplight                                    |
-| Dark  | Contrast   | `#000`    | `#fff`    | Low vision: bright hairlines, lighter swatches |
+| Side  | Style    | Page      | Ink       | Note                                                   |
+| ----- | -------- | --------- | --------- | ------------------------------------------------------ |
+| Light | Paper    | `#fff`    | `#1c1c1e` | Default: the plain light block                         |
+| Light | Mist     | `#f2f2f4` | `#26262a` | Soft gray, less glare                                  |
+| Light | Sepia    | `#f6eedb` | `#3a2e21` | Book page for long reading                             |
+| Light | Contrast | `#fff`    | `#000`    | Low vision: dark hairlines, deeper accent and swatches |
+| Dark  | Graphite | `#121214` | `#f2f2f7` | Default: the plain dark block                          |
+| Dark  | Ink      | `#000`    | `#e6e4df` | OLED black, warm ink; composer lifts by a hairline     |
+| Dark  | Warm     | `#171412` | `#ece4d8` | Lamplight                                              |
+| Dark  | Contrast | `#000`    | `#fff`    | Low vision: bright hairlines, lighter swatches         |
 
 Each style block restates only the tokens it changes; accents and
 semantic colors are shared unless a contrast style needs them deeper.

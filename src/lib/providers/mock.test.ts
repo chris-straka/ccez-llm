@@ -84,7 +84,9 @@ describe("mock fetch hook", () => {
 			"ccez-mock-reply",
 			"Bien sûr !\n\n```correction\nJe vais au parc\n```"
 		);
-		const result = await new MockProvider().chat([{ role: "user", content: "hi" }]);
+		const result = await new MockProvider().chat([
+			{ role: "user", content: "hi" }
+		]);
 		expect(result.content).toContain("```correction");
 	});
 });

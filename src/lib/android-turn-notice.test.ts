@@ -32,7 +32,10 @@ describe("android turn notice", () => {
  * on source: backgrounding only exists on hardware.
  */
 function onVisibleBody(): string {
-	const source = readFileSync(new URL("../routes/+page.svelte", import.meta.url), "utf8");
+	const source = readFileSync(
+		new URL("../routes/+page.svelte", import.meta.url),
+		"utf8"
+	);
 	const start = source.indexOf("const onVisible");
 	expect(start).toBeGreaterThan(-1);
 	const end = source.indexOf("\n\t\t};", start);
@@ -75,7 +78,9 @@ describe("android service observability", () => {
 describe("android background silence", () => {
 	it("returns from the hidden branch with no haptic", () => {
 		const body = onVisibleBody();
-		expect(body).toContain('if (document.visibilityState !== "visible") return;');
+		expect(body).toContain(
+			'if (document.visibilityState !== "visible") return;'
+		);
 		expect(body).not.toContain("hapticBeatAsync");
 		expect(body).not.toContain("buzzBeat");
 		expect(body).not.toContain("buzzTap");

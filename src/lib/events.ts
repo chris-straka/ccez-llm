@@ -123,9 +123,7 @@ export function isSidebarTarget(target: EventTarget | null): boolean {
  * button keeps its native Enter.
  */
 export function isChatRowTarget(target: EventTarget | null): boolean {
-	return (
-		closestFromTarget(target, "aside ul li button.side-chat") !== null
-	);
+	return closestFromTarget(target, "aside ul li button.side-chat") !== null;
 }
 
 /** True anywhere inside the learner-news story panel. */

@@ -38,20 +38,33 @@ owns the row markup and its surfaces. -->
 		actions: LangMenusActions;
 	}
 
-	let { openId, anchor, activeCode, highlightCode = null, previewing, actions }: Props =
-		$props();
+	let {
+		openId,
+		anchor,
+		activeCode,
+		highlightCode = null,
+		previewing,
+		actions
+	}: Props = $props();
 	let root: HTMLElement | undefined = $state();
 	// Typed matches scroll into view inside the sheet (never the page).
 	$effect(() => {
 		const code = highlightCode;
 		if (!code || !root) return;
 		root
-			.querySelector<HTMLElement>(`.lang-list [data-lang="${CSS.escape(code)}"]`)
+			.querySelector<HTMLElement>(
+				`.lang-list [data-lang="${CSS.escape(code)}"]`
+			)
 			?.scrollIntoView({ block: "nearest" });
 	});
 </script>
 
-<div class="lang-menus" aria-label="Reply language" inert={previewing} bind:this={root}>
+<div
+	class="lang-menus"
+	aria-label="Reply language"
+	inert={previewing}
+	bind:this={root}
+>
 	{#each LANGUAGE_MENUS as menu (menu.id)}
 		{@const sections = menuSections(menu)}
 		<div class="lang-menu">
@@ -86,14 +99,19 @@ owns the row markup and its surfaces. -->
 							<span class="lang-sep" role="separator"></span>
 						{/if}
 						{#each group as lang (lang.code)}
-							{@const quickKey = quickKeyFor(lang.code, currentPlatform().isMac)}
+							{@const quickKey = quickKeyFor(
+								lang.code,
+								currentPlatform().isMac
+							)}
 							<button
 								type="button"
 								role="menuitem"
 								class:selected={activeCode === lang.code}
 								class:typed={highlightCode === lang.code}
 								data-lang={lang.code}
-								title={quickKey && tauriBackendAvailable() ? `${lang.name} (${quickKey})` : lang.name}
+								title={quickKey && tauriBackendAvailable()
+									? `${lang.name} (${quickKey})`
+									: lang.name}
 								onclick={() => actions.pick(lang)}
 								onpointerenter={() => actions.hover?.(lang)}
 								onfocus={() => actions.hover?.(lang)}

@@ -40,9 +40,7 @@ describe("nodeAtBlockOffset", () => {
 		for (const at of [0, 3, 6, 8, 11, 12]) {
 			const hit = nodeAtBlockOffset(document, el, at);
 			expect(hit).not.toBeNull();
-			expect(caretOffsetInBlock(document, el, hit!.node, hit!.offset)).toBe(
-				at
-			);
+			expect(caretOffsetInBlock(document, el, hit!.node, hit!.offset)).toBe(at);
 		}
 	});
 

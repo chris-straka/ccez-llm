@@ -51,9 +51,7 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			// Pins never persist (fresh loads start unpinned, so a
 			// stale approval can't ride a later send); deleting is
 			// the only removal.
-			...(typeof a.answer === "string" && a.answer
-				? { answer: a.answer }
-				: {})
+			...(typeof a.answer === "string" && a.answer ? { answer: a.answer } : {})
 		});
 	}
 	return out;

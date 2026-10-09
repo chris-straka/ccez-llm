@@ -29,11 +29,11 @@
 	}
 
 	let {
-	notices,
-	toastAction = $bindable(),
-	errorToastAction = $bindable(),
-	android
-}: Props = $props();
+		notices,
+		toastAction = $bindable(),
+		errorToastAction = $bindable(),
+		android
+	}: Props = $props();
 
 	/** Plain-toast copy: silent on success (the toast is the
 	confirmation); a failed write says so, guarded against clobbering
@@ -77,10 +77,7 @@
 	tap copies the failure text (bug reports, keys from 401s), then
 	dismisses. A failed copy re-flashes red. */
 	function errorToastTap(): void {
-		if (
-			errorToastAction &&
-			errorToastAction.seq === notices.errorToast.seq
-		) {
+		if (errorToastAction && errorToastAction.seq === notices.errorToast.seq) {
 			const run = errorToastAction.run;
 			errorToastAction = null;
 			dismissErrorToast();
@@ -116,8 +113,7 @@
 		class={toastLong(notices.errorToast.message)
 			? "toast error long"
 			: "toast error"}
-		title={errorToastAction &&
-		errorToastAction.seq === notices.errorToast.seq
+		title={errorToastAction && errorToastAction.seq === notices.errorToast.seq
 			? "Open"
 			: "Click to copy"}
 		aria-live="polite"

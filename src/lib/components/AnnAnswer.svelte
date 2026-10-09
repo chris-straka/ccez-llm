@@ -68,7 +68,8 @@ prompt approval the badge's plus/minus. -->
 	let floor = $state<number | null>(null);
 	function readFloor(): void {
 		const prompt = document.querySelector(".prompt");
-		const top = prompt instanceof HTMLElement ? prompt.getBoundingClientRect().top : null;
+		const top =
+			prompt instanceof HTMLElement ? prompt.getBoundingClientRect().top : null;
 		floor = top !== null && top > 0 && top < vh ? top : null;
 	}
 	$effect(() => {

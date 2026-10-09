@@ -12,10 +12,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		SentTagAction
 	} from "$lib/attachments";
 	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
-	import {
-	annRefsFor,
-	REFS_ONLY_BODY
-} from "$lib/annotation-block";
+	import { annRefsFor, REFS_ONLY_BODY } from "$lib/annotation-block";
 	import { correctionHtmlFor } from "$lib/correction";
 	import {
 		detectScript,
@@ -283,7 +280,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				<!-- Quiet entry: shows only while cards are due, never
 				as a badge or ping. -->
 				<button type="button" class="flashcards-open" onclick={onFlashcards}>
-					{flashcardsDue === 1 ? "1 flashcard due" : `${flashcardsDue} flashcards due`}
+					{flashcardsDue === 1
+						? "1 flashcard due"
+						: `${flashcardsDue} flashcards due`}
 				</button>
 			{/if}
 			{#if activeReplyCode && listen.available && !previewing}
@@ -329,7 +328,11 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		rows, the rolling summary stays compacted either way. -->
 		<div class="trim-marker" role="status">
 			<span class="trim-rule" aria-hidden="true"></span>
-			<span>{trimIdx === 1 ? "1 message trimmed" : `${trimIdx} messages trimmed`}</span>
+			<span
+				>{trimIdx === 1
+					? "1 message trimmed"
+					: `${trimIdx} messages trimmed`}</span
+			>
 			<button type="button" class="trim-undo" onclick={onUndoTrim}>Undo</button>
 			<span class="trim-rule" aria-hidden="true"></span>
 		</div>
@@ -343,7 +346,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
 		<!-- News openers rest folded as their tag: a fold toggle
 		opens what was sent, so membership means "unfolded" there. -->
-		{@const newsTag = msg.role === "user" && parseNewsLaunch(msg.content) !== null}
+		{@const newsTag =
+			msg.role === "user" && parseNewsLaunch(msg.content) !== null}
 		{@const isFolded = newsTag ? !foldedIds.has(msg.id) : foldedIds.has(msg.id)}
 		{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 		{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
@@ -412,143 +416,144 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			{/if}
 		{/snippet}
 		{#if trimIdx <= 0 || i >= trimIdx}
-		<MessageArticle
-			header={msg.clip || msg.drillEnd ? clipHeader : undefined}
-			footer={msg.clip ? clipFooter : undefined}
-			{msg}
-			index={i}
-			selected={focusMode === "scroll" && selectedIdx === i}
-			folded={isFolded}
-			speakingNow={speakingId === msg.id}
-			speakingSel={speakingSelection === msg.id}
-			aidLoading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
-			actionsOpen={shownActionsId === msg.id}
-			editing={editingMsgId === msg.id}
-			{sentRefs}
-			textModels={actions.sentTagModels(msg, tagBase).filter((m) => m.kind === "text")}
-			imageModels={actions.sentTagModels(msg, tagBase).filter((m) => m.kind === "image")}
-			{ocrBusyId}
-			{android}
-			showButtons={showButtons}
-			{refsEditing}
-			{refsBlink}
-			bind:popOpen
-			bind:refsDraft
-			bind:refsBox
-			streaming={streamingThis}
-			{sourcesWanted}
-			foldPreview={refsOnly && sentRefs
-				? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
-				: null}
-			marks={actions.marksFor(msg.id)}
-			{washId}
-			{expandedTags}
-			textOverride={actions.aidedTextFor(msg)}
-			contentOverride={sentRefs
-				? refsOnly && !isFolded
-					? REFS_ONLY_BODY
-					: sentRefs.text
-				: null}
-			{correction}
-			aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
-			{previewing}
-			news={newsTag && !previewing
-				? {
-						busy: sending && chatId === sendingChatId,
-						setLevel: (level: CefrLevel) => actions.newsSetLevel(level, msg)
+			<MessageArticle
+				header={msg.clip || msg.drillEnd ? clipHeader : undefined}
+				footer={msg.clip ? clipFooter : undefined}
+				{msg}
+				index={i}
+				selected={focusMode === "scroll" && selectedIdx === i}
+				folded={isFolded}
+				speakingNow={speakingId === msg.id}
+				speakingSel={speakingSelection === msg.id}
+				aidLoading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
+				actionsOpen={shownActionsId === msg.id}
+				editing={editingMsgId === msg.id}
+				{sentRefs}
+				textModels={actions
+					.sentTagModels(msg, tagBase)
+					.filter((m) => m.kind === "text")}
+				imageModels={actions
+					.sentTagModels(msg, tagBase)
+					.filter((m) => m.kind === "image")}
+				{ocrBusyId}
+				{android}
+				{showButtons}
+				{refsEditing}
+				{refsBlink}
+				bind:popOpen
+				bind:refsDraft
+				bind:refsBox
+				streaming={streamingThis}
+				{sourcesWanted}
+				foldPreview={refsOnly && sentRefs
+					? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
+					: null}
+				marks={actions.marksFor(msg.id)}
+				{washId}
+				{expandedTags}
+				textOverride={actions.aidedTextFor(msg)}
+				contentOverride={sentRefs
+					? refsOnly && !isFolded
+						? REFS_ONLY_BODY
+						: sentRefs.text
+					: null}
+				{correction}
+				aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
+				{previewing}
+				news={newsTag && !previewing
+					? {
+							busy: sending && chatId === sendingChatId,
+							setLevel: (level: CefrLevel) => actions.newsSetLevel(level, msg)
+						}
+					: null}
+				aidKinds={actions.localAidsOverrideFor(msg)}
+				{aidPreferred}
+				{foldTitle}
+				{deleteTitle}
+				speaking={actions.messageSpeaking(msg)}
+				speakable={actions.messageSpeakable(msg)}
+				speakLabel={actions.speakTitle(msg)}
+				{aidId}
+				aidModelPinned={aidModelPin.has(msg.id)}
+				aidVocalizing={vocalizing.has(msg.id)}
+				{localKinds}
+				pinnedKinds={actions.pinnedKinds(msg.id)}
+				aidBusy={aidBusy.has(msg.id)}
+				actions={{
+					articleClick: (event: MouseEvent) => {
+						if (
+							event.target instanceof Element &&
+							event.target.closest(".sent-fold,.sent-open")
+						)
+							return;
+						if (event.altKey) actions.toggleFold(msg.id);
+						actions.toggleMessageActions(msg.id, event);
+					},
+					articleEnter: () => actions.hoverRow(i),
+					articleLeave: (event: MouseEvent) =>
+						actions.articleLeave(event, msg, i),
+					editFocusOut: (event: FocusEvent) => actions.editFocusOut(event),
+					editAction: (node: HTMLElement) => actions.editAction(node),
+					tags: {
+						toggle: (id: string) => actions.toggleSentTag(msg, id),
+						copy: (att: Attachment) => actions.copyAttachment(att),
+						recognize: (att: Attachment) =>
+							void actions.recognizeAttachment(att)
+					},
+					refs: {
+						clearAll: () => actions.clearSentRefs(msg.id),
+						quoteClick: (quote: string, n: number) =>
+							actions.refsQuoteClick(msg.id, quote, n),
+						copy: (quote: string, comment: string) =>
+							actions.copyAnnotation(quote, comment),
+						startEdit: (ref: { n: number; comment: string }) =>
+							actions.startRefsEdit(msg.id, ref),
+						saveEdit: () => actions.saveRefsEdit(),
+						cancelEdit: () => actions.cancelRefsEdit()
+					},
+					setHoverBadge: (id: string | null) => actions.setHoverBadge(id),
+					badgeClick: (id: AnnotationId, anchor: { x: number; y: number }) =>
+						actions.badgeClick(id, anchor),
+					attachAction: (action: SentTagAction, id: string) =>
+						actions.attachAction(action, id),
+					tagToggle: (id: string) => actions.toggleSentTag(msg, id),
+					toast: (message: string) => actions.toast(message),
+					foldToggle: (index: number) => actions.togglePasteFold(msg, index),
+					unfold: () => actions.toggleFold(msg.id),
+					aidLoadingChange: (loading: boolean) =>
+						actions.setAidBusy(msg.id, loading),
+					aidError: (_id: ChatMsgId, reason?: string) =>
+						actions.aidFailed(msg.id, reason),
+					ma: {
+						toggleFold: () => actions.toggleFold(msg.id),
+						copy: () => actions.copyText(msg.content, msg.role),
+						branch: () => actions.branchHere(i),
+						drop: () => actions.dropMessage(i),
+						stopVoice: () => actions.stopVoice(),
+						speak: () => void actions.speakReply(msg),
+						unpinModelAid: () => actions.unpinModelAid(msg),
+						runModelAid: (modelId: string) =>
+							void actions.runModelAidFor(msg, modelId, true),
+						unpinLocalAid: (kind: LocalAid) => actions.unpinLocalAid(msg, kind),
+						pinLocalAid: (kind: LocalAid) => actions.pinLocalAid(msg, kind),
+						peekAid: (kind: LocalAid) => actions.peekAid(msg, kind),
+						unpeekAid: () => actions.unpeekAid(msg),
+						commitEdit: () => void actions.commitMessageEdit(),
+						edit: () => void actions.editMessage(i),
+						rerun: () => actions.rerunFrom(i),
+						retry: () => void actions.retryFailed(),
+						releaseRowFocus: (event: MouseEvent) =>
+							actions.releaseRowFocus(event),
+						holdOpen: () => actions.holdActionsOpen(),
+						releaseHold: () => actions.releaseActionsHold()
 					}
-				: null}
-			aidKinds={actions.localAidsOverrideFor(msg)}
-			{aidPreferred}
-			{foldTitle}
-			{deleteTitle}
-			speaking={actions.messageSpeaking(msg)}
-			speakable={actions.messageSpeakable(msg)}
-			speakLabel={actions.speakTitle(msg)}
-			{aidId}
-			aidModelPinned={aidModelPin.has(msg.id)}
-			aidVocalizing={vocalizing.has(msg.id)}
-			{localKinds}
-			pinnedKinds={actions.pinnedKinds(msg.id)}
-			aidBusy={aidBusy.has(msg.id)}
-			actions={{
-				articleClick: (event: MouseEvent) => {
-					if (
-						event.target instanceof Element &&
-						event.target.closest(".sent-fold,.sent-open")
-					)
-						return;
-					if (event.altKey) actions.toggleFold(msg.id);
-					actions.toggleMessageActions(msg.id, event);
-				},
-				articleEnter: () => actions.hoverRow(i),
-				articleLeave: (event: MouseEvent) =>
-					actions.articleLeave(event, msg, i),
-				editFocusOut: (event: FocusEvent) => actions.editFocusOut(event),
-				editAction: (node: HTMLElement) => actions.editAction(node),
-				tags: {
-					toggle: (id: string) => actions.toggleSentTag(msg, id),
-					copy: (att: Attachment) => actions.copyAttachment(att),
-					recognize: (att: Attachment) => void actions.recognizeAttachment(att)
-				},
-				refs: {
-					clearAll: () => actions.clearSentRefs(msg.id),
-					quoteClick: (quote: string, n: number) =>
-						actions.refsQuoteClick(msg.id, quote, n),
-					copy: (quote: string, comment: string) =>
-						actions.copyAnnotation(quote, comment),
-					startEdit: (ref: { n: number; comment: string }) =>
-						actions.startRefsEdit(msg.id, ref),
-					saveEdit: () => actions.saveRefsEdit(),
-					cancelEdit: () => actions.cancelRefsEdit()
-				},
-				setHoverBadge: (id: string | null) => actions.setHoverBadge(id),
-				badgeClick: (id: AnnotationId, anchor: { x: number; y: number }) =>
-					actions.badgeClick(id, anchor),
-				attachAction: (action: SentTagAction, id: string) =>
-					actions.attachAction(action, id),
-				tagToggle: (id: string) => actions.toggleSentTag(msg, id),
-				toast: (message: string) => actions.toast(message),
-				foldToggle: (index: number) => actions.togglePasteFold(msg, index),
-				unfold: () => actions.toggleFold(msg.id),
-				aidLoadingChange: (loading: boolean) =>
-					actions.setAidBusy(msg.id, loading),
-				aidError: (_id: ChatMsgId, reason?: string) =>
-					actions.aidFailed(msg.id, reason),
-				ma: {
-					toggleFold: () => actions.toggleFold(msg.id),
-					copy: () => actions.copyText(msg.content, msg.role),
-					branch: () => actions.branchHere(i),
-					drop: () => actions.dropMessage(i),
-					stopVoice: () => actions.stopVoice(),
-					speak: () => void actions.speakReply(msg),
-					unpinModelAid: () => actions.unpinModelAid(msg),
-					runModelAid: (modelId: string) =>
-						void actions.runModelAidFor(msg, modelId, true),
-					unpinLocalAid: (kind: LocalAid) => actions.unpinLocalAid(msg, kind),
-					pinLocalAid: (kind: LocalAid) => actions.pinLocalAid(msg, kind),
-					peekAid: (kind: LocalAid) => actions.peekAid(msg, kind),
-					unpeekAid: () => actions.unpeekAid(msg),
-					commitEdit: () => void actions.commitMessageEdit(),
-					edit: () => void actions.editMessage(i),
-					rerun: () => actions.rerunFrom(i),
-					retry: () => void actions.retryFailed(),
-					releaseRowFocus: (event: MouseEvent) =>
-						actions.releaseRowFocus(event),
-					holdOpen: () => actions.holdActionsOpen(),
-					releaseHold: () => actions.releaseActionsHold()
-				}
-			}}
-		/>
+				}}
+			/>
 		{/if}
 	{/each}
 	<!-- Sending status renders in `SendingIndicator.svelte`; the page
 	keeps send/fetch state and labels. -->
-	<SendingIndicator
-		phase={sendingPhase}
-		elapsed={sendElapsed}
-		waitingLabel={waitingLabel}
-	/>
+	<SendingIndicator phase={sendingPhase} elapsed={sendElapsed} {waitingLabel} />
 </div>
 
 <style>

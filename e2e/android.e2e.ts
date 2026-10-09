@@ -1178,12 +1178,9 @@ test.describe("touch", () => {
 		test(`touch selection menu fits the phone at ${fontScale * 100}% text`, async ({
 			page
 		}) => {
-			await seedChat(
-				page,
-				[{ role: "assistant", content: "語" }],
-				null,
-				{ fontScale }
-			);
+			await seedChat(page, [{ role: "assistant", content: "語" }], null, {
+				fontScale
+			});
 			await page.goto("/");
 			await expect(page.locator("article .rendered").first()).toBeVisible();
 			await summonTouchSelection(page);
@@ -1201,13 +1198,17 @@ test.describe("touch", () => {
 				const box = menu.getBoundingClientRect();
 				const out: string[] = [];
 				if (box.left < 0 || box.right > vw)
-					out.push(`menu ${Math.round(box.left)}..${Math.round(box.right)} of ${vw}`);
+					out.push(
+						`menu ${Math.round(box.left)}..${Math.round(box.right)} of ${vw}`
+					);
 				for (const btn of menu.querySelectorAll("button")) {
 					const r = btn.getBoundingClientRect();
 					if (r.left < box.left - 1 || r.right > box.right + 1)
 						out.push(`${btn.textContent} clipped by the menu`);
 				}
-				for (const btn of document.querySelectorAll(".sel-menu button, .ann-dock")) {
+				for (const btn of document.querySelectorAll(
+					".sel-menu button, .ann-dock"
+				)) {
 					if (btn.scrollWidth > btn.clientWidth + 1)
 						out.push(`${btn.textContent} label overflows`);
 					if (btn.scrollHeight > btn.clientHeight + 1)
@@ -1217,8 +1218,13 @@ test.describe("touch", () => {
 						out.push(`${btn.textContent} off screen`);
 				}
 				const dock = document.querySelector(".ann-dock");
-				const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
-				if (dock && parseFloat(getComputedStyle(dock).fontSize) < 1.3 * root * 1.5)
+				const root = parseFloat(
+					getComputedStyle(document.documentElement).fontSize
+				);
+				if (
+					dock &&
+					parseFloat(getComputedStyle(dock).fontSize) < 1.3 * root * 1.5
+				)
 					out.push("dock label never grew");
 				return out;
 			});
@@ -2552,9 +2558,7 @@ test.describe("touch", () => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
-		const box = page.locator(
-			'label.check:has-text("Haptic feedback") input'
-		);
+		const box = page.locator('label.check:has-text("Haptic feedback") input');
 		await expect(box).toBeChecked();
 		// The off state persists through the next settings flush:
 		// dismiss settings, then summon the list (its toggle persists

@@ -104,9 +104,7 @@ test("right-click speaks ruby-wrapped furigana words", async ({ page }) => {
 	expect((await spoken(page)).join("")).toContain("知");
 });
 
-test("right-click on open message space speaks nothing", async ({
-	page
-}) => {
+test("right-click on open message space speaks nothing", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "short" }]);
 	await armSpeechSpy(page);
 	await page.goto("/");

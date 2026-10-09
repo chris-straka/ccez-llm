@@ -396,9 +396,9 @@ test("escape cancels an arabic draft cleanly", async ({ page }) => {
 		{ role: "assistant", content: "اللغة العربية جميلة والأفكار عميقة" }
 	]);
 	await page.goto("/");
-	await expect(
-		page.locator("article .rendered").first()
-	).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await openAnnotate(page, "والأفكار");
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.keyboard.press("Escape");
@@ -439,9 +439,9 @@ test("hovering an arabic badge moves no text", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(
-		page.locator("article .rendered").first()
-	).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// Two annotations on the message: filing asks at once (the
 	// mock provider answers), so both badges land orange. The
 	// shift showed with two badges up, mid-restyle — hover must
@@ -481,10 +481,16 @@ test("hovering an arabic badge moves no text", async ({ page }) => {
 			// The badge wash paints the shared Highlight registry (no DOM
 			// marks), so count registry ranges plus any DOM marks.
 			const reg = w.CSS?.highlights;
-			const washed = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"].flatMap(
-				(n) => [...(reg?.get(n) ?? [])]
-			).length;
-			const walker = document.createTreeWalker(root ?? document.body, NodeFilter.SHOW_TEXT);
+			const washed = [
+				"ccez-ann",
+				"ccez-ann-d1",
+				"ccez-ann-d2",
+				"ccez-ann-d3"
+			].flatMap((n) => [...(reg?.get(n) ?? [])]).length;
+			const walker = document.createTreeWalker(
+				root ?? document.body,
+				NodeFilter.SHOW_TEXT
+			);
 			const parts: string[] = [];
 			let node: Node | null;
 			while ((node = walker.nextNode())) {
@@ -494,7 +500,9 @@ test("hovering an arabic badge moves no text", async ({ page }) => {
 				parts.push(node.textContent ?? "");
 			}
 			const base = parts.join("");
-			const anchor = document.querySelector("article .rendered span.ccez-ann-anchor");
+			const anchor = document.querySelector(
+				"article .rendered span.ccez-ann-anchor"
+			);
 			const rect = anchor?.getBoundingClientRect();
 			const badge = document.querySelector("button.ccez-ann-badge");
 			const sameBadge = w.__b === undefined ? true : w.__b === badge;
@@ -505,7 +513,9 @@ test("hovering an arabic badge moves no text", async ({ page }) => {
 			return {
 				base,
 				adrak: base.split("أدرك").length - 1,
-				anchors: document.querySelectorAll("article .rendered span.ccez-ann-anchor").length,
+				anchors: document.querySelectorAll(
+					"article .rendered span.ccez-ann-anchor"
+				).length,
 				marks:
 					washed +
 					document.querySelectorAll("article .rendered mark.ccez-ann").length,
@@ -699,9 +709,7 @@ test("answer card re-press pins the annotation", async ({ page }) => {
 
 /** The orange pencil rewords the question and re-asks at once
 (the dock row carries the new wording under its fresh answer). */
-test("orange pencil rewords and re-asks the annotation", async ({
-	page
-}) => {
+test("orange pencil rewords and re-asks the annotation", async ({ page }) => {
 	test.setTimeout(120_000);
 	await openAnnotate(page, "確認しました");
 	await page.locator(".ann-pop textarea").fill("why here?");
@@ -741,9 +749,7 @@ test("orange pencil rewords and re-asks the annotation", async ({
 /** Pinning lists the annotation in the prompt button's overlay
 (quote, question, answer) — nothing renders inside the prompt
 itself. Only plus-pinned annotations bake into a send. */
-test("pinning lists the annotation in the button overlay", async ({
-	page
-}) => {
+test("pinning lists the annotation in the button overlay", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.locator(".ann-pop textarea").fill("typed");
 	await page.keyboard.press("Enter");
@@ -771,9 +777,7 @@ test("pinning lists the annotation in the button overlay", async ({
 	// Unpinning drops the pill again (the annotation stays filed).
 	await page.locator('button:has-text("Unpin")').click();
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(
-		1
-	);
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(1);
 });
 
 /** Sending bakes the pinned annotations with the message: the composer
@@ -892,9 +896,9 @@ test("clear-all keeps unpinned annotations", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	await openAnnotate(page, "お手伝い");
 	await page.keyboard.press("Enter");
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toHaveCount(2, { timeout: 30_000 });
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(2, {
+		timeout: 30_000
+	});
 	// Pin the first badge; the second stays filed but unpinned.
 	await page.locator("button.ccez-ann-badge").nth(0).dblclick();
 	await page.keyboard.press("Escape");
@@ -2044,7 +2048,9 @@ test("tab through the badge edit card keeps it open", async ({ page }) => {
 		await expect(card).toBeVisible();
 		expect(await insideCard()).toBe(true);
 	}
-	await expect(card.locator('button[aria-label="Save annotation"]')).toBeVisible();
+	await expect(
+		card.locator('button[aria-label="Save annotation"]')
+	).toBeVisible();
 	// One Escape per layer: the first closes the review dock behind
 	// the card (the card stays open, focus inside); the second
 	// cancels the card itself.
@@ -2337,7 +2343,9 @@ test("answered badge keeps its wash past the readings tint", async ({
 				const css = CSS as unknown as {
 					highlights?: {
 						keys: () => Iterable<string>;
-						get: (k: string) => { forEach: (cb: (r: Range) => void) => void } | undefined;
+						get: (
+							k: string
+						) => { forEach: (cb: (r: Range) => void) => void } | undefined;
 					};
 				};
 				out.hasHighlights = String(!!css.highlights);
@@ -2352,15 +2360,13 @@ test("answered badge keeps its wash past the readings tint", async ({
 					if (k.startsWith("keys-threw")) continue;
 					let text = "";
 					try {
-						css.highlights
-							?.get(k)
-							?.forEach((r: Range) => {
-								try {
-									text += r.toString();
-								} catch (e) {
-									text += `[range-threw:${String(e)}]`;
-								}
-							});
+						css.highlights?.get(k)?.forEach((r: Range) => {
+							try {
+								text += r.toString();
+							} catch (e) {
+								text += `[range-threw:${String(e)}]`;
+							}
+						});
 					} catch (e) {
 						text = `[get-threw:${String(e)}]`;
 					}

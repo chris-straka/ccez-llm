@@ -81,7 +81,8 @@ pub fn ondevice_status(app: tauri::AppHandle) -> Result<serde_json::Value, Strin
             "no-bridge".to_string()
         })
         .and_then(|payload| {
-            serde_json::from_str::<serde_json::Value>(&payload).map_err(|_| "bad-status".to_string())
+            serde_json::from_str::<serde_json::Value>(&payload)
+                .map_err(|_| "bad-status".to_string())
         });
     #[cfg(not(target_os = "android"))]
     {
@@ -154,9 +155,9 @@ fn ondevice_generate_inner(
 #[cfg(target_os = "android")]
 mod ondevice_android {
     use jni::{
-        JNIEnv,
         objects::{GlobalRef, JClass, JObject, JString, JValue},
         sys::jint,
+        JNIEnv,
     };
     use std::sync::OnceLock;
 
@@ -245,9 +246,7 @@ mod ondevice_android {
             let out = env
                 .call_static_method(cls, "status", "()Ljava/lang/String;", &[])
                 .map_err(|e| format!("status() failed: {e:?}"))?;
-            let obj: JObject = out
-                .l()
-                .map_err(|e| format!("bad status() return: {e:?}"))?;
+            let obj: JObject = out.l().map_err(|e| format!("bad status() return: {e:?}"))?;
             jstring_result(env, obj, "status")
         })
     }

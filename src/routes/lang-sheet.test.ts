@@ -43,9 +43,9 @@ describe("phone language sheet", () => {
 
 	it("never pins a top/bottom pair on the fixed sheet", () => {
 		const css = menuStyle();
-		const blocks = [
-			...css.matchAll(/\.lang-list-fixed[^{]*\{([^}]*)\}/g)
-		].map((m) => m[1] ?? "");
+		const blocks = [...css.matchAll(/\.lang-list-fixed[^{]*\{([^}]*)\}/g)].map(
+			(m) => m[1] ?? ""
+		);
 		expect(blocks.length).toBeGreaterThan(0);
 		for (const block of blocks) {
 			const hasTop = /(^|;|\s)top\s*:/.test(block);

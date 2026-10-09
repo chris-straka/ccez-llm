@@ -7,9 +7,7 @@
  * re-verified by ear. Bodies keep their liveness guards
  * (`!annPop || annPopClosing`) and fall through unchanged.
  */
-import {
-	placeAnnPopX
-} from "$lib/sel-geometry";
+import { placeAnnPopX } from "$lib/sel-geometry";
 
 export type AnnPopSaveKind = "commit-pending" | "save-edit";
 
@@ -269,7 +267,9 @@ export function quoteAnchor(
 	rects: readonly AnchorRect[],
 	badgeTop: number | null
 ): { anchor: AnchorRect; clearTop: number } | null {
-	const boxes = rects.filter((r) => r.right - r.left > 0 && r.bottom - r.top > 0);
+	const boxes = rects.filter(
+		(r) => r.right - r.left > 0 && r.bottom - r.top > 0
+	);
 	const last = boxes.at(-1);
 	if (!last) return null;
 	const line = boxes.filter(
@@ -282,5 +282,8 @@ export function quoteAnchor(
 		bottom: Math.max(...line.map((r) => r.bottom))
 	};
 	const top = Math.min(...boxes.map((r) => r.top));
-	return { anchor, clearTop: badgeTop === null ? top : Math.min(top, badgeTop) };
+	return {
+		anchor,
+		clearTop: badgeTop === null ? top : Math.min(top, badgeTop)
+	};
 }

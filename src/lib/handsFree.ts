@@ -22,11 +22,7 @@ export type HandsFreeEvent =
 	| { type: "failed" };
 
 export type HandsFreeEffect =
-	| "startListening"
-	| "stopListening"
-	| "send"
-	| "readback"
-	| "stopAll";
+	"startListening" | "stopListening" | "send" | "readback" | "stopAll";
 
 /**
  * One machine step: the next phase plus the effects the page must
@@ -49,8 +45,7 @@ export function handsFreeNext(
 				// Silence re-arms the mic (dictation backends report
 				// hard failures as errors, so this only loops on
 				// genuine quiet — and the button always stops it).
-				if (!event.text.trim())
-					return { phase, effects: ["startListening"] };
+				if (!event.text.trim()) return { phase, effects: ["startListening"] };
 				return { phase: "sending", effects: ["stopListening", "send"] };
 			}
 			if (event.type === "failed")

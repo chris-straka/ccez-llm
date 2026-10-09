@@ -16,8 +16,7 @@ export const SCROLLKEY_LINE_PX = 72;
  * Non-finite or non-positive scales read as 1, never 0 or NaN.
  */
 export function scaleScrollPx(px: number, fontScale: number): number {
-	const scale =
-		Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+	const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
 	return px * scale;
 }
 

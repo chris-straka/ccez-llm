@@ -74,9 +74,9 @@ describe("onDeviceErrorCopy", () => {
 
 describe("onDeviceNotReadyCopy", () => {
 	it("prefers the native reason when one is present", () => {
-		expect(
-			onDeviceNotReadyCopy({ state: "error", reason: "no-model" })
-		).toBe(onDeviceErrorCopy("no-model"));
+		expect(onDeviceNotReadyCopy({ state: "error", reason: "no-model" })).toBe(
+			onDeviceErrorCopy("no-model")
+		);
 	});
 	it("names a downloading state with no reason instead of failing vaguely", () => {
 		expect(onDeviceNotReadyCopy({ state: "downloading" })).toBe(

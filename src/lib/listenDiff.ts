@@ -67,8 +67,12 @@ export function diffWords(text: string, lang: string): string[] {
 	if (/\s/.test(trimmed) || typeof Intl.Segmenter !== "function") {
 		return trimmed.split(/\s+/).filter((w) => LETTERS.test(w));
 	}
-	const seg = new Intl.Segmenter(baseLang(lang) || undefined, { granularity: "word" });
-	return [...seg.segment(trimmed)].filter((s) => s.isWordLike).map((s) => s.segment);
+	const seg = new Intl.Segmenter(baseLang(lang) || undefined, {
+		granularity: "word"
+	});
+	return [...seg.segment(trimmed)]
+		.filter((s) => s.isWordLike)
+		.map((s) => s.segment);
 }
 
 function editDistance(a: string, b: string): number {
@@ -79,7 +83,13 @@ function editDistance(a: string, b: string): number {
 		const row = [i];
 		for (let j = 1; j <= y.length; j++) {
 			const cost = x[i - 1] === y[j - 1] ? 0 : 1;
-			row.push(Math.min((prev[j] ?? 0) + 1, (row[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + cost));
+			row.push(
+				Math.min(
+					(prev[j] ?? 0) + 1,
+					(row[j - 1] ?? 0) + 1,
+					(prev[j - 1] ?? 0) + cost
+				)
+			);
 		}
 		prev = row;
 	}
@@ -105,13 +115,19 @@ function subCost(r: string, g: string): { cost: number; kind: DiffKind } {
  * skip a transcript word (missed) 1, an extra guess word 1, a
  * substitution by `subCost`.
  */
-export function diffGuess(reference: string, guess: string, lang: string): GuessDiff {
+export function diffGuess(
+	reference: string,
+	guess: string,
+	lang: string
+): GuessDiff {
 	const ref = diffWords(reference, lang);
 	const hyp = diffWords(guess, lang);
 	const n = ref.length;
 	const m = hyp.length;
 	// cost[i][j]: best alignment of ref[i..] with hyp[j..].
-	const cost: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+	const cost: number[][] = Array.from({ length: n + 1 }, () =>
+		new Array<number>(m + 1).fill(0)
+	);
 	for (let i = n; i >= 0; i--) {
 		for (let j = m; j >= 0; j--) {
 			const row = cost[i];
@@ -124,7 +140,10 @@ export function diffGuess(reference: string, guess: string, lang: string): Guess
 			if (i < n) best = Math.min(best, 1 + (cost[i + 1]?.[j] ?? 0));
 			if (j < m) best = Math.min(best, 1 + (row[j + 1] ?? 0));
 			if (i < n && j < m) {
-				best = Math.min(best, subCost(ref[i] ?? "", hyp[j] ?? "").cost + (cost[i + 1]?.[j + 1] ?? 0));
+				best = Math.min(
+					best,
+					subCost(ref[i] ?? "", hyp[j] ?? "").cost + (cost[i + 1]?.[j + 1] ?? 0)
+				);
 			}
 			row[j] = best;
 		}
@@ -140,13 +159,20 @@ export function diffGuess(reference: string, guess: string, lang: string): Guess
 		if (r !== undefined && g !== undefined) {
 			const sub = subCost(r, g);
 			if (Math.abs(here - (sub.cost + (cost[i + 1]?.[j + 1] ?? 0))) < eps) {
-				ops.push(sub.kind === "ok" ? { kind: "ok", ref: r, guess: g } : { kind: sub.kind, ref: r, guess: g });
+				ops.push(
+					sub.kind === "ok"
+						? { kind: "ok", ref: r, guess: g }
+						: { kind: sub.kind, ref: r, guess: g }
+				);
 				i++;
 				j++;
 				continue;
 			}
 		}
-		if (r !== undefined && Math.abs(here - (1 + (cost[i + 1]?.[j] ?? 0))) < eps) {
+		if (
+			r !== undefined &&
+			Math.abs(here - (1 + (cost[i + 1]?.[j] ?? 0))) < eps
+		) {
 			ops.push({ kind: "missed", ref: r });
 			i++;
 			continue;

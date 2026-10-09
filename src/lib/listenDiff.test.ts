@@ -5,7 +5,11 @@ const kinds = (ops: DiffOp[]): string => ops.map((o) => o.kind).join(" ");
 
 describe("diffGuess", () => {
 	it("a perfect guess is all ok, whatever the case and punctuation", () => {
-		const d = diffGuess("Nous couvrons ce sujet de manière approfondie.", "nous couvrons ce sujet de manière approfondie", "fr");
+		const d = diffGuess(
+			"Nous couvrons ce sujet de manière approfondie.",
+			"nous couvrons ce sujet de manière approfondie",
+			"fr"
+		);
 		expect(kinds(d.ops)).toBe("ok ok ok ok ok ok ok");
 		expect(d.got).toBe(7);
 		expect(d.total).toBe(7);
@@ -13,7 +17,11 @@ describe("diffGuess", () => {
 	});
 
 	it("accents and elisions typed loosely count as heard (near)", () => {
-		const d = diffGuess("Il a été interrogé sur la possibilité d'une épidémie", "il a ete interroge sur la possibilite dune epidemie", "fr");
+		const d = diffGuess(
+			"Il a été interrogé sur la possibilité d'une épidémie",
+			"il a ete interroge sur la possibilite dune epidemie",
+			"fr"
+		);
 		expect(d.ops.filter((o) => o.kind === "near").map((o) => o.ref)).toEqual([
 			"été",
 			"interrogé",
@@ -25,14 +33,22 @@ describe("diffGuess", () => {
 	});
 
 	it("marks missed words where they were skipped", () => {
-		const d = diffGuess("Parlons de la peste. Donald Trump a été interrogé", "parlons de la peste Trump a été interrogé", "fr");
+		const d = diffGuess(
+			"Parlons de la peste. Donald Trump a été interrogé",
+			"parlons de la peste Trump a été interrogé",
+			"fr"
+		);
 		expect(d.ops.find((o) => o.kind === "missed")?.ref).toBe("Donald");
 		expect(d.got).toBe(8);
 		expect(d.total).toBe(9);
 	});
 
 	it("pairs a mishearing with the word it replaced", () => {
-		const d = diffGuess("Ce qui est incroyable, c'est que Trump", "ce qui est incroyable c'est quand Trump", "fr");
+		const d = diffGuess(
+			"Ce qui est incroyable, c'est que Trump",
+			"ce qui est incroyable c'est quand Trump",
+			"fr"
+		);
 		const wrong = d.ops.filter((o) => o.kind === "wrong");
 		expect(wrong).toEqual([{ kind: "wrong", ref: "que", guess: "quand" }]);
 	});
@@ -54,7 +70,14 @@ describe("diffGuess", () => {
 	});
 
 	it("Japanese and Chinese diff per character", () => {
-		expect(diffWords("今日は雨です。", "ja")).toEqual(["今", "日", "は", "雨", "で", "す"]);
+		expect(diffWords("今日は雨です。", "ja")).toEqual([
+			"今",
+			"日",
+			"は",
+			"雨",
+			"で",
+			"す"
+		]);
 		const d = diffGuess("今日は雨です。", "今日は飴です", "ja");
 		expect(kinds(d.ops)).toBe("ok ok ok wrong ok ok");
 		expect(diffGuess("我们走吧", "我们走", "zh").got).toBe(3);

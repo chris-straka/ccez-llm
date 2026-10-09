@@ -434,9 +434,7 @@ test.describe("web pass-through", () => {
 		).toHaveCount(0);
 	});
 
-	test("Ctrl+F never opens the find bar in the browser", async ({
-		page
-	}) => {
+	test("Ctrl+F never opens the find bar in the browser", async ({ page }) => {
 		await seedThreeChats(page);
 		await page.keyboard.press("Control+f");
 		await expect(page.locator(".find-bar")).toHaveCount(0);
@@ -538,9 +536,7 @@ test.describe("touch paths", () => {
 		await expect(sidebar).not.toHaveClass(/collapsed/);
 	});
 
-	test("the sidebar search clear is a 44px thumb target", async ({
-		page
-	}) => {
+	test("the sidebar search clear is a 44px thumb target", async ({ page }) => {
 		await seedThreeChats(page);
 		await toggleSidebar(page);
 		const box = page.getByLabel("Search chats");
@@ -552,8 +548,8 @@ test.describe("touch paths", () => {
 		expect(btn.height).toBeGreaterThanOrEqual(44);
 		// Inside the field, and the typed text stops short of it.
 		expect(btn.x + btn.width).toBeLessThanOrEqual(field.x + field.width);
-		const padRight = await box.evaluate(
-			(el) => parseFloat(getComputedStyle(el).paddingRight)
+		const padRight = await box.evaluate((el) =>
+			parseFloat(getComputedStyle(el).paddingRight)
 		);
 		expect(padRight).toBeGreaterThanOrEqual(btn.width);
 		// No engine cancel glyph (Chromium paints it blue) beside the
@@ -568,7 +564,16 @@ test.describe("touch paths", () => {
 			c.height = img.height;
 			const g = c.getContext("2d")!;
 			g.drawImage(img, 0, 0);
-			const d = g.getImageData(0, 0, c.width, c.height).data;
+			// Inside the field only: Chromium may ring the focused box in
+			// blue (a focus ring, not a cancel glyph), so skip the edge
+			// band out to the corner radius.
+			const inset = 8;
+			const d = g.getImageData(
+				inset,
+				inset,
+				c.width - inset * 2,
+				c.height - inset * 2
+			).data;
 			let n = 0;
 			for (let i = 0; i < d.length; i += 4)
 				if (d[i + 2]! - d[i]! > 60 && d[i + 2]! > 120) n++;

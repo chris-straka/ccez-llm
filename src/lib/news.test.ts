@@ -132,9 +132,16 @@ describe("news feeds", () => {
 				}
 				const home = NEWS_FEEDS[code]!.regions;
 				const native = home.length;
-				const world = ["GBL", "US", "CA", "EUR", "GB", "AU", "LAT", "ASI"].filter(
-					(gl) => !home.some((r) => r.gl === gl)
-				).length;
+				const world = [
+					"GBL",
+					"US",
+					"CA",
+					"EUR",
+					"GB",
+					"AU",
+					"LAT",
+					"ASI"
+				].filter((gl) => !home.some((r) => r.gl === gl)).length;
 				expect(regions!.length).toBe(native + world);
 			}
 			// Default region first, every region addressable (merges fan out).
@@ -245,9 +252,9 @@ describe("news feeds", () => {
 				}
 			]
 		});
-		expect(newsRegionsFor("da")!.find((r) => r.gl === "EUR")?.merge).toHaveLength(
-			5
-		);
+		expect(
+			newsRegionsFor("da")!.find((r) => r.gl === "EUR")?.merge
+		).toHaveLength(5);
 		// Asia mixes the four giants; learners outside the mix keep
 		// all four, insiders drop their own (the compound hl still
 		// matches by bare language). French reads a native desk.
@@ -305,9 +312,7 @@ describe("news feeds", () => {
 			"🌏"
 		]);
 		expect(fr.slice(0, -7).every((r) => r.icon === undefined)).toBe(true);
-		expect(newsRegionsFor("da")!.find((r) => r.gl === "CA")?.icon).toBe(
-			"🇨🇦"
-		);
+		expect(newsRegionsFor("da")!.find((r) => r.gl === "CA")?.icon).toBe("🇨🇦");
 		// Latin America mixes Mexico, Brazil, Argentina; Spanish,
 		// Portuguese, French, Chinese, and Persian read native desks.
 		expect(newsRegionsFor("da")!.find((r) => r.gl === "LAT")).toMatchObject({
@@ -409,7 +414,10 @@ describe("news feeds", () => {
 		const frUs = newsRegionsFor("fr")!.find((r) => r.gl === "US")!;
 		expect(frUs.translate).toBeUndefined();
 		expect(frUs.merge).toMatchObject([
-			{ url: "https://www.france24.com/fr/am%C3%A9riques/rss", source: "France 24" },
+			{
+				url: "https://www.france24.com/fr/am%C3%A9riques/rss",
+				source: "France 24"
+			},
 			{ url: "https://www.rfi.fr/fr/am%C3%A9riques/rss", source: "RFI" }
 		]);
 		const frGbl = newsRegionsFor("fr")!.find((r) => r.gl === "GBL")!;
@@ -444,7 +452,10 @@ describe("news feeds", () => {
 		const ptGbl = newsRegionsFor("pt")!.find((r) => r.gl === "GBL")!;
 		expect(ptGbl.translate).toBeUndefined();
 		expect(ptGbl.merge).toMatchObject([
-			{ url: "https://feeds.bbci.co.uk/portuguese/rss.xml", source: "BBC Brasil" },
+			{
+				url: "https://feeds.bbci.co.uk/portuguese/rss.xml",
+				source: "BBC Brasil"
+			},
 			{ url: "https://www.rfi.fr/br/rss", source: "RFI Brasil" }
 		]);
 		const deGbl = newsRegionsFor("de")!.find((r) => r.gl === "GBL")!;
@@ -469,7 +480,10 @@ describe("news feeds", () => {
 		expect(jaGbl.translate).toBeUndefined();
 		expect(jaGbl.merge).toMatchObject([
 			{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" },
-			{ url: "https://feeds.bbci.co.uk/japanese/rss.xml", source: "BBC Japanese" }
+			{
+				url: "https://feeds.bbci.co.uk/japanese/rss.xml",
+				source: "BBC Japanese"
+			}
 		]);
 		const koGbl = newsRegionsFor("ko")!.find((r) => r.gl === "GBL")!;
 		expect(koGbl.translate).toBeUndefined();
@@ -572,15 +586,11 @@ describe("news feeds", () => {
 		expect(faHome[0]?.translate).toBeUndefined();
 		expect(faHome[0]?.merge).toHaveLength(1);
 		// Overrides keep chip position, label, and icon.
-		expect(newsRegionsFor("fr")!.slice(-7).map((r) => r.gl)).toEqual([
-			"GBL",
-			"US",
-			"EUR",
-			"GB",
-			"AU",
-			"LAT",
-			"ASI"
-		]);
+		expect(
+			newsRegionsFor("fr")!
+				.slice(-7)
+				.map((r) => r.gl)
+		).toEqual(["GBL", "US", "EUR", "GB", "AU", "LAT", "ASI"]);
 		expect(frUs).toMatchObject({ label: "U.S.", icon: "🇺🇸" });
 		expect(frGbl).toMatchObject({ label: "Global", icon: "🌐" });
 		// Everyone else keeps the translated English feeds.
@@ -588,7 +598,9 @@ describe("news feeds", () => {
 			hl: "en-US",
 			translate: true
 		});
-		expect(newsRegionsFor("pl")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
+		expect(
+			newsRegionsFor("pl")!.find((r) => r.gl === "GBL")?.merge
+		).toMatchObject([
 			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
 			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]);
@@ -652,7 +664,9 @@ describe("news feeds", () => {
 	});
 
 	it("passes direct desk links through, decoding only Google links", async () => {
-		expect(isDirectStoryLink("https://news.google.com/rss/articles/AAA")).toBe(false);
+		expect(isDirectStoryLink("https://news.google.com/rss/articles/AAA")).toBe(
+			false
+		);
 		expect(isDirectStoryLink("https://www.france24.com/fr/a")).toBe(true);
 		expect(isDirectStoryLink("not a url")).toBe(false);
 		// Passthrough needs no shell: native-desk cards launch anywhere.
@@ -684,13 +698,7 @@ describe("news feeds", () => {
 		};
 		const stories = await loadNewsStories("da", "EUR", feed);
 		expect(seen).toHaveLength(5);
-		expect(stories.map((s) => s.title)).toEqual([
-			"FR",
-			"DE",
-			"ES",
-			"IT",
-			"RU"
-		]);
+		expect(stories.map((s) => s.title)).toEqual(["FR", "DE", "ES", "IT", "RU"]);
 		seen.length = 0;
 		await loadNewsStories("es", "EUR", async (url) => {
 			seen.push(url);
@@ -746,7 +754,9 @@ describe("news feeds", () => {
 			seen.push(url);
 			return xml("AmLat");
 		});
-		expect(seen).toEqual(["https://www.france24.com/es/am%C3%A9rica-latina/rss"]);
+		expect(seen).toEqual([
+			"https://www.france24.com/es/am%C3%A9rica-latina/rss"
+		]);
 		seen.length = 0;
 		await loadNewsStories("pt", "LAT", async (url) => {
 			seen.push(url);
@@ -768,7 +778,9 @@ describe("news feeds", () => {
 		).toEqual(["One", "Two", "Three"]);
 		// Same event in two languages collapses to the first telling.
 		expect(
-			withTranslatedTitles(stories, ["One", "one!", "Three"]).map((s) => s.title)
+			withTranslatedTitles(stories, ["One", "one!", "Three"]).map(
+				(s) => s.title
+			)
 		).toEqual(["One", "Three"]);
 		// A short list keeps the original rather than blanking a card.
 		expect(withTranslatedTitles(stories, ["One"]).map((s) => s.title)).toEqual([
@@ -790,10 +802,14 @@ describe("news feeds", () => {
 
 	it("translates titles in one call, failing loudly when short", async () => {
 		const seen: string[] = [];
-		const out = await translateNewsTitles(["Markets rally"], "French", async (prompt) => {
-			seen.push(prompt);
-			return "1. Les marchés montent";
-		});
+		const out = await translateNewsTitles(
+			["Markets rally"],
+			"French",
+			async (prompt) => {
+				seen.push(prompt);
+				return "1. Les marchés montent";
+			}
+		);
 		expect(out).toEqual(["Les marchés montent"]);
 		expect(seen).toHaveLength(1);
 		expect(seen[0]).toContain("French");
@@ -807,7 +823,11 @@ describe("news feeds", () => {
 describe("story shaping", () => {
 	it("splits the outlet off Google titles", () => {
 		expect(
-			shapeStory({ title: "Markets rally - BBC News", link: "https://x", description: "" })
+			shapeStory({
+				title: "Markets rally - BBC News",
+				link: "https://x",
+				description: ""
+			})
 		).toEqual({
 			title: "Markets rally",
 			source: "BBC News",
@@ -816,17 +836,30 @@ describe("story shaping", () => {
 		});
 		// Last dash wins (headlines carry their own dashes).
 		expect(
-			shapeStory({ title: "War - live updates - Al Jazeera", link: "https://x", description: "" })
+			shapeStory({
+				title: "War - live updates - Al Jazeera",
+				link: "https://x",
+				description: ""
+			})
 		).toMatchObject({ title: "War - live updates", source: "Al Jazeera" });
 	});
 
 	it("keeps long tails and sourceless titles whole", () => {
-		const long = "Markets rally on news that the central bank will meet again soon";
-		expect(shapeStory({ title: long, link: "https://x", description: "" })).toMatchObject({
+		const long =
+			"Markets rally on news that the central bank will meet again soon";
+		expect(
+			shapeStory({ title: long, link: "https://x", description: "" })
+		).toMatchObject({
 			title: long,
 			source: ""
 		});
-		expect(shapeStory({ title: "Plain headline", link: "https://x", description: "" })).toMatchObject({
+		expect(
+			shapeStory({
+				title: "Plain headline",
+				link: "https://x",
+				description: ""
+			})
+		).toMatchObject({
 			title: "Plain headline",
 			source: ""
 		});
@@ -834,7 +867,12 @@ describe("story shaping", () => {
 
 	it("carries feed images through, else no key", () => {
 		expect(
-			shapeStory({ title: "T", link: "https://x", description: "", image: "https://img/a.jpg" })
+			shapeStory({
+				title: "T",
+				link: "https://x",
+				description: "",
+				image: "https://img/a.jpg"
+			})
 		).toMatchObject({ image: "https://img/a.jpg" });
 		expect(
 			shapeStory({ title: "T", link: "https://x", description: "" })
@@ -842,14 +880,18 @@ describe("story shaping", () => {
 	});
 
 	it("drops linkless and titleless items (dead cards)", () => {
-		expect(shapeStory({ title: "No link - BBC", link: "", description: "" })).toBeNull();
-		expect(shapeStory({ title: "   ", link: "https://x", description: "" })).toBeNull();
+		expect(
+			shapeStory({ title: "No link - BBC", link: "", description: "" })
+		).toBeNull();
+		expect(
+			shapeStory({ title: "   ", link: "https://x", description: "" })
+		).toBeNull();
 	});
 
 	it("strips feed HTML and entities from snippets", () => {
-		expect(stripTags('<a href="https://x">Out&shy;let</a>&nbsp;reports &amp; more')).toBe(
-			"Out&shy;let reports & more"
-		);
+		expect(
+			stripTags('<a href="https://x">Out&shy;let</a>&nbsp;reports &amp; more')
+		).toBe("Out&shy;let reports & more");
 		expect(stripTags("<p>One</p><p>Two</p>")).toBe("One Two");
 		expect(
 			shapeStory({
@@ -913,7 +955,11 @@ describe("session prompts", () => {
 			"C1",
 			"C2"
 		]);
-		expect(SUMMARY_SIZES.map((s) => s.size)).toEqual(["short", "medium", "long"]);
+		expect(SUMMARY_SIZES.map((s) => s.size)).toEqual([
+			"short",
+			"medium",
+			"long"
+		]);
 	});
 
 	it("writes short summary openers with outlet and word target", () => {
@@ -957,10 +1003,13 @@ describe("article fetch", () => {
 
 	it("extracts direct HTML first, no reader pass", async () => {
 		const seen: string[] = [];
-		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
-			seen.push(url);
-			return `<html><body><nav>Home Politics Sport</nav><article><h1>Head</h1><p>${body}</p></article></body></html>`;
-		});
+		const text = await fetchArticleText(
+			"https://outlet.test/a",
+			async (url) => {
+				seen.push(url);
+				return `<html><body><nav>Home Politics Sport</nav><article><h1>Head</h1><p>${body}</p></article></body></html>`;
+			}
+		);
 		expect(seen).toEqual(["https://outlet.test/a"]);
 		expect(text).toContain(body.slice(0, 20));
 		expect(text).not.toContain("Sport");
@@ -968,12 +1017,18 @@ describe("article fetch", () => {
 
 	it("falls back to reader markdown on direct failure or shells", async () => {
 		const seen: string[] = [];
-		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
-			seen.push(url);
-			if (!url.includes("jina")) throw new Error("refused");
-			return `Title: Head\nURL Source: https://outlet.test/a\nMarkdown Content:\n# Head\n\n[Lede](${url}) ${body}`;
-		});
-		expect(seen).toEqual(["https://outlet.test/a", "https://r.jina.ai/https://outlet.test/a"]);
+		const text = await fetchArticleText(
+			"https://outlet.test/a",
+			async (url) => {
+				seen.push(url);
+				if (!url.includes("jina")) throw new Error("refused");
+				return `Title: Head\nURL Source: https://outlet.test/a\nMarkdown Content:\n# Head\n\n[Lede](${url}) ${body}`;
+			}
+		);
+		expect(seen).toEqual([
+			"https://outlet.test/a",
+			"https://r.jina.ai/https://outlet.test/a"
+		]);
 		// Stripped to prose: no envelope, no URLs.
 		expect(text).not.toContain("URL Source");
 		expect(text).not.toContain("https://");
@@ -981,10 +1036,13 @@ describe("article fetch", () => {
 	});
 
 	it("retries reader when direct returns a stub, throws past both", async () => {
-		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
-			if (url.includes("jina")) return `# Head\n\n${body}`;
-			return "<html><body><div id='root'></div></body></html>";
-		});
+		const text = await fetchArticleText(
+			"https://outlet.test/a",
+			async (url) => {
+				if (url.includes("jina")) return `# Head\n\n${body}`;
+				return "<html><body><div id='root'></div></body></html>";
+			}
+		);
 		expect(text.length).toBeGreaterThanOrEqual(400);
 		await expect(
 			fetchArticleText("https://outlet.test/a", async () => "stub")
@@ -1012,7 +1070,9 @@ describe("article fetch", () => {
 		expect(text).not.toContain("Copyright");
 		// Main/body scope when no article; crumbs fall away.
 		expect(
-			extractArticleText(`<html><body><main><p>${body}</p><p>Hi</p></main></body></html>`)
+			extractArticleText(
+				`<html><body><main><p>${body}</p><p>Hi</p></main></body></html>`
+			)
 		).toContain(body.slice(0, 20));
 		expect(extractArticleText("<html><body><p>Hi</p></body></html>")).toBe("");
 		expect(extractArticleText("not html {{{")).toBe("");
@@ -1024,7 +1084,9 @@ describe("article fetch", () => {
 				"Title: T\nMarkdown Content:\n![Photo of X](https://img/a.jpg)\n\nSee [the report](https://o/r) now.\n\n[ref]: https://o/ref\n\nText[1]."
 			)
 		).toBe("Photo of X\n\nSee the report now.\n\nText[1].");
-		expect(stripMarkdownMedia("![](https://img/a.jpg)\n\nBody here.")).toBe("Body here.");
+		expect(stripMarkdownMedia("![](https://img/a.jpg)\n\nBody here.")).toBe(
+			"Body here."
+		);
 	});
 
 	it("builds Jina URLs by prefix", () => {
@@ -1054,10 +1116,14 @@ describe("loading and errors", () => {
 
 	it("maps every failure to a human sentence", () => {
 		expect(newsErrorCopy(new Error("news-needs-shell"))).toContain("app shell");
-		expect(newsErrorCopy(new Error("news-unsupported"))).toContain("no edition");
+		expect(newsErrorCopy(new Error("news-unsupported"))).toContain(
+			"no edition"
+		);
 		expect(newsErrorCopy(new Error("news-empty"))).toContain("try another one");
 		expect(newsErrorCopy({ code: "unreadable" })).toContain("retry in a bit");
-		expect(newsErrorCopy(new Error("no-decoded-url"))).toContain("try another story");
+		expect(newsErrorCopy(new Error("no-decoded-url"))).toContain(
+			"try another story"
+		);
 		expect(newsErrorCopy(new Error("no-signature"))).toContain("app update");
 		expect(newsErrorCopy(new Error("timed out"))).toContain("timed out");
 		expect(newsErrorCopy(new Error("bad-status"))).toContain("refused");
@@ -1087,7 +1153,10 @@ describe("article resolution", () => {
 				store
 			);
 		const first = await run();
-		expect(first).toEqual({ url: "https://outlet.test/a", text: `# T\n\n${body}` });
+		expect(first).toEqual({
+			url: "https://outlet.test/a",
+			text: `# T\n\n${body}`
+		});
 		expect(calls).toEqual([
 			"decode:https://news.google.com/rss/articles/AAA",
 			"fetch:https://outlet.test/a",
@@ -1173,7 +1242,9 @@ describe("article resolution", () => {
 			)
 		).toBe("https://outlet.test/pic/b.jpg");
 		expect(articleImageFromHtml(html(""), "https://outlet.test/s")).toBeNull();
-		expect(articleImageFromHtml("not html {{{", "https://outlet.test/s")).toBeNull();
+		expect(
+			articleImageFromHtml("not html {{{", "https://outlet.test/s")
+		).toBeNull();
 		// Reader markdown: first content image, chrome skipped.
 		expect(
 			contentImageFromMarkdown(
@@ -1181,7 +1252,9 @@ describe("article resolution", () => {
 			)
 		).toBe("https://img/photo.jpg");
 		expect(contentImageFromMarkdown("no images here")).toBeNull();
-		expect(contentImageFromMarkdown("![Logo](https://img/logo.png)")).toBeNull();
+		expect(
+			contentImageFromMarkdown("![Logo](https://img/logo.png)")
+		).toBeNull();
 	});
 
 	it("spaces gated reader calls, first one immediate", async () => {
@@ -1444,7 +1517,10 @@ describe("article resolution", () => {
 	it("retries transient images once, then settles the letter tile", async () => {
 		const settled: Array<[string, string | null, boolean]> = [];
 		const calls = new Map<string, number>();
-		const script: Record<string, Array<{ found: string | null; complete: boolean }>> = {
+		const script: Record<
+			string,
+			Array<{ found: string | null; complete: boolean }>
+		> = {
 			hit: [{ found: "https://img/h.jpg", complete: true }],
 			miss: [{ found: null, complete: true }],
 			flaky: [
@@ -1464,7 +1540,8 @@ describe("article resolution", () => {
 				return step;
 			},
 			fresh: () => true,
-			onSettled: (link, found, complete) => void settled.push([link, found, complete])
+			onSettled: (link, found, complete) =>
+				void settled.push([link, found, complete])
 		});
 		// Complete links settle once, never retried.
 		expect(calls.get("hit")).toBe(1);
@@ -1472,7 +1549,9 @@ describe("article resolution", () => {
 		// Flaky recovers on round two; dead settles UI-only.
 		expect(calls.get("flaky")).toBe(2);
 		expect(calls.get("dead")).toBe(2);
-		const byLink = new Map(settled.map(([link, found, complete]) => [link, [found, complete]]));
+		const byLink = new Map(
+			settled.map(([link, found, complete]) => [link, [found, complete]])
+		);
 		expect(byLink.get("hit")).toEqual(["https://img/h.jpg", true]);
 		expect(byLink.get("miss")).toEqual([null, true]);
 		expect(byLink.get("flaky")).toEqual(["https://img/f.jpg", true]);
@@ -1541,7 +1620,9 @@ describe("article cache", () => {
 		storeArticle(store, "https://a", "body", 1000);
 		expect(cachedArticle(store, "https://a", 2000)).toBe("body");
 		// Past the TTL the body is gone — and the entry with it.
-		expect(cachedArticle(store, "https://a", 1000 + NEWS_CACHE_TTL_MS + 1)).toBeNull();
+		expect(
+			cachedArticle(store, "https://a", 1000 + NEWS_CACHE_TTL_MS + 1)
+		).toBeNull();
 		expect(cachedArticle(store, "https://a", 2000)).toBeNull();
 	});
 
@@ -1569,7 +1650,10 @@ describe("article cache", () => {
 describe("feed cache", () => {
 	const mem = (): KeyValueStore => {
 		const m = new Map<string, string>();
-		return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
+		return {
+			getItem: (k) => m.get(k) ?? null,
+			setItem: (k, v) => void m.set(k, v)
+		};
 	};
 	const stories = [{ title: "T", source: "S", link: "l", snippet: "" }];
 
@@ -1578,12 +1662,15 @@ describe("feed cache", () => {
 		storeFeed(store, "fr", "FR", stories, 1000);
 		expect(cachedFeed(store, "fr", "FR", 2000)).toEqual(stories);
 		expect(cachedFeed(store, "fr", "CA", 2000)).toBeNull();
-		expect(cachedFeed(store, "fr", "FR", 1000 + NEWS_FEED_TTL_MS + 1)).toBeNull();
+		expect(
+			cachedFeed(store, "fr", "FR", 1000 + NEWS_FEED_TTL_MS + 1)
+		).toBeNull();
 	});
 
 	it("evicts the oldest past the cap and never throws", () => {
 		const store = mem();
-		for (let i = 0; i < 14; i++) storeFeed(store, "fr", `R${i}`, stories, i + 1);
+		for (let i = 0; i < 14; i++)
+			storeFeed(store, "fr", `R${i}`, stories, i + 1);
 		expect(cachedFeed(store, "fr", "R0", 20)).toBeNull();
 		expect(cachedFeed(store, "fr", "R13", 20)).toEqual(stories);
 		const hostile: KeyValueStore = {
@@ -1600,17 +1687,40 @@ describe("feed cache", () => {
 describe("remembered session picks", () => {
 	it("defaults to conversation, B2, medium and round-trips valid picks only", () => {
 		const m = new Map<string, string>();
-		const store: KeyValueStore = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
-		expect(loadNewsPicks(store)).toEqual({ kind: "talk", level: "B2", size: "medium" });
+		const store: KeyValueStore = {
+			getItem: (k) => m.get(k) ?? null,
+			setItem: (k, v) => void m.set(k, v)
+		};
+		expect(loadNewsPicks(store)).toEqual({
+			kind: "talk",
+			level: "B2",
+			size: "medium"
+		});
 		storeNewsPicks(store, { kind: "read", level: "A1", size: "long" });
-		expect(loadNewsPicks(store)).toEqual({ kind: "read", level: "A1", size: "long" });
-		m.set("ccez-news-picks-v1", JSON.stringify({ kind: "x", level: "Z9", size: "huge" }));
-		expect(loadNewsPicks(store)).toEqual({ kind: "talk", level: "B2", size: "medium" });
+		expect(loadNewsPicks(store)).toEqual({
+			kind: "read",
+			level: "A1",
+			size: "long"
+		});
+		m.set(
+			"ccez-news-picks-v1",
+			JSON.stringify({ kind: "x", level: "Z9", size: "huge" })
+		);
+		expect(loadNewsPicks(store)).toEqual({
+			kind: "talk",
+			level: "B2",
+			size: "medium"
+		});
 	});
 });
 
 describe("parseNewsLaunch", () => {
-	const story = { title: "Soupçons de peste en Russie", source: "CNews", link: "l", snippet: "" };
+	const story = {
+		title: "Soupçons de peste en Russie",
+		source: "CNews",
+		link: "l",
+		snippet: ""
+	};
 	it("reads a conversation opener back into its tag", () => {
 		const text = `${newsConversationInstruction(story, "B2", "French")} [Pasted 3491 chars] `;
 		expect(parseNewsLaunch(text)).toEqual({
@@ -1622,7 +1732,12 @@ describe("parseNewsLaunch", () => {
 		});
 	});
 	it("reads a summary opener with its length", () => {
-		const text = newsSummaryInstruction({ ...story, source: "" }, "long", "C1", "German");
+		const text = newsSummaryInstruction(
+			{ ...story, source: "" },
+			"long",
+			"C1",
+			"German"
+		);
 		expect(parseNewsLaunch(text)).toEqual({
 			kind: "read",
 			title: "Soupçons de peste en Russie",
@@ -1633,14 +1748,19 @@ describe("parseNewsLaunch", () => {
 	});
 	it("leaves ordinary messages alone", () => {
 		expect(parseNewsLaunch("hello")).toBeNull();
-		expect(parseNewsLaunch('📰 "A quote"\nmy own words about CEFR B2')).toBeNull();
+		expect(
+			parseNewsLaunch('📰 "A quote"\nmy own words about CEFR B2')
+		).toBeNull();
 	});
 });
 
 describe("sent opener pictures", () => {
 	it("keeps a launched story's picture by headline, http only", () => {
 		const m = new Map<string, string>();
-		const store: KeyValueStore = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
+		const store: KeyValueStore = {
+			getItem: (k) => m.get(k) ?? null,
+			setItem: (k, v) => void m.set(k, v)
+		};
 		expect(newsLaunchImage(store, "T")).toBeNull();
 		storeNewsLaunchImage(store, "T", "https://img/x.jpg");
 		expect(newsLaunchImage(store, "T")).toBe("https://img/x.jpg");
@@ -1657,9 +1777,11 @@ describe("conversation length", () => {
 		const short = newsConversationInstruction(story, "B1", "French", "short");
 		expect(short).toContain("about 120 words");
 		expect(parseNewsLaunch(short)?.size).toBe("short");
-		expect(parseNewsLaunch(newsConversationInstruction(story, "B1", "French", "long"))?.size).toBe(
-			"long"
-		);
+		expect(
+			parseNewsLaunch(
+				newsConversationInstruction(story, "B1", "French", "long")
+			)?.size
+		).toBe("long");
 	});
 	it("older openers without a length show none", () => {
 		const old = newsConversationInstruction(story, "B1", "French").replace(
@@ -1676,7 +1798,9 @@ describe("relevelNewsOpener", () => {
 		const head = `${newsConversationInstruction(story, "B2", "French")} `;
 		const article = "ARTICLE BODY";
 		const content = head + article;
-		const folds = [{ start: head.length, end: content.length, chars: article.length }];
+		const folds = [
+			{ start: head.length, end: content.length, chars: article.length }
+		];
 		const out = relevelNewsOpener(content, folds, "B1")!;
 		expect(out.content).toContain("CEFR B1 (Intermediate)");
 		expect(out.content).not.toContain("CEFR B2");

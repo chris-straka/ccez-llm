@@ -85,9 +85,9 @@ describe("capture source resolution", () => {
 	const area = { x: 1, y: 2, width: 3, height: 4 };
 
 	it("runs one-shots outright", () => {
-		expect(
-			captureSourceFor({ kind: "fullscreen" }, area, chord)
-		).toEqual({ kind: "fullscreen" });
+		expect(captureSourceFor({ kind: "fullscreen" }, area, chord)).toEqual({
+			kind: "fullscreen"
+		});
 		expect(
 			captureSourceFor({ kind: "interactive", mode: "area" }, area, chord)
 		).toEqual({ kind: "interactive", mode: "area" });

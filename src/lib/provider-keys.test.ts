@@ -75,7 +75,10 @@ describe("ProviderKeys lock", () => {
 
 	it("the shell waits for hydration before locking, then migrates the launch provider", async () => {
 		const hydration = gate();
-		const { keys, calls } = harness({ secure: true, hydrate: hydration.promise });
+		const { keys, calls } = harness({
+			secure: true,
+			hydrate: hydration.promise
+		});
 		expect(calls.hydrated).toBe(1);
 		expect(keys.loaded).toBe(false);
 		expect(keys.locked).toBe(false);
@@ -87,7 +90,10 @@ describe("ProviderKeys lock", () => {
 	});
 
 	it("a launch key parked in a legacy item unlocks after hydration", async () => {
-		const { keys } = harness({ secure: true, legacy: { [DEEPSEEK]: "sk-old" } });
+		const { keys } = harness({
+			secure: true,
+			legacy: { [DEEPSEEK]: "sk-old" }
+		});
 		await new Promise((r) => setTimeout(r, 0));
 		expect(keys.loaded).toBe(true);
 		expect(keys.locked).toBe(false);

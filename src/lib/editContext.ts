@@ -46,7 +46,10 @@ export function shouldDeferForComposition(input: {
  * candidate): app keys must leave it alone. WebKit can deliver the
  * confirming Enter with `isComposing` false but keyCode 229.
  */
-export function isImeKey(event: { isComposing?: boolean; keyCode?: number }): boolean {
+export function isImeKey(event: {
+	isComposing?: boolean;
+	keyCode?: number;
+}): boolean {
 	return event.isComposing === true || event.keyCode === 229;
 }
 

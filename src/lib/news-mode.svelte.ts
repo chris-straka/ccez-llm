@@ -120,7 +120,10 @@ export class NewsMode {
 	/** Raw headline loads by `code|region`, shared between a hover
 	 * prefetch and the open that follows it. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
-	private rawFeeds = new Map<string, { at: number; stories: Promise<NewsStory[]> }>();
+	private rawFeeds = new Map<
+		string,
+		{ at: number; stories: Promise<NewsStory[]> }
+	>();
 	/** Article bodies in flight or done, by story link. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
 	private articles = new Map<string, Promise<string>>();
@@ -157,7 +160,12 @@ export class NewsMode {
 			launch: () => {
 				const staged = this.staged;
 				if (!staged) return;
-				void this.launchNewsSession(staged.link, staged.kind, staged.level, staged.size);
+				void this.launchNewsSession(
+					staged.link,
+					staged.kind,
+					staged.level,
+					staged.size
+				);
 			},
 			close: () => {
 				this.close();
@@ -224,7 +232,11 @@ export class NewsMode {
 			(error: unknown) => {
 				this.articles.delete(link);
 				if (this.staged?.link === link)
-					this.staged = { ...this.staged, article: "error", error: newsErrorCopy(error) };
+					this.staged = {
+						...this.staged,
+						article: "error",
+						error: newsErrorCopy(error)
+					};
 			}
 		);
 	}
@@ -319,7 +331,8 @@ export class NewsMode {
 		const stories = loadNewsStories(code, region, fetchRawPage);
 		this.rawFeeds.set(key, { at: Date.now(), stories });
 		stories.catch(() => {
-			if (this.rawFeeds.get(key)?.stories === stories) this.rawFeeds.delete(key);
+			if (this.rawFeeds.get(key)?.stories === stories)
+				this.rawFeeds.delete(key);
 		});
 		return stories;
 	}
@@ -331,18 +344,29 @@ export class NewsMode {
 		const region = current.regions.find((r) => r.gl === gl);
 		if (!region) return;
 		// Translated headlines need the model: no key, no switch.
-		if (region.translate && !cachedFeed(this.deps.getStorage(), current.code, gl)) {
+		if (
+			region.translate &&
+			!cachedFeed(this.deps.getStorage(), current.code, gl)
+		) {
 			const provider = await this.deps.resolveProvider();
 			if (this.news !== current) return;
 			if (!provider) {
-				this.deps.toast(`Set an API key to translate ${region.label} headlines.`);
+				this.deps.toast(
+					`Set an API key to translate ${region.label} headlines.`
+				);
 				this.deps.denyBuzz();
 				return;
 			}
 		}
 		this.deps.tapTick();
 		this.staged = null;
-		this.news = { ...current, region: gl, status: "loading", stories: [], error: "" };
+		this.news = {
+			...current,
+			region: gl,
+			status: "loading",
+			stories: [],
+			error: ""
+		};
 		void this.fetchNewsStories();
 	}
 
@@ -359,13 +383,18 @@ export class NewsMode {
 		code: string,
 		region: string,
 		stories: NewsStory[],
-		running: () => boolean = () => this.news?.code === code && this.news?.region === region
+		running: () => boolean = () =>
+			this.news?.code === code && this.news?.region === region
 	): Promise<void> {
 		const storage = this.deps.getStorage();
-		const visible = () => this.news?.code === code && this.news?.region === region;
+		const visible = () =>
+			this.news?.code === code && this.news?.region === region;
 		const links = stories
 			.filter(
-				(s) => !s.image && !this.newsImageSession.has(s.link) && !cachedNewsImage(storage, s.link)
+				(s) =>
+					!s.image &&
+					!this.newsImageSession.has(s.link) &&
+					!cachedNewsImage(storage, s.link)
 			)
 			.map((s) => s.link);
 		await resolveImageBatch(links, {
@@ -387,11 +416,13 @@ export class NewsMode {
 					fetchWebview: this.deps.isPhone()
 						? undefined
 						: async (articleUrl) => {
-								if (this.webviewUnsupported || this.webviewSkips.has(link)) return null;
+								if (this.webviewUnsupported || this.webviewSkips.has(link))
+									return null;
 								try {
 									return await fetchWebviewImage(articleUrl);
 								} catch (error) {
-									if (isWebviewUnsupported(error)) this.webviewUnsupported = true;
+									if (isWebviewUnsupported(error))
+										this.webviewUnsupported = true;
 									else this.webviewSkips.add(link);
 									throw error;
 								}
@@ -418,9 +449,11 @@ export class NewsMode {
 		const prefill: Record<string, string | null> = {};
 		for (const s of stories) {
 			if (s.image) continue;
-			const hit = this.newsImageSession.get(s.link) ?? cachedNewsImage(storage, s.link);
+			const hit =
+				this.newsImageSession.get(s.link) ?? cachedNewsImage(storage, s.link);
 			if (hit) prefill[s.link] = hit;
-			else if (this.newsImageSession.get(s.link) === null) prefill[s.link] = null;
+			else if (this.newsImageSession.get(s.link) === null)
+				prefill[s.link] = null;
 		}
 		return prefill;
 	}
@@ -432,7 +465,9 @@ export class NewsMode {
 		const seq = ++this.newsSeq;
 		const { code, region } = current;
 		const stale = () =>
-			this.newsSeq !== seq || this.news?.code !== code || this.news?.region !== region;
+			this.newsSeq !== seq ||
+			this.news?.code !== code ||
+			this.news?.region !== region;
 		const cached = cachedFeed(storage, code, region);
 		if (cached) {
 			this.newsImages = this.knownImages(cached);
@@ -456,9 +491,8 @@ export class NewsMode {
 					stories.map((s) => s.title),
 					current.langName,
 					async (prompt) =>
-						(
-							await provider.chat([{ role: "user", content: prompt }], {})
-						).content
+						(await provider.chat([{ role: "user", content: prompt }], {}))
+							.content
 				);
 				stories = withTranslatedTitles(stories, titles);
 			}
@@ -491,7 +525,13 @@ export class NewsMode {
 		size: SummarySize
 	): Promise<void> {
 		const current = this.news;
-		if (!current || current.status !== "ready" || this.newsBusy || !this.deps.getEditor()) return;
+		if (
+			!current ||
+			current.status !== "ready" ||
+			this.newsBusy ||
+			!this.deps.getEditor()
+		)
+			return;
 		const story = current.stories.find((s) => s.link === link);
 		if (!story) return;
 		const instruction =
@@ -504,7 +544,9 @@ export class NewsMode {
 		// those are explicit user files, never silently dropped, and
 		// the launch sets its own pasted article over the slot.
 		if (this.deps.getAttachments().length > 0) {
-			this.deps.toastError("Remove attachments first — the story brings its own article.");
+			this.deps.toastError(
+				"Remove attachments first — the story brings its own article."
+			);
 			this.deps.denyBuzz();
 			return;
 		}
@@ -517,8 +559,11 @@ export class NewsMode {
 			// mid-flight: don't seed a dead panel.
 			if (this.panelSeq !== panel || this.news?.code !== current.code) return;
 			const image = story.image ?? this.newsImages[link];
-			if (image) storeNewsLaunchImage(this.deps.getStorage(), story.title, image);
-			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
+			if (image)
+				storeNewsLaunchImage(this.deps.getStorage(), story.title, image);
+			const att = makePastedTextAttachment(
+				`${PASTE_OPEN}${text}${PASTE_CLOSE}`
+			);
 			this.deps.setAttachments([att]);
 			this.news = null;
 			this.staged = null;

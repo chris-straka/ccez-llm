@@ -31,7 +31,8 @@ test.beforeEach(async ({ page }) => {
 			) => {
 				pending.push(
 					window.setTimeout(() => {
-						if (name === "start") utterance.onstart?.(new Event("start") as SpeechSynthesisEvent);
+						if (name === "start")
+							utterance.onstart?.(new Event("start") as SpeechSynthesisEvent);
 						else utterance.onend?.(new Event("end") as SpeechSynthesisEvent);
 					}, ms)
 				);
@@ -223,10 +224,9 @@ test("right-click mixed message reads each line in its own voice", async ({
 	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, {
 		button: "right"
 	});
-	await expect.poll(() => spoken(page), { timeout: 10_000 }).toEqual([
-		"paragraph for you:",
-		"汉语是"
-	]);
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.toEqual(["paragraph for you:", "汉语是"]);
 	// The Han line keeps its Chinese voice under the English seed —
 	// never the message fallback.
 	const langs = await spokenLang(page);
@@ -329,18 +329,16 @@ test("right-click outside a live selection reads the word under the cursor", asy
 	await page.mouse.click(point.x, point.y, { button: "right" });
 	// The click missed the highlight, so the word wins — and the stale
 	// wash drops so the highlight never contradicts the audio.
-	await expect
-		.poll(() => spoken(page), { timeout: 10_000 })
-		.toEqual(["gamma"]);
-	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
-		""
-	);
+	await expect.poll(() => spoken(page), { timeout: 10_000 }).toEqual(["gamma"]);
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
 });
 
 test("right-click on CJK repoints a missed highlight onto the clicked word", async ({
 	page
 }) => {
-	await seedChat(page, [{ role: "assistant", content: "日本語でお答えします" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "日本語でお答えします" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -376,7 +374,9 @@ test("right-click on CJK repoints a missed highlight onto the clicked word", asy
 		.poll(() => spoken(page), { timeout: 10_000 })
 		.not.toHaveLength(0);
 	const texts = await spoken(page);
-	const sel = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const sel = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(sel).toContain("答");
 	expect(texts.join("")).toContain(sel);
 });
@@ -445,7 +445,5 @@ test("right-click press that extends the highlight repoints the new word", async
 		page.evaluate(() => window.getSelection()?.toString() ?? "");
 	await expect.poll(resel, { timeout: 10_000 }).toContain("很");
 	await expect.poll(resel, { timeout: 10_000 }).not.toContain("声调");
-	await expect
-		.poll(() => spoken(page), { timeout: 10_000 })
-		.toContain("很");
+	await expect.poll(() => spoken(page), { timeout: 10_000 }).toContain("很");
 });

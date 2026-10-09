@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { AnnotationDrafts, type AnnotationDraftsDeps } from "./annotation-drafts.svelte";
 import {
-	type Annotation,
-	type AnnotationId
-} from "./annotations";
+	AnnotationDrafts,
+	type AnnotationDraftsDeps
+} from "./annotation-drafts.svelte";
+import { type Annotation, type AnnotationId } from "./annotations";
 import {
 	loadDraftAnnotations,
 	saveDraftAnnotations
@@ -26,14 +26,16 @@ function note(over: Partial<Annotation> = {}): Annotation {
 
 const PROVIDER = {} as ChatProvider;
 
-function harness(opts: {
-	active?: string;
-	chats?: string[];
-	phone?: boolean;
-	storyOpen?: boolean;
-	provider?: ChatProvider | null;
-	answer?: (q: AnnotationQuestion) => Promise<string>;
-} = {}): {
+function harness(
+	opts: {
+		active?: string;
+		chats?: string[];
+		phone?: boolean;
+		storyOpen?: boolean;
+		provider?: ChatProvider | null;
+		answer?: (q: AnnotationQuestion) => Promise<string>;
+	} = {}
+): {
 	drafts: AnnotationDrafts;
 	calls: {
 		answers: AnnotationQuestion[];
@@ -106,8 +108,15 @@ describe("per-chat file and restore", () => {
 	});
 
 	it("switching chats files the leaving chat and restores the entering one", () => {
-		saveDraftAnnotations("c2", [note({ id: "b" as AnnotationId })], ["c1", "c2"]);
-		const { drafts, setActive } = harness({ active: "c1", chats: ["c1", "c2"] });
+		saveDraftAnnotations(
+			"c2",
+			[note({ id: "b" as AnnotationId })],
+			["c1", "c2"]
+		);
+		const { drafts, setActive } = harness({
+			active: "c1",
+			chats: ["c1", "c2"]
+		});
 		drafts.setList([note({ id: "a" as AnnotationId })]);
 		drafts.fileChat("c1" as ChatId);
 		setActive("c2");
@@ -125,7 +134,11 @@ describe("per-chat file and restore", () => {
 	});
 
 	it("draftsFor reads live for the active chat, storage for the rest", () => {
-		saveDraftAnnotations("c2", [note({ id: "stored" as AnnotationId })], ["c1", "c2"]);
+		saveDraftAnnotations(
+			"c2",
+			[note({ id: "stored" as AnnotationId })],
+			["c1", "c2"]
+		);
 		const { drafts } = harness({ active: "c1", chats: ["c1", "c2"] });
 		const live = [note({ id: "live" as AnnotationId })];
 		drafts.setList(live);
@@ -171,7 +184,10 @@ describe("own-message edits", () => {
 		const { drafts } = harness({ active: "c1" });
 		drafts.setList([note({ id: "f" as AnnotationId })]);
 		drafts.beginOwnEdit("c1" as ChatId, [note({ id: "s" as AnnotationId })]);
-		drafts.setList([note({ id: "s" as AnnotationId }), note({ id: "x" as AnnotationId })]);
+		drafts.setList([
+			note({ id: "s" as AnnotationId }),
+			note({ id: "x" as AnnotationId })
+		]);
 		drafts.endOwnEdit("c2" as ChatId, true);
 		expect(drafts.list.map((a) => a.id)).toEqual(["x"]);
 	});
@@ -355,7 +371,10 @@ describe("pins and send", () => {
 
 	it("deleteById drops one note", () => {
 		const { drafts } = harness();
-		drafts.setList([note({ id: "a" as AnnotationId }), note({ id: "b" as AnnotationId })]);
+		drafts.setList([
+			note({ id: "a" as AnnotationId }),
+			note({ id: "b" as AnnotationId })
+		]);
 		drafts.deleteById("a");
 		expect(drafts.list.map((a) => a.id)).toEqual(["b"]);
 	});

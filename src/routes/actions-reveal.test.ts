@@ -68,7 +68,8 @@ describe("hover-only message actions", () => {
 	});
 
 	it("keeps the row up while an aid loads", () => {
-		const css = rowStyle();
+		// Whitespace-blind: the formatter may wrap selector lists.
+		const css = rowStyle().replace(/\s+/g, " ");
 		expect(css).toContain(":global(article.user.aid-loading) .actions");
 		expect(css).toContain(":global(article.assistant.aid-loading) .actions");
 	});

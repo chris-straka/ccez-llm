@@ -123,12 +123,12 @@ pub fn ocr_supported() -> bool {
 
 /// Recognize text in raw image bytes with the installed subset of
 /// `languages` (BCP-47). Returns stdout lines for the caller to shape.
-pub fn ocr_recognize(
-    bytes: &[u8],
-    languages: &[String],
-) -> Result<Vec<(String, f32)>, String> {
+pub fn ocr_recognize(bytes: &[u8], languages: &[String]) -> Result<Vec<(String, f32)>, String> {
     if !command_present("tesseract") {
-        return Err("no on-device OCR on this machine (install tesseract for offline text recognition)".into());
+        return Err(
+            "no on-device OCR on this machine (install tesseract for offline text recognition)"
+                .into(),
+        );
     }
     let codes = usable_codes(languages, &installed_langs());
     if codes.is_empty() {
@@ -204,10 +204,7 @@ mod tesseract_tests {
     fn keeps_requested_subset_falls_back_to_english() {
         let installed = vec!["eng".to_string(), "jpn".to_string()];
         assert_eq!(
-            usable_codes(
-                &["zh-Hans".to_string(), "ja-JP".to_string()],
-                &installed
-            ),
+            usable_codes(&["zh-Hans".to_string(), "ja-JP".to_string()], &installed),
             vec!["jpn".to_string()]
         );
         // English fallback only when nothing requested is installed.
@@ -219,7 +216,11 @@ mod tesseract_tests {
         // Requested and installed: exact order, deduplicated.
         assert_eq!(
             usable_codes(
-                &["en-US".to_string(), "ja-JP".to_string(), "en-US".to_string()],
+                &[
+                    "en-US".to_string(),
+                    "ja-JP".to_string(),
+                    "en-US".to_string()
+                ],
                 &installed
             ),
             vec!["eng".to_string(), "jpn".to_string()]

@@ -9,9 +9,7 @@ popOpen toggles here, the draft and its focus live here. The
 extracts (it renders paged for now). -->
 <script lang="ts">
 	import type { ChatMsgId } from "$lib/chat";
-	import type {
-	AnnotationRef
-} from "$lib/annotation-block";
+	import type { AnnotationRef } from "$lib/annotation-block";
 	import { annotationCountLabel } from "$lib/annotations";
 	import ActionIcon from "./ActionIcon.svelte";
 	import { isImeKey } from "$lib/editContext";
@@ -207,9 +205,7 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 	offset above. The article renders paged for now, so its ancestor
 	stays global. */
 	:global(article):has(.ann-refs) {
-		margin-top: calc(
-			var(--msg-gap, 0.35rem) + 1.1rem * var(--font-scale, 1)
-		);
+		margin-top: calc(var(--msg-gap, 0.35rem) + 1.1rem * var(--font-scale, 1));
 	}
 	:global(article.user) .ann-refs {
 		/* The user bubble is narrow: span it like above, but keep

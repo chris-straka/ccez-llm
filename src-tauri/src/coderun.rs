@@ -148,7 +148,10 @@ pub fn run_code(language: String, code: String) -> Result<CodeRunResult, String>
     let start = Instant::now();
     let mut timed_out = false;
     loop {
-        match child.try_wait().map_err(|e| format!("could not poll the runner: {e}"))? {
+        match child
+            .try_wait()
+            .map_err(|e| format!("could not poll the runner: {e}"))?
+        {
             Some(_status) => break,
             None => {
                 if start.elapsed() >= deadline {
@@ -164,7 +167,9 @@ pub fn run_code(language: String, code: String) -> Result<CodeRunResult, String>
     let status = if timed_out {
         None
     } else {
-        child.try_wait().map_err(|e| format!("could not read the exit status: {e}"))?
+        child
+            .try_wait()
+            .map_err(|e| format!("could not read the exit status: {e}"))?
     };
 
     let stdout = out_handle

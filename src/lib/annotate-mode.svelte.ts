@@ -13,9 +13,7 @@ import {
 	occurrenceAtPosition,
 	paragraphForQuote
 } from "./quote-match";
-import {
-	selMenuPlacement
-} from "./sel-geometry";
+import { selMenuPlacement } from "./sel-geometry";
 import { selMenuWidthEstimate } from "./selSlices";
 import { messageIndexFromId, type ChatMsg, type ChatMsgId } from "./chat";
 import {
@@ -103,7 +101,12 @@ export interface AnnotateModeDeps {
 	getScrollBox: () => HTMLElement | undefined;
 	ensureSwapObserver: () => void;
 	/** Fire-and-forget quote readback (page wraps speakQuote). */
-	speak: (quote: string, key: string, keepMenu: boolean, context: string) => void;
+	speak: (
+		quote: string,
+		key: string,
+		keepMenu: boolean,
+		context: string
+	) => void;
 	selSpeakKey: (sel: {
 		messageId: ChatMsgId | null;
 		story?: StoryAnchor;
@@ -125,7 +128,12 @@ export interface AnnotateModeDeps {
 	) => void;
 	dismissSelPanels: () => void;
 	/** Desktop create pill open (draft seed, focus, haptic inside). */
-	openCreatePill: (id: AnnotationId, x: number, y: number, draft: string) => void;
+	openCreatePill: (
+		id: AnnotationId,
+		x: number,
+		y: number,
+		draft: string
+	) => void;
 	/** Cancel the pill when it addresses id; true when it did. */
 	cancelPillFor: (id: string) => boolean;
 	/** Drop the pill: only id when given, any open pill otherwise. */
@@ -224,11 +232,18 @@ export class AnnotateMode {
 	storyOfHeadline(headline: Element): StoryAnchor | null {
 		const news = this.deps.getNews();
 		if (!news) return null;
-		const link = headline.closest(".news-open")?.getAttribute("data-story-link");
+		const link = headline
+			.closest(".news-open")
+			?.getAttribute("data-story-link");
 		if (!link) return null;
 		const story = news.stories.find((s) => s.link === link);
 		if (!story) return null;
-		return { link, title: story.title, outlet: story.source, lang: news.langName };
+		return {
+			link,
+			title: story.title,
+			outlet: story.source,
+			lang: news.langName
+		};
 	}
 
 	/** Message id owning the selection anchor, or null outside messages. */
@@ -267,7 +282,8 @@ export class AnnotateMode {
 		story: StoryAnchor;
 	} | null {
 		const headline = this.headlineOf(selection.anchorNode);
-		if (!headline || this.headlineOf(selection.focusNode) !== headline) return null;
+		if (!headline || this.headlineOf(selection.focusNode) !== headline)
+			return null;
 		const frag = selection.getRangeAt(0).cloneContents();
 		const quote = quoteFragmentText(frag);
 		if (!quote) return null;
@@ -343,7 +359,9 @@ export class AnnotateMode {
 				node = firstText;
 				offset = 0;
 			}
-			const index = this.deps.getChatMessages().findIndex((m) => m.id === messageId);
+			const index = this.deps
+				.getChatMessages()
+				.findIndex((m) => m.id === messageId);
 			if (index === -1) return 0;
 			const root = document.querySelector(`article#msg-${index} .rendered`);
 			if (!(root instanceof HTMLElement)) return 0;
@@ -681,7 +699,10 @@ export class AnnotateMode {
 		};
 		return (
 			quoteAnchor(this.quoteRects(ann), badgeTop) ??
-			quoteAnchor([fallback], badgeTop) ?? { anchor: fallback, clearTop: fallback.top }
+			quoteAnchor([fallback], badgeTop) ?? {
+				anchor: fallback,
+				clearTop: fallback.top
+			}
 		);
 	}
 
@@ -701,7 +722,9 @@ export class AnnotateMode {
 	(empty when it is off the wire): the answer card's anchor. */
 	quoteRects(ann: Annotation): DOMRect[] {
 		if (!ann.messageId) return [];
-		const index = this.deps.getChatMessages().findIndex((m) => m.id === ann.messageId);
+		const index = this.deps
+			.getChatMessages()
+			.findIndex((m) => m.id === ann.messageId);
 		const root = document.querySelector(`article#msg-${index} .rendered`);
 		if (index === -1 || !(root instanceof HTMLElement)) return [];
 		const nodes = quoteTextNodes(root);
@@ -728,9 +751,12 @@ export class AnnotateMode {
 	selection, so the existing text reads as context and the
 	readings panels place against it. Null when the quote is gone
 	(aid swap, edit). */
-	selectAnswerQuote(
-		id: AnnotationId
-	): { quote: string; messageId: ChatMsgId; context: string; at: number } | null {
+	selectAnswerQuote(id: AnnotationId): {
+		quote: string;
+		messageId: ChatMsgId;
+		context: string;
+		at: number;
+	} | null {
 		const ann = this.deps.getAnnotations().find((a) => a.id === id);
 		if (!ann) return null;
 		// Story notes select nothing (no message row to locate
@@ -747,7 +773,9 @@ export class AnnotateMode {
 		// live selection. Everything else highlights wash-only while
 		// its card reads — never a native-blue flash.
 		if (!this.deps.quoteOffers(quoted)) return quoted;
-		const index = this.deps.getChatMessages().findIndex((m) => m.id === ann.messageId);
+		const index = this.deps
+			.getChatMessages()
+			.findIndex((m) => m.id === ann.messageId);
 		if (index === -1) return null;
 		const root = document.querySelector(`article#msg-${index} .rendered`);
 		if (!(root instanceof HTMLElement)) return null;
@@ -762,12 +790,14 @@ export class AnnotateMode {
 		const endNode = nodes[loc.endNode];
 		if (!startNode || !endNode) return null;
 		try {
-			window.getSelection()?.setBaseAndExtent(
-				startNode,
-				Math.min(loc.startOffset, startNode.length),
-				endNode,
-				Math.min(loc.endOffset, endNode.length)
-			);
+			window
+				.getSelection()
+				?.setBaseAndExtent(
+					startNode,
+					Math.min(loc.startOffset, startNode.length),
+					endNode,
+					Math.min(loc.endOffset, endNode.length)
+				);
 		} catch {
 			return null;
 		}
@@ -789,7 +819,12 @@ export class AnnotateMode {
 		// Loading — the answer is still on the wire, so there is no
 		// card to open and the review dock must not open either (it
 		// used to open and strand the tap there).
-		if (this.deps.isPhone() && !this.deps.isIOS() && current && !current.answer) {
+		if (
+			this.deps.isPhone() &&
+			!this.deps.isIOS() &&
+			current &&
+			!current.answer
+		) {
 			this.deps.toast("Loading");
 			return;
 		}
@@ -979,7 +1014,9 @@ export class AnnotateMode {
 			this.deps.toastError("That story is no longer open");
 			return;
 		}
-		const index = this.deps.getViewMessages().findIndex((m) => m.id === ann.messageId);
+		const index = this.deps
+			.getViewMessages()
+			.findIndex((m) => m.id === ann.messageId);
 		if (index < 0) {
 			this.deps.toastError("Annotation no longer exists");
 			return;
@@ -1029,13 +1066,17 @@ export class AnnotateMode {
 			return;
 		}
 		if (!canPinAnnotation(current)) return;
-		this.deps.setAnnotations(setPromptPinned(this.deps.getAnnotations(), id, true));
+		this.deps.setAnnotations(
+			setPromptPinned(this.deps.getAnnotations(), id, true)
+		);
 	}
 
 	/** Unpin: the annotation stays filed (badge, dock) — only the
 	next send omits it. */
 	unpinAnnotation(id: AnnotationId): void {
-		this.deps.setAnnotations(setPromptPinned(this.deps.getAnnotations(), id, false));
+		this.deps.setAnnotations(
+			setPromptPinned(this.deps.getAnnotations(), id, false)
+		);
 	}
 
 	removeAnnotation(id: string): void {

@@ -30,9 +30,9 @@ async function askAtFile(page: Page, question: string): Promise<void> {
 		.textContent({ timeout: 1_000 })
 		.catch(() => null);
 	expect(bannered, "annotation ask failed").toBeNull();
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({
+		timeout: 10_000
+	});
 }
 
 test("staged question asks on send and the reply lands as its answer", async ({
@@ -69,13 +69,11 @@ test("staged question asks on send and the reply lands as its answer", async ({
 	// No quote title, no close button: the highlighted word
 	// upstream is the title, click-off closes.
 	await expect(card.locator(".ann-answer-quote")).toHaveCount(0);
-	await expect(
-		card.getByRole("button", { name: "Close answer" })
-	).toHaveCount(0);
-	// The card fades in below the word, never covering it.
-	const fade = await card.evaluate(
-		(el) => getComputedStyle(el).animationName
+	await expect(card.getByRole("button", { name: "Close answer" })).toHaveCount(
+		0
 	);
+	// The card fades in below the word, never covering it.
+	const fade = await card.evaluate((el) => getComputedStyle(el).animationName);
 	expect(fade).toContain("ann-answer-in");
 	const badgeBox = await ready.boundingBox();
 	const cardBox = await card.boundingBox();
@@ -91,9 +89,7 @@ test("staged question asks on send and the reply lands as its answer", async ({
 	await page.locator(".prompt-tools .ann-pill").click();
 	const dock = page.locator(".ann-wrap .review");
 	await expect(dock).toHaveCSS("opacity", "1");
-	await expect(
-		page.locator(".review-quote.annotated").first()
-	).toBeVisible();
+	await expect(page.locator(".review-quote.annotated").first()).toBeVisible();
 	await expect(page.locator(".review-answer").first()).toContainText(
 		"Mock reply to:"
 	);
@@ -209,9 +205,7 @@ test("unapproved annotations never bake into a send", async ({ page }) => {
 
 /** A reload resets pins: a stale approval can't ride a later send,
 while the answer itself persists orange. */
-test("answered annotations stay orange across a reload", async ({
-	page
-}) => {
+test("answered annotations stay orange across a reload", async ({ page }) => {
 	test.setTimeout(120_000);
 	await seedChat(page, [
 		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
@@ -227,9 +221,9 @@ test("answered annotations stay orange across a reload", async ({
 	// Shift+A opens the box (bare A files and sends at once now).
 	await page.keyboard.press("A");
 	await askAtFile(page, "what lives here?");
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({
+		timeout: 10_000
+	});
 	// Pin with a second Enter, then reload: the answer persists
 	// orange but the pin resets — no pill, nothing riding the
 	// next send. The badge keeps its number throughout.
@@ -245,12 +239,12 @@ test("answered annotations stay orange across a reload", async ({
 	);
 	await page.reload();
 	await expect(article).toBeVisible({ timeout: 60_000 });
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toBeVisible({ timeout: 10_000 });
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-waiting")
-	).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({
+		timeout: 10_000
+	});
+	await expect(page.locator("button.ccez-ann-badge.ans-waiting")).toHaveCount(
+		0
+	);
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 });
 
@@ -319,16 +313,15 @@ test("open answer keeps its quote washed until the card closes", async ({
 	const card = page.locator(".ann-answer");
 	await expect(card).toBeVisible({ timeout: 10_000 });
 	const washed = (): Promise<boolean> =>
-		page.evaluate(
-			() =>
-				["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"].some(
-					(n) =>
-						(
-							window as unknown as {
-								CSS?: { highlights?: { has(n: string): boolean } };
-							}
-						).CSS?.highlights?.has(n) ?? false
-				)
+		page.evaluate(() =>
+			["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"].some(
+				(n) =>
+					(
+						window as unknown as {
+							CSS?: { highlights?: { has(n: string): boolean } };
+						}
+					).CSS?.highlights?.has(n) ?? false
+			)
 		);
 	// Park clear of badge and card, past the hover-clear hysteresis:
 	// the wash must still paint while the card reads.
@@ -374,13 +367,10 @@ test("waiting badge breathes until the answer lands glowing", async ({
 	await page.keyboard.press("Enter");
 	await expect(pop).toHaveCount(0);
 	const animName = (sel: string): Promise<string> =>
-		page.evaluate(
-			(s: string) => {
-				const el = document.querySelector(s);
-				return el ? getComputedStyle(el).animationName : "";
-			},
-			sel
-		);
+		page.evaluate((s: string) => {
+			const el = document.querySelector(s);
+			return el ? getComputedStyle(el).animationName : "";
+		}, sel);
 	// The filed badge waits blue and breathes (motion = in-flight).
 	const waiting = page.locator("button.ccez-ann-badge.ans-waiting");
 	await expect(waiting).toBeVisible({ timeout: 10_000 });
@@ -402,9 +392,7 @@ test("waiting badge breathes until the answer lands glowing", async ({
 
 /** Reduced motion keeps the waiting pulse (opacity only, slower):
 a still badge can't say it's loading. */
-test("waiting badge still breathes under reduced motion", async ({
-	page
-}) => {
+test("waiting badge still breathes under reduced motion", async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: "reduce" });
 	await seedChat(page, [
 		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
@@ -413,7 +401,9 @@ test("waiting badge still breathes under reduced motion", async ({
 		localStorage.setItem("ccez-mock-chat-ms", "12000");
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant")).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
 	await dragQuote(page, 0, "riverbank");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("A");
@@ -482,9 +472,8 @@ test("answer card scrolls with its quote", async ({ page }) => {
 	await page.waitForFunction(
 		(y: number) =>
 			document.querySelector(".ann-answer") &&
-			(document
-				.querySelector(".ann-answer")!
-				.getBoundingClientRect().y as number) <
+			(document.querySelector(".ann-answer")!.getBoundingClientRect()
+				.y as number) <
 				y - 280,
 		startY,
 		{ timeout: 5_000 }
@@ -537,10 +526,9 @@ test("restart resumes unanswered annotation asks", async ({ page }) => {
 	const badges = page.locator("button.ccez-ann-badge");
 	await expect(badges).toHaveCount(2, { timeout: 10_000 });
 	// The waiting ask relaunches on boot: blue turns orange alone.
-	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(
-		2,
-		{ timeout: 30_000 }
-	);
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(2, {
+		timeout: 30_000
+	});
 	// And the answered draft never refired: opening its badge
 	// shows the seeded answer (a refire would mock-overwrite it).
 	const done = page.locator("button.ccez-ann-badge.ans-ready").nth(1);
@@ -642,7 +630,10 @@ test("second-occurrence quote opens its own paragraph's readings", async ({
 }) => {
 	test.setTimeout(120_000);
 	await seedChat(page, [
-		{ role: "assistant", content: "日本語の旅行は楽しいです。\n\n北京旅行很好。" }
+		{
+			role: "assistant",
+			content: "日本語の旅行は楽しいです。\n\n北京旅行很好。"
+		}
 	]);
 	await page.addInitScript(() => {
 		localStorage.setItem("ccez-mock-chat-ms", "2500");
@@ -940,10 +931,7 @@ test("below-fold badge press survives its own trailing click", async ({
 				"article.assistant:last-of-type"
 			);
 			while (el) {
-				if (
-					el instanceof HTMLElement &&
-					el.scrollHeight > el.clientHeight + 4
-				)
+				if (el instanceof HTMLElement && el.scrollHeight > el.clientHeight + 4)
 					return el.scrollTop;
 				el = el.parentElement;
 			}
@@ -963,7 +951,9 @@ test("below-fold badge press survives its own trailing click", async ({
 	const card = page.locator(".ann-answer");
 	await expect(card).toBeVisible({ timeout: 10_000 });
 	const cardH = await page.evaluate(
-		() => document.querySelector(".ann-answer")?.getBoundingClientRect().height ?? null
+		() =>
+			document.querySelector(".ann-answer")?.getBoundingClientRect().height ??
+			null
 	);
 	expect(cardH).not.toBeNull();
 	await page.keyboard.press("Escape");
@@ -988,8 +978,7 @@ test("below-fold badge press survives its own trailing click", async ({
 				parent.scrollHeight > parent.clientHeight + 4
 			) {
 				parent.style.scrollBehavior = "auto";
-				parent.scrollTop +=
-					badge.getBoundingClientRect().bottom - wantBottom;
+				parent.scrollTop += badge.getBoundingClientRect().bottom - wantBottom;
 				break;
 			}
 			el = parent;
@@ -1024,17 +1013,20 @@ test("below-fold badge press survives its own trailing click", async ({
 	// WebKit's trailing click in its exact shape: a non-drag click
 	// at the press point, targeted at the common ancestor (main)
 	// the displaced mouseup yields — off-card, off-badge.
-	await page.evaluate(({ x, y }) => {
-		document.querySelector("main")!.dispatchEvent(
-			new MouseEvent("click", {
-				bubbles: true,
-				screenX: x,
-				screenY: y,
-				clientX: x,
-				clientY: y
-			})
-		);
-	}, { x: parked!.x, y: parked!.y });
+	await page.evaluate(
+		({ x, y }) => {
+			document.querySelector("main")!.dispatchEvent(
+				new MouseEvent("click", {
+					bubbles: true,
+					screenX: x,
+					screenY: y,
+					clientX: x,
+					clientY: y
+				})
+			);
+		},
+		{ x: parked!.x, y: parked!.y }
+	);
 	// Past the 160ms fade-out: a shut card would be gone by now.
 	await page.waitForTimeout(500);
 	await expect(card).toBeVisible();

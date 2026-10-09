@@ -8,7 +8,10 @@ import { describe, it, expect } from "vitest";
  * jsdom, so this asserts on source like the other component contracts.
  */
 function overlaySource(): string {
-	return readFileSync(new URL("./CaptureOverlay.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("./CaptureOverlay.svelte", import.meta.url),
+		"utf8"
+	);
 }
 
 describe("capture overlay", () => {
@@ -28,7 +31,8 @@ describe("capture overlay", () => {
 		expect(source).toContain('event.key === "Enter"');
 		expect(source).toContain("!event.isComposing");
 		expect(source).toContain("actions.confirm(draft)");
-		expect(source).toContain("file it to chat");
+		// Whitespace-blind: the formatter may wrap the hint copy.
+		expect(source.replace(/\s+/g, " ")).toContain("file it to chat");
 	});
 
 	it("exposes file and cancel with no Esc of its own", () => {

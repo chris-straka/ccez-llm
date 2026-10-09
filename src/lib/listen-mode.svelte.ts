@@ -58,7 +58,10 @@ export interface NativeGradeResult {
 }
 
 export interface NativeGrader {
-	start: (chatId: ChatId, items: { i: number; prompt: string; retry: boolean }[]) => Promise<void>;
+	start: (
+		chatId: ChatId,
+		items: { i: number; prompt: string; retry: boolean }[]
+	) => Promise<void>;
 	results: (chatId: ChatId) => Promise<NativeGradeResult[]>;
 }
 
@@ -160,7 +163,8 @@ export class ListenMode {
 		this.lang = lang;
 		this.error = "";
 		this.results = null;
-		for (const channel of this.deps.getChannels()) void this.loadChannel(channel.url);
+		for (const channel of this.deps.getChannels())
+			void this.loadChannel(channel.url);
 		if (this.query.trim()) void this.search();
 	}
 
@@ -180,7 +184,11 @@ export class ListenMode {
 	async probe(ids: string[]): Promise<void> {
 		const lang = this.lang;
 		if (!lang) return;
-		const todo = ids.filter((id) => !this.info.has(infoKey(id, lang)) && !this.probing.has(infoKey(id, lang)));
+		const todo = ids.filter(
+			(id) =>
+				!this.info.has(infoKey(id, lang)) &&
+				!this.probing.has(infoKey(id, lang))
+		);
 		if (todo.length === 0) return;
 		for (const id of todo) this.probing.set(infoKey(id, lang), true);
 		try {
@@ -197,7 +205,11 @@ export class ListenMode {
 	async loadChannel(url: string): Promise<void> {
 		const current = this.channelViews.get(url);
 		if (current?.status === "loading") return;
-		this.channelViews.set(url, { status: "loading", page: current?.page ?? null, error: "" });
+		this.channelViews.set(url, {
+			status: "loading",
+			page: current?.page ?? null,
+			error: ""
+		});
 		try {
 			const page = await this.needBackend().channel(url);
 			this.channelViews.set(url, { status: "ready", page, error: "" });
@@ -239,7 +251,8 @@ export class ListenMode {
 		if (!q || !this.lang) return;
 		// Enter right after the pause already searched: no second call.
 		const key = `${this.lang}|${this.searchKind}|${q}`;
-		if (key === this.searchedFor && (this.searching || this.results !== null)) return;
+		if (key === this.searchedFor && (this.searching || this.results !== null))
+			return;
 		this.searchedFor = key;
 		const seq = ++this.browseSeq;
 		this.searching = true;
@@ -302,7 +315,10 @@ export class ListenMode {
 
 	addChannel(entry: { url: string; name: string }): void {
 		if (this.hasChannel(entry.url)) return;
-		this.deps.setChannels([...this.deps.getChannels(), { url: entry.url, name: entry.name }]);
+		this.deps.setChannels([
+			...this.deps.getChannels(),
+			{ url: entry.url, name: entry.name }
+		]);
 		this.deps.toast(`Added ${entry.name}`);
 		if (!this.channelViews.has(entry.url)) void this.loadChannel(entry.url);
 	}
@@ -314,7 +330,9 @@ export class ListenMode {
 	/** Fold or unfold a channel's recent videos (kept across launches). */
 	toggleFold(url: string): void {
 		this.deps.setChannels(
-			this.deps.getChannels().map((c) => (c.url === url ? { ...c, folded: !c.folded } : c))
+			this.deps
+				.getChannels()
+				.map((c) => (c.url === url ? { ...c, folded: !c.folded } : c))
 		);
 	}
 
@@ -378,7 +396,9 @@ export class ListenMode {
 				const fetched = await backend.fetch(session.videoId, session.lang);
 				const bytes = await backend.audio(session.videoId, session.lang);
 				if (this.audioFor !== key) return false;
-				const url = URL.createObjectURL(new Blob([bytes], { type: fetched.audio_mime }));
+				const url = URL.createObjectURL(
+					new Blob([bytes], { type: fetched.audio_mime })
+				);
 				const el = new Audio();
 				el.preload = "auto";
 				this.wireGain(el);
@@ -391,7 +411,9 @@ export class ListenMode {
 				if (this.audioFor === key) {
 					this.audioStatus = "error";
 					this.audioLoad = null;
-					this.deps.toast(listenErrorCopy(error, this.deps.langName(session.lang)));
+					this.deps.toast(
+						listenErrorCopy(error, this.deps.langName(session.lang))
+					);
 				}
 				return false;
 			}
@@ -413,7 +435,10 @@ export class ListenMode {
 			if (typeof AudioContext === "function") {
 				this.audioCtx ??= new AudioContext();
 				const gain = this.audioCtx.createGain();
-				this.audioCtx.createMediaElementSource(el).connect(gain).connect(this.audioCtx.destination);
+				this.audioCtx
+					.createMediaElementSource(el)
+					.connect(gain)
+					.connect(this.audioCtx.destination);
 				this.gain = gain;
 			}
 		} catch {
@@ -458,7 +483,10 @@ export class ListenMode {
 		const session = chat.listen;
 		const clip = session?.clips[i];
 		if (!session || !clip) return;
-		if (!this.audio || this.audioFor !== infoKey(session.videoId, session.lang)) {
+		if (
+			!this.audio ||
+			this.audioFor !== infoKey(session.videoId, session.lang)
+		) {
 			void this.loadAudio(session).then((ok) => {
 				if (ok) this.play(i, slow, from);
 			});
@@ -475,7 +503,10 @@ export class ListenMode {
 		// Caption end times run late: stop a touch early so the next
 		// sentence's first sound never leaks in.
 		this.stopAt = Math.max(clip.start + MIN_CLIP_SEC, clip.end - END_TRIM_SEC);
-		const at = from !== undefined && from >= clip.start && from < this.stopAt ? from : clip.start;
+		const at =
+			from !== undefined && from >= clip.start && from < this.stopAt
+				? from
+				: clip.start;
 		el.currentTime = at;
 		this.position = { i, t: at };
 		this.playing = { i, slow };
@@ -523,7 +554,8 @@ export class ListenMode {
 			return;
 		}
 		const at = this.position;
-		if (this.paused?.i === i && this.paused.slow === slow && at?.i === i) this.play(i, slow, at.t);
+		if (this.paused?.i === i && this.paused.slow === slow && at?.i === i)
+			this.play(i, slow, at.t);
 		else this.play(i, slow);
 	}
 
@@ -548,7 +580,8 @@ export class ListenMode {
 	/** Space: play, pause, or resume the clip waiting for a guess. */
 	replay(slow: boolean): void {
 		const chat = activeChat(this.deps.getChatState());
-		const clip = openClip(chat)?.clip ?? chat.messages.findLast((m) => m.clip)?.clip;
+		const clip =
+			openClip(chat)?.clip ?? chat.messages.findLast((m) => m.clip)?.clip;
 		if (!clip) return;
 		this.toggle(clip.i, slow);
 	}
@@ -579,8 +612,7 @@ export class ListenMode {
 				this.paused = null;
 				this.queued = next.i;
 			} else this.play(next.i, false);
-		}
-		else if (!this.playing) this.stop();
+		} else if (!this.playing) this.stop();
 		this.queueGrades(chatId);
 		this.deps.reveal();
 		return true;
@@ -595,9 +627,15 @@ export class ListenMode {
 		const open = openClip(chat)?.clip?.i ?? session.clips.length;
 		const wanted: number[] = [];
 		for (const m of chat.messages) {
-			if (m.clip && m.clip.grade !== "done" && m.clip.grade !== "pending") wanted.push(m.clip.i);
+			if (m.clip && m.clip.grade !== "done" && m.clip.grade !== "pending")
+				wanted.push(m.clip.i);
 		}
-		for (let i = open; i < Math.min(session.clips.length, open + 1 + GRADE_AHEAD); i++) wanted.push(i);
+		for (
+			let i = open;
+			i < Math.min(session.clips.length, open + 1 + GRADE_AHEAD);
+			i++
+		)
+			wanted.push(i);
 		const fresh: number[] = [];
 		for (const i of wanted) {
 			const key = `${chatId}|${i}`;
@@ -618,7 +656,11 @@ export class ListenMode {
 	private promptFor(session: ListenSession, i: number): string | null {
 		const clip = session.clips[i];
 		if (!clip) return null;
-		return gradePrompt(clip.text, this.deps.langName(session.lang), clipBefore(session, i));
+		return gradePrompt(
+			clip.text,
+			this.deps.langName(session.lang),
+			clipBefore(session, i)
+		);
 	}
 
 	private hasRow(chatId: ChatId, i: number): boolean {
@@ -632,14 +674,20 @@ export class ListenMode {
 
 	private begin(chatId: ChatId, i: number): void {
 		this.inFlight.add(`${chatId}|${i}`);
-		if (this.hasRow(chatId, i)) markGrading(this.deps.getChatState(), chatId, i);
+		if (this.hasRow(chatId, i))
+			markGrading(this.deps.getChatState(), chatId, i);
 	}
 
 	/** A grading came back (null = failed): onto its row, or held in
 	 * `early` until the row appears (catchUpGrade). */
-	private settle(chatId: ChatId, i: number, result: ReturnType<typeof parseGrade>): void {
+	private settle(
+		chatId: ChatId,
+		i: number,
+		result: ReturnType<typeof parseGrade>
+	): void {
 		this.inFlight.delete(`${chatId}|${i}`);
-		if (this.hasRow(chatId, i)) landGrade(this.deps.getChatState(), chatId, i, result);
+		if (this.hasRow(chatId, i))
+			landGrade(this.deps.getChatState(), chatId, i, result);
 		else this.early.set(`${chatId}|${i}`, result);
 	}
 
@@ -679,11 +727,16 @@ export class ListenMode {
 	/** Subscribe to native results as they finish. Missed events (a
 	 * paused page) land through `resync` instead. */
 	listenNative(
-		listen: <T>(event: string, cb: (e: { payload: T }) => void) => Promise<() => void>
+		listen: <T>(
+			event: string,
+			cb: (e: { payload: T }) => void
+		) => Promise<() => void>
 	): () => void {
 		let off: (() => void) | null = null;
 		let gone = false;
-		void listen<NativeGradeResult>(GRADED_EVENT, (e) => this.landNative(e.payload))
+		void listen<NativeGradeResult>(GRADED_EVENT, (e) =>
+			this.landNative(e.payload)
+		)
 			.then((unlisten) => {
 				if (gone) unlisten();
 				else off = unlisten;
@@ -709,7 +762,9 @@ export class ListenMode {
 			.chats.filter(
 				(c) =>
 					c.listen &&
-					(chatId ? c.id === chatId : c.messages.some((m) => m.clip && m.clip.grade !== "done"))
+					(chatId
+						? c.id === chatId
+						: c.messages.some((m) => m.clip && m.clip.grade !== "done"))
 			);
 		for (const c of chats) {
 			let results: NativeGradeResult[];
@@ -727,7 +782,10 @@ export class ListenMode {
 	}
 
 	private pumpGrades(): void {
-		while (this.gradesRunning < GRADE_CONCURRENCY && this.gradeQueue.length > 0) {
+		while (
+			this.gradesRunning < GRADE_CONCURRENCY &&
+			this.gradeQueue.length > 0
+		) {
 			const job = this.gradeQueue.shift();
 			if (!job) break;
 			this.gradesRunning++;
@@ -739,7 +797,9 @@ export class ListenMode {
 	}
 
 	private async grade(chatId: ChatId, i: number): Promise<void> {
-		const session = this.deps.getChatState().chats.find((c) => c.id === chatId)?.listen;
+		const session = this.deps
+			.getChatState()
+			.chats.find((c) => c.id === chatId)?.listen;
 		const prompt = session ? this.promptFor(session, i) : null;
 		if (!prompt) return;
 		this.begin(chatId, i);
@@ -747,7 +807,10 @@ export class ListenMode {
 		try {
 			const provider = await this.deps.resolveProvider();
 			if (provider) {
-				const reply = await provider.chat([{ role: "user", content: prompt }], {});
+				const reply = await provider.chat(
+					[{ role: "user", content: prompt }],
+					{}
+				);
 				result = parseGrade(reply.content);
 			}
 		} catch {

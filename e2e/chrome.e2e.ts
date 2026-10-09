@@ -1248,9 +1248,7 @@ test("huge type widens neither the column nor the composer", async ({
 	const vars = await page.evaluate(() => {
 		const app = document.querySelector(".app") as HTMLElement;
 		return {
-			chat: parseFloat(
-				getComputedStyle(app).getPropertyValue("--chat-width")
-			),
+			chat: parseFloat(getComputedStyle(app).getPropertyValue("--chat-width")),
 			prompt: parseFloat(
 				getComputedStyle(app).getPropertyValue("--prompt-width")
 			)
@@ -1437,7 +1435,9 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 
 /** Language menus lead with the most learned languages, then A-Z,
 and typing with a menu open jumps to a language (Enter picks it). */
-test("language menu: popular first, typing jumps, Enter picks", async ({ page }) => {
+test("language menu: popular first, typing jumps, Enter picks", async ({
+	page
+}) => {
 	await page.setViewportSize({ width: 1280, height: 1000 });
 	await seedChat(page, []);
 	await page.goto("/");
@@ -1449,11 +1449,15 @@ test("language menu: popular first, typing jumps, Enter picks", async ({ page })
 	await expect(page.locator(".lang-list .lang-sep")).toHaveCount(1);
 	await expect(items.nth(6)).toContainText("Bulgarian");
 	await page.keyboard.type("po");
-	await expect(page.locator(".lang-list button.typed")).toContainText("Portuguese");
+	await expect(page.locator(".lang-list button.typed")).toContainText(
+		"Portuguese"
+	);
 	await page.keyboard.type("l");
 	await expect(page.locator(".lang-list button.typed")).toContainText("Polish");
 	await page.keyboard.press("ArrowDown");
-	await expect(page.locator(".lang-list button.typed")).toContainText("Romanian");
+	await expect(page.locator(".lang-list button.typed")).toContainText(
+		"Romanian"
+	);
 	await page.keyboard.press("ArrowUp");
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".lang-list")).toHaveCount(0);

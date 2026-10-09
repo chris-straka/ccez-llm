@@ -41,7 +41,9 @@ everything else is theme tokens, never raw hex. -->
 	let { panel, staged, busy, images, actions }: Props = $props();
 
 	const lang = $derived(replyLanguageFor(panel.code));
-	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
+	const activeRegion = $derived(
+		panel.regions.find((r) => r.gl === panel.region)
+	);
 	const stagedStory = $derived(
 		staged ? (panel.stories.find((s) => s.link === staged.link) ?? null) : null
 	);
@@ -98,7 +100,10 @@ everything else is theme tokens, never raw hex. -->
 		const s = from.width / to.width;
 		node.animate(
 			[
-				{ transformOrigin: "top left", transform: `translate(${dx}px, ${dy}px) scale(${s})` },
+				{
+					transformOrigin: "top left",
+					transform: `translate(${dx}px, ${dy}px) scale(${s})`
+				},
 				{ transformOrigin: "top left", transform: "none" }
 			],
 			{ duration: 420, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" }
@@ -160,7 +165,8 @@ everything else is theme tokens, never raw hex. -->
 
 	{#if stagedStory && staged}
 		{@const image = imageFor(stagedStory)}
-		{@const levelTag = CEFR_LEVELS.find((l) => l.level === staged.level)?.tag ?? ""}
+		{@const levelTag =
+			CEFR_LEVELS.find((l) => l.level === staged.level)?.tag ?? ""}
 		{@const words = sessionWords(staged.kind, staged.size)}
 		<div class="news-stage">
 			<div class="session" use:flipIn>
@@ -196,7 +202,10 @@ everything else is theme tokens, never raw hex. -->
 						onclick={() => actions.unpick()}>✕</button
 					>
 				</div>
-				<div class="stage-opts" in:fly={{ y: 10, duration: motionMs(260), delay: motionMs(220) }}>
+				<div
+					class="stage-opts"
+					in:fly={{ y: 10, duration: motionMs(260), delay: motionMs(220) }}
+				>
 					<div class="opt-row">
 						<span class="opt-label" id="news-kind">Session</span>
 						<div class="seg" role="group" aria-labelledby="news-kind">
@@ -219,7 +228,9 @@ everything else is theme tokens, never raw hex. -->
 						</div>
 					</div>
 					<div class="opt-row">
-						<span class="opt-label" aria-hidden="true">Level · {staged.level} {levelTag}</span>
+						<span class="opt-label" aria-hidden="true"
+							>Level · {staged.level} {levelTag}</span
+						>
 						<div class="seg" role="group" aria-label="Level">
 							{#each CEFR_LEVELS as level (level.level)}
 								<button
@@ -236,7 +247,9 @@ everything else is theme tokens, never raw hex. -->
 						</div>
 					</div>
 					<div class="opt-row">
-						<span class="opt-label" aria-hidden="true">Length · about {words} words</span>
+						<span class="opt-label" aria-hidden="true"
+							>Length · about {words} words</span
+						>
 						<div class="seg" role="group" aria-label="Length">
 							{#each SUMMARY_SIZES as size (size.size)}
 								<button
@@ -270,7 +283,11 @@ everything else is theme tokens, never raw hex. -->
 						<p class="stage-note" aria-live="polite">
 							{#if staged.article === "error"}
 								<span role="alert">{staged.error}</span>
-								<button type="button" class="news-retry" onclick={() => actions.retry()}>
+								<button
+									type="button"
+									class="news-retry"
+									onclick={() => actions.retry()}
+								>
 									Retry
 								</button>
 							{:else}
@@ -284,7 +301,11 @@ everything else is theme tokens, never raw hex. -->
 	{:else if panel.status === "loading"}
 		<ul class="news-cards" aria-busy="true" aria-label="Loading headlines">
 			{#each Array.from({ length: SKELETONS }, (_, i) => i) as i (i)}
-				<li class="news-card skel-card" aria-hidden="true" in:fade={{ duration: motionMs(200) }}>
+				<li
+					class="news-card skel-card"
+					aria-hidden="true"
+					in:fade={{ duration: motionMs(200) }}
+				>
 					<span class="news-thumb"><span class="news-skel"></span></span>
 					<span class="news-text">
 						<span class="skel-line"></span>
@@ -296,13 +317,21 @@ everything else is theme tokens, never raw hex. -->
 		</ul>
 	{:else if panel.status === "translating" || (panel.status === "ready" && panel.stories.length > 0)}
 		{@const translating = panel.status === "translating"}
-		<ul class="news-cards" class:leaving={leaving !== null} aria-busy={translating}>
+		<ul
+			class="news-cards"
+			class:leaving={leaving !== null}
+			aria-busy={translating}
+		>
 			{#each panel.stories as story, i (story.link)}
 				{@const image = imageFor(story)}
 				<li
 					class="news-item"
 					class:picked={leaving === story.link}
-					in:fly={{ y: 14, duration: motionMs(280), delay: motionMs(Math.min(i * 40, 360)) }}
+					in:fly={{
+						y: 14,
+						duration: motionMs(280),
+						delay: motionMs(Math.min(i * 40, 360))
+					}}
 				>
 					<button
 						type="button"
@@ -331,7 +360,9 @@ everything else is theme tokens, never raw hex. -->
 							{:else if image === undefined}
 								<span class="news-skel"></span>
 							{:else}
-								<span class="news-img-fallback" in:fade={{ duration: motionMs(250) }}
+								<span
+									class="news-img-fallback"
+									in:fade={{ duration: motionMs(250) }}
 									>{story.source.trim().charAt(0)}</span
 								>
 							{/if}
@@ -341,8 +372,9 @@ everything else is theme tokens, never raw hex. -->
 								<span class="skel-line"></span>
 								<span class="skel-line short"></span>
 							{:else}
-								<span class="news-headline" in:fade={{ duration: motionMs(220) }}
-									>{story.title}</span
+								<span
+									class="news-headline"
+									in:fade={{ duration: motionMs(220) }}>{story.title}</span
 								>
 							{/if}
 							{#if story.source}
@@ -355,14 +387,20 @@ everything else is theme tokens, never raw hex. -->
 		</ul>
 	{:else if panel.status === "error"}
 		<p class="news-note" role="alert">{panel.error}</p>
-		<button type="button" class="news-retry" onclick={() => actions.retry()}>Retry</button>
+		<button type="button" class="news-retry" onclick={() => actions.retry()}
+			>Retry</button
+		>
 	{:else if panel.status === "unsupported"}
 		<p class="news-note">Google News has no {panel.langName} edition yet.</p>
 	{:else if panel.status === "needs-shell"}
-		<p class="news-note">News needs the app shell — the browser preview can't reach it.</p>
+		<p class="news-note">
+			News needs the app shell — the browser preview can't reach it.
+		</p>
 	{:else}
 		<p class="news-note">No stories right now.</p>
-		<button type="button" class="news-retry" onclick={() => actions.retry()}>Retry</button>
+		<button type="button" class="news-retry" onclick={() => actions.retry()}
+			>Retry</button
+		>
 	{/if}
 </div>
 

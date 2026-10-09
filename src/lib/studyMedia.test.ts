@@ -452,8 +452,7 @@ describe("shell-aware notifications", () => {
 		expect(p.sendNotification).toHaveBeenCalledTimes(1);
 		// Title-only: no reply excerpt rides along.
 		const sent = p.sendNotification.mock.calls[0]?.[0] as
-			| Record<string, unknown>
-			| undefined;
+			Record<string, unknown> | undefined;
 		expect(sent).not.toHaveProperty("body");
 		// The ping carries the fixed id with autoCancel, so finishes
 		// replace each other instead of stacking in the shade.
@@ -512,8 +511,7 @@ describe("shell-aware notifications", () => {
 			hidden: true
 		});
 		const sent = failing.sendNotification.mock.calls[0]?.[0] as
-			| Record<string, unknown>
-			| undefined;
+			Record<string, unknown> | undefined;
 		expect(sent).toMatchObject({ id: REPLY_NOTIFICATION_ID });
 		expect(sent).not.toHaveProperty("channelId");
 	});

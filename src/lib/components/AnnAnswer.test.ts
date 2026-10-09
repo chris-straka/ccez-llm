@@ -32,7 +32,9 @@ describe("annotation answer card", () => {
 	it("sizes border-box so padding never spills past the viewport", () => {
 		// The page sizes the card to the clear width: content-box
 		// padding pushed the card past the edge on narrow phones.
-		expect(answerSource()).toMatch(/\.ann-answer\s*\{[^}]*box-sizing:\s*border-box/);
+		expect(answerSource()).toMatch(
+			/\.ann-answer\s*\{[^}]*box-sizing:\s*border-box/
+		);
 	});
 
 	it("rings the card so it never dissolves into the thread", () => {

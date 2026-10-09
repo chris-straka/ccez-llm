@@ -4,7 +4,11 @@ guess marked against what was said. The transcript is the message
 body itself (annotatable like any reply); the translation and notes
 fold under it (`ListenGloss`). -->
 <script lang="ts">
-	import { storyboardFrame, type ClipState, type ListenSession } from "$lib/listen";
+	import {
+		storyboardFrame,
+		type ClipState,
+		type ListenSession
+	} from "$lib/listen";
 
 	interface Props {
 		session: ListenSession;
@@ -22,7 +26,8 @@ fold under it (`ListenGloss`). -->
 		};
 	}
 
-	let { session, clip, open, playing, position, audioStatus, actions }: Props = $props();
+	let { session, clip, open, playing, position, audioStatus, actions }: Props =
+		$props();
 
 	const span = $derived(session.clips[clip.i]);
 	const here = $derived(playing?.i === clip.i);
@@ -78,7 +83,9 @@ fold under it (`ListenGloss`). -->
 			live = false;
 		};
 	});
-	const words = $derived(clip.ops?.filter((o) => o.kind !== "extra").length ?? 0);
+	const words = $derived(
+		clip.ops?.filter((o) => o.kind !== "extra").length ?? 0
+	);
 	const heardWords = $derived(
 		clip.ops?.filter((o) => o.kind === "ok" || o.kind === "near").length ?? 0
 	);
@@ -87,7 +94,12 @@ fold under it (`ListenGloss`). -->
 <div class="clip" class:open class:answered>
 	<div class="controls">
 		{#if frame && frameState !== "error"}
-			<span class="frame" class:shown={frameState === "ok"} style={frameStyle} aria-hidden="true"></span>
+			<span
+				class="frame"
+				class:shown={frameState === "ok"}
+				style={frameStyle}
+				aria-hidden="true"
+			></span>
 		{/if}
 		<button
 			type="button"
@@ -103,10 +115,20 @@ fold under it (`ListenGloss`). -->
 		>
 			{#if here && !playing?.slow}
 				<svg viewBox="0 0 16 16" aria-hidden="true"
-					><rect x="4" y="3.5" width="2.8" height="9" rx="1" /><rect x="9.2" y="3.5" width="2.8" height="9" rx="1" /></svg
+					><rect x="4" y="3.5" width="2.8" height="9" rx="1" /><rect
+						x="9.2"
+						y="3.5"
+						width="2.8"
+						height="9"
+						rx="1"
+					/></svg
 				>
 			{:else}
-				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z" /></svg>
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><path
+						d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z"
+					/></svg
+				>
 			{/if}
 		</button>
 		<button
@@ -130,7 +152,9 @@ fold under it (`ListenGloss`). -->
 				value={at ?? span.start}
 				aria-label="Position in the clip"
 				disabled={audioStatus !== "ready"}
-				style="--fill: {(((at ?? span.start) - span.start) / Math.max(span.end - span.start, 0.01)) * 100}%"
+				style="--fill: {(((at ?? span.start) - span.start) /
+					Math.max(span.end - span.start, 0.01)) *
+					100}%"
 				oninput={(e) => actions.seek(Number(e.currentTarget.value))}
 				onchange={(e) => e.currentTarget.blur()}
 				onclick={(e) => e.stopPropagation()}
@@ -156,8 +180,8 @@ fold under it (`ListenGloss`). -->
 	</div>
 	{#if open}
 		<p class="hint">
-			Type what you hear · Enter · <kbd class="reveal-ctrl">Ctrl+Enter</kbd><kbd class="reveal-mac"
-				>⌘Enter</kbd
+			Type what you hear · Enter · <kbd class="reveal-ctrl">Ctrl+Enter</kbd><kbd
+				class="reveal-mac">⌘Enter</kbd
 			><kbd class="reveal-phone">?</kbd> reveals
 		</p>
 	{:else if answered}
@@ -169,9 +193,13 @@ fold under it (`ListenGloss`). -->
 					{#if op.kind === "ok"}
 						<span class="w ok">{op.guess}</span>
 					{:else if op.kind === "near"}
-						<span class="w near" title="Heard right; spelled {op.ref}">{op.guess}</span>
+						<span class="w near" title="Heard right; spelled {op.ref}"
+							>{op.guess}</span
+						>
 					{:else if op.kind === "wrong"}
-						<span class="w wrong"><s>{op.guess}</s> <span class="fix">{op.ref}</span></span>
+						<span class="w wrong"
+							><s>{op.guess}</s> <span class="fix">{op.ref}</span></span
+						>
 					{:else if op.kind === "missed"}
 						<span class="w missed" title="Missed">{op.ref}</span>
 					{:else}
@@ -399,7 +427,11 @@ fold under it (`ListenGloss`). -->
 	.scrub::-webkit-slider-runnable-track {
 		height: 3px;
 		border-radius: 999px;
-		background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill));
+		background: linear-gradient(
+			to right,
+			var(--accent) var(--fill),
+			var(--line) var(--fill)
+		);
 	}
 	.scrub::-webkit-slider-thumb {
 		-webkit-appearance: none;
@@ -412,7 +444,11 @@ fold under it (`ListenGloss`). -->
 	.scrub::-moz-range-track {
 		height: 3px;
 		border-radius: 999px;
-		background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill));
+		background: linear-gradient(
+			to right,
+			var(--accent) var(--fill),
+			var(--line) var(--fill)
+		);
 	}
 	.scrub::-moz-range-thumb {
 		width: 0.7rem;

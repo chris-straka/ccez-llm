@@ -198,6 +198,8 @@ test("shortcuts modal lists the message keys", async ({ page }) => {
 		timeout: 10_000
 	});
 	for (const name of ["Copy", "Branch from here", "Read aloud"]) {
-		await expect(page.locator(`.modal .keys dt:text-is("${name}")`)).toBeVisible();
+		await expect(
+			page.locator(`.modal .keys dt:text-is("${name}")`)
+		).toBeVisible();
 	}
 });

@@ -7,6 +7,8 @@ markup). Field writes ride the shared object like the notices proxy
 (see Toasts.svelte). The box seating (`.search-palette`) lives in
 `Modal.svelte` with the other dialog chrome. -->
 <script lang="ts">
+	// An expression: the quoted "phrase" can't sit in a quoted attribute.
+	const PLACEHOLDER = 'Search chats · "phrase" from:me in:notes';
 	import ActionIcon from "./ActionIcon.svelte";
 	import { isImeKey } from "$lib/editContext";
 	import type { SearchHit } from "$lib/chatSearch";
@@ -88,7 +90,7 @@ markup). Field writes ride the shared object like the notices proxy
 			bind:this={inputEl}
 			bind:value={palette.query}
 			oninput={actions.query}
-			placeholder='Search chats · "phrase" from:me in:notes'
+			placeholder={PLACEHOLDER}
 			aria-label="Search chats and annotations"
 			inputmode="search"
 			enterkeyhint="search"

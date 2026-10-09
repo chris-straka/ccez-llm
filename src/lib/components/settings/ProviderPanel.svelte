@@ -26,7 +26,7 @@
 	} from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { readClipboardText } from "$lib/clipboard";
-		import {
+	import {
 		downloadedMB,
 		isOnDeviceProvider,
 		onDeviceErrorCopy,
@@ -58,7 +58,10 @@
 	async function refreshModels() {
 		clearNotice(modelNotice, "banner");
 		if (browserOnlyBlocked) return;
-		if (!active.baseUrl.trim() || (!active.apiKey.trim() && !activeDef.publicModels)) {
+		if (
+			!active.baseUrl.trim() ||
+			(!active.apiKey.trim() && !activeDef.publicModels)
+		) {
 			flashNotice(
 				modelNotice,
 				"banner",
@@ -167,7 +170,9 @@
 		activeDef.browserBlocked === true && !(inShell && androidBridge)
 	);
 	/** The model list needs the shell's Rust read (desktop or Android). */
-	const browserOnlyBlocked = $derived(!inShell && activeDef.browserBlocked === true);
+	const browserOnlyBlocked = $derived(
+		!inShell && activeDef.browserBlocked === true
+	);
 	const activeModelFree = $derived(
 		isFreeModel(settings.activeProviderId, active.model)
 	);
@@ -467,8 +472,8 @@
 			</datalist>
 			{#if activeModelFree}<span class="hint model-note">Free model</span>{/if}
 			{#if sendsBlocked}<span class="hint model-note" role="status"
-					>{activeDef.label} works in the Android app for now: its API
-					refuses requests from browsers and the desktop app.</span
+					>{activeDef.label} works in the Android app for now: its API refuses requests
+					from browsers and the desktop app.</span
 				>{/if}
 			{#if modelNotice.banner.message}<span class="hint" role="alert"
 					>{modelNotice.banner.message}</span
@@ -528,8 +533,7 @@
 						if (!keyNeedsEditing(active.apiKey)) {
 							editingKey[settings.activeProviderId] = false;
 						} else if (active.apiKey.trim()) {
-							keyPasteError =
-								"That key looks too short — paste the whole key.";
+							keyPasteError = "That key looks too short — paste the whole key.";
 						}
 						// Persist the commit (including wipes) so a
 						// restart can't resurrect the stored key.

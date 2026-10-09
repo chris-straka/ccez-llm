@@ -74,9 +74,7 @@ export async function seedChat(
  * so specs pick the chord per runtime.
  */
 export async function toggleSidebar(page: Page): Promise<void> {
-	const inShell = await page.evaluate(
-		() => "__TAURI_INTERNALS__" in window
-	);
+	const inShell = await page.evaluate(() => "__TAURI_INTERNALS__" in window);
 	await page.keyboard.press(inShell ? "Meta+b" : "Meta+Shift+BracketLeft");
 }
 
@@ -87,9 +85,7 @@ export async function toggleSidebar(page: Page): Promise<void> {
  * dialog there — call after the seed/goto, before the chord press.
  */
 export async function requireShell(page: Page): Promise<void> {
-	const inShell = await page.evaluate(
-		() => "__TAURI_INTERNALS__" in window
-	);
+	const inShell = await page.evaluate(() => "__TAURI_INTERNALS__" in window);
 	test.skip(!inShell, "shell-only chord passes through on web runtimes");
 }
 

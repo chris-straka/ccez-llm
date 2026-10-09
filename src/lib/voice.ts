@@ -165,9 +165,7 @@ export function sentenceSpeechLang(
 	// for the length gate the pinned fragment tests rest on).
 	if (hasDistinctiveChinese(sentence)) return direct;
 	const surrounding = fallbackLang.split(/[-_]/)[0]?.toLowerCase();
-	return surrounding === "ja" ||
-		surrounding === "zh" ||
-		surrounding === "ko"
+	return surrounding === "ja" || surrounding === "zh" || surrounding === "ko"
 		? fallbackLang
 		: direct;
 }
@@ -339,13 +337,19 @@ export function startSpeechError(facts: {
  * (headless or voice-less Linux) reports for every utterance. Other
  * text passes through.
  */
-export function webSpeechErrorCopy(message: string, inventoryEmpty: boolean): string {
+export function webSpeechErrorCopy(
+	message: string,
+	inventoryEmpty: boolean
+): string {
 	switch (message) {
 		case "synthesis-failed":
 		case "synthesis-unavailable":
 		case "voice-unavailable":
 		case "language-unavailable":
-			return startSpeechError({ quiet: false, useNative: false, inventoryEmpty }) ?? message;
+			return (
+				startSpeechError({ quiet: false, useNative: false, inventoryEmpty }) ??
+				message
+			);
 		case "audio-busy":
 		case "audio-hardware":
 			return "The audio output is busy.";
@@ -707,7 +711,9 @@ export function speakTitleFor(speaking: boolean): string {
  * rides the draft's tail, so words never glue or double-space.
  */
 export function appendDictation(draft: string, transcript: string): string {
-	return draft === "" || draft.endsWith(" ") ? draft + transcript : `${draft} ${transcript}`;
+	return draft === "" || draft.endsWith(" ")
+		? draft + transcript
+		: `${draft} ${transcript}`;
 }
 
 /**

@@ -1,11 +1,5 @@
-import {
-	firstContentRect
-} from "$lib/sel-geometry";
-import {
-	slicePoint,
-	spanSliceOverlap,
-	type SelSlice
-} from "$lib/selSlices";
+import { firstContentRect } from "$lib/sel-geometry";
+import { slicePoint, spanSliceOverlap, type SelSlice } from "$lib/selSlices";
 
 /**
  * Selection tint: tintSelectionSpans and friends.
@@ -110,15 +104,11 @@ export function scopeSlices(scope: ParentNode): SelSlice[] {
 
 /** Block elements whose boundaries count as paragraph breaks when
 speech chords flatten scope slices to plain text. */
-const SPEECH_BLOCK_SEL =
-	"p,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td,th,dt,dd";
+const SPEECH_BLOCK_SEL = "p,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td,th,dt,dd";
 
 /** Nearest speech-block ancestor of a text node, confined to the
 scope (a match above the scope belongs to outer chrome). */
-export function speechBlockOf(
-	node: Text,
-	scope: ParentNode
-): Element | null {
+export function speechBlockOf(node: Text, scope: ParentNode): Element | null {
 	try {
 		const block = node.parentElement?.closest(SPEECH_BLOCK_SEL) ?? null;
 		return block && scope.contains(block) ? block : null;
@@ -178,8 +168,7 @@ export function longestLineWidth(frags: LineFrag[]): number {
 		lines.set(f.top, line);
 	}
 	let longest = 0;
-	for (const { l, r } of lines.values())
-		longest = Math.max(longest, r - l);
+	for (const { l, r } of lines.values()) longest = Math.max(longest, r - l);
 	return longest;
 }
 
@@ -213,12 +202,10 @@ export function shrinkPanelToContent(node: Element): number {
 		const longest = longestLineWidth(frags);
 		const cs = getComputedStyle(node);
 		const pad =
-			(parseFloat(cs.paddingLeft) || 0) +
-			(parseFloat(cs.paddingRight) || 0);
+			(parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
 		if (longest > 0 && w > longest + pad + 1) {
 			const narrowed = Math.ceil(longest + pad);
-			if (node instanceof HTMLElement)
-				node.style.width = `${narrowed}px`;
+			if (node instanceof HTMLElement) node.style.width = `${narrowed}px`;
 			return narrowed;
 		}
 		return w;
@@ -247,8 +234,7 @@ export function joinSlicesWithBlocks(
 			const block =
 				s.node instanceof Text ? speechBlockOf(s.node, scope) : null;
 			if (started && block !== prev) full += "\n\n";
-			if (s === hit)
-				at = full.length + Math.max(caretOffset - s.start, 0);
+			if (s === hit) at = full.length + Math.max(caretOffset - s.start, 0);
 			full += (s.node.textContent ?? "").slice(s.start, s.end);
 			prev = block;
 			started = true;
@@ -348,9 +334,7 @@ export function tintSelectionSpans(
 /** Unwrap every tint span back to bare text (dismiss paths and
 re-summons; a re-rendered message simply has none to find). */
 export function unwrapFuriganaTint(): void {
-	const spans = document.querySelectorAll(
-		".frbt0, .frbt1, .frbt2, .frbt3"
-	);
+	const spans = document.querySelectorAll(".frbt0, .frbt1, .frbt2, .frbt3");
 	const parents: ParentNode[] = [];
 	spans.forEach((el) => {
 		const parent = el.parentNode;

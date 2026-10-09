@@ -106,7 +106,9 @@ async fn download_apk(app: &AppHandle, url: &str) -> Result<String, String> {
         let _ = std::fs::remove_file(&dest);
         return Err("failed".into());
     }
-    dest.to_str().map(str::to_owned).ok_or_else(|| "failed".into())
+    dest.to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| "failed".into())
 }
 
 #[cfg(not(target_os = "android"))]
@@ -122,8 +124,8 @@ mod android {
     use std::sync::OnceLock;
 
     use jni::{
-        JNIEnv,
         objects::{GlobalRef, JClass, JObject, JString, JValue},
+        JNIEnv,
     };
     use tauri::AppHandle;
 
@@ -197,9 +199,10 @@ mod android {
             )
             .map_err(|e| format!("installApk() failed: {e:?}"))?;
         let text: String = env
-            .get_string(&JString::from(out.l().map_err(|e| {
-                format!("bad installApk() return: {e:?}")
-            })?))
+            .get_string(&JString::from(
+                out.l()
+                    .map_err(|e| format!("bad installApk() return: {e:?}"))?,
+            ))
             .map_err(|e| format!("install result failed: {e:?}"))?
             .to_string_lossy()
             .into_owned();

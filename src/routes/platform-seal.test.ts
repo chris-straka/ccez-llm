@@ -20,11 +20,15 @@ function appHtml(): string {
 
 describe("platform seal", () => {
 	it("keeps the iOS furigana nudge on its own override", () => {
-		expect(bodySource()).toContain(":global(.app[data-ios]) .rendered :global(.frt)");
+		expect(bodySource()).toContain(
+			":global(.app[data-ios]) .rendered :global(.frt)"
+		);
 	});
 
 	it("keeps the iOS pinyin fit on its own override", () => {
-		expect(bodySource()).toContain(":global(.app[data-ios]) .rendered :global(rt)");
+		expect(bodySource()).toContain(
+			":global(.app[data-ios]) .rendered :global(rt)"
+		);
 	});
 
 	it("keeps the Android furigana nudge off the iOS gate", () => {

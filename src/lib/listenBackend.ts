@@ -5,7 +5,12 @@
  * browser pages), so drills are an app feature.
  */
 
-import type { ListenChannelPage, ListenEntry, ListenFetched, ListenVideo } from "./listen";
+import type {
+	ListenChannelPage,
+	ListenEntry,
+	ListenFetched,
+	ListenVideo
+} from "./listen";
 
 export interface ListenBackend {
 	search: (query: string, kind: "video" | "channel") => Promise<ListenEntry[]>;
@@ -20,9 +25,12 @@ type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
 export function shellBackend(invoke: Invoke): ListenBackend {
 	return {
-		search: (query, kind) => invoke<ListenEntry[]>("listen_search", { query, kind }),
-		channel: (reference) => invoke<ListenChannelPage>("listen_channel", { reference }),
-		videos: (ids, lang) => invoke<ListenVideo[]>("listen_videos", { ids, lang }),
+		search: (query, kind) =>
+			invoke<ListenEntry[]>("listen_search", { query, kind }),
+		channel: (reference) =>
+			invoke<ListenChannelPage>("listen_channel", { reference }),
+		videos: (ids, lang) =>
+			invoke<ListenVideo[]>("listen_videos", { ids, lang }),
 		fetch: (id, lang) => invoke<ListenFetched>("listen_fetch", { id, lang }),
 		audio: (id, lang) => invoke<ArrayBuffer>("listen_audio", { id, lang })
 	};

@@ -330,16 +330,12 @@ describe("expandPastedTags", () => {
 		expect(expandPastedTags(selected, [])).toBe(selected);
 		expect(expandPastedTags(selected, [null])).toBe(selected);
 		const two = `${pastedTextMarker(3)} ${pastedTextMarker(3)}`;
-		expect(expandPastedTags(two, ["AAA"])).toBe(
-			`AAA ${pastedTextMarker(3)}`
-		);
+		expect(expandPastedTags(two, ["AAA"])).toBe(`AAA ${pastedTextMarker(3)}`);
 	});
 
 	it("splices region inner prose with brackets stripped", () => {
 		const region = `${PASTE_OPEN}XY${PASTE_CLOSE}`;
-		expect(expandPastedTags(`see ${region} end`, ["STALE"])).toBe(
-			"see XY end"
-		);
+		expect(expandPastedTags(`see ${region} end`, ["STALE"])).toBe("see XY end");
 		// Mixed slots stay positional: tags take stored text,
 		// regions take inner prose (stored entries ignored).
 		expect(
@@ -423,14 +419,14 @@ describe("removedMarkerIndexes", () => {
 		const region = `${PASTE_OPEN}xy${PASTE_CLOSE}`;
 		const doc = `${tag} ${region}`;
 		expect(
-			removedMarkerIndexes(doc, [
-				{ from: tag.length + 1, to: doc.length }
-			])
+			removedMarkerIndexes(doc, [{ from: tag.length + 1, to: doc.length }])
 		).toEqual({ image: [], file: [], pasted: [1] });
 		// Whole-document wipes take both slots in order.
-		expect(removedMarkerIndexes(doc, [{ from: 0, to: doc.length }])).toEqual(
-			{ image: [], file: [], pasted: [0, 1] }
-		);
+		expect(removedMarkerIndexes(doc, [{ from: 0, to: doc.length }])).toEqual({
+			image: [],
+			file: [],
+			pasted: [0, 1]
+		});
 	});
 
 	it("separates kinds and spans whole-document wipes", () => {
@@ -652,7 +648,13 @@ describe("pasted tags in shared tag flows", () => {
 
 describe("bakeEditedMessage", () => {
 	it("bakes text with markers and fresh folds", () => {
-		const { stored, folds } = bakeEditedMessage("hello", [], 1, "other", undefined);
+		const { stored, folds } = bakeEditedMessage(
+			"hello",
+			[],
+			1,
+			"other",
+			undefined
+		);
 		expect(stored).toBe(`hello ${IMAGE_MARKER}`);
 		expect(folds).toEqual([]);
 	});

@@ -486,15 +486,11 @@ describe("settings", () => {
 
 	it("keeps a valid capture square and heals junk to null", () => {
 		expect(defaultSettings().captureArea).toBe(null);
-		expect(
-			validCaptureArea({ x: 10, y: 20, width: 300, height: 150 })
-		).toBe(true);
-		expect(validCaptureArea({ x: 0, y: 0, width: 0, height: 10 })).toBe(
-			false
+		expect(validCaptureArea({ x: 10, y: 20, width: 300, height: 150 })).toBe(
+			true
 		);
-		expect(validCaptureArea({ x: -1, y: 0, width: 5, height: 5 })).toBe(
-			false
-		);
+		expect(validCaptureArea({ x: 0, y: 0, width: 0, height: 10 })).toBe(false);
+		expect(validCaptureArea({ x: -1, y: 0, width: 5, height: 5 })).toBe(false);
 		expect(validCaptureArea("nope")).toBe(false);
 		const wild = blankSettings();
 		(wild as unknown as Record<string, unknown>).captureArea = {
@@ -751,13 +747,15 @@ describe("settings", () => {
 			models: []
 		});
 		expect(
-			envProviderDefaults({ OPENCODE_API_KEY: "zen-cli", VITE_OPENCODE_ZEN_API_KEY: "zen-vite" })[
-				"opencode-zen"
-			]!.apiKey
+			envProviderDefaults({
+				OPENCODE_API_KEY: "zen-cli",
+				VITE_OPENCODE_ZEN_API_KEY: "zen-vite"
+			})["opencode-zen"]!.apiKey
 		).toBe("zen-vite");
-		expect(envProviderDefaults({ OPENCODE_API_KEY: "zen-cli" })["opencode-zen"]!.apiKey).toBe(
-			"zen-cli"
-		);
+		expect(
+			envProviderDefaults({ OPENCODE_API_KEY: "zen-cli" })["opencode-zen"]!
+				.apiKey
+		).toBe("zen-cli");
 	});
 
 	it("adds the OpenCode Zen entry to saves from before it existed", () => {
@@ -990,7 +988,9 @@ describe("color-scheme picker", () => {
 			lightStyle: "paper",
 			darkStyle: "ink"
 		});
-		expect(pickSchemeStyle({ ...base, theme: "dark" }, "light", "sepia")).toEqual({
+		expect(
+			pickSchemeStyle({ ...base, theme: "dark" }, "light", "sepia")
+		).toEqual({
 			theme: "light",
 			lightStyle: "sepia",
 			darkStyle: "graphite"

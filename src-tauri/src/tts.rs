@@ -26,23 +26,23 @@ use tauri::AppHandle;
 mod imp {
     use std::cell::RefCell;
     use std::sync::{
-        OnceLock,
         atomic::{AtomicU64, Ordering},
-        mpsc::{Receiver, Sender, channel},
+        mpsc::{channel, Receiver, Sender},
+        OnceLock,
     };
     use std::time::Duration;
 
     use objc2::rc::Retained;
     use objc2::runtime::{AnyObject, ProtocolObject};
-    use objc2::{ClassType, MainThreadMarker, define_class, msg_send};
-    use objc2_natural_language::NLLanguageRecognizer;
+    use objc2::{define_class, msg_send, ClassType, MainThreadMarker};
     use objc2_avf_audio::{
-        AVSpeechBoundary, AVSpeechSynthesizer, AVSpeechSynthesizerDelegate, AVSpeechSynthesisVoice,
+        AVSpeechBoundary, AVSpeechSynthesisVoice, AVSpeechSynthesizer, AVSpeechSynthesizerDelegate,
         AVSpeechUtterance,
     };
     use objc2_foundation::{
-        NSDictionary, NSNumber, NSRange, NSUserDefaults, NSObject, NSObjectProtocol, NSString,
+        NSDictionary, NSNumber, NSObject, NSObjectProtocol, NSRange, NSString, NSUserDefaults,
     };
+    use objc2_natural_language::NLLanguageRecognizer;
     use tauri::{AppHandle, Emitter};
 
     /// Payload for `tts-word`: which utterance and which UTF-16 range of its
@@ -130,7 +130,13 @@ mod imp {
                 let id = CURRENT_ID.load(Ordering::SeqCst);
                 eprintln!("[tts] done id={id} finished=false");
                 if let Some(app) = APP.get() {
-                    let _ = app.emit("tts-done", DoneEvent { id, finished: false });
+                    let _ = app.emit(
+                        "tts-done",
+                        DoneEvent {
+                            id,
+                            finished: false,
+                        },
+                    );
                 }
             }
         }
@@ -406,7 +412,9 @@ mod imp {
                 // Benign by design (see above): no per-language System Voice
                 // configured, so the quality ranking below auto-picks — speech
                 // still goes out, just not via a system entry.
-                eprintln!("[tts] {ctx}: no per-language System Voice set, auto-picking installed voice");
+                eprintln!(
+                    "[tts] {ctx}: no per-language System Voice set, auto-picking installed voice"
+                );
                 return None;
             };
             for candidate in candidates {
@@ -451,11 +459,7 @@ mod imp {
     ) -> Option<(Retained<AVSpeechSynthesisVoice>, &'static str)> {
         unsafe {
             let requested = voice.filter(|v| !v.is_empty());
-            let req_primary = lang
-                .split(['-', '_'])
-                .next()
-                .unwrap_or(lang)
-                .to_lowercase();
+            let req_primary = lang.split(['-', '_']).next().unwrap_or(lang).to_lowercase();
             let explicit = match requested.and_then(voice_by_id) {
                 Some(v) if voice_primary(&v) == req_primary => Some(v),
                 Some(v) => {
@@ -530,11 +534,7 @@ mod imp {
     /// rushes past learners, so Chinese reads slightly slower. Every
     /// other language keeps the shared default. Pure and unit-tested.
     fn speech_rate_for(lang: &str) -> f32 {
-        let primary = lang
-            .split(['-', '_'])
-            .next()
-            .unwrap_or(lang)
-            .to_lowercase();
+        let primary = lang.split(['-', '_']).next().unwrap_or(lang).to_lowercase();
         if primary == "zh" || primary == "cmn" {
             0.45
         } else {
@@ -612,15 +612,18 @@ mod imp {
         });
     }
 
-
-
-
     fn worker(rx: Receiver<Cmd>) {
         // The worker only queues: speech runs on the main thread (see
         // MAIN_STATE), and voice inventory is a plain registry read.
         for cmd in rx {
             match cmd {
-                Cmd::Speak { id, text, lang, voice, rate } => {
+                Cmd::Speak {
+                    id,
+                    text,
+                    lang,
+                    voice,
+                    rate,
+                } => {
                     if let Some(app) = APP.get() {
                         speak_on_main(app, id, text, lang, voice, rate);
                     }
@@ -663,8 +666,7 @@ mod imp {
         }
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         let ctx = format!("render id={id}");
-        let out_path =
-            std::env::temp_dir().join(format!("ccez-speech-{id}.m4a"));
+        let out_path = std::env::temp_dir().join(format!("ccez-speech-{id}.m4a"));
         /// One-way ownership transfer across threads: the pointer
         /// carries an extra retain, and exactly one thread ever
         /// touches the object (raw pointers are neither Send nor
@@ -687,12 +689,10 @@ mod imp {
         app.run_on_main_thread(move || {
             with_main_synth(|synth| unsafe {
                 synth.stopSpeakingAtBoundary(AVSpeechBoundary::Immediate);
-                let Some((picked, origin)) =
-                    choose_voice(&main_ctx, &lang, voice.as_deref())
-                        .or_else(|| pick_voice(&lang).map(|v| (v, "auto")))
+                let Some((picked, origin)) = choose_voice(&main_ctx, &lang, voice.as_deref())
+                    .or_else(|| pick_voice(&lang).map(|v| (v, "auto")))
                 else {
-                    let _ =
-                        setup_tx.send(Err(format!("no installed voice for {lang}")));
+                    let _ = setup_tx.send(Err(format!("no installed voice for {lang}")));
                     return;
                 };
                 eprintln!(
@@ -711,24 +711,21 @@ mod imp {
                 // The voice's own settings describe the buffer format
                 // below (the documented pairing for this method).
                 let settings = picked.audioFileSettings();
-                let url = NSURL::fileURLWithPath(&NSString::from_str(
-                    &main_path.to_string_lossy(),
-                ));
-                let allocated: Allocated<AVAudioFile> =
-                    msg_send![AVAudioFile::class(), alloc];
-                let file = match AVAudioFile::initForWriting_settings_error(allocated, &url, &settings) {
-                    Ok(file) => file,
-                    Err(error) => {
-                        let _ = setup_tx.send(Err(format!(
-                            "could not create audio file: {}",
-                            error.localizedDescription().to_string()
-                        )));
-                        return;
-                    }
-                };
+                let url = NSURL::fileURLWithPath(&NSString::from_str(&main_path.to_string_lossy()));
+                let allocated: Allocated<AVAudioFile> = msg_send![AVAudioFile::class(), alloc];
+                let file =
+                    match AVAudioFile::initForWriting_settings_error(allocated, &url, &settings) {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let _ = setup_tx.send(Err(format!(
+                                "could not create audio file: {}",
+                                error.localizedDescription().to_string()
+                            )));
+                            return;
+                        }
+                    };
                 let block = RcBlock::new(move |buffer: NonNull<AVAudioBuffer>| {
-                    let raw =
-                        Retained::retain(buffer.as_ptr()).map(Retained::into_raw);
+                    let raw = Retained::retain(buffer.as_ptr()).map(Retained::into_raw);
                     if let Some(ptr) = raw {
                         let _ = tx.send(SendPtr(ptr));
                     }
@@ -777,9 +774,8 @@ mod imp {
                 // Trailing empty buffer: synthesis is complete.
                 break;
             }
-            unsafe { file.writeFromBuffer_error(pcm) }.map_err(|e| {
-                e.localizedDescription().to_string()
-            })?;
+            unsafe { file.writeFromBuffer_error(pcm) }
+                .map_err(|e| e.localizedDescription().to_string())?;
         }
         eprintln!("[tts] {ctx}: saved {}", out_path.to_string_lossy());
         Ok(out_path.to_string_lossy().into_owned())
@@ -911,9 +907,7 @@ mod imp {
             assert_eq!(name.as_deref(), Some("not-a-voice-id"));
         }
     }
-
 }
-
 
 /// Does this build speak through the native engine? Always true on macOS,
 /// always false elsewhere — the frontend gates the toggle on this.
@@ -1099,7 +1093,6 @@ pub fn tts_identify_lang(text: String, hint: Option<String>) -> Option<String> {
         return super::langid::identify_lang_offline(&text);
     }
 }
-
 
 /// List installed system voices with their quality tiers.
 #[tauri::command]

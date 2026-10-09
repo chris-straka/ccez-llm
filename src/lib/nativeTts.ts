@@ -211,9 +211,7 @@ export async function quoteLangFor(
 	// Short highlights never reach the full scorer's word minimum —
 	// the orthographic pass reads them (umlauts, accents, ß) instead
 	// of stranding every one on the fallback voice.
-	return (
-		identifyLangOffline(quote) ?? identifyLangShort(quote) ?? fallback
-	);
+	return identifyLangOffline(quote) ?? identifyLangShort(quote) ?? fallback;
 }
 
 /**
@@ -284,10 +282,7 @@ export async function sentenceLangsFor(
 				// The term resolves normally (seed for misses); its
 				// translation reads in the gloss fallback.
 				perSentence.set(gloss[0], await quoteLangFor(gloss[0], seed));
-				perSentence.set(
-					gloss[1],
-					await quoteLangFor(gloss[1], glossFallback)
-				);
+				perSentence.set(gloss[1], await quoteLangFor(gloss[1], glossFallback));
 			} else {
 				perSentence.set(sentence, await quoteLangFor(sentence, seed));
 			}
@@ -360,9 +355,7 @@ export async function quoteLangForContext(
 	} catch {
 		// Bridge unavailable (browser preview, tests): offline scorer below.
 	}
-	return (
-		identifyLangOffline(probe) ?? identifyLangShort(probe) ?? "zh-CN"
-	);
+	return identifyLangOffline(probe) ?? identifyLangShort(probe) ?? "zh-CN";
 }
 
 /**
@@ -603,11 +596,9 @@ export function speakNativeWord(
 		voice: voiceId,
 		rate: currentSpeechRate(),
 		volume: currentSpeechVolume()
-	}).catch(
-		(error: unknown) => {
-			onError?.(error instanceof Error ? error.message : String(error));
-		}
-	);
+	}).catch((error: unknown) => {
+		onError?.(error instanceof Error ? error.message : String(error));
+	});
 }
 
 /** Stop native speech and invalidate in-flight event listeners. Never throws. */

@@ -17,8 +17,7 @@ use crate::fetch::{fetchable_url, transport_code};
 const NEWS_TIMEOUT_SECS: u64 = 20;
 /// Params page head kept: ~600KB of shell markup today, with room.
 const MAX_PARAMS_BYTES: usize = 1024 * 1024;
-const BATCHEXECUTE_URL: &str =
-    "https://news.google.com/_/DotsSplashUi/data/batchexecute";
+const BATCHEXECUTE_URL: &str = "https://news.google.com/_/DotsSplashUi/data/batchexecute";
 
 /// Article id out of a Google News URL (`/read/`, `/articles/`, or
 /// `/rss/articles/`). Pure.
@@ -49,9 +48,7 @@ fn article_id(link: &str) -> Option<String> {
 /// correctly-shaped request with a foreign-locale signature still
 /// decodes to null — verified live, twice.
 fn params_page_url(art_id: &str) -> String {
-    format!(
-        "https://news.google.com/rss/articles/{art_id}?hl=en-US&gl=US&ceid=US%3Aen"
-    )
+    format!("https://news.google.com/rss/articles/{art_id}?hl=en-US&gl=US&ceid=US%3Aen")
 }
 
 /// Percent-encode a form value exactly like the reference decoder
@@ -77,7 +74,25 @@ fn percent_encode(input: &str) -> String {
 /// constant wrong yields plausible 200s with null payloads. Pure.
 fn batchexecute_body(art_id: &str, ts: &str, sig: &str) -> String {
     let ctx = serde_json::json!([
-        ["X", "X", ["X", "X"], null, null, 1, 1, "US:en", null, 1, null, null, null, null, null, 0, 1],
+        [
+            "X",
+            "X",
+            ["X", "X"],
+            null,
+            null,
+            1,
+            1,
+            "US:en",
+            null,
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            1
+        ],
         "X",
         "X",
         1,
@@ -95,8 +110,7 @@ fn batchexecute_body(art_id: &str, ts: &str, sig: &str) -> String {
         Err(_) => ts.into(),
     };
     let inner = serde_json::json!(["garturlreq", ctx, art_id, ts_value, sig]);
-    let inner_text =
-        serde_json::to_string(&inner).unwrap_or_else(|_| String::new());
+    let inner_text = serde_json::to_string(&inner).unwrap_or_else(|_| String::new());
     let envelope = serde_json::json!([[["Fbv4je", inner_text, null, "0"]]]);
     let text = serde_json::to_string(&envelope).unwrap_or_else(|_| String::new());
     format!("f.req={}", percent_encode(&text))
@@ -244,9 +258,7 @@ mod tests {
         // Non-numeric timestamps ride as strings, like the reference
         // (double-escaped: the inner JSON string sits inside the
         // envelope string).
-        assert!(
-            batchexecute_body("ARTID", "soon", "SGVAL").contains("%5C%22soon%5C%22")
-        );
+        assert!(batchexecute_body("ARTID", "soon", "SGVAL").contains("%5C%22soon%5C%22"));
     }
 
     #[test]

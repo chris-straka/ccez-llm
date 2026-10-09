@@ -224,8 +224,12 @@ describe("badge actions", () => {
 		mode.pinAnnotation("a" as AnnotationId);
 		mode.pinAnnotation("b" as AnnotationId);
 		mode.pinAnnotation("gone" as AnnotationId);
-		expect(getAnnotations().find((a) => a.id === "a")?.pinnedToPrompt).toBe(true);
-		expect(getAnnotations().find((a) => a.id === "b")?.pinnedToPrompt).not.toBe(true);
+		expect(getAnnotations().find((a) => a.id === "a")?.pinnedToPrompt).toBe(
+			true
+		);
+		expect(getAnnotations().find((a) => a.id === "b")?.pinnedToPrompt).not.toBe(
+			true
+		);
 		expect(calls.errors).toEqual(["Annotation no longer exists"]);
 	});
 
@@ -311,7 +315,9 @@ describe("annotate", () => {
 		expect(pending?.quote).toBe("Bonjour");
 		expect(pending?.at).toBe(0);
 		expect(pending?.comment).toBe("");
-		expect(calls.speak).toEqual([{ quote: "Bonjour", key: "sel", keepMenu: true }]);
+		expect(calls.speak).toEqual([
+			{ quote: "Bonjour", key: "sel", keepMenu: true }
+		]);
 		expect(mode.selMenu).toBeNull();
 		expect(getHighlight()).toBe(pending?.id);
 		expect(calls.promptEdits).toEqual(["why?"]);
@@ -360,8 +366,14 @@ describe("annotate", () => {
 	});
 
 	it("re-annotating a span replaces it and opens fresh", () => {
-		const { mode, calls, getAnnotations, getPending, setAnnotations, setHighlight } =
-			harness({ phone: true });
+		const {
+			mode,
+			calls,
+			getAnnotations,
+			getPending,
+			setAnnotations,
+			setHighlight
+		} = harness({ phone: true });
 		const dupe = note({
 			id: "dupe" as AnnotationId,
 			messageId: "m1" as ChatMsgId,
@@ -370,7 +382,14 @@ describe("annotate", () => {
 		});
 		setAnnotations([dupe]);
 		setHighlight("dupe" as AnnotationId);
-		mode.answerPop = { id: "dupe" as AnnotationId, anchor: { left: 0, top: 0, right: 1, bottom: 1 }, clearTop: 0, pointX: 0, w: 300, gap: 3 };
+		mode.answerPop = {
+			id: "dupe" as AnnotationId,
+			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
+			clearTop: 0,
+			pointX: 0,
+			w: 300,
+			gap: 3
+		};
 		mode.answerTimer = setTimeout(() => {}, 10_000);
 		mode.selMenu = menu();
 		mode.annotate();
@@ -406,7 +425,9 @@ describe("openBadge", () => {
 		mode.openBadge("ann-1" as AnnotationId, { x: 100, y: 100 });
 		expect(mode.answerPop?.id).toBe("ann-1");
 		expect(getHighlight()).toBe("ann-1");
-		expect(calls.speak).toEqual([{ quote: "quote", key: "ann", keepMenu: false }]);
+		expect(calls.speak).toEqual([
+			{ quote: "quote", key: "ann", keepMenu: false }
+		]);
 		expect(calls.review).toEqual([]);
 		expect(calls.unstuck).toBe(1);
 	});
@@ -414,7 +435,14 @@ describe("openBadge", () => {
 	it("re-pressing an open card toggles its prompt pin", () => {
 		const { mode, calls, getAnnotations, setAnnotations } = harness();
 		setAnnotations([note({ answer: "yes", pinnedToPrompt: true })]);
-		mode.answerPop = { id: "ann-1" as AnnotationId, anchor: { left: 0, top: 0, right: 1, bottom: 1 }, clearTop: 0, pointX: 0, w: 300, gap: 3 };
+		mode.answerPop = {
+			id: "ann-1" as AnnotationId,
+			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
+			clearTop: 0,
+			pointX: 0,
+			w: 300,
+			gap: 3
+		};
 		mode.openBadge("ann-1" as AnnotationId);
 		expect(getAnnotations()[0]?.pinnedToPrompt).not.toBe(true);
 		expect(mode.answerPop?.id).toBe("ann-1");
@@ -432,7 +460,9 @@ describe("openBadge", () => {
 		expect(mode.answerPop).toBeNull();
 		expect(calls.review).toEqual([true]);
 		expect(getHighlight()).toBe("ann-1");
-		expect(calls.speak).toEqual([{ quote: "quote", key: "ann", keepMenu: false }]);
+		expect(calls.speak).toEqual([
+			{ quote: "quote", key: "ann", keepMenu: false }
+		]);
 	});
 
 	it("android toasts Loading on a blue badge", () => {

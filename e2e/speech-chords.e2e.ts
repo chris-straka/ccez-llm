@@ -118,9 +118,7 @@ async function hoverWord(
 test("Shift+W reads just the word under the mouse", async ({ page }) => {
 	await hoverWord(page, "beta");
 	await page.keyboard.press("Shift+W");
-	await expect
-		.poll(() => spoken(page), { timeout: 10_000 })
-		.toContain("beta");
+	await expect.poll(() => spoken(page), { timeout: 10_000 }).toContain("beta");
 });
 
 test("Shift+S reads the sentence under the mouse", async ({ page }) => {
@@ -140,8 +138,7 @@ test("Shift+P reads the rendered paragraph, not the whole message", async ({
 	// the rendered paragraph, with nothing from the next block.
 	await expect
 		.poll(
-			async () =>
-				(await spoken(page)).join(" ").replace(/\s+/g, " ").trim(),
+			async () => (await spoken(page)).join(" ").replace(/\s+/g, " ").trim(),
 			{ timeout: 10_000 }
 		)
 		.toBe("Alpha beta gamma. Delta epsilon zeta.");

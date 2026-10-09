@@ -27,9 +27,7 @@ test("own-bubble toggle reads as Background on my messages, under Enable", async
 	page
 }) => {
 	await expect(
-		page
-			.locator(".settings-panel")
-			.getByText("Background on my messages")
+		page.locator(".settings-panel").getByText("Background on my messages")
 	).toBeVisible();
 });
 
@@ -343,10 +341,7 @@ test("on-device note renders probe facts", async ({ page }) => {
 			? (JSON.parse(stored) as Record<string, unknown>)
 			: {};
 		parsed["activeProviderId"] = "local-mlkit";
-		window.localStorage.setItem(
-			"ccez-llm-settings-v1",
-			JSON.stringify(parsed)
-		);
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
 		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
 			invoke: async (cmd: string) => {
 				if (cmd === "plugin:event|listen") return 1;

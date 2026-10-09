@@ -2,8 +2,15 @@
 # (see each file header). Regen output is dense, so formatting
 # them would flip-flop on every regen.
 *.generated.ts
+# Tauri CLI scaffolding (Xcode/Android projects, capability schemas
+# rebuilt on every Rust build): regenerated, never hand-formatted.
+src-tauri/gen/
 # Build outputs and local artifacts: never formatted.
 target/
 dist/
 build/
 coverage/
+# Vendored third-party crates and captured YouTube responses: kept
+# byte-for-byte as upstream / as captured.
+src-tauri/vendor/
+src-tauri/listen/tests/fixtures/

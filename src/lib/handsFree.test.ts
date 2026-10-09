@@ -33,7 +33,9 @@ describe("handsFreeNext", () => {
 	});
 
 	it("re-arms the mic on silence instead of sending", () => {
-		expect(handsFreeNext("listening", { type: "utterance", text: "  " })).toEqual({
+		expect(
+			handsFreeNext("listening", { type: "utterance", text: "  " })
+		).toEqual({
 			phase: "listening",
 			effects: ["startListening"]
 		});

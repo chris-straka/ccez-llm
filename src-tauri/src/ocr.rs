@@ -31,7 +31,7 @@
 //! "unsupported", and the frontend hides/gates the UI on
 //! `ocr_supported`.
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 
 /// One recognized text line: the top candidate and its confidence in
 /// `[0.0, 1.0]` (1.0 is most confident).
@@ -258,8 +258,7 @@ mod imp {
     ) -> Result<Vec<(String, f32)>, String> {
         unsafe {
             let data = NSData::from_vec(image_bytes.to_vec());
-            let options =
-                NSDictionary::<NSString, AnyObject>::from_slices::<NSString>(&[], &[]);
+            let options = NSDictionary::<NSString, AnyObject>::from_slices::<NSString>(&[], &[]);
             let alloc: Allocated<VNImageRequestHandler> =
                 msg_send![VNImageRequestHandler::class(), alloc];
             let handler = VNImageRequestHandler::initWithData_options(alloc, &data, &options);
@@ -278,8 +277,7 @@ mod imp {
 
             // `performRequests` takes the base class: upcast through
             // VNImageBasedRequest to VNRequest.
-            let base: Retained<VNRequest> =
-                request.clone().into_super().into_super();
+            let base: Retained<VNRequest> = request.clone().into_super().into_super();
             let requests = NSArray::from_slice(&[&*base]);
             handler.performRequests_error(&requests).map_err(|err| {
                 format!("text recognition failed: {}", err.localizedDescription())
@@ -320,15 +318,27 @@ mod tests {
     fn raw_base64_and_other_urls_pass_through() {
         assert_eq!(split_data_url("aGVsbG8="), "aGVsbG8=");
         // Not a base64 data URL: leave it for the decoder to reject.
-        assert_eq!(split_data_url("data:text/plain,hello"), "data:text/plain,hello");
+        assert_eq!(
+            split_data_url("data:text/plain,hello"),
+            "data:text/plain,hello"
+        );
         assert_eq!(split_data_url(""), "");
     }
 
     #[test]
     fn language_hints_map_to_vision_codes() {
-        assert_eq!(recognition_languages(Some("zh-CN")), vec!["zh-Hans", "zh-Hant"]);
-        assert_eq!(recognition_languages(Some("cmn")), vec!["zh-Hans", "zh-Hant"]);
-        assert_eq!(recognition_languages(Some("yue-HK")), vec!["yue-Hant", "yue-Hans"]);
+        assert_eq!(
+            recognition_languages(Some("zh-CN")),
+            vec!["zh-Hans", "zh-Hant"]
+        );
+        assert_eq!(
+            recognition_languages(Some("cmn")),
+            vec!["zh-Hans", "zh-Hant"]
+        );
+        assert_eq!(
+            recognition_languages(Some("yue-HK")),
+            vec!["yue-Hant", "yue-Hans"]
+        );
         assert_eq!(recognition_languages(Some("ja-JP")), vec!["ja-JP"]);
         assert_eq!(recognition_languages(Some("ko")), vec!["ko-KR"]);
         assert_eq!(recognition_languages(Some("fr-FR")), vec!["fr-FR"]);
@@ -419,9 +429,6 @@ mod tests {
         assert!(decode_image("!!!not-base64!!!").is_err());
         // Valid base64 decodes (data URL or raw alike).
         assert_eq!(decode_image("aGk=").unwrap(), b"hi");
-        assert_eq!(
-            decode_image("data:image/jpeg;base64,aGk=").unwrap(),
-            b"hi"
-        );
+        assert_eq!(decode_image("data:image/jpeg;base64,aGk=").unwrap(), b"hi");
     }
 }

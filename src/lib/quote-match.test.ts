@@ -195,11 +195,8 @@ describe("paragraphForQuote", () => {
 	});
 
 	it("resolves a repeated quote to its occurrence paragraph", () => {
-		const two =
-			"日本語の旅行は楽しいです。\n\n北京旅行很好。";
-		expect(paragraphForQuote(two, "旅行")).toBe(
-			"日本語の旅行は楽しいです。"
-		);
+		const two = "日本語の旅行は楽しいです。\n\n北京旅行很好。";
+		expect(paragraphForQuote(two, "旅行")).toBe("日本語の旅行は楽しいです。");
 		expect(paragraphForQuote(two, "旅行", 1)).toBe("北京旅行很好。");
 		// An overrun falls back to the first match, the old behavior.
 		expect(paragraphForQuote(two, "旅行", 7)).toBe(

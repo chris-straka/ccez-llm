@@ -134,7 +134,7 @@ route renders a note (same three-runtime degrade as area-pick). -->
 <main class="game-line">
 	{#if !inShell}
 		<p class="note">The game line needs the desktop app.</p>
-	{:else if (!line)}
+	{:else if !line}
 		<p class="note">Capture a game line — it shows up here.</p>
 	{:else}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -178,8 +178,7 @@ route renders a note (same three-runtime degrade as area-pick). -->
 					bind:value={comment}
 					rows="2"
 					placeholder="What does it mean?"
-					aria-label="Annotation comment"
-				></textarea>
+					aria-label="Annotation comment"></textarea>
 				<div class="game-row">
 					<button type="button" onclick={() => void onFile()}>File</button>
 					<button

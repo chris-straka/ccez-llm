@@ -16,7 +16,10 @@ test("a failing speech engine reports in plain words", async ({ page }) => {
 	await page.addInitScript(() => {
 		const synth = window.speechSynthesis;
 		if (!synth) return;
-		Object.defineProperty(synth, "getVoices", { value: () => [], configurable: true });
+		Object.defineProperty(synth, "getVoices", {
+			value: () => [],
+			configurable: true
+		});
 		Object.defineProperty(synth, "speak", {
 			value: (u: SpeechSynthesisUtterance) =>
 				setTimeout(() =>

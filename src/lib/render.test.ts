@@ -352,9 +352,9 @@ describe("highlighting", () => {
 				renderMarkdown(`\`\`\`js\nconst filler${i} = ${i};\n\`\`\``)
 			);
 		}
-		await expect(
-			highlightRendered(renderMarkdown(block))
-		).resolves.toBe(before);
+		await expect(highlightRendered(renderMarkdown(block))).resolves.toBe(
+			before
+		);
 	}, 120000);
 });
 

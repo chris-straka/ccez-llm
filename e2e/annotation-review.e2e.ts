@@ -559,9 +559,7 @@ test("orphaned review quote toasts that the annotation is gone", async ({
 	await pinFiled(page);
 	const first = page.locator("article.assistant").first();
 	await first.hover();
-	await first
-		.locator('button[aria-label^="Delete this message"]')
-		.click();
+	await first.locator('button[aria-label^="Delete this message"]').click();
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();

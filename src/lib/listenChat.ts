@@ -14,7 +14,12 @@ import {
 	type ChatMsgId,
 	type ChatState
 } from "./chat";
-import { answerClip, type ClipNote, type ClipState, type ListenSession } from "./listen";
+import {
+	answerClip,
+	type ClipNote,
+	type ClipState,
+	type ListenSession
+} from "./listen";
 import type { KeyValueStore } from "./settings";
 
 function chatById(state: ChatState, id: ChatId): Chat | undefined {
@@ -22,7 +27,14 @@ function chatById(state: ChatState, id: ChatId): Chat | undefined {
 }
 
 function clipMessage(i: number): ChatMsg {
-	return { id: newChatMsgId(), role: "assistant", content: "", usage: null, error: null, clip: { i } };
+	return {
+		id: newChatMsgId(),
+		role: "assistant",
+		content: "",
+		usage: null,
+		error: null,
+		clip: { i }
+	};
 }
 
 /** Turn an (empty) chat into a drill on `session`, clip 1 showing. */
@@ -59,14 +71,25 @@ export function nextClipIndex(chat: Chat): number {
  * Show the next clip; past the last one, the tally row instead.
  * Returns the new row's id (null when the drill already ended).
  */
-export function advanceDrill(state: ChatState, chatId: ChatId, store?: KeyValueStore): ChatMsgId | null {
+export function advanceDrill(
+	state: ChatState,
+	chatId: ChatId,
+	store?: KeyValueStore
+): ChatMsgId | null {
 	const chat = chatById(state, chatId);
 	if (!chat?.listen || chat.messages.some((m) => m.drillEnd)) return null;
 	const i = nextClipIndex(chat);
 	const row: ChatMsg =
 		i < chat.listen.clips.length
 			? clipMessage(i)
-			: { id: newChatMsgId(), role: "assistant", content: "", usage: null, error: null, drillEnd: true };
+			: {
+					id: newChatMsgId(),
+					role: "assistant",
+					content: "",
+					usage: null,
+					error: null,
+					drillEnd: true
+				};
 	chat.messages = [...chat.messages, row];
 	persistChats(state, store);
 	return row.id;
@@ -115,8 +138,19 @@ export function answerDrillClip(
 }
 
 /** Mark clip `i`'s grading in flight. */
-export function markGrading(state: ChatState, chatId: ChatId, i: number, store?: KeyValueStore): void {
-	updateClip(state, chatId, (m) => m.clip?.i === i, (clip) => ({ ...clip, grade: "pending" }), store);
+export function markGrading(
+	state: ChatState,
+	chatId: ChatId,
+	i: number,
+	store?: KeyValueStore
+): void {
+	updateClip(
+		state,
+		chatId,
+		(m) => m.clip?.i === i,
+		(clip) => ({ ...clip, grade: "pending" }),
+		store
+	);
 }
 
 /** Land clip `i`'s translation and notes (null = it failed). */
@@ -133,7 +167,12 @@ export function landGrade(
 		(m) => m.clip?.i === i,
 		(clip) =>
 			grade
-				? { ...clip, translation: grade.translation, notes: grade.notes, grade: "done" }
+				? {
+						...clip,
+						translation: grade.translation,
+						notes: grade.notes,
+						grade: "done"
+					}
 				: { ...clip, grade: "error" },
 		store
 	);

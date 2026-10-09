@@ -1,7 +1,8 @@
 import { test, expect } from "./fixtures";
 import { seedChat } from "./helpers";
 
-const REPLY_WITH_BLOCK = "Bien sûr !\n\n```correction\nJe vais au grand parc\n```";
+const REPLY_WITH_BLOCK =
+	"Bien sûr !\n\n```correction\nJe vais au grand parc\n```";
 
 test("correction mode diffs under the user message and hides the block", async ({
 	page
@@ -29,7 +30,9 @@ test("correction mode diffs under the user message and hides the block", async (
 	await expect(assistant).not.toContainText("Je vais au grand parc");
 	// The user's message carries the diff: "le" struck, "grand" added.
 	const diff = page.locator("article.user .correction");
-	await expect(diff).toHaveText("Je vais au le grand parc", { timeout: 15_000 });
+	await expect(diff).toHaveText("Je vais au le grand parc", {
+		timeout: 15_000
+	});
 	await expect(diff.locator(".corr-del")).toHaveText("le ");
 	await expect(diff.locator(".corr-ins")).toHaveText("grand ");
 	// The corrected word annotates like any text: menu, box, filing.

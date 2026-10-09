@@ -543,7 +543,8 @@ export async function generateChatTitle(
 	try {
 		// Naming needs no deliberation: the bottom thinking rung keeps
 		// a title to a few hundred tokens on reasoning models.
-		content = (await provider.chat(messages, { thinking: LOWEST_THINKING })).content;
+		content = (await provider.chat(messages, { thinking: LOWEST_THINKING }))
+			.content;
 	} catch {
 		return;
 	}
@@ -1620,7 +1621,9 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					if (clips) {
 						c.messages = c.messages.map((m) => {
 							const text = m.clip ? clips[m.clip.i]?.text : undefined;
-							return text !== undefined && m.clip?.heard !== undefined ? { ...m, content: text } : m;
+							return text !== undefined && m.clip?.heard !== undefined
+								? { ...m, content: text }
+								: m;
 						});
 					}
 					// A missing timestamp renders "Invalid Date" in the
@@ -1694,7 +1697,6 @@ export function messageIndexFromId(
 	length: number
 ): number | null {
 	const index = Number(articleId.slice(4));
-	if (!Number.isInteger(index) || index < 0 || index >= length)
-		return null;
+	if (!Number.isInteger(index) || index < 0 || index >= length) return null;
 	return index;
 }

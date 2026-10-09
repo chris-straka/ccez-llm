@@ -73,9 +73,7 @@ describe("annotations", () => {
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
 		// Creating never includes: the prompt goes out bare.
 		expect(promptInclusions(list)).toHaveLength(0);
-		expect(withAnnotations("explain", promptInclusions(list))).toBe(
-			"explain"
-		);
+		expect(withAnnotations("explain", promptInclusions(list))).toBe("explain");
 		const pinned = setPromptPinned(list, list[0]!.id, true);
 		expect(pinned[0]?.pinnedToPrompt).toBe(true);
 		expect(list[0]?.pinnedToPrompt).toBeUndefined();
@@ -85,9 +83,7 @@ describe("annotations", () => {
 		expect(unpinned[0]).not.toHaveProperty("pinnedToPrompt");
 		expect(promptInclusions(unpinned)).toHaveLength(0);
 		// Unknown id: nothing changes.
-		expect(setPromptPinned(list, "missing" as AnnotationId, true)).toBe(
-			list
-		);
+		expect(setPromptPinned(list, "missing" as AnnotationId, true)).toBe(list);
 	});
 
 	it("restarts refire exactly the answerless drafts", () => {
@@ -121,7 +117,6 @@ describe("annotations", () => {
 			list
 		);
 	});
-
 });
 
 describe("duplicateAnnotationId", () => {
@@ -135,15 +130,21 @@ describe("duplicateAnnotationId", () => {
 		const kyoto = list[0];
 		if (!kyoto) throw new Error("no annotation");
 		// Same message, quote, and repeat: a twin.
-		expect(duplicateAnnotationId(list, { messageId: msg }, "  Kyoto ", 0)).toBe(kyoto.id);
+		expect(duplicateAnnotationId(list, { messageId: msg }, "  Kyoto ", 0)).toBe(
+			kyoto.id
+		);
 		// A different repeat of the same text is its own span.
-		expect(duplicateAnnotationId(list, { messageId: msg }, "Kyoto", 2)).toBeNull();
+		expect(
+			duplicateAnnotationId(list, { messageId: msg }, "Kyoto", 2)
+		).toBeNull();
 		// Same quote in another message is unrelated.
 		expect(
 			duplicateAnnotationId(list, { messageId: "m2" as ChatMsgId }, "Kyoto", 0)
 		).toBeNull();
 		// Blank quotes never match.
-		expect(duplicateAnnotationId(list, { messageId: msg }, "   ", 0)).toBeNull();
+		expect(
+			duplicateAnnotationId(list, { messageId: msg }, "   ", 0)
+		).toBeNull();
 	});
 
 	it("treats aid scope as part of span identity", () => {
@@ -158,10 +159,12 @@ describe("duplicateAnnotationId", () => {
 			}
 		];
 		// Same span in the bare text is not a twin of the vocalized one.
-		expect(duplicateAnnotationId(scoped, { messageId: msg }, "Kyoto", 0)).toBeNull();
-		expect(duplicateAnnotationId(scoped, { messageId: msg }, "Kyoto", 0, "tashkeel")).toBe(
-			"a1"
-		);
+		expect(
+			duplicateAnnotationId(scoped, { messageId: msg }, "Kyoto", 0)
+		).toBeNull();
+		expect(
+			duplicateAnnotationId(scoped, { messageId: msg }, "Kyoto", 0, "tashkeel")
+		).toBe("a1");
 		// Unscoped lists match unscoped lookups, as before.
 		const plain = addAnnotation([], msg, "Kyoto");
 		expect(duplicateAnnotationId(plain, { messageId: msg }, "Kyoto", 0)).toBe(
@@ -221,9 +224,7 @@ describe("story-anchored annotations", () => {
 	});
 	it("excludes story notes from message marks", () => {
 		const list: Annotation[] = [storyNote("s1", "q")];
-		expect(
-			buildMarksFor(list, "m1" as ChatMsgId, false, null)
-		).toEqual([]);
+		expect(buildMarksFor(list, "m1" as ChatMsgId, false, null)).toEqual([]);
 	});
 	it("builds numbered headline badges per story, waiting or ready", () => {
 		const other = { ...story, link: "https://x/z" };
@@ -234,7 +235,11 @@ describe("story-anchored annotations", () => {
 		];
 		const marks = buildStoryMarks(list, "https://x/y", null);
 		expect(marks).toHaveLength(2);
-		expect(marks[0]).toMatchObject({ number: 1, quote: "q", answer: "waiting" });
+		expect(marks[0]).toMatchObject({
+			number: 1,
+			quote: "q",
+			answer: "waiting"
+		});
 		expect(marks[1]).toMatchObject({ number: 2, quote: "qq", answer: "ready" });
 		expect(marks[0]).not.toHaveProperty("aidScope");
 		// Another story's pill never leaks in; pending previews next.
@@ -266,11 +271,7 @@ describe("story-anchored annotations", () => {
 describe("buildMarksFor", () => {
 	const m1 = "m1" as ChatMsgId;
 	const m2 = "m2" as ChatMsgId;
-	const list = addAnnotation(
-		addAnnotation([], m1, "first"),
-		m2,
-		"second"
-	);
+	const list = addAnnotation(addAnnotation([], m1, "first"), m2, "second");
 
 	it("builds numbered badges for one message only", () => {
 		const marks = buildMarksFor(list, m1, false, null);
@@ -339,9 +340,7 @@ describe("aidedTextForMsg", () => {
 	const m1 = "m1" as ChatMsgId;
 
 	it("reads the peeked message cache first", () => {
-		expect(aidedTextForMsg(m1, m1, { m1: "vocal" }, new Set())).toBe(
-			"vocal"
-		);
+		expect(aidedTextForMsg(m1, m1, { m1: "vocal" }, new Set())).toBe("vocal");
 		expect(aidedTextForMsg(m1, m1, {}, new Set([m1]))).toBeNull();
 	});
 
@@ -362,7 +361,11 @@ describe("seedAnnotationsFromRefs", () => {
 			{ n: 2, quote: "b", comment: "" }
 		]);
 		expect(seeded).toHaveLength(2);
-		expect(seeded[0]).toMatchObject({ messageId: m1, quote: "a", comment: "x" });
+		expect(seeded[0]).toMatchObject({
+			messageId: m1,
+			quote: "a",
+			comment: "x"
+		});
 		expect(seeded[0]!.id).not.toBe(seeded[1]!.id);
 		expect(seedAnnotationsFromRefs(m1, [])).toEqual([]);
 	});
@@ -391,18 +394,23 @@ describe("annotationsAfterEdit", () => {
 	it("restores the filed list and drops the seeds", () => {
 		const filed = [ann("filed")];
 		const live = [ann("seed", true)];
-		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), false)).toEqual(filed);
-		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), true)).toEqual(filed);
+		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), false)).toEqual(
+			filed
+		);
+		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), true)).toEqual(
+			filed
+		);
 	});
 
 	it("keeps notes filed mid-edit unless the save baked them", () => {
 		const live = [ann("seed", true), ann("new"), ann("newPinned", true)];
 		const ids = (list: Annotation[]) => list.map((a) => a.id);
-		expect(ids(annotationsAfterEdit([], live, new Set(["seed"]), true))).toEqual(["new"]);
-		expect(ids(annotationsAfterEdit(null, live, new Set(["seed"]), false))).toEqual([
-			"new",
-			"newPinned"
-		]);
+		expect(
+			ids(annotationsAfterEdit([], live, new Set(["seed"]), true))
+		).toEqual(["new"]);
+		expect(
+			ids(annotationsAfterEdit(null, live, new Set(["seed"]), false))
+		).toEqual(["new", "newPinned"]);
 	});
 });
 
@@ -445,4 +453,3 @@ describe("annEditCommitToast", () => {
 		expect(annEditCommitToast(false)).toBe("Annotation edited");
 	});
 });
-

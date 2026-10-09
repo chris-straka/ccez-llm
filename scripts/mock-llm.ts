@@ -10,7 +10,10 @@ const REPLY =
 	"Add « s'il vous plaît » and you are set.";
 
 const port = Number(process.argv[2] ?? 8787);
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" };
+const cors = {
+	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Allow-Headers": "*"
+};
 
 function chunk(delta: Record<string, string>, finish: string | null): string {
 	const body = {
@@ -27,11 +30,16 @@ Bun.serve({
 	port,
 	async fetch(req) {
 		const url = new URL(req.url);
-		if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+		if (req.method === "OPTIONS")
+			return new Response(null, { status: 204, headers: cors });
 		if (url.pathname.endsWith("/models")) {
-			return Response.json({ object: "list", data: [{ id: "mock-tutor", object: "model" }] }, { headers: cors });
+			return Response.json(
+				{ object: "list", data: [{ id: "mock-tutor", object: "model" }] },
+				{ headers: cors }
+			);
 		}
-		if (!url.pathname.endsWith("/chat/completions")) return new Response("not found", { status: 404 });
+		if (!url.pathname.endsWith("/chat/completions"))
+			return new Response("not found", { status: 404 });
 		const body = (await req.json()) as { stream?: boolean };
 		console.log("chat request");
 		if (!body.stream) {
@@ -40,7 +48,13 @@ Bun.serve({
 					id: "mock",
 					object: "chat.completion",
 					model: "mock-tutor",
-					choices: [{ index: 0, message: { role: "assistant", content: REPLY }, finish_reason: "stop" }],
+					choices: [
+						{
+							index: 0,
+							message: { role: "assistant", content: REPLY },
+							finish_reason: "stop"
+						}
+					],
 					usage: { prompt_tokens: 12, completion_tokens: 40, total_tokens: 52 }
 				},
 				{ headers: cors }
@@ -59,7 +73,9 @@ Bun.serve({
 				controller.close();
 			}
 		});
-		return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream" } });
+		return new Response(stream, {
+			headers: { ...cors, "Content-Type": "text/event-stream" }
+		});
 	}
 });
 console.log(`mock LLM on http://127.0.0.1:${port}/v1`);

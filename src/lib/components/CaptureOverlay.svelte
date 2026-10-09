@@ -30,8 +30,8 @@ returns focus. -->
 
 <div class="capture-overlay" role="dialog" aria-label="Weak capture">
 	<p class="capture-note">
-		Weak capture ({Math.round(confidence * 100)}%) — check the text, then
-		file it to chat.
+		Weak capture ({Math.round(confidence * 100)}%) — check the text, then file
+		it to chat.
 	</p>
 	<input
 		class="capture-edit"
@@ -41,8 +41,7 @@ returns focus. -->
 		autocomplete="off"
 		spellcheck="false"
 		onkeydown={(event) => {
-			if (event.key === "Enter" && !event.isComposing)
-				actions.confirm(draft);
+			if (event.key === "Enter" && !event.isComposing) actions.confirm(draft);
 		}}
 	/>
 	<div class="capture-row">

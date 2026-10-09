@@ -50,9 +50,9 @@ describe("annotation badge font-size tracking", () => {
 		// Dampened tracking (never compounding rem): the badge rule must
 		// read the message scale instead of pinning an absolute size.
 		const css = appCss();
-		const badge = [...css.matchAll(/([^{}]*button\.ccez-ann-badge[^{}]*)\{([^{}]*)\}/g)].find(
-			(rule) => !/ans-|rtl|fresh|arrived|::after/.test(rule[1]!)
-		);
+		const badge = [
+			...css.matchAll(/([^{}]*button\.ccez-ann-badge[^{}]*)\{([^{}]*)\}/g)
+		].find((rule) => !/ans-|rtl|fresh|arrived|::after/.test(rule[1]!));
 		expect(badge?.[2]).toContain("var(--font-scale, 1)");
 	});
 });
@@ -142,7 +142,9 @@ describe("annotation edit Save animation", () => {
 		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		// Symmetric means the transition lives on the base rule, not
 		// :hover (a hover-only transition snaps back on leave).
-		expect(css).toMatch(/\.review-head button\.review-add\s*\{[^}]*transition:/);
+		expect(css).toMatch(
+			/\.review-head button\.review-add\s*\{[^}]*transition:/
+		);
 		expect(css).toContain(".review-head button.review-add:hover");
 	});
 });

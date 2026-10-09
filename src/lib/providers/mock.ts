@@ -96,7 +96,8 @@ export class MockProvider implements ChatProvider {
 /** Finite non-negative flag value (ms), or null when unset/invalid. */
 function mockFlagMs(key: string): number | null {
 	try {
-		const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(key);
+		const raw =
+			typeof localStorage === "undefined" ? null : localStorage.getItem(key);
 		const n = raw === null ? NaN : Number(raw);
 		return Number.isFinite(n) && n >= 0 ? n : null;
 	} catch {
@@ -119,7 +120,9 @@ function canned(messages: ChatMessage[]): string {
 	// Chat-title requests get a short deterministic name from the
 	// opening question's first words.
 	const system = messages.find((m) => m.role === "system");
-	if (messageText(system?.content ?? "").startsWith("Title this conversation")) {
+	if (
+		messageText(system?.content ?? "").startsWith("Title this conversation")
+	) {
 		const opener = messageText(messages[1]?.content ?? "")
 			.replace(/^User:\s*/, "")
 			.split(/\s+/)

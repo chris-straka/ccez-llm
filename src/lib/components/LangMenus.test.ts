@@ -18,7 +18,10 @@ function componentStyle(): string {
 }
 
 function pageSource(): string {
-	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("../../routes/+page.svelte", import.meta.url),
+		"utf8"
+	);
 }
 
 function pageStyle(): string {

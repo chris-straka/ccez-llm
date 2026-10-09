@@ -40,7 +40,8 @@ interface Json3Event {
 }
 
 /** Scripts written without spaces between words. */
-const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+const UNSPACED =
+	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 /** Punctuation that ends a sentence (Latin, CJK, Arabic, Devanagari). */
 const SENTENCE_END = /[.!?…。！？؟।]["'»”’)\]]*$/u;
 const CLAUSE_END = /[,;:—–،、，；：]["'»”’)\]]*$/u;
@@ -103,7 +104,12 @@ export function parseJson3(doc: string): Token[] {
 				if (!word) return;
 				const space =
 					cleaned.startsWith(" ") || (k === 0 && !UNSPACED.test(word[0] ?? ""));
-				raw.push({ text: word, start: t0 + (seg.tOffsetMs ?? 0) / 1000, end: NaN, space });
+				raw.push({
+					text: word,
+					start: t0 + (seg.tOffsetMs ?? 0) / 1000,
+					end: NaN,
+					space
+				});
 			});
 		} else {
 			// One cue: words take their natural length from the cue's
@@ -112,9 +118,12 @@ export function parseJson3(doc: string): Token[] {
 			// rest as silence instead of slowing every word.
 			// A cue opening on "…" continues the last one; the marker
 			// is subtitle layout, not speech.
-			const cue = cleanSeg(text).trim().replace(/^(?:…|\.\.\.)\s*/u, "");
+			const cue = cleanSeg(text)
+				.trim()
+				.replace(/^(?:…|\.\.\.)\s*/u, "");
 			if (!cue) continue;
-			const words = UNSPACED.test(cue) && !cue.includes(" ") ? [...cue] : cue.split(" ");
+			const words =
+				UNSPACED.test(cue) && !cue.includes(" ") ? [...cue] : cue.split(" ");
 			const natural = words.reduce((n, w) => n + spokenLength(w), 0);
 			const scale = dur > 0 ? Math.min(1.3, dur / natural) : 1;
 			let at = t0;
@@ -124,7 +133,10 @@ export function parseJson3(doc: string): Token[] {
 					text: w,
 					start: at,
 					end: at + share,
-					space: k > 0 ? !UNSPACED.test(w) || cue.includes(" ") : !UNSPACED.test(w[0] ?? "")
+					space:
+						k > 0
+							? !UNSPACED.test(w) || cue.includes(" ")
+							: !UNSPACED.test(w[0] ?? "")
 				});
 				at += share;
 			});
@@ -143,7 +155,10 @@ export function parseJson3(doc: string): Token[] {
 		if (SOUND_TAG.test(tok.text)) continue;
 		const next = raw[k + 1];
 		const end = Number.isNaN(tok.end)
-			? Math.min(next ? next.start : Infinity, tok.start + spokenLength(tok.text))
+			? Math.min(
+					next ? next.start : Infinity,
+					tok.start + spokenLength(tok.text)
+				)
 			: tok.end;
 		const prev = tokens.at(-1);
 		if (prev && TRAILING_PUNCT.test(tok.text)) {
@@ -152,7 +167,12 @@ export function parseJson3(doc: string): Token[] {
 			prev.end = Math.max(prev.end, end);
 			continue;
 		}
-		tokens.push({ text: tok.text, start: tok.start, end: Math.max(end, tok.start + 0.05), space: tok.space });
+		tokens.push({
+			text: tok.text,
+			start: tok.start,
+			end: Math.max(end, tok.start + 0.05),
+			space: tok.space
+		});
 	}
 	if (tokens[0]) tokens[0].space = false;
 	return tokens;
@@ -226,7 +246,11 @@ export function segmentClips(
 			}
 			// A long silence ends a clip even without punctuation
 			// (captions from speech recognition can lack it).
-			if (dur >= opts.minSec && score >= 1 && (tokens[k + 1]?.start ?? Infinity) - tok.end >= 1.2) {
+			if (
+				dur >= opts.minSec &&
+				score >= 1 &&
+				(tokens[k + 1]?.start ?? Infinity) - tok.end >= 1.2
+			) {
 				cut = k;
 				break;
 			}
@@ -264,7 +288,10 @@ export function segmentClips(
 		const roomAfter = after ? (after.start - end) / 2 : opts.padAfter;
 		return {
 			i,
-			start: Math.max(0, start - Math.min(opts.padBefore, Math.max(0, roomBefore))),
+			start: Math.max(
+				0,
+				start - Math.min(opts.padBefore, Math.max(0, roomBefore))
+			),
 			end: end + Math.min(opts.padAfter, Math.max(0, roomAfter)),
 			text: joinTokens(g)
 		};

@@ -1,8 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { activeChat, createChatState, type ChatId, type ChatMsgId, type ChatState } from "./chat";
-import { NativeTurns, type NativeRouteFacts, type TurnListen } from "./native-turns.svelte";
-import { defaultSettings, type AppSettings, type KeyValueStore } from "./settings";
+import {
+	activeChat,
+	createChatState,
+	type ChatId,
+	type ChatMsgId,
+	type ChatState
+} from "./chat";
+import {
+	NativeTurns,
+	type NativeRouteFacts,
+	type TurnListen
+} from "./native-turns.svelte";
+import {
+	defaultSettings,
+	type AppSettings,
+	type KeyValueStore
+} from "./settings";
 import { INTERRUPTED_COPY, type NativeTurnFile, type TurnId } from "./turns";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -38,7 +52,9 @@ function stubInvoke(answers: Record<string, (args: unknown) => unknown> = {}): {
 	return { calls };
 }
 
-function harness(opts: { facts?: Partial<NativeRouteFacts>; visible?: boolean } = {}) {
+function harness(
+	opts: { facts?: Partial<NativeRouteFacts>; visible?: boolean } = {}
+) {
 	const state: ChatState = createChatState(memoryStore());
 	const calls = {
 		afterSend: [] as ChatId[],
@@ -86,7 +102,13 @@ function startArgs(calls: { cmd: string; args: unknown }[]): {
 async function sendOne(h: ReturnType<typeof harness>, text = "Hallo") {
 	const config = h.turns.route([]);
 	if (!config) throw new Error("no route");
-	await h.turns.send({ baked: text, kept: [], pasteFolds: [], config, system: "sys" });
+	await h.turns.send({
+		baked: text,
+		kept: [],
+		pasteFolds: [],
+		config,
+		system: "sys"
+	});
 }
 
 beforeEach(() => {
@@ -172,7 +194,12 @@ describe("NativeTurns send → stream → done", () => {
 		expect(h.state.sendingChatIds).toEqual([]);
 		expect(h.turns.live.has(chat_id)).toBe(false);
 		expect(h.turns.turns.size).toBe(0);
-		expect(calls.map((c) => c.cmd)).toEqual(["turn_start", "turn_poll", "turn_seen", "turn_dismiss"]);
+		expect(calls.map((c) => c.cmd)).toEqual([
+			"turn_start",
+			"turn_poll",
+			"turn_seen",
+			"turn_dismiss"
+		]);
 		expect(h.calls.dismissed).toBe(1);
 		expect(h.calls.afterSend).toEqual([chat_id]);
 	});
@@ -234,7 +261,13 @@ describe("NativeTurns.resend", () => {
 		const h = harness();
 		const chat = activeChat(h.state);
 		chat.messages = [
-			{ id: "u1" as ChatMsgId, role: "user", content: "Noch mal", usage: null, error: null }
+			{
+				id: "u1" as ChatMsgId,
+				role: "user",
+				content: "Noch mal",
+				usage: null,
+				error: null
+			}
 		];
 		const config = h.turns.route([]);
 		if (!config) throw new Error("no route");
@@ -270,8 +303,20 @@ describe("NativeTurns.reconcile", () => {
 	function placeholderChat(h: ReturnType<typeof harness>, sending: boolean) {
 		const chat = activeChat(h.state);
 		chat.messages = [
-			{ id: "u1" as ChatMsgId, role: "user", content: "Hallo", usage: null, error: null },
-			{ id: "a1" as ChatMsgId, role: "assistant", content: "", usage: null, error: null }
+			{
+				id: "u1" as ChatMsgId,
+				role: "user",
+				content: "Hallo",
+				usage: null,
+				error: null
+			},
+			{
+				id: "a1" as ChatMsgId,
+				role: "assistant",
+				content: "",
+				usage: null,
+				error: null
+			}
 		];
 		if (sending) h.state.sendingChatIds = [chat.id];
 		return chat;
@@ -317,14 +362,20 @@ describe("NativeTurns.reconcile", () => {
 	it("restarts a turn a dead process left streaming", async () => {
 		const h = harness();
 		const chat = placeholderChat(h, false);
-		const { calls } = stubInvoke({ turn_scan: () => [file(chat.id, "streaming")] });
+		const { calls } = stubInvoke({
+			turn_scan: () => [file(chat.id, "streaming")]
+		});
 		await h.turns.reconcile();
 		const req = startArgs(calls);
 		expect(req.message_id).toBe("a1");
 		expect(req.turn_id).not.toBe("old");
 		expect(h.turns.live.has(chat.id)).toBe(true);
 		expect(h.state.sendingChatIds).toEqual([chat.id]);
-		expect(calls.map((c) => c.cmd)).toEqual(["turn_scan", "turn_start", "turn_dismiss"]);
+		expect(calls.map((c) => c.cmd)).toEqual([
+			"turn_scan",
+			"turn_start",
+			"turn_dismiss"
+		]);
 	});
 
 	it("overlapping scans resume a dead turn once, never mark it interrupted", async () => {
@@ -361,7 +412,13 @@ describe("NativeTurns.reconcile", () => {
 		mockInvoke.mockImplementation(async (cmd: string) => {
 			calls.push({ cmd, args: undefined });
 			return cmd === "turn_scan"
-				? [{ ...file(req.chat_id, "streaming"), turn_id: req.turn_id, message_id: req.message_id }]
+				? [
+						{
+							...file(req.chat_id, "streaming"),
+							turn_id: req.turn_id,
+							message_id: req.message_id
+						}
+					]
 				: true;
 		});
 		await h.turns.reconcile();
@@ -381,7 +438,12 @@ describe("NativeTurns.listen", () => {
 		const stop = harness().turns.listen(listen);
 		await Promise.resolve();
 		await Promise.resolve();
-		expect(events).toEqual(["turn-token", "turn-fetch", "turn-retry", "turn-done"]);
+		expect(events).toEqual([
+			"turn-token",
+			"turn-fetch",
+			"turn-retry",
+			"turn-done"
+		]);
 		stop();
 		expect(offs).toEqual(events);
 	});

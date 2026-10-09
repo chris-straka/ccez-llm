@@ -487,9 +487,9 @@ describe("multiTapOwnsRelease", () => {
 		expect(
 			multiTapOwnsRelease({ count: 2, at: 1000, x: 50, y: 50 }, 2000)
 		).toBe(false);
-		expect(
-			multiTapOwnsRelease({ count: 2, at: 1000, x: 50, y: 50 }, 900)
-		).toBe(false);
+		expect(multiTapOwnsRelease({ count: 2, at: 1000, x: 50, y: 50 }, 900)).toBe(
+			false
+		);
 	});
 });
 

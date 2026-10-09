@@ -98,10 +98,7 @@
 		type LanguageMenu,
 		type ReplyLanguage
 	} from "$lib/languages";
-	import {
-		listProviders,
-		type ProviderId
-	} from "$lib/providers/registry";
+	import { listProviders, type ProviderId } from "$lib/providers/registry";
 	import { isImeKey } from "$lib/editContext";
 	import {
 		OFFLINE_FALLBACK_ID,
@@ -182,11 +179,7 @@
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
 	import Waypoints from "$lib/components/Waypoints.svelte";
-	import {
-		plainBody,
-		sourcesAsked,
-		messageCopyText
-	} from "$lib/render";
+	import { plainBody, sourcesAsked, messageCopyText } from "$lib/render";
 	import {
 		clearNotice,
 		emptyNotices,
@@ -224,63 +217,60 @@
 		type SentTagAction
 	} from "$lib/attachments";
 	import {
-	promptInclusions,
-	canHoldDeleteBadge,
-	buildMarksFor,
-	aidedTextForMsg,
-	seedAnnotationsFromRefs,
-	annotationCopyText,
-	promptAnnWashIdFor,
-	annEditCommitToast,
-	addAnnotation,
-	attachAnnotationAnswer,
-	type Annotation,
-	type AnnotationId,
-	type AnnotationMark,
-	type StoryAnchor
-} from "$lib/annotations";
-import {
-	resolveSentRefTarget,
-	locateQuote
-} from "$lib/quote-match";
-import {
-	withAnnotations,
-	annRefsFor,
-	commitRefsEdit,
-	planClearSentRefs
-} from "$lib/annotation-block";
-import {
-	pressExpandedSelection,
-	selMenuPlacement,
-	readingPanelPlacement,
-	menuYAbovePanel,
-	clampPanelCenterX,
-	highlightSteady,
-	panelCenterMoved,
-	lineStartOffset,
-	clampDragAnchorToFocusLine,
-	menuBtnTouchAction,
-	selMenuDragTarget
-} from "$lib/sel-geometry";
-import {
-	loadDraftAnnotations,
-	saveDraftAnnotations
-} from "$lib/annotation-drafts-store";
-import {
-	handsFreeNext,
-	type HandsFreeEvent,
-	type HandsFreePhase
-} from "$lib/handsFree";
-import {
-	GAME_LINE_CLOSED_EVENT,
-	GAME_LINE_EVENT,
-	GAME_LINE_FILE_EVENT,
-	GAME_LINE_OPEN_EVENT,
-	closeGameLine,
-	openGameLine,
-	translateGameLine,
-	type GameLineFile
-} from "$lib/gameLine";
+		promptInclusions,
+		canHoldDeleteBadge,
+		buildMarksFor,
+		aidedTextForMsg,
+		seedAnnotationsFromRefs,
+		annotationCopyText,
+		promptAnnWashIdFor,
+		annEditCommitToast,
+		addAnnotation,
+		attachAnnotationAnswer,
+		type Annotation,
+		type AnnotationId,
+		type AnnotationMark,
+		type StoryAnchor
+	} from "$lib/annotations";
+	import { resolveSentRefTarget, locateQuote } from "$lib/quote-match";
+	import {
+		withAnnotations,
+		annRefsFor,
+		commitRefsEdit,
+		planClearSentRefs
+	} from "$lib/annotation-block";
+	import {
+		pressExpandedSelection,
+		selMenuPlacement,
+		readingPanelPlacement,
+		menuYAbovePanel,
+		clampPanelCenterX,
+		highlightSteady,
+		panelCenterMoved,
+		lineStartOffset,
+		clampDragAnchorToFocusLine,
+		menuBtnTouchAction,
+		selMenuDragTarget
+	} from "$lib/sel-geometry";
+	import {
+		loadDraftAnnotations,
+		saveDraftAnnotations
+	} from "$lib/annotation-drafts-store";
+	import {
+		handsFreeNext,
+		type HandsFreeEvent,
+		type HandsFreePhase
+	} from "$lib/handsFree";
+	import {
+		GAME_LINE_CLOSED_EVENT,
+		GAME_LINE_EVENT,
+		GAME_LINE_FILE_EVENT,
+		GAME_LINE_OPEN_EVENT,
+		closeGameLine,
+		openGameLine,
+		translateGameLine,
+		type GameLineFile
+	} from "$lib/gameLine";
 	import { AnnotationDrafts } from "$lib/annotation-drafts.svelte";
 	import {
 		trimParagraphTerminator,
@@ -337,9 +327,7 @@ import {
 		unwrapFuriganaTint
 	} from "$lib/selTint";
 	import { caretOffsetInBlock, nodeAtBlockOffset } from "$lib/caret";
-	import {
-		frontendPingOnDone
-	} from "$lib/turns";
+	import { frontendPingOnDone } from "$lib/turns";
 	import { NativeTurns } from "$lib/native-turns.svelte";
 	import { replySystemPrompt } from "$lib/replyPrompt";
 	import { pinyinRuby } from "$lib/pinyin";
@@ -810,8 +798,7 @@ import {
 			mock: useMock,
 			onDevice: isOnDeviceProvider(settings.activeProviderId)
 		}),
-		systemFor: (target) =>
-			replySystemPrompt(settings, activeReplyCode, target),
+		systemFor: (target) => replySystemPrompt(settings, activeReplyCode, target),
 		isShell: () => tauriBackendAvailable(),
 		isVisible: () => document.visibilityState === "visible",
 		stuckToBottom: () => stuckToBottom(),
@@ -1247,8 +1234,7 @@ import {
 					if (
 						selMenuIdleDecision({
 							android: androidUI,
-							selectionLive:
-								(window.getSelection()?.toString() ?? "") !== "",
+							selectionLive: (window.getSelection()?.toString() ?? "") !== "",
 							hover: annotateMode.selMenuHover,
 							lastInputAt,
 							now: Date.now(),
@@ -1367,7 +1353,9 @@ import {
 		const unlistenTurns = nativeTurns.listen(listen);
 		// Native drill grading (Android shell): same suspension-safe
 		// pair, events while visible and a file read on return.
-		const unlistenGrades = tauriBackendAvailable() ? listenMode.listenNative(listen) : () => {};
+		const unlistenGrades = tauriBackendAvailable()
+			? listenMode.listenNative(listen)
+			: () => {};
 		window.addEventListener("pointerdown", stampPress, { passive: true });
 		window.addEventListener("keydown", stampPress);
 		document.addEventListener("visibilitychange", onVisible);
@@ -1426,7 +1414,12 @@ import {
 	function menuDragStart(event: TouchEvent): void {
 		const t = event.changedTouches[0];
 		if (!t || !annotateMode.selMenu) return;
-		selMenuDrag = { mx: t.clientX, my: t.clientY, x0: annotateMode.selMenu.x, y0: annotateMode.selMenu.y };
+		selMenuDrag = {
+			mx: t.clientX,
+			my: t.clientY,
+			x0: annotateMode.selMenu.x,
+			y0: annotateMode.selMenu.y
+		};
 		selMenuDragging = true;
 	}
 	function menuDragMove(event: TouchEvent): void {
@@ -1520,7 +1513,12 @@ import {
 				quote: menu.quote,
 				messageId: menu.messageId
 			});
-			void speakQuote(kana ?? menu.quote, selSpeakKey(menu), true, menu.context);
+			void speakQuote(
+				kana ?? menu.quote,
+				selSpeakKey(menu),
+				true,
+				menu.context
+			);
 			if (androidUI) liftSelMenuAboveReadings();
 			return;
 		}
@@ -1548,8 +1546,7 @@ import {
 	 */
 	function liftSelMenuAboveReadings(): void {
 		if (!androidUI || !annotateMode.selMenu) return;
-		if (!selPinyin?.above && !selFurigana?.some((panel) => panel.above))
-			return;
+		if (!selPinyin?.above && !selFurigana?.some((panel) => panel.above)) return;
 		requestAnimationFrame(() => {
 			const tops: number[] = [];
 			document.querySelectorAll(".sel-pinyin.above").forEach((el) => {
@@ -1607,9 +1604,7 @@ import {
 		try {
 			const selection = window.getSelection();
 			const range =
-				selection && selection.rangeCount > 0
-					? selection.getRangeAt(0)
-					: null;
+				selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 			if (!range || range.collapsed) return;
 			if (
 				!document.contains(range.startContainer) ||
@@ -1810,12 +1805,12 @@ import {
 			const block = anchor?.closest("p, li");
 			if (block && liveSel && liveSel.rangeCount > 0) {
 				const range = liveSel.getRangeAt(0);
-			const at = caretOffsetInBlock(
-				document,
-				block,
-				range.startContainer,
-				range.startOffset
-			);
+				const at = caretOffsetInBlock(
+					document,
+					block,
+					range.startContainer,
+					range.startOffset
+				);
 				const blockText = block.textContent ?? "";
 				qStart = quoteStartForContext(
 					plain,
@@ -1847,8 +1842,7 @@ import {
 			selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 		if (!range || range.collapsed || !document.contains(range.startContainer)) {
 			range =
-				rangeForQuote(quoted.messageId, quoted.quote, quoted.at ?? 0) ??
-				range;
+				rangeForQuote(quoted.messageId, quoted.quote, quoted.at ?? 0) ?? range;
 		}
 		const highlightRect = range?.getBoundingClientRect() ?? null;
 		const slices = range ? selectionSlices(range) : null;
@@ -1885,8 +1879,7 @@ import {
 			// at the corner from a zero-area rect. Detached ranges
 			// report zeros (truthy), so area-guard the live rects.
 			const live = rect ?? highlightRect;
-			const usable =
-				live && (live.width > 0 || live.height > 0) ? live : null;
+			const usable = live && (live.width > 0 || live.height > 0) ? live : null;
 			const anchor =
 				usable ??
 				screenRectForQuote(quoted.messageId, quoted.quote, quoted.at ?? 0);
@@ -2118,12 +2111,7 @@ import {
 	Screen Recording denial arms the System Settings pane. */
 	let errorToastAction = $state<{ seq: number; run: () => void } | null>(null);
 	function flashErrorToast(message: string, action?: () => void): void {
-		flashNotice(
-			notices,
-			"errorToast",
-			message,
-			errorToastTimeoutFor(message)
-		);
+		flashNotice(notices, "errorToast", message, errorToastTimeoutFor(message));
 		errorToastAction = action
 			? { seq: notices.errorToast.seq, run: action }
 			: null;
@@ -2162,7 +2150,12 @@ import {
 		}
 		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 			const step = event.key === "ArrowDown" ? 1 : -1;
-			const next = at < 0 ? (step > 0 ? 0 : order.length - 1) : (at + step + order.length) % order.length;
+			const next =
+				at < 0
+					? step > 0
+						? 0
+						: order.length - 1
+					: (at + step + order.length) % order.length;
 			langTyped = order[next]?.code ?? null;
 			return true;
 		}
@@ -2189,8 +2182,9 @@ import {
 	the plain web build has none (null), so its entry stays hidden. */
 	function listenBackend() {
 		if (!tauriBackendAvailable()) return null;
-		return shellBackend(async <T,>(cmd: string, args?: Record<string, unknown>) =>
-			(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
+		return shellBackend(
+			async <T,>(cmd: string, args?: Record<string, unknown>) =>
+				(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
 		);
 	}
 	const listenMode = new ListenMode({
@@ -2210,7 +2204,9 @@ import {
 		openUrl: async (url) => {
 			if (tauriBackendAvailable()) {
 				const { invoke } = await import("@tauri-apps/api/core");
-				await invoke("plugin:opener|open_url", { url, with: null }).catch(() => undefined);
+				await invoke("plugin:opener|open_url", { url, with: null }).catch(
+					() => undefined
+				);
 			} else {
 				window.open(url, "_blank", "noopener");
 			}
@@ -2245,7 +2241,9 @@ import {
 				},
 				results: async (chatId) => {
 					const { invoke } = await import("@tauri-apps/api/core");
-					return invoke<NativeGradeResult[]>("listen_grade_results", { chatId });
+					return invoke<NativeGradeResult[]>("listen_grade_results", {
+						chatId
+					});
 				}
 			};
 		}
@@ -2416,7 +2414,8 @@ import {
 		popWidth: () => popWidth(),
 		hasPromptEdit: () => promptAnnEdit !== null,
 		commitPromptEdit: () => commitPromptAnnEdit(),
-		editInPrompt: (comment) => editAnnotationInPrompt({ pending: true }, comment),
+		editInPrompt: (comment) =>
+			editAnnotationInPrompt({ pending: true }, comment),
 		scrollRectIntoClear: (rect) => scrollRectIntoClear(rect),
 		flashJumpMark: (locate) => flashJumpMark(locate),
 		unstick: () => {
@@ -2505,11 +2504,15 @@ import {
 		isShell: () => tauriBackendAvailable(),
 		isPhone: () => androidUI,
 		focusComposer: () => editor?.focus(),
-		speakQuote: (quote, id, context) => void speakQuote(quote, id, true, context),
+		speakQuote: (quote, id, context) =>
+			void speakQuote(quote, id, true, context),
 		getSpeakingSelection: () => speakingSelection,
 		stopVoice: () => stopVoice(),
 		saveText: (filename, text) =>
-			nativeSaveText(filename, text, { name: "Anki import", extensions: ["txt"] }),
+			nativeSaveText(filename, text, {
+				name: "Anki import",
+				extensions: ["txt"]
+			}),
 		copyText: (text) => copyExportText(text),
 		downloadText: (text, filename) => downloadMarkdownFile(text, filename),
 		isDismissal: (error) => isPermissionDismissal(error),
@@ -2544,14 +2547,21 @@ import {
 		const voices = webVoices();
 		const seed = await quoteLangFor(text, fallback);
 		readerLang = await sentenceLangsFor(text, seed, voices, fallback);
-		reader = startReader(phrases, mode, phraseIndexAtOffset(text, phrases, offset));
+		reader = startReader(
+			phrases,
+			mode,
+			phraseIndexAtOffset(text, phrases, offset)
+		);
 		speakReaderPhrase();
 	}
 	function speakReaderPhrase(): void {
 		const phrase = reader?.phrases[reader.index];
 		if (!phrase) return;
 		const seq = ++readerSeq;
-		const lang = typeof readerLang === "function" ? readerLang(phrase.sentence) : readerLang;
+		const lang =
+			typeof readerLang === "function"
+				? readerLang(phrase.sentence)
+				: readerLang;
 		startSpeech("reader", phrase.text, lang, false, () => {
 			if (seq === readerSeq) stepReader("spoken");
 		});
@@ -2992,11 +3002,7 @@ import {
 
 	function moveSearchCursor(delta: 1 | -1): void {
 		if (palette.hits.length === 0) return;
-		palette.cursor = stepFindCursor(
-			palette.hits.length,
-			palette.cursor,
-			delta
-		);
+		palette.cursor = stepFindCursor(palette.hits.length, palette.cursor, delta);
 	}
 
 	/**
@@ -3378,7 +3384,11 @@ import {
 		 * at component scope).
 		 */
 		const onFocusInIdle = (event: FocusEvent): void => {
-			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS && newsMode.news === null) return;
+			if (
+				settings.promptIdleSec !== PROMPT_IDLE_ALWAYS &&
+				newsMode.news === null
+			)
+				return;
 			if (!closestFromTarget(event.target, ".prompt .ta-input")) return;
 			restorePrompt();
 		};
@@ -3596,7 +3606,8 @@ import {
 			// still lands above it at the bottom. Empty chats keep
 			// none: no tail to protect, hero owns the space — except
 			// news mode, whose card list is a tail like any thread.
-			const emptyChat = viewChat.messages.length === 0 && newsMode.news === null;
+			const emptyChat =
+				viewChat.messages.length === 0 && newsMode.news === null;
 			const boxPad = emptyChat ? "0px" : `${clearPx + trayH + trayGap}px`;
 			if (boxPad !== lastBoxPad) {
 				box.style.paddingBottom = boxPad;
@@ -3813,7 +3824,8 @@ import {
 		// badges, and pills are words too, but filing UI chrome as an
 		// annotation is nonsense — those hovers keep the old aids
 		// behavior.
-		if (!node.parentElement?.closest(".rendered, .news-card-title")) return null;
+		if (!node.parentElement?.closest(".rendered, .news-card-title"))
+			return null;
 		const text = node.textContent ?? "";
 		const bounds = wordBoundsAt(text, range.startOffset);
 		if (!bounds) return null;
@@ -3983,7 +3995,9 @@ import {
 			// now would strand the spinner with no buttons, or the
 			// stop button out of reach mid-utterance. Re-arm and let
 			// a later tick close it after the work lands.
-			if (rowWorkRunning(id, aidBusy, vocalizing, speakingId, speakingSelection)) {
+			if (
+				rowWorkRunning(id, aidBusy, vocalizing, speakingId, speakingSelection)
+			) {
 				armActionsTimer(id);
 				return;
 			}
@@ -4327,7 +4341,6 @@ import {
 	function composerText(): string {
 		return stripAttachmentMarkers(editor?.getText() ?? "").trim();
 	}
-
 
 	/**
 	 * Attachment/OCR failure: inline under the composer on desktop, a
@@ -4870,9 +4883,7 @@ import {
 	let captureMenu = $state<{ open: boolean }>({ open: false });
 	/** Low-confidence read awaiting a check (overlay card owns it;
 	null sends straight through). */
-	let captureStaged = $state<{ text: string; confidence: number } | null>(
-		null
-	);
+	let captureStaged = $state<{ text: string; confidence: number } | null>(null);
 	/** Capture-any-window OCR: screenshot the source, recognize it
 	 * like an attachment, and file the read as an assistant message
 	 * — no model call, no send, ready to annotate and question. A
@@ -4896,7 +4907,9 @@ import {
 			// The deep link gives no landing confirmation and
 			// sub-anchors can be swallowed: always print the
 			// in-pane row alongside (voice-settings convention).
-			flashToast("Screen Recording row: Privacy & Security → Screen Recording.");
+			flashToast(
+				"Screen Recording row: Privacy & Security → Screen Recording."
+			);
 		} catch {
 			flashToast(
 				"Screen Recording lives in System Settings → Privacy & Security."
@@ -4943,8 +4956,9 @@ import {
 				// A denial tap opens the privacy row; every other
 				// failure keeps the copy-on-tap error toast.
 				if (isScreenRecordingDenial(raw))
-					flashErrorToast(friendlyCaptureError(raw), () =>
-						void openCaptureSettings()
+					flashErrorToast(
+						friendlyCaptureError(raw),
+						() => void openCaptureSettings()
 					);
 				else flashErrorToast(friendlyCaptureError(raw));
 				return;
@@ -4988,7 +5002,9 @@ import {
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				flashErrorToast(
-					fallbackLangs ? friendlyFallbackError(message) : friendlyOcrError(message)
+					fallbackLangs
+						? friendlyFallbackError(message)
+						: friendlyOcrError(message)
 				);
 			}
 		} finally {
@@ -5125,9 +5141,7 @@ import {
 
 	function undoTrim(chat: Chat): void {
 		if (!chat.trimmedThrough) return;
-		const index = chat.messages.findIndex(
-			(m) => m.id === chat.trimmedThrough
-		);
+		const index = chat.messages.findIndex((m) => m.id === chat.trimmedThrough);
 		const top = index >= 0 ? articleTop(index) : null;
 		buzzTap();
 		setTrimPoint(chatState, chat, null);
@@ -5183,8 +5197,7 @@ import {
 	stands down there; older Android, iOS, and desktop keep ours
 	(the clipboard gives no visible confirmation of its own). */
 	function flashCopyToast(note: string): void {
-		if (osConfirmsClipboard(androidMajorFromUA(navigator.userAgent)))
-			return;
+		if (osConfirmsClipboard(androidMajorFromUA(navigator.userAgent))) return;
 		flashToast(note);
 	}
 
@@ -5355,7 +5368,11 @@ import {
 		// Selections never span messages or headlines: a drag
 		// crossing into another article or card trims back to the
 		// anchor's edge first.
-		if (live) lockSelectionToMessage(live, (n) => annotateMode.articleOf(n) ?? annotateMode.headlineOf(n));
+		if (live)
+			lockSelectionToMessage(
+				live,
+				(n) => annotateMode.articleOf(n) ?? annotateMode.headlineOf(n)
+			);
 		// Multi-click picks grab the block terminator newline,
 		// painting the line beneath the highlight (the quote trims it
 		// anyway): drop it before the menu reads the quote. A word
@@ -5420,7 +5437,9 @@ import {
 		// card (orange pencil) rewrites the filed comment and
 		// re-asks at once. A stale pop addressing anything else
 		// just closes.
-		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending") {
+		if (
+			annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending"
+		) {
 			annotateMode.commitPending();
 		} else if (annPop.fresh === false) {
 			if (drafts.commitCommentEdit(annPop.id, annDraft))
@@ -5860,7 +5879,10 @@ import {
 			quote
 		);
 		if (target.kind === "live") {
-			annotateMode.gotoAnnotation({ id: target.id, messageId: target.messageId ?? null });
+			annotateMode.gotoAnnotation({
+				id: target.id,
+				messageId: target.messageId ?? null
+			});
 			return;
 		}
 		if (target.kind === "quoted") {
@@ -6599,7 +6621,9 @@ import {
 		// No Punjabi voice on the device: the Hindi voice reads the
 		// transliteration instead of the default voice going silent.
 		const speakable = punjabiSpeechText(text, voices);
-		if (!messageSpeakableFor(settings.voiceEngine, msg.content, fallback, voices)) {
+		if (
+			!messageSpeakableFor(settings.voiceEngine, msg.content, fallback, voices)
+		) {
 			if (!quiet) setVoiceError("No voice for this language.");
 			return false;
 		}
@@ -7121,7 +7145,10 @@ import {
 	 * reads at all. Returns true when this completion belonged to
 	 * the loop (consumed either way).
 	 */
-	function maybeHandsFreeReply(origin: Chat, sent: ChatMsg | undefined): boolean {
+	function maybeHandsFreeReply(
+		origin: Chat,
+		sent: ChatMsg | undefined
+	): boolean {
 		if (!converseOwnedSend) return false;
 		converseOwnedSend = false;
 		if (converse === "sending") {
@@ -7149,7 +7176,8 @@ import {
 		// provider, so a reload while offline can't strand the user on
 		// the on-device fallback (the mount re-parks if still offline).
 		const snapshot =
-			offlineParkedFrom !== null && live.activeProviderId === OFFLINE_FALLBACK_ID
+			offlineParkedFrom !== null &&
+			live.activeProviderId === OFFLINE_FALLBACK_ID
 				? { ...live, activeProviderId: offlineParkedFrom }
 				: live;
 		void (async () => {
@@ -7245,7 +7273,8 @@ import {
 	let renameEl: HTMLInputElement | undefined = $state();
 	function startRename(item: Chat): void {
 		renamingChatId = item.id;
-		renameDraft = item.title ?? (item.messages.length > 0 ? chatTitle(item) : "");
+		renameDraft =
+			item.title ?? (item.messages.length > 0 ? chatTitle(item) : "");
 		void tick().then(() => {
 			renameEl?.focus();
 			renameEl?.select();
@@ -7329,7 +7358,8 @@ import {
 		// its own scroll position.
 		// A pinned view rides the final render down via the resize
 		// hold (instant); an unpinned one is never moved.
-		if (stillHere && viewport.stick) void tick().then(() => holdScrollOnResize());
+		if (stillHere && viewport.stick)
+			void tick().then(() => holdScrollOnResize());
 		const origin = chatState.chats.find((c) => c.id === originId);
 		if (origin && !maybeHandsFreeReply(origin, sent)) maybeSpeakReply(origin);
 		if (origin && sent?.role === "assistant" && !sent.error)
@@ -7548,7 +7578,10 @@ import {
 		// Locked taps explain instead of focusing (the disabled field
 		// takes no focus and pops no keyboard) — except on controls
 		// with their own behavior, which keep it.
-		if (providerKeys.locked && !target?.closest("button, input, select, a, .ann-wrap")) {
+		if (
+			providerKeys.locked &&
+			!target?.closest("button, input, select, a, .ann-wrap")
+		) {
 			flashMissingKey();
 			return;
 		}
@@ -7774,10 +7807,15 @@ import {
 				editingSeed,
 				prev?.pasteFolds
 			);
-			editMessageContent(chatState, id, withAnnotations(stored, promptInclusions(drafts.list)), {
-				attachments: editingAttachments,
-				pasteFolds: keepFolds
-			});
+			editMessageContent(
+				chatState,
+				id,
+				withAnnotations(stored, promptInclusions(drafts.list)),
+				{
+					attachments: editingAttachments,
+					pasteFolds: keepFolds
+				}
+			);
 			// Saving is silent in the thread (the text just rewrites),
 			// so the checkmark earns the same confirmation an
 			// annotation edit gets ("Annotation edited").
@@ -7965,7 +8003,9 @@ import {
 		const el = document.getElementById(anchor.id);
 		if (!el || !box.contains(el)) return;
 		const delta =
-			el.getBoundingClientRect().top - box.getBoundingClientRect().top - anchor.offset;
+			el.getBoundingClientRect().top -
+			box.getBoundingClientRect().top -
+			anchor.offset;
 		if (Math.abs(delta) > 0.5) {
 			box.scrollTop += delta;
 			viewport.lastTop = box.scrollTop;
@@ -7985,7 +8025,8 @@ import {
 				holdScrollOnResize();
 			});
 		});
-		for (const el of box.querySelectorAll('article[id^="msg-"]')) ro.observe(el);
+		for (const el of box.querySelectorAll('article[id^="msg-"]'))
+			ro.observe(el);
 		return () => {
 			ro.disconnect();
 			if (frame) cancelAnimationFrame(frame);
@@ -8507,7 +8548,8 @@ import {
 		// The News | Listen switch remembers its side.
 		const empty = activeChat(chatState).messages.length === 0;
 		const wantsListen =
-			listenMode.open || (settings.emptyChatMode === "listen" && listenBackend() !== null);
+			listenMode.open ||
+			(settings.emptyChatMode === "listen" && listenBackend() !== null);
 		if (empty && wantsListen) listenMode.enter(code);
 		else if (empty) newsMode.enterNewsMode(code);
 		else newsMode.news = null;
@@ -8522,12 +8564,18 @@ import {
 		const index = live.messages.findIndex((m) => m.id === msg.id);
 		const target = live.messages[index];
 		if (!target) return;
-		const next = relevelNewsOpener(target.content, target.pasteFolds ?? [], level);
+		const next = relevelNewsOpener(
+			target.content,
+			target.pasteFolds ?? [],
+			level
+		);
 		if (!next) return;
 		const chatId = live.id;
 		const before = live.messages;
 		buzzTap();
-		editMessageContent(chatState, target.id, next.content, { pasteFolds: next.pasteFolds });
+		editMessageContent(chatState, target.id, next.content, {
+			pasteFolds: next.pasteFolds
+		});
 		rerunFrom(index);
 		flashToast(`Restarted at ${level}`, () => {
 			const chatNow = chatState.chats.find((c) => c.id === chatId);
@@ -8551,11 +8599,11 @@ import {
 
 	/** Shared by the `LangMenus` hero call site (see `ThreadView`). */
 	const langMenusActions = {
-		toggle: (id: LanguageMenu["id"], el: HTMLElement) =>
-			toggleLangMenu(id, el),
+		toggle: (id: LanguageMenu["id"], el: HTMLElement) => toggleLangMenu(id, el),
 		hover: (lang: ReplyLanguage) => {
 			// Only empty chats open news on a pick, so only they warm it.
-			if (activeChat(chatState).messages.length === 0) newsMode.prefetch(lang.code);
+			if (activeChat(chatState).messages.length === 0)
+				newsMode.prefetch(lang.code);
 		},
 		pick: (lang: ReplyLanguage) => {
 			const quickKey = quickKeyFor(lang.code, isMac);
@@ -8614,8 +8662,7 @@ import {
 		// annotations ride the send either way, so they never block
 		// the hold — only text and attachments disarm it.
 		const empty = composerText() === "" && attachments.length === 0;
-		if (!sendHoldArmed(sendHoldTimer !== null, !!promptAnnEdit, empty))
-			return;
+		if (!sendHoldArmed(sendHoldTimer !== null, !!promptAnnEdit, empty)) return;
 		sendHoldTimer = setTimeout(() => {
 			sendHoldTimer = null;
 			swapReplyLangHold();
@@ -8863,8 +8910,9 @@ import {
 		if (!tauriBackendAvailable()) return;
 		try {
 			await listen(GAME_LINE_OPEN_EVENT, () => void pushGameLine());
-			await listen<GameLineFile>(GAME_LINE_FILE_EVENT, (event) =>
-				void fileGameAnnotation(event.payload)
+			await listen<GameLineFile>(
+				GAME_LINE_FILE_EVENT,
+				(event) => void fileGameAnnotation(event.payload)
 			);
 			await listen(GAME_LINE_CLOSED_EVENT, () => {
 				if (!settings.gameLine) return;
@@ -9223,15 +9271,17 @@ import {
 			start: { x: number; y: number; clean: boolean },
 			ended: { clientX: number; clientY: number }
 		): EdgePanel | null {
-			if (!androidUI || !start.clean || shortcutsOpen || flashcards.isOpen || readerOpen || inspectChar)
+			if (
+				!androidUI ||
+				!start.clean ||
+				shortcutsOpen ||
+				flashcards.isOpen ||
+				readerOpen ||
+				inspectChar
+			)
 				return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
-			return contentSwipeTarget(
-				start.x,
-				start.y,
-				ended.clientX,
-				ended.clientY
-			);
+			return contentSwipeTarget(start.x, start.y, ended.clientX, ended.clientY);
 		}
 		/**
 		 * Shared edge-stroke outcome (touch swipes and desktop mouse
@@ -9417,7 +9467,8 @@ import {
 					) === null;
 				// Message the stroke starts on (for swipe-to-fold). The
 				// article id carries the viewChat index (see msg-{i}).
-				const art = target instanceof Element ? annotateMode.articleOf(target) : null;
+				const art =
+					target instanceof Element ? annotateMode.articleOf(target) : null;
 				const msgIndex = art ? Number(art.id.slice(4)) : NaN;
 				const msgId = Number.isInteger(msgIndex)
 					? (viewChat.messages[msgIndex]?.id ?? null)
@@ -9678,17 +9729,18 @@ import {
 				// middleSwipeTarget) — except strokes starting on the
 				// action row, inside code/math blocks, or on the news
 				// chip rail, where the inner scroller owns the stroke.
-				const target = start.rowSwipe || start.codeSwipe || start.chipSwipe
-					? null
-					: (edgeSwipeTarget(
-							start.x,
-							start.y,
-							ended.clientX,
-							ended.clientY,
-							window.innerWidth,
-							48,
-							64
-						) ?? middleSwipeTarget(start, ended));
+				const target =
+					start.rowSwipe || start.codeSwipe || start.chipSwipe
+						? null
+						: (edgeSwipeTarget(
+								start.x,
+								start.y,
+								ended.clientX,
+								ended.clientY,
+								window.innerWidth,
+								48,
+								64
+							) ?? middleSwipeTarget(start, ended));
 				// The quick switcher owns every swipe while up: strokes
 				// on its veil cycle chats, and nothing may summon a
 				// sidebar behind it.
@@ -9779,7 +9831,15 @@ import {
 				} else if (multiTouchSeen) {
 					return;
 				}
-				if (!androidUI || shortcutsOpen || flashcards.isOpen || readerOpen || inspectChar || !start) return;
+				if (
+					!androidUI ||
+					shortcutsOpen ||
+					flashcards.isOpen ||
+					readerOpen ||
+					inspectChar ||
+					!start
+				)
+					return;
 				const touch = event.changedTouches[0];
 				if (!touch) return;
 				// No travel limit: dragging the selection handles across
@@ -9801,7 +9861,12 @@ import {
 				if (!androidUI && settings.autoSpeakSelection) {
 					const fresh = annotateMode.currentQuote();
 					if (fresh)
-						void speakQuote(fresh.quote, selSpeakKey(fresh), true, fresh.context);
+						void speakQuote(
+							fresh.quote,
+							selSpeakKey(fresh),
+							true,
+							fresh.context
+						);
 				}
 			},
 			{ passive: true }
@@ -9835,8 +9900,7 @@ import {
 				if (!first || !badge) return;
 				const id = badge.getAttribute("data-ann-badge") ?? "";
 				// Every filed badge holds to delete, blue or orange.
-				if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id)))
-					return;
+				if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id))) return;
 				badgeHold = {
 					x: first.clientX,
 					y: first.clientY,
@@ -9848,8 +9912,7 @@ import {
 					badgeHold = null;
 					if (!held) return;
 					if ((scrollBox?.scrollTop ?? 0) !== held.top) return;
-					if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id)))
-						return;
+					if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id))) return;
 					annotateMode.removeAnnotation(id);
 					badgeHoldFired = { id, at: Date.now() };
 				}, 2000);
@@ -9893,7 +9956,10 @@ import {
 			// land here.
 			if (Date.now() - lastHoverChangeAt < 500) {
 				const liveKeep = window.getSelection();
-				if (annotateMode.selMenu?.range && (!liveKeep || liveKeep.toString() === "")) {
+				if (
+					annotateMode.selMenu?.range &&
+					(!liveKeep || liveKeep.toString() === "")
+				) {
 					try {
 						liveKeep?.removeAllRanges();
 						liveKeep?.addRange(annotateMode.selMenu.range.cloneRange());
@@ -9955,7 +10021,10 @@ import {
 					// still stands: keep the menu. Every other
 					// annotateMode.clearSelection() caller nulls the menu in the same
 					// tick, so this only ever fires for the capture.
-					if (annotateMode.lastProgrammaticClearAt > annotateMode.selMenuOpenedAt) return;
+					if (
+						annotateMode.lastProgrammaticClearAt > annotateMode.selMenuOpenedAt
+					)
+						return;
 					if (!annotateMode.selMenuHover) annotateMode.selMenu = null;
 					return;
 				}
@@ -9992,7 +10061,12 @@ import {
 			// extending past one character hides Inspect, shrinking
 			// back restores it. Rescue paths returned above, so a live
 			// selection here is new work.
-			if (live && !live.isCollapsed && live.toString() !== "" && annotateMode.selMenu) {
+			if (
+				live &&
+				!live.isCollapsed &&
+				live.toString() !== "" &&
+				annotateMode.selMenu
+			) {
 				const refreshed = annotateMode.currentQuote();
 				if (refreshed && refreshed.quote !== annotateMode.selMenu.quote) {
 					annotateMode.selMenu = {
@@ -10091,7 +10165,8 @@ import {
 			);
 		}
 		const gestureClean = (event: TouchEvent): boolean => {
-			if (!androidUI || shortcutsOpen || flashcards.isOpen || readerOpen) return false;
+			if (!androidUI || shortcutsOpen || flashcards.isOpen || readerOpen)
+				return false;
 			const target = event.target;
 			return (
 				!(target instanceof Element) ||
@@ -10121,7 +10196,11 @@ import {
 					// slide; only clean ones pair taps, and taps never
 					// pair mid-select (see the guards below).
 					const modalBusy =
-						shortcutsOpen || flashcards.isOpen || readerOpen || palette.open || inspectChar !== null;
+						shortcutsOpen ||
+						flashcards.isOpen ||
+						readerOpen ||
+						palette.open ||
+						inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
@@ -10653,7 +10732,10 @@ import {
 			// The reader owns the keyboard while open (same fence as
 			// the deck below): Space taps, arrows step, Esc closes.
 			if (reader) {
-				const readerKey = readerKeyAction({ ...keyFacts(event), repeat: event.repeat });
+				const readerKey = readerKeyAction({
+					...keyFacts(event),
+					repeat: event.repeat
+				});
 				if (readerKey === "pass") return;
 				consumeEvent(event);
 				if (readerKey === "close") closeReader();
@@ -10670,7 +10752,8 @@ import {
 				alt: event.altKey,
 				meta: event.metaKey,
 				ctrl: event.ctrlKey,
-				inDrill: Boolean(chat.listen) && !reader && !shortcutsOpen && !palette.open,
+				inDrill:
+					Boolean(chat.listen) && !reader && !shortcutsOpen && !palette.open,
 				composerEmpty: !hasText,
 				inComposer: isPromptEditorTarget(event.target),
 				inOtherField:
@@ -10688,7 +10771,8 @@ import {
 				const hoveredClip = chat.messages[hoveredIdx]?.clip?.i;
 				if (listenKey === "reveal") {
 					if (listenMode.submit(null)) editor?.clear();
-				} else if (listenKey === "slow" && hoveredClip !== undefined) listenMode.toggle(hoveredClip, true);
+				} else if (listenKey === "slow" && hoveredClip !== undefined)
+					listenMode.toggle(hoveredClip, true);
 				else listenMode.replay(listenKey === "slow");
 				return;
 			}
@@ -10987,7 +11071,8 @@ import {
 			}
 			if (chord === "toggle-annotation-lang") {
 				consumeEvent(event);
-				settings.annotationAnswersInPassageLang = !settings.annotationAnswersInPassageLang;
+				settings.annotationAnswersInPassageLang =
+					!settings.annotationAnswersInPassageLang;
 				persistSettings();
 				flashToast(
 					settings.annotationAnswersInPassageLang
@@ -11187,10 +11272,7 @@ import {
 			// and Shift+A): caretRangeFromPoint on every keypress would
 			// tax typing-adjacent keys for nothing.
 			const shiftAOnly =
-				event.key === "A" &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey;
+				event.key === "A" && !event.metaKey && !event.ctrlKey && !event.altKey;
 			const bareAOnly =
 				event.key === "a" &&
 				!event.metaKey &&
@@ -11221,9 +11303,7 @@ import {
 						if (!live || live.isCollapsed) return false;
 						const anchor = live.anchorNode;
 						const el =
-							anchor instanceof Element
-								? anchor
-								: anchor?.parentElement;
+							anchor instanceof Element ? anchor : anchor?.parentElement;
 						return !!el?.closest(".messages .rendered, .news-card-title");
 					} catch {
 						return false;
@@ -11240,7 +11320,8 @@ import {
 			// E below; typing in any field keeps the key).
 			const cardEdit = answerCardKeyAction({
 				...keyFacts(event),
-				cardOpen: annotateMode.answerPop !== null && !annotateMode.answerClosing,
+				cardOpen:
+					annotateMode.answerPop !== null && !annotateMode.answerClosing,
 				inField: isFieldTarget(event.target),
 				inEditor: inEditor !== null,
 				inEditable: isEditableTarget(event.target)
@@ -11257,10 +11338,14 @@ import {
 				listOpen: !settings.sidebarCollapsed,
 				inField: isFieldTarget(event.target),
 				hoveredRowId: previewChatId,
-				walkedRowId: isSidebarTarget(event.target) ? chatState.activeChatId : null
+				walkedRowId: isSidebarTarget(event.target)
+					? chatState.activeChatId
+					: null
 			});
 			const speakChat =
-				speakRow === null ? null : chatState.chats.find((c) => c.id === speakRow);
+				speakRow === null
+					? null
+					: chatState.chats.find((c) => c.id === speakRow);
 			if (speakChat) {
 				consumeEvent(event);
 				const title = chatTitle(speakChat);
@@ -11293,7 +11378,9 @@ import {
 				window.getSelection()?.removeAllRanges();
 				markerSyncMuted = true;
 				try {
-					ed.setText(expandDraft(ed.getText(), quote, expandAskFor(activeReplyCode)));
+					ed.setText(
+						expandDraft(ed.getText(), quote, expandAskFor(activeReplyCode))
+					);
 					syncMarkerCounts();
 				} finally {
 					markerSyncMuted = false;
@@ -11727,10 +11814,7 @@ import {
 											intent.kind === "half-page"
 												? halfPageDy(scrollBox.clientHeight, intent.dir)
 												: intent.kind === "skip"
-													? scaleScrollPx(
-															intent.dir * SCROLLKEY_SKIP_PX,
-															step
-														)
+													? scaleScrollPx(intent.dir * SCROLLKEY_SKIP_PX, step)
 													: Math.sign(velocity) *
 														scaleScrollPx(SCROLLKEY_LINE_PX, step);
 										startScrollHold(
@@ -12224,7 +12308,8 @@ import {
 			if (!movedSinceDown() || !lastGoodDragRange) return false;
 			// Dragging home to the anchor point cancels: only resurrect
 			// collapses stranded outside the anchor article.
-			if (annotateMode.articleOf(live.anchorNode) === dragAnchorArticle) return false;
+			if (annotateMode.articleOf(live.anchorNode) === dragAnchorArticle)
+				return false;
 			// Collapses inside the prompt or a control are that
 			// gesture's business (editor selections), never the
 			// message drag's.
@@ -12355,7 +12440,8 @@ import {
 				if (anchorEl?.closest("input, textarea")) return;
 				if (
 					anchorEl?.closest(".messages .rendered") &&
-					annotateMode.articleOf(anchorNode) === annotateMode.articleOf(focusNode)
+					annotateMode.articleOf(anchorNode) ===
+						annotateMode.articleOf(focusNode)
 				)
 					return;
 				// Only the upward side clamps: an anchor below the
@@ -12378,7 +12464,8 @@ import {
 					// highlight below them untouched.
 					if (
 						anchorEl?.closest(".messages .rendered") &&
-						annotateMode.articleOf(anchorNode) !== annotateMode.articleOf(focusNode) &&
+						annotateMode.articleOf(anchorNode) !==
+							annotateMode.articleOf(focusNode) &&
 						focusNode instanceof Text
 					) {
 						containDragTo(annotateMode.articleOf(focusNode));
@@ -12637,8 +12724,7 @@ import {
 		function selectionHitsPoint(x: number, y: number): boolean {
 			try {
 				const live = window.getSelection();
-				if (!live || live.rangeCount === 0 || live.isCollapsed)
-					return false;
+				if (!live || live.rangeCount === 0 || live.isCollapsed) return false;
 				return [...live.getRangeAt(0).getClientRects()].some(
 					(rect) =>
 						x >= rect.left - 2 &&
@@ -12862,7 +12948,10 @@ import {
 			// beside ours. The selection (and its handles) stay live
 			// for handle-dragging; the lift below drops the highlight
 			// once the quote is stored.
-			if (androidUI && target?.closest(".messages .rendered, .news-card-title")) {
+			if (
+				androidUI &&
+				target?.closest(".messages .rendered, .news-card-title")
+			) {
 				event.preventDefault();
 				if (annotateMode.currentQuote()) {
 					annotateMode.placeSelMenu(event.clientX, event.clientY);
@@ -12959,10 +13048,7 @@ import {
 					// all. Programmatic ranges summon no menu (the
 					// selectionchange watcher stands down with none
 					// open), and speech stays on the instant word path.
-					const wordRange = cjkWordRangeAtPoint(
-						event.clientX,
-						event.clientY
-					);
+					const wordRange = cjkWordRangeAtPoint(event.clientX, event.clientY);
 					try {
 						const live = window.getSelection();
 						if (wordRange) {
@@ -13388,7 +13474,11 @@ import {
 			try {
 				const live = window.getSelection();
 				const range = live && live.rangeCount > 0 ? live.getRangeAt(0) : null;
-				if (!range || range.collapsed || !document.contains(range.startContainer)) {
+				if (
+					!range ||
+					range.collapsed ||
+					!document.contains(range.startContainer)
+				) {
 					// Unpinned panels die with the highlight; pinned ones
 					// re-anchor (see above).
 					if (!panelsPinned) {
@@ -13416,8 +13506,7 @@ import {
 					let moved = false;
 					const next = selFurigana.map((panel) => {
 						const runs = panel.runs;
-						const start =
-							Math.min(...runs.map((run) => run.start)) + qi;
+						const start = Math.min(...runs.map((run) => run.start)) + qi;
 						const end = Math.max(...runs.map((run) => run.end)) + qi;
 						const rect = spanRect(slices, start, end);
 						if (!rect) return panel;
@@ -13486,7 +13575,13 @@ import {
 					annotateMode.selMenu.left !== rect.left ||
 					annotateMode.selMenu.w !== rect.width
 				)
-					annotateMode.selMenu = { ...annotateMode.selMenu, x, y, left: rect.left, w: rect.width };
+					annotateMode.selMenu = {
+						...annotateMode.selMenu,
+						x,
+						y,
+						left: rect.left,
+						w: rect.width
+					};
 			} catch {
 				annotateMode.selMenu = null;
 			}
@@ -13587,9 +13682,16 @@ import {
 		settings.fontScale,
 		settings.chatWidth ?? 36,
 		settings.promptWidth ?? PROMPT_WIDTH_BASE_REM
-	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem; --msg-line-height: {settings.lineHeight ?? LINE_HEIGHT_DEFAULT}; --ui-scale: {settings.uiScale ?? 1}; --ui-scale-inv: {1 / (settings.uiScale ?? 1)}"
+	)}; --prompt-font: {settings.promptScale ??
+		1}; --annpop-scale: {settings.annPopScale ??
+		1}; --msg-gap: {settings.messageGap ??
+		MESSAGE_GAP_DEFAULT}rem; --msg-line-height: {settings.lineHeight ??
+		LINE_HEIGHT_DEFAULT}; --ui-scale: {settings.uiScale ??
+		1}; --ui-scale-inv: {1 / (settings.uiScale ?? 1)}"
 	data-mac={(isMac && !androidUI) || null}
-	data-titlebar={tauriBackendAvailable() && isMac && !androidUI ? "overlay" : null}
+	data-titlebar={tauriBackendAvailable() && isMac && !androidUI
+		? "overlay"
+		: null}
 >
 	<Sidebar
 		chats={sideVisibleChats()}
@@ -13713,11 +13815,11 @@ import {
 		the wrap node, the points, and jump; the component owns the
 		nav markup and its surfaces. -->
 		<Waypoints
-			points={points}
+			{points}
 			messages={chat.messages}
 			pos={wpPos}
-			settingsOpen={settingsOpen}
-			previewing={previewing}
+			{settingsOpen}
+			{previewing}
 			bind:open={wpOpen}
 			bind:wrapEl={wpWrap}
 			actions={{
@@ -13776,7 +13878,9 @@ import {
 			{previewing}
 			{activeReplyCode}
 			foldTitle={tip(
-				isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)",
+				isMac
+					? "Fold this message (F or Option-click)"
+					: "Fold this message (F or Alt-click)",
 				"Fold this message"
 			)}
 			deleteTitle={tip(
@@ -13822,17 +13926,21 @@ import {
 			listen={{
 				mode: listenMode,
 				session: chat.listen ?? null,
-				langName: replyLanguageFor(listenMode.lang ?? activeReplyCode ?? "")?.name ?? "",
+				langName:
+					replyLanguageFor(listenMode.lang ?? activeReplyCode ?? "")?.name ??
+					"",
 				channels: settings.listenChannels,
 				available: listenBackend() !== null,
-				summary: chat.listen && chat.messages.some((m) => m.drillEnd)
-					? summarizeDrill(drillStates(chat))
-					: null,
+				summary:
+					chat.listen && chat.messages.some((m) => m.drillEnd)
+						? summarizeDrill(drillStates(chat))
+						: null,
 				another: anotherDrill,
 				showNews: () => {
 					settings.emptyChatMode = "news";
 					listenMode.close();
-					if (!newsMode.news && activeReplyCode) newsMode.enterNewsMode(activeReplyCode);
+					if (!newsMode.news && activeReplyCode)
+						newsMode.enterNewsMode(activeReplyCode);
 				},
 				showListen: () => {
 					settings.emptyChatMode = "listen";
@@ -13930,7 +14038,7 @@ import {
 		in the shared `.error` look (Svelte scoping binds page CSS to
 		page markup, so moving it would drop the red pairing). -->
 		<Attachments
-			attachments={attachments}
+			{attachments}
 			expanded={expandedPastes}
 			dragging={stripDragging}
 			busyId={ocrBusyId}
@@ -13965,23 +14073,23 @@ import {
 			hidden={!!annPop && androidUI && !iosUI}
 			parked={promptParked()}
 			preview={previewing && viewChat.messages.length === 0}
-			hasText={hasText}
+			{hasText}
 			android={androidUI}
 			ios={iosUI}
 			hasSelMenu={annotateMode.selMenu !== null}
 			inspectQuote={annotateMode.selMenu?.quote ?? ""}
 			inspectEnabled={settings.inspectEnabled}
 			annotations={drafts.list}
-			reviewOpen={reviewOpen}
+			{reviewOpen}
 			bind:highlightId={highlightAnnId}
 			bind:pillEl={annPill}
-			attachBusy={attachBusy}
-			canMic={canMic}
+			{attachBusy}
+			{canMic}
 			micEnabled={settings.micEnabled}
-			canCapture={canCapture}
+			{canCapture}
 			captureEnabled={settings.captureEnabled}
-			captureMenu={captureMenu}
-			dictating={dictating}
+			{captureMenu}
+			{dictating}
 			voiceOn={voiceOn()}
 			speaking={speakingId !== null}
 			conversePhase={converse}
@@ -13989,12 +14097,12 @@ import {
 			altKey={altm}
 			replyLang={activeReplyLang}
 			correctionOn={chat.correction ?? false}
-			altHeld={altHeld}
-			canSubmit={canSubmit}
+			{altHeld}
+			{canSubmit}
 			hasAnnEdit={promptAnnEdit !== null}
 			banner={notices.banner.message}
 			waypointCount={points.length}
-			wpOpen={wpOpen}
+			{wpOpen}
 			bind:promptEl
 			bind:sendBtnEl
 			actions={{
@@ -14056,7 +14164,7 @@ import {
 
 		<!-- Speech errors render from `Toasts.svelte` (top notice,
 		tap to dismiss); the banner below stays paged. -->
-		</main>
+	</main>
 
 	{#if annotateMode.selMenu && !previewing && !iosUI}
 		<!-- Floating Annotate/Copy/Inspect menu: annotate-mode owns the
@@ -14109,7 +14217,7 @@ import {
 	<!-- Selection readings panels: pronunciations for just the
 	highlight. Readings.svelte owns the panels and their surfaces;
 	the page keeps placement, tracking, and dismiss. -->
-	<Readings pinyin={selPinyin} furigana={selFurigana} previewing={previewing} />
+	<Readings pinyin={selPinyin} furigana={selFurigana} {previewing} />
 
 	{#if annPop}
 		<!-- Annotation pill through AnnPop: the page keeps pop state,
@@ -14123,7 +14231,7 @@ import {
 			android={androidUI}
 			micEnabled={canMic && settings.micEnabled}
 			dictating={pillDictating}
-			scrollBox={scrollBox}
+			{scrollBox}
 			actions={{
 				key: annPopKey,
 				blur: blurAnnPop,
@@ -14202,9 +14310,8 @@ import {
 			title={chatTitle(activeChat(chatState) ?? { messages: [] })}
 			position="{chatLabel(
 				activeChat(chatState)?.createdAt ?? Date.now()
-			)} · {chatState.chats.findIndex(
-				(c) => c.id === chatState.activeChatId
-			) + 1} / {chatState.chats.length}"
+			)} · {chatState.chats.findIndex((c) => c.id === chatState.activeChatId) +
+				1} / {chatState.chats.length}"
 			openedAt={switcherOpenedAt}
 			actions={{
 				close: closeChatSwitcher,
@@ -14252,10 +14359,7 @@ import {
 			flashcards={settings.flashcardsEnabled}
 			bind:query={shortcutQuery}
 			bind:inputEl={shortcutInputEl}
-			closeTitle={tip(
-				isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift+/)",
-				"Close"
-			)}
+			closeTitle={tip(isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift+/)", "Close")}
 			onClose={() => (shortcutsOpen = false)}
 		/>
 	{/if}

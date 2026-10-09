@@ -32,14 +32,16 @@ describe("resolveProviderFor", () => {
 
 	it("returns the on-device provider without conf or key", () => {
 		expect(
-			resolveProviderFor(base({ activeProviderId: "local-mlkit", providers: {} }))
+			resolveProviderFor(
+				base({ activeProviderId: "local-mlkit", providers: {} })
+			)
 		).toBeInstanceOf(OnDeviceChatProvider);
 	});
 
 	it("throws on unknown ids even without conf", () => {
-		expect(() => resolveProviderFor(base({ activeProviderId: "nope" }))).toThrow(
-			"Unknown provider"
-		);
+		expect(() =>
+			resolveProviderFor(base({ activeProviderId: "nope" }))
+		).toThrow("Unknown provider");
 	});
 
 	it("returns null without conf and without a usable key", () => {

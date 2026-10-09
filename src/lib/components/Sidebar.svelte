@@ -141,7 +141,8 @@ only this drawer through scoping. -->
 				type="button"
 				class="side-search-clear"
 				aria-label="Clear chat search"
-				onclick={() => actions.clearSearch()}><ActionIcon kind="close" /></button
+				onclick={() => actions.clearSearch()}
+				><ActionIcon kind="close" /></button
 			>
 		{/if}
 	</div>
@@ -231,7 +232,8 @@ only this drawer through scoping. -->
 					type="button"
 					class="del"
 					aria-label="Delete chat"
-					onclick={() => actions.drop(item.id)}><ActionIcon kind="close" /></button
+					onclick={() => actions.drop(item.id)}
+					><ActionIcon kind="close" /></button
 				>
 				{#if item.messages.length > 0}
 					<span class="side-tip" role="tooltip">{actions.tipFor(item)}</span>

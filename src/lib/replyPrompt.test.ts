@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ONDEVICE_PROVIDER_ID } from "./ondevice/bridge";
 import { replySystemPrompt } from "./replyPrompt";
-import { CORRECTION_HINT, LOOKUP_CAPABILITY_HINT, defaultSettings } from "./settings";
+import {
+	CORRECTION_HINT,
+	LOOKUP_CAPABILITY_HINT,
+	defaultSettings
+} from "./settings";
 
 describe("replySystemPrompt", () => {
 	it("tells cloud replies they can look things up", () => {

@@ -17,9 +17,7 @@ import { seedChat } from "./helpers";
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
-test("review dock respects its width cap at 200% type", async ({
-	page
-}) => {
+test("review dock respects its width cap at 200% type", async ({ page }) => {
 	const sentence =
 		"Kyoto is an old capital with many temples near the riverbank.";
 	await seedChat(page, [
@@ -65,9 +63,9 @@ test("review dock respects its width cap at 200% type", async ({
 	await expect(pop).toHaveCount(0, { timeout: 5_000 });
 	// The dock lists pinned rows only: wait for the answer,
 	// pin the badge (double-click), then open the dock.
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toHaveCount(1, { timeout: 30_000 });
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(1, {
+		timeout: 30_000
+	});
 	await page.locator("button.ccez-ann-badge").nth(0).dblclick();
 	await page.keyboard.press("Escape");
 	await page.locator(".prompt-tools .ann-pill").click();
@@ -174,11 +172,10 @@ test("create box centers over narrow highlights, wide ones clamp to the viewport
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	// The highlight's own bottom (element boxes carry a stray
 	// leading pixel the text never paints).
-	const hlBottom = await page.evaluate(
-		() =>
-			window.getSelection()?.rangeCount
-				? window.getSelection()!.getRangeAt(0).getBoundingClientRect().bottom
-				: null
+	const hlBottom = await page.evaluate(() =>
+		window.getSelection()?.rangeCount
+			? window.getSelection()!.getRangeAt(0).getBoundingClientRect().bottom
+			: null
 	);
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(pop).toBeVisible();
@@ -205,7 +202,9 @@ test("creation pill and Annotate button scale with font size", async ({
 	await para.dblclick({ position: { x: 10, y: 10 } });
 	const menuBtn = page.locator('.sel-menu button:has-text("Annotate")');
 	await expect(menuBtn).toBeVisible();
-	const btnSmall = await menuBtn.evaluate((el) => getComputedStyle(el).fontSize);
+	const btnSmall = await menuBtn.evaluate(
+		(el) => getComputedStyle(el).fontSize
+	);
 	await page.evaluate(() => {
 		document.querySelector(".app")?.setAttribute("style", "--font-scale: 2");
 	});
@@ -307,9 +306,7 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("badge tap opens the dock on its row, never an edit", async ({
-	page
-}) => {
+test("badge tap opens the dock on its row, never an edit", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "alpha beta gamma delta" }
 	]);

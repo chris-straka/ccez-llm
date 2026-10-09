@@ -397,9 +397,9 @@ test("inline math holds one line", async ({ browser }) => {
 	await second.goto("/");
 	const inline = second.locator(".ccez-math-inline").first();
 	await expect(inline).toBeVisible({ timeout: 60_000 });
-	expect(
-		await inline.evaluate((el) => getComputedStyle(el).whiteSpace)
-	).toBe("nowrap");
+	expect(await inline.evaluate((el) => getComputedStyle(el).whiteSpace)).toBe(
+		"nowrap"
+	);
 	const box = await inline.boundingBox();
 	if (!box) throw new Error("inline math has no box");
 	const fs = await inline.evaluate((el) =>
@@ -570,7 +570,8 @@ test("preview settles latex chrome", async ({ page }) => {
 			document
 				.getAnimations()
 				.filter(
-					(a) => a instanceof CSSAnimation && a.animationName.endsWith("aid-swap")
+					(a) =>
+						a instanceof CSSAnimation && a.animationName.endsWith("aid-swap")
 				)
 				.map((a) => a.finished)
 		)

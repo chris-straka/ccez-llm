@@ -89,7 +89,10 @@ export class NativeTurns {
 	/** Turn id → owning chat and the placeholder the runner fills.
 	Survives nothing — a killed page rebuilds ownership from the turn
 	files on boot instead. */
-	readonly turns = new SvelteMap<TurnId, { chatId: ChatId; replyId: ChatMsgId }>();
+	readonly turns = new SvelteMap<
+		TurnId,
+		{ chatId: ChatId; replyId: ChatMsgId }
+	>();
 	/** Streamed text per turn (a retry recompute clears its own). */
 	readonly texts = new SvelteMap<TurnId, string>();
 	/** Chats with a native page fetch in flight: the Fetching chip reads

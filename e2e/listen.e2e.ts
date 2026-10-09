@@ -19,7 +19,14 @@ const info = {
 	duration: 12,
 	thumbnail: "",
 	original_lang: "en-US",
-	audio: { kind: "dub", lang: "fr-FR", itag: 139, track: "fr-FR.10", mime: "audio/mp4", auto: true },
+	audio: {
+		kind: "dub",
+		lang: "fr-FR",
+		itag: 139,
+		track: "fr-FR.10",
+		mime: "audio/mp4",
+		auto: true
+	},
 	captions: { key: "a.fr", kind: "asr" }
 };
 
@@ -29,7 +36,9 @@ function captions(): string {
 	const sentence = (start: number, words: string[]) => ({
 		tStartMs: start,
 		dDurationMs: words.length * 600,
-		segs: words.map((w, k) => (k === 0 ? { utf8: w } : { utf8: ` ${w}`, tOffsetMs: k * 600 }))
+		segs: words.map((w, k) =>
+			k === 0 ? { utf8: w } : { utf8: ` ${w}`, tOffsetMs: k * 600 }
+		)
 	});
 	return JSON.stringify({
 		events: [
@@ -50,7 +59,8 @@ async function mockListenShell(page: Page): Promise<void> {
 				const n = rate * seconds;
 				const buf = new DataView(new ArrayBuffer(44 + n));
 				const text = (at: number, s: string) => {
-					for (let k = 0; k < s.length; k++) buf.setUint8(at + k, s.charCodeAt(k));
+					for (let k = 0; k < s.length; k++)
+						buf.setUint8(at + k, s.charCodeAt(k));
 				};
 				text(0, "RIFF");
 				buf.setUint32(4, 36 + n, true);
@@ -79,7 +89,11 @@ async function mockListenShell(page: Page): Promise<void> {
 			const shell = {
 				invoke: async (cmd: string): Promise<unknown> => {
 					if (cmd === "listen_channel")
-						return { name: "Learner Channel", url: seed.channel, videos: [row] };
+						return {
+							name: "Learner Channel",
+							url: seed.channel,
+							videos: [row]
+						};
 					if (cmd === "listen_videos") return [seed.info];
 					if (cmd === "listen_search") return [row];
 					if (cmd === "listen_fetch")
@@ -100,7 +114,8 @@ async function mockListenShell(page: Page): Promise<void> {
 				transformCallback: (): number => 0,
 				unregisterCallback: (): void => {}
 			};
-			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = shell;
+			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ =
+				shell;
 		},
 		{ info, captions: captions(), channel: CHANNEL }
 	);
@@ -116,7 +131,10 @@ test.beforeEach(async ({ page }) => {
 	await mockListenShell(page);
 	await page.route("http://grade.test/v1/chat/completions", (route) =>
 		route.fulfill({
-			headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" },
+			headers: {
+				"access-control-allow-origin": "*",
+				"access-control-allow-headers": "*"
+			},
 			json: { choices: [{ message: { content: JSON.stringify(GRADE) } }] }
 		})
 	);
@@ -124,14 +142,21 @@ test.beforeEach(async ({ page }) => {
 		listenChannels: [{ url: CHANNEL, name: "Learner Channel" }],
 		activeProviderId: "deepseek",
 		providers: {
-			deepseek: { baseUrl: "http://grade.test/v1", apiKey: "test-key", model: "stub", models: [] }
+			deepseek: {
+				baseUrl: "http://grade.test/v1",
+				apiKey: "test-key",
+				model: "stub",
+				models: []
+			}
 		}
 	});
 	await page.goto("/");
 	await expect(page.locator(".empty-state")).toBeVisible({ timeout: 60_000 });
 });
 
-test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) => {
+test("a drill runs: guess, next clip at once, reveal, tally", async ({
+	page
+}) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	const panel = page.locator(".listen-panel");
 	await expect(panel).toContainText("Learner Channel");
@@ -156,7 +181,9 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	await expect(clips.first().locator(".w.near")).toHaveText(["a"]);
 	await expect(clips.first().locator(".w.missed")).toHaveText(["et"]);
 	await expect(clips.first()).toContainText("4 of 5 words");
-	await expect(page.locator(".messages")).toContainText("Bonjour à tous et bienvenue.");
+	await expect(page.locator(".messages")).toContainText(
+		"Bonjour à tous et bienvenue."
+	);
 	await expect(box).toHaveValue("");
 
 	// ⌘Enter reveals clip 2 as a skip, dropping the half-typed guess.
@@ -172,7 +199,9 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	const end = page.locator(".end");
 	await expect(end).toContainText("End of the video");
 	await expect(end).toContainText("Nous parlons de la peste.");
-	await expect(end.getByRole("button", { name: "Another video" })).toBeVisible();
+	await expect(
+		end.getByRole("button", { name: "Another video" })
+	).toBeVisible();
 
 	// Grading ran behind: the English folds under each clip, the body
 	// stays the French.
@@ -186,20 +215,28 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	await expect(first).toContainText("welcome");
 });
 
-test("the search box searches on a typing pause; emptying it drops the results", async ({ page }) => {
+test("the search box searches on a typing pause; emptying it drops the results", async ({
+	page
+}) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	const panel = page.locator(".listen-panel");
 	const search = panel.getByRole("searchbox", { name: "Search YouTube" });
 	await search.fill("pakman");
 	const results = panel.locator(".results");
-	await expect(results.locator(".video", { hasText: info.title })).toBeVisible();
+	await expect(
+		results.locator(".video", { hasText: info.title })
+	).toBeVisible();
 	await search.fill("");
 	await expect(results).toHaveCount(0);
-	await expect(panel.getByRole("button", { name: "Clear search" })).toHaveCount(0);
+	await expect(panel.getByRole("button", { name: "Clear search" })).toHaveCount(
+		0
+	);
 
 	// The × inside the box clears it the same way.
 	await search.fill("pakman");
-	await expect(results.locator(".video", { hasText: info.title })).toBeVisible();
+	await expect(
+		results.locator(".video", { hasText: info.title })
+	).toBeVisible();
 	await panel.getByRole("button", { name: "Clear search" }).click();
 	await expect(search).toHaveValue("");
 	await expect(search).toBeFocused();
@@ -207,7 +244,9 @@ test("the search box searches on a typing pause; emptying it drops the results",
 	await expect(panel).toContainText("Learner Channel");
 });
 
-test("Space pauses and resumes mid-clip; answering lets the clip finish first", async ({ page }) => {
+test("Space pauses and resumes mid-clip; answering lets the clip finish first", async ({
+	page
+}) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
@@ -217,7 +256,9 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 	const scrub = first.getByRole("slider", { name: "Position in the clip" });
 	// The first clip starts on its own (a new clip row never cuts it).
 	await expect(pause).toBeVisible();
-	await expect.poll(async () => Number(await scrub.inputValue())).toBeGreaterThan(0.3);
+	await expect
+		.poll(async () => Number(await scrub.inputValue()))
+		.toBeGreaterThan(0.3);
 
 	// Space pauses where it is; the playhead holds.
 	const box = page.locator(".prompt textarea").first();
@@ -239,11 +280,15 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 	await box.press("Enter");
 	await expect(clips).toHaveCount(2);
 	await expect(pause).toBeVisible();
-	await expect(clips.nth(1).getByRole("button", { name: "Pause" })).toBeVisible({ timeout: 6_000 });
+	await expect(clips.nth(1).getByRole("button", { name: "Pause" })).toBeVisible(
+		{ timeout: 6_000 }
+	);
 	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
 });
 
-test("outside the composer: S slows the hovered clip, A with nothing hovered reveals", async ({ page }) => {
+test("outside the composer: S slows the hovered clip, A with nothing hovered reveals", async ({
+	page
+}) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
@@ -252,7 +297,9 @@ test("outside the composer: S slows the hovered clip, A with nothing hovered rev
 	await box.fill("bonjour");
 	await box.press("Enter");
 	await expect(clips).toHaveCount(2);
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur()
+	);
 
 	await page.locator("#msg-0").hover();
 	await page.keyboard.press("s");
@@ -265,13 +312,24 @@ test("outside the composer: S slows the hovered clip, A with nothing hovered rev
 	await expect(clips.nth(1)).toContainText("Revealed");
 });
 
-test("annotating while a clip plays never reads the quote over it", async ({ page }) => {
+test("annotating while a clip plays never reads the quote over it", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		const w = window as unknown as { __spoke: number };
 		w.__spoke = 0;
 		const synth = window.speechSynthesis;
-		const voice = { name: "Thomas", lang: "fr-FR", localService: true, default: true, voiceURI: "Thomas" };
-		Object.defineProperty(synth, "getVoices", { value: () => [voice], configurable: true });
+		const voice = {
+			name: "Thomas",
+			lang: "fr-FR",
+			localService: true,
+			default: true,
+			voiceURI: "Thomas"
+		};
+		Object.defineProperty(synth, "getVoices", {
+			value: () => [voice],
+			configurable: true
+		});
 		Object.defineProperty(synth, "speak", {
 			value: () => {
 				w.__spoke++;
@@ -291,7 +349,9 @@ test("annotating while a clip plays never reads the quote over it", async ({ pag
 	await box.press("Enter");
 	await expect(clips).toHaveCount(2);
 	// Clip 1 is still playing (clip 2 waits for it).
-	await expect(clips.first().getByRole("button", { name: "Pause" })).toBeVisible();
+	await expect(
+		clips.first().getByRole("button", { name: "Pause" })
+	).toBeVisible();
 	const body = page.locator("#msg-0 .rendered");
 	const rect = await body.boundingBox();
 	if (!rect) throw new Error("clip body has no box");
@@ -299,25 +359,41 @@ test("annotating while a clip plays never reads the quote over it", async ({ pag
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.waitForTimeout(300);
-	expect(await page.evaluate(() => (window as unknown as { __spoke: number }).__spoke)).toBe(0);
+	expect(
+		await page.evaluate(
+			() => (window as unknown as { __spoke: number }).__spoke
+		)
+	).toBe(0);
 	await expect(page.getByText("No voice for this language.")).toHaveCount(0);
 });
 
-test("a channel's videos fold by its chevron or hover + F, and stay folded", async ({ page }) => {
+test("a channel's videos fold by its chevron or hover + F, and stay folded", async ({
+	page
+}) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
-	const channel = page.locator(".listen-panel .channel", { hasText: "Learner Channel" });
+	const channel = page.locator(".listen-panel .channel", {
+		hasText: "Learner Channel"
+	});
 	const videos = channel.locator(".video", { hasText: info.title });
 	await expect(videos).toBeVisible();
 
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur()
+	);
 	await channel.hover();
 	await page.keyboard.press("f");
 	await expect(videos).toHaveCount(0);
-	await expect(channel.getByRole("button", { name: "Show Learner Channel's videos" })).toBeVisible();
+	await expect(
+		channel.getByRole("button", { name: "Show Learner Channel's videos" })
+	).toBeVisible();
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
 		.toContain('"folded":true');
 
-	await channel.getByRole("button", { name: "Show Learner Channel's videos" }).click();
+	await channel
+		.getByRole("button", { name: "Show Learner Channel's videos" })
+		.click();
 	await expect(videos).toBeVisible();
 });

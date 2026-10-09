@@ -122,9 +122,7 @@ test("a held finger freezes submit scroll and stream follow", async ({
 
 /** Neither the submit, the stream, nor the completion yanks a
 mid-thread reader: stuck-to-bottom follows, anything else stays. */
-test("send and completion never yank a mid-thread reader", async ({
-	page
-}) => {
+test("send and completion never yank a mid-thread reader", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "user", content: "first" },
 		{ role: "assistant", content: LONG },
@@ -225,7 +223,10 @@ test("a nudge up mid-stream stays put, with no jump button", async ({
 	]);
 	await page.addInitScript(() => {
 		localStorage.setItem("ccez-mock-word-ms", "20");
-		localStorage.setItem("ccez-mock-reply", "Inès : voilà ma question. ".repeat(120));
+		localStorage.setItem(
+			"ccez-mock-reply",
+			"Inès : voilà ma question. ".repeat(120)
+		);
 	});
 	await page.goto("/");
 	await page.locator(".ta-input").waitFor({ timeout: 60_000 });
@@ -245,6 +246,10 @@ test("a nudge up mid-stream stays put, with no jump button", async ({
 	// Through the rest of the stream and the completion: no movement.
 	await expect(page.locator(".send-btn")).toHaveText("↑", { timeout: 60_000 });
 	await page.waitForTimeout(800);
-	expect(Math.abs((await box.evaluate((el) => el.scrollTop)) - held)).toBeLessThanOrEqual(1);
-	await expect(page.getByRole("button", { name: "Jump to latest" })).toHaveCount(0);
+	expect(
+		Math.abs((await box.evaluate((el) => el.scrollTop)) - held)
+	).toBeLessThanOrEqual(1);
+	await expect(
+		page.getByRole("button", { name: "Jump to latest" })
+	).toHaveCount(0);
 });

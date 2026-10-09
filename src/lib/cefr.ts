@@ -17,7 +17,10 @@ export function isCefrLevel(value: unknown): value is CefrLevel {
 /** One step easier (-1) or harder (+1), held at A1 and C2. Pure. */
 export function stepLevel(level: CefrLevel, dir: -1 | 1): CefrLevel {
 	const at = CEFR_LEVELS.findIndex((l) => l.level === level);
-	return CEFR_LEVELS[Math.min(Math.max(at + dir, 0), CEFR_LEVELS.length - 1)]?.level ?? level;
+	return (
+		CEFR_LEVELS[Math.min(Math.max(at + dir, 0), CEFR_LEVELS.length - 1)]
+			?.level ?? level
+	);
 }
 
 export function cefrTag(level: CefrLevel): string {

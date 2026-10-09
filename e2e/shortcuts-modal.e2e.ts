@@ -44,7 +44,9 @@ test("list runs in sections, hovered-message keys first", async ({ page }) => {
 		].map((h) => h.toLowerCase())
 	);
 	// The modal toggle still lists middle-click.
-	const toggle = keys.locator("div", { has: page.locator('dt:text-is("Shortcuts")') });
+	const toggle = keys.locator("div", {
+		has: page.locator('dt:text-is("Shortcuts")')
+	});
 	await expect(toggle).toContainText("middle-click");
 	for (const name of [
 		"Scroll",
@@ -76,7 +78,9 @@ test("list runs in sections, hovered-message keys first", async ({ page }) => {
 	}
 	// Each alternative is its own chip.
 	await expect(
-		keys.locator("div", { has: page.locator('dt:text-is("Half page")') }).locator(".chip")
+		keys
+			.locator("div", { has: page.locator('dt:text-is("Half page")') })
+			.locator(".chip")
 	).toHaveText(["Ctrl+D / Ctrl+U"]);
 	// No paren spam in the entry copy (each dd reads flat).
 	const details = await keys.locator("dd").allInnerTexts();

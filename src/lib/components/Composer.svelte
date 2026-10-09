@@ -308,9 +308,7 @@ stop, so both rules below stay suppressed. -->
 				class="mic-btn"
 				class:recording={dictating}
 				title={dictating ? "Stop dictation" : "Dictate into the prompt"}
-				aria-label={dictating
-					? "Stop dictation"
-					: "Dictate into the prompt"}
+				aria-label={dictating ? "Stop dictation" : "Dictate into the prompt"}
 				aria-pressed={dictating}
 				onclick={actions.mic}
 			>
@@ -446,7 +444,8 @@ stop, so both rules below stay suppressed. -->
 			</div>
 		{/if}
 	</div>
-	<span class="send-hold"><button
+	<span class="send-hold"
+		><button
 			type="button"
 			bind:this={sendBtnEl}
 			class="send-btn"
@@ -678,7 +677,9 @@ stop, so both rules below stay suppressed. -->
 	}
 	/* The dock's own half of the rule above renders in
 	`ReviewDock.svelte` (the wrap moved with the dock). */
-	:global(.app[data-android]) .prompt:has(.ann-dock) :global(.ta-input::placeholder) {
+	:global(.app[data-android])
+		.prompt:has(.ann-dock)
+		:global(.ta-input::placeholder) {
 		color: transparent;
 	}
 	.hidden-input {

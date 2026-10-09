@@ -40,6 +40,9 @@ TTS/OCR/dictation, page fetch, Android background turns).
   desktop-only, localhost-bound; it loads after a dev-shell relaunch.
 - `bun run test` (Vitest), `bun run check` (svelte-check strict),
   `bun run lint`, `bun run build`.
+- `bun run format` (Prettier, then `cargo fmt`) before committing; CI
+  runs `format:check`'s two halves. Generated, vendored, and captured
+  files are listed in `.prettierignore`.
 - Rust: `cd src-tauri && cargo test --lib` (CI runs `cargo check --locked`
   per target plus `cargo test --locked`).
 - Web: `bun run build:web` → `build/`. Cloudflare Pages project
@@ -125,7 +128,7 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - Shortcuts menu (registry in `shortcuts.ts`, rendered by
   `ShortcutsModal.svelte`): rows sit in sections, hovered-message keys
   first (their keys drop the "Hover +"); names are sentence case and
-  pithy; ` · ` separates alternatives (each draws as a chip), and a
+  pithy; `·` separates alternatives (each draws as a chip), and a
   sequence reads `, then`. `dd` copy has no parentheses (pinned by
   `e2e/shortcuts-modal.e2e.ts`). Deliberately removed, do not re-add:
   New line, Stage message, Scroll messages, Export chat, Translate

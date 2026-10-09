@@ -63,9 +63,7 @@ describe("filterSidebarChats", () => {
 		expect(filterSidebarChats(chats, "   ")).toBe(chats);
 	});
 	it("matches message bodies", () => {
-		expect(filterSidebarChats(chats, "ramen").map((c) => c.id)).toEqual([
-			"a"
-		]);
+		expect(filterSidebarChats(chats, "ramen").map((c) => c.id)).toEqual(["a"]);
 	});
 	it("matches nothing unknown", () => {
 		expect(filterSidebarChats(chats, "croissant")).toEqual([]);
@@ -96,7 +94,11 @@ describe("chatTitle", () => {
 		expect(
 			chatTitle(
 				chat("a", 1, [
-					msg("1", "user", "Fix this:\n```js\nlet x = 1\n```\nsee [docs](https://x.dev)")
+					msg(
+						"1",
+						"user",
+						"Fix this:\n```js\nlet x = 1\n```\nsee [docs](https://x.dev)"
+					)
 				])
 			)
 		).toBe("Fix this: see docs");
@@ -104,19 +106,29 @@ describe("chatTitle", () => {
 
 	it("prefers a stored name", () => {
 		expect(
-			chatTitle({ ...chat("a", 1, [msg("1", "user", "Was heißt über?")]), title: "German" })
+			chatTitle({
+				...chat("a", 1, [msg("1", "user", "Was heißt über?")]),
+				title: "German"
+			})
 		).toBe("German");
 	});
 
 	it("falls back to the reply, then to New chat", () => {
 		expect(
-			chatTitle(chat("a", 1, [msg("1", "user", "  "), msg("2", "assistant", "A cat photo.")]))
+			chatTitle(
+				chat("a", 1, [
+					msg("1", "user", "  "),
+					msg("2", "assistant", "A cat photo.")
+				])
+			)
 		).toBe("A cat photo.");
 		expect(chatTitle(chat("a", 1, []))).toBe("New chat");
 	});
 
 	it("cuts long openers at a word with an ellipsis", () => {
-		const title = chatTitle(chat("a", 1, [msg("1", "user", "word ".repeat(40))]));
+		const title = chatTitle(
+			chat("a", 1, [msg("1", "user", "word ".repeat(40))])
+		);
 		expect(title.length).toBeLessThanOrEqual(81);
 		expect(title.endsWith("word…")).toBe(true);
 	});

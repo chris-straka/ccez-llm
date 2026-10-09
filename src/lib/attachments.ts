@@ -990,8 +990,7 @@ export function pasteSlotCut(doc: string, index: number): PasteSlotCut | null {
 	const keepAfter = tail.slice(0, tail.trimEnd().length);
 	if ((head + keepAfter).trim() === "") {
 		const isLast = endLineEnd === doc.length;
-		if (!isLast)
-			return { from: lineStart, to: endLineEnd + 1, insert: "" };
+		if (!isLast) return { from: lineStart, to: endLineEnd + 1, insert: "" };
 		if (lineStart === 0) return { from: 0, to: endLineEnd, insert: "" };
 		return { from: lineStart - 1, to: endLineEnd, insert: "" };
 	}

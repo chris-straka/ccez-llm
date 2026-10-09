@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SEGMENT, joinTokens, parseJson3, segmentClips, type Token } from "./listenClips";
+import {
+	DEFAULT_SEGMENT,
+	joinTokens,
+	parseJson3,
+	segmentClips,
+	type Token
+} from "./listenClips";
 
 /** The opening of a real auto-dub's speech recognition (David Pakman,
  * ujQZH4qyEgQ, fr-orig): one seg per word, punctuation as its own seg,
@@ -61,7 +67,11 @@ const ASR = JSON.stringify({
 		{
 			tStartMs: 9402,
 			dDurationMs: 3290,
-			segs: [{ utf8: " manière" }, { utf8: " approfondie", tOffsetMs: 444 }, { utf8: ".", tOffsetMs: 987 }]
+			segs: [
+				{ utf8: " manière" },
+				{ utf8: " approfondie", tOffsetMs: 444 },
+				{ utf8: ".", tOffsetMs: 987 }
+			]
 		}
 	]
 });
@@ -81,13 +91,33 @@ const UPLOADED = JSON.stringify({
 	events: [
 		cue(0, 2067, "Vous pouvez retirer vos bandeaux !"),
 		cue(0, 2067, "Vous pouvez retirer vos bandeaux !"),
-		cue(3000, 3467, "Celui qui sera le dernier ", "à quitter cette villa la gardera."),
-		cue(3000, 3467, "Celui qui sera le dernier ", "à quitter cette villa la gardera."),
+		cue(
+			3000,
+			3467,
+			"Celui qui sera le dernier ",
+			"à quitter cette villa la gardera."
+		),
+		cue(
+			3000,
+			3467,
+			"Celui qui sera le dernier ",
+			"à quitter cette villa la gardera."
+		),
 		cue(6534, 1000, "On partira pas."),
 		cue(7601, 1333, "Moi ? Jamais."),
 		cue(9000, 1434, "On va vite le découvrir."),
-		cue(14200, 3401, "cette immense villa ", "d'une valeur d'un million de dollars…"),
-		cue(17634, 3167, "… ne contient pas une, deux, ", "trois, quatre, cinq, six,"),
+		cue(
+			14200,
+			3401,
+			"cette immense villa ",
+			"d'une valeur d'un million de dollars…"
+		),
+		cue(
+			17634,
+			3167,
+			"… ne contient pas une, deux, ",
+			"trois, quatre, cinq, six,"
+		),
 		cue(20868, 1432, "mais bien sept chambres.")
 	]
 });
@@ -95,7 +125,13 @@ const UPLOADED = JSON.stringify({
 describe("parseJson3", () => {
 	it("reads word-timed recognition with punctuation attached", () => {
 		const tokens = parseJson3(ASR);
-		expect(tokens.slice(0, 5).map((t) => t.text)).toEqual(["Parlons", "de", "la", "peste.", "Donald"]);
+		expect(tokens.slice(0, 5).map((t) => t.text)).toEqual([
+			"Parlons",
+			"de",
+			"la",
+			"peste.",
+			"Donald"
+		]);
 		expect(tokens[0]?.start).toBeCloseTo(0.1);
 		expect(tokens[3]?.start).toBeCloseTo(1.581);
 		// A word ends before the next starts, and never runs absurdly long.
@@ -128,7 +164,15 @@ describe("parseJson3", () => {
 		const doc = JSON.stringify({
 			events: [
 				{ tStartMs: 0, dDurationMs: 1000, segs: [{ utf8: "[Musique]" }] },
-				{ tStartMs: 1000, segs: [{ utf8: "Bonjour" }, { utf8: " [", tOffsetMs: 400 }, { utf8: "rires]", tOffsetMs: 500 }, { utf8: " tout", tOffsetMs: 900 }] }
+				{
+					tStartMs: 1000,
+					segs: [
+						{ utf8: "Bonjour" },
+						{ utf8: " [", tOffsetMs: 400 },
+						{ utf8: "rires]", tOffsetMs: 500 },
+						{ utf8: " tout", tOffsetMs: 900 }
+					]
+				}
 			]
 		});
 		expect(joinTokens(parseJson3(doc))).toBe("Bonjour tout");
@@ -138,7 +182,18 @@ describe("parseJson3", () => {
 
 	it("joins unspaced scripts without spaces", () => {
 		const doc = JSON.stringify({
-			events: [{ tStartMs: 0, segs: [{ utf8: "今日" }, { utf8: "は", tOffsetMs: 300 }, { utf8: "雨", tOffsetMs: 500 }, { utf8: "です", tOffsetMs: 700 }, { utf8: "。", tOffsetMs: 900 }] }]
+			events: [
+				{
+					tStartMs: 0,
+					segs: [
+						{ utf8: "今日" },
+						{ utf8: "は", tOffsetMs: 300 },
+						{ utf8: "雨", tOffsetMs: 500 },
+						{ utf8: "です", tOffsetMs: 700 },
+						{ utf8: "。", tOffsetMs: 900 }
+					]
+				}
+			]
 		});
 		expect(joinTokens(parseJson3(doc))).toBe("今日は雨です。");
 	});
@@ -172,12 +227,16 @@ describe("segmentClips", () => {
 			const next = clips[k + 1];
 			if (next) expect(c.end).toBeLessThanOrEqual(next.start + 1e-9);
 		}
-		expect(clips.map((c) => c.text).join(" ")).toBe(joinTokens(parseJson3(UPLOADED)));
+		expect(clips.map((c) => c.text).join(" ")).toBe(
+			joinTokens(parseJson3(UPLOADED))
+		);
 	});
 
 	it("splits a long run at its best clause boundary", () => {
 		// 30 words at 0.4 s each (12 s), one comma in the middle.
-		const spec = Array.from({ length: 30 }, (_, k) => (k === 13 ? "mot," : k === 29 ? "fin." : "mot")).join(" ");
+		const spec = Array.from({ length: 30 }, (_, k) =>
+			k === 13 ? "mot," : k === 29 ? "fin." : "mot"
+		).join(" ");
 		const clips = segmentClips(words(spec));
 		expect(clips.length).toBe(2);
 		expect(clips[0]?.text.endsWith("mot,")).toBe(true);
@@ -185,12 +244,23 @@ describe("segmentClips", () => {
 	});
 
 	it("cuts at a long pause when recognition has no punctuation", () => {
-		const clips = segmentClips(words("un deux trois quatre cinq six sept| huit neuf dix onze douze treize"));
-		expect(clips.map((c) => c.text)).toEqual(["un deux trois quatre cinq six sept", "huit neuf dix onze douze treize"]);
+		const clips = segmentClips(
+			words(
+				"un deux trois quatre cinq six sept| huit neuf dix onze douze treize"
+			)
+		);
+		expect(clips.map((c) => c.text)).toEqual([
+			"un deux trois quatre cinq six sept",
+			"huit neuf dix onze douze treize"
+		]);
 	});
 
 	it("pads clips without crossing into the neighbor's words", () => {
-		const clips = segmentClips(words("Un deux trois quatre cinq six sept huit.| Neuf dix onze douze treize quatorze quinze."));
+		const clips = segmentClips(
+			words(
+				"Un deux trois quatre cinq six sept huit.| Neuf dix onze douze treize quatorze quinze."
+			)
+		);
 		const [a, b] = clips;
 		expect(a?.start).toBe(0);
 		expect(a && b && a.end <= b.start).toBe(true);
@@ -198,9 +268,13 @@ describe("segmentClips", () => {
 	});
 
 	it("merges a too-short tail into the clip before", () => {
-		const clips = segmentClips(words("Un deux trois quatre cinq six sept huit. Oui."));
+		const clips = segmentClips(
+			words("Un deux trois quatre cinq six sept huit. Oui.")
+		);
 		expect(clips).toHaveLength(1);
-		expect(clips[0]?.text).toBe("Un deux trois quatre cinq six sept huit. Oui.");
+		expect(clips[0]?.text).toBe(
+			"Un deux trois quatre cinq six sept huit. Oui."
+		);
 	});
 
 	it("returns nothing for nothing", () => {

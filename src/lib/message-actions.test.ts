@@ -50,7 +50,12 @@ describe("canEditMessage", () => {
 });
 
 describe("rerunIndexFor", () => {
-	const messages = [{ role: "user" }, { role: "assistant" }, { role: "user" }, { role: "assistant" }];
+	const messages = [
+		{ role: "user" },
+		{ role: "assistant" },
+		{ role: "user" },
+		{ role: "assistant" }
+	];
 	it("reruns your message itself, a reply from the turn it answered", () => {
 		expect(rerunIndexFor(messages, 2, false)).toBe(2);
 		expect(rerunIndexFor(messages, 3, false)).toBe(2);

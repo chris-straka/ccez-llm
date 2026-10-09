@@ -97,7 +97,11 @@
 <section aria-labelledby="color-scheme-heading">
 	<h2 id="color-scheme-heading">Color scheme</h2>
 	<fieldset class="theme">
-		<div class="segmented scheme-side" role="radiogroup" aria-label="Light or dark">
+		<div
+			class="segmented scheme-side"
+			role="radiogroup"
+			aria-label="Light or dark"
+		>
 			{#each ["light", "dark"] as const as option (option)}
 				<button
 					type="button"
@@ -111,7 +115,11 @@
 		</div>
 		<!-- Each tile is a small painting of its style (raw preview
 		hexes: the tokens only resolve for the active theme). -->
-		<div class="theme-tiles" role="group" aria-label="{side === 'light' ? 'Light' : 'Dark'} style">
+		<div
+			class="theme-tiles"
+			role="group"
+			aria-label="{side === 'light' ? 'Light' : 'Dark'} style"
+		>
 			{#each styles as style (`${side}-${style}`)}
 				<button
 					type="button"
@@ -160,10 +168,8 @@
 					title={choice === "off"
 						? "No color on my messages"
 						: `Color my messages ${choice}`}
-					onclick={() => (settings.ownInk = choice)}><span
-						class="dot"
-						data-choice={choice}
-						aria-hidden="true"
+					onclick={() => (settings.ownInk = choice)}
+					><span class="dot" data-choice={choice} aria-hidden="true"
 					></span>{OWN_INK_LABELS[choice]}</button
 				>
 			{/each}

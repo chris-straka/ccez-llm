@@ -39,14 +39,26 @@ export function touchShortcuts(): ShortcutRow[] {
 	const msg = "Messages";
 	const sel = "Selected text";
 	return [
-		{ group: move, name: "Chats list", keys: "Swipe right · two-finger swipe right" },
+		{
+			group: move,
+			name: "Chats list",
+			keys: "Swipe right · two-finger swipe right"
+		},
 		{
 			group: move,
 			name: "Quick switcher",
 			keys: "Two-finger hold · double-tap empty space · swipe to cycle"
 		},
-		{ group: move, name: "Search chats", keys: "Quick switcher, then magnifier" },
-		{ group: move, name: "Newer / older chat", keys: "Three-finger swipe left / right" },
+		{
+			group: move,
+			name: "Search chats",
+			keys: "Quick switcher, then magnifier"
+		},
+		{
+			group: move,
+			name: "Newer / older chat",
+			keys: "Three-finger swipe left / right"
+		},
 		{ group: move, name: "Top of chat", keys: "Two-finger swipe up" },
 		{ group: move, name: "Bottom of chat", keys: "Two-finger swipe down" },
 		{
@@ -54,7 +66,11 @@ export function touchShortcuts(): ShortcutRow[] {
 			name: "Settings",
 			keys: "Swipe left off messages · two-finger swipe left · chats list button"
 		},
-		{ group: move, name: "Rename a chat", keys: "Long-press it in the chats list" },
+		{
+			group: move,
+			name: "Rename a chat",
+			keys: "Long-press it in the chats list"
+		},
 		{ group: msg, name: "Message buttons", keys: "Tap a message" },
 		{ group: msg, name: "Text size", keys: "Pinch the messages" },
 		{ group: msg, name: "Fold a message", keys: "Swipe left on it" },
@@ -64,10 +80,18 @@ export function touchShortcuts(): ShortcutRow[] {
 		{ group: sel, name: "Annotate", keys: "Select text, then Annotate" },
 		{ group: sel, name: "Copy", keys: "Select text, then Copy" },
 		{ group: sel, name: "Speak", keys: "Select text, then Speak" },
-		{ group: sel, name: "Inspect character", keys: "Select one Han character, then Inspect" },
+		{
+			group: sel,
+			name: "Inspect character",
+			keys: "Select one Han character, then Inspect"
+		},
 		{ group: sel, name: "Move the selection menu", keys: "Drag it" },
 		{ group: sel, name: "Pin / unpin annotation", keys: "Double-tap badge" },
-		{ group: sel, name: "Cancel an annotation", keys: "Tap away · scrolling keeps it" }
+		{
+			group: sel,
+			name: "Cancel an annotation",
+			keys: "Tap away · scrolling keeps it"
+		}
 	];
 }
 
@@ -127,10 +151,18 @@ export function desktopShortcuts(
 	const scroll = "Scrolling";
 	const view = "Window & view";
 	const rows: ShortcutRow[] = [
-		{ group: hover, name: "Fold / unfold", keys: `F · ${isMac ? "Option" : "Alt"}-click` },
+		{
+			group: hover,
+			name: "Fold / unfold",
+			keys: `F · ${isMac ? "Option" : "Alt"}-click`
+		},
 		{ group: hover, name: "Copy", keys: "C" },
 		{ group: hover, name: "Read aloud", keys: "Shift+R" },
-		{ group: hover, name: "Read word / sentence / paragraph", keys: "Shift+W / Shift+S / Shift+P" },
+		{
+			group: hover,
+			name: "Read word / sentence / paragraph",
+			keys: "Shift+W / Shift+S / Shift+P"
+		},
 		{ group: hover, name: "Annotate word", keys: "A" },
 		{ group: hover, name: "Edit your message", keys: "E" },
 		{ group: hover, name: "Rerun / regenerate", keys: "R" },
@@ -144,25 +176,49 @@ export function desktopShortcuts(
 			name: "Delete",
 			keys: isMac ? "⌘Delete · ⌘D · Shift+D" : "Ctrl+Delete · Shift+D"
 		},
-		{ group: chats, name: "Search chats", keys: isMac ? "⌘P" : "Ctrl+K · Ctrl+P" },
-		{ group: chats, name: "Search filters", keys: '"exact phrase" · from:me · from:ai · in:notes' },
+		{
+			group: chats,
+			name: "Search chats",
+			keys: isMac ? "⌘P" : "Ctrl+K · Ctrl+P"
+		},
+		{
+			group: chats,
+			name: "Search filters",
+			keys: '"exact phrase" · from:me · from:ai · in:notes'
+		},
 		{ group: chats, name: "Find in chat", keys: `${meta}F` },
 		{
 			group: chats,
 			name: "Chat list",
 			keys: `${meta}B · ${shiftMeta}H · J / K walk · Space enters`
 		},
-		{ group: chats, name: "New chat", keys: `${meta}N · ${shiftMeta}N · ${meta}T` },
+		{
+			group: chats,
+			name: "New chat",
+			keys: `${meta}N · ${shiftMeta}N · ${meta}T`
+		},
 		{
 			group: chats,
 			name: "Newer / older chat",
 			keys: `${shiftMeta}J / ${shiftMeta}K · ${meta}↑ / ${meta}↓`
 		},
-		{ group: chats, name: "Read a chat's name", keys: "Hover it in the list + Shift+R" },
-		{ group: chats, name: "Rename a chat", keys: "Hover it in the list, then the pencil" },
+		{
+			group: chats,
+			name: "Read a chat's name",
+			keys: "Hover it in the list + Shift+R"
+		},
+		{
+			group: chats,
+			name: "Rename a chat",
+			keys: "Hover it in the list, then the pencil"
+		},
 		{ group: chats, name: "Delete this chat", keys: `${shiftMeta}Delete` },
 		{ group: prompt, name: "Edit newest message", keys: `${meta}E` },
-		{ group: prompt, name: "Rerun a prompt", keys: "Rerun button · deletes after" },
+		{
+			group: prompt,
+			name: "Rerun a prompt",
+			keys: "Rerun button · deletes after"
+		},
 		{ group: prompt, name: "Pasted text expand / collapse", keys: "Ctrl+O" },
 		{
 			group: prompt,
@@ -172,7 +228,11 @@ export function desktopShortcuts(
 		{ group: prompt, name: "Switch model / key", keys: `Ctrl+${altm}+← / →` },
 		{ group: prompt, name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
 		{ group: reading, name: "Voice readback on / off", keys: `Ctrl+${altm}+S` },
-		{ group: reading, name: "Annotation answers in English / the passage's language", keys: `Ctrl+${altm}+L` },
+		{
+			group: reading,
+			name: "Annotation answers in English / the passage's language",
+			keys: `Ctrl+${altm}+L`
+		},
 		{ group: reading, name: "Stop voice / close", keys: "Esc" },
 		{ group: reading, name: "Reading aids", keys: "M pinyin · N furigana" },
 		{ group: reading, name: "Stroke order step", keys: "H / L in Inspect" },
@@ -189,22 +249,50 @@ export function desktopShortcuts(
 		{ group: reading, name: "Capture window text", keys: `${shiftMeta}O` },
 		{ group: reading, name: "Set capture area", keys: `${shiftMeta}U` },
 		{ group: mouse, name: "Speak text aloud", keys: "Right-click" },
-		{ group: mouse, name: "Annotate and send", keys: "Select + A · right-click Annotate" },
+		{
+			group: mouse,
+			name: "Annotate and send",
+			keys: "Select + A · right-click Annotate"
+		},
 		{ group: mouse, name: "Ask to expand", keys: "Select + C" },
-		{ group: mouse, name: "Select sentence / paragraph", keys: "Triple-click / quadruple-click" },
+		{
+			group: mouse,
+			name: "Select sentence / paragraph",
+			keys: "Triple-click / quadruple-click"
+		},
 		{ group: mouse, name: "Delete annotation", keys: "Hover badge + Delete" },
-		{ group: mouse, name: "Pin / unpin annotation", keys: "Double-click badge" },
-		{ group: mouse, name: "Fold / unfold code", keys: "Right-click toggles · left-click unfolds" },
+		{
+			group: mouse,
+			name: "Pin / unpin annotation",
+			keys: "Double-click badge"
+		},
+		{
+			group: mouse,
+			name: "Fold / unfold code",
+			keys: "Right-click toggles · left-click unfolds"
+		},
 		{ group: scroll, name: "Scroll", keys: "j / k" },
 		{ group: scroll, name: "Scroll further", keys: "d / u" },
 		{ group: scroll, name: "Half page", keys: "Ctrl+D / Ctrl+U" },
 		{ group: scroll, name: "Top / bottom", keys: "gg / G" },
-		{ group: view, name: "Shortcuts", keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click` },
+		{
+			group: view,
+			name: "Shortcuts",
+			keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click`
+		},
 		{ group: view, name: "Summon / hide window", keys: `${shiftMeta}Space` },
-		{ group: view, name: "Send selected text here", keys: "Ctrl+Alt+Space in any app" },
+		{
+			group: view,
+			name: "Send selected text here",
+			keys: "Ctrl+Alt+Space in any app"
+		},
 		{ group: view, name: "Fullscreen", keys: isMac ? "Ctrl+⌘F" : "F11" },
 		{ group: view, name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
-		{ group: view, name: "Text size", keys: isMac ? `${mod}+ / ${mod}−` : "Ctrl+Plus / Ctrl+Minus" },
+		{
+			group: view,
+			name: "Text size",
+			keys: isMac ? `${mod}+ / ${mod}−` : "Ctrl+Plus / Ctrl+Minus"
+		},
 		{
 			group: view,
 			name: "Chat width",

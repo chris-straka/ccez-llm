@@ -88,8 +88,18 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &custom(app, "next-chat", "Next Chat", None)?,
             &custom(app, "prev-chat", "Previous Chat", None)?,
             &sep(app)?,
-            &custom(app, "bigger-text", "Increase Text Size", Some("CmdOrCtrl+="))?,
-            &custom(app, "smaller-text", "Decrease Text Size", Some("CmdOrCtrl+-"))?,
+            &custom(
+                app,
+                "bigger-text",
+                "Increase Text Size",
+                Some("CmdOrCtrl+="),
+            )?,
+            &custom(
+                app,
+                "smaller-text",
+                "Decrease Text Size",
+                Some("CmdOrCtrl+-"),
+            )?,
         ],
     )?;
     let window_menu = Submenu::with_items(

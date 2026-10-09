@@ -126,7 +126,10 @@ export function getProviderDef(
 const MODEL_RULES: Partial<
 	Record<
 		BuiltinProviderId,
-		{ pick: (ids: readonly string[]) => string[]; free: (id: string) => boolean }
+		{
+			pick: (ids: readonly string[]) => string[];
+			free: (id: string) => boolean;
+		}
 	>
 > = {
 	"opencode-zen": { pick: zenModelList, free: zenFreeModel }

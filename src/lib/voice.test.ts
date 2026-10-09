@@ -262,15 +262,15 @@ describe("splitGlossHalves", () => {
 	it("reads gloss halves in different voices, same-voice lines whole", () => {
 		const halves = (s: string): string =>
 			s === "miteinander" ? "de-DE" : "en-US";
-		expect(splitSpeechSegments("miteinander = with each other", halves)).toEqual(
-			[
-				{ text: "miteinander", lang: "de-DE" },
-				{ text: "with each other", lang: "en-US" }
-			]
-		);
-		expect(splitSpeechSegments("miteinander = with each other", () => "de-DE")).toEqual(
-			[{ text: "miteinander = with each other", lang: "de-DE" }]
-		);
+		expect(
+			splitSpeechSegments("miteinander = with each other", halves)
+		).toEqual([
+			{ text: "miteinander", lang: "de-DE" },
+			{ text: "with each other", lang: "en-US" }
+		]);
+		expect(
+			splitSpeechSegments("miteinander = with each other", () => "de-DE")
+		).toEqual([{ text: "miteinander = with each other", lang: "de-DE" }]);
 	});
 });
 
@@ -443,9 +443,7 @@ describe("speechErrorStep", () => {
 		expect(speechErrorStep({ useNative: false, fellBack: false })).toBe(
 			"report"
 		);
-		expect(speechErrorStep({ useNative: true, fellBack: true })).toBe(
-			"report"
-		);
+		expect(speechErrorStep({ useNative: true, fellBack: true })).toBe("report");
 		expect(speechErrorStep({ useNative: false, fellBack: true })).toBe(
 			"report"
 		);
@@ -459,9 +457,9 @@ describe("message row voice state", () => {
 		// An unloaded inventory never disables; a loaded one without
 		// the locale does.
 		expect(messageSpeakableFor("web", "hello", "en-US", [])).toBe(true);
-		expect(messageSpeakableFor("web", "hello", "en-US", [{ lang: "ja-JP" }])).toBe(
-			false
-		);
+		expect(
+			messageSpeakableFor("web", "hello", "en-US", [{ lang: "ja-JP" }])
+		).toBe(false);
 		expect(messageSpeakableFor("native", "hello", "en-US", [])).toBe(true);
 	});
 
@@ -527,8 +525,14 @@ describe("webSpeechErrorCopy", () => {
 		expect(webSpeechErrorCopy("synthesis-failed", true)).toBe(
 			"No voices on this device — check its text-to-speech settings."
 		);
-		expect(webSpeechErrorCopy("voice-unavailable", false)).toBe("Voice not available.");
-		expect(webSpeechErrorCopy("audio-busy", false)).toBe("The audio output is busy.");
-		expect(webSpeechErrorCopy("Something else.", false)).toBe("Something else.");
+		expect(webSpeechErrorCopy("voice-unavailable", false)).toBe(
+			"Voice not available."
+		);
+		expect(webSpeechErrorCopy("audio-busy", false)).toBe(
+			"The audio output is busy."
+		);
+		expect(webSpeechErrorCopy("Something else.", false)).toBe(
+			"Something else."
+		);
 	});
 });

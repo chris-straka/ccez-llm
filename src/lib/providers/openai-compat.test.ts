@@ -348,7 +348,10 @@ describe("stream", () => {
 		const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
 			bodies.push(JSON.parse(init.body as string) as { tools?: unknown });
 			if (bodies.length === 1)
-				return sseResponse([sseToolCall("call_1", "example.com"), "data: [DONE]\n\n"]);
+				return sseResponse([
+					sseToolCall("call_1", "example.com"),
+					"data: [DONE]\n\n"
+				]);
 			return sseResponse([
 				`data: {"choices":[{"delta":{"content":"plain answer"}}]}\n\ndata: [DONE]\n\n`
 			]);
@@ -370,7 +373,9 @@ describe("stream", () => {
 		const controller = new AbortController();
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(async () => sseResponse([sseToolCall("call_1", "https://example.com/")]))
+			vi.fn(async () =>
+				sseResponse([sseToolCall("call_1", "https://example.com/")])
+			)
 		);
 		const fetchPage = vi.fn(async () => {
 			controller.abort();
@@ -378,7 +383,11 @@ describe("stream", () => {
 		});
 		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
 		const err = await provider
-			.stream([{ role: "user", content: "x" }], { onToken: () => {} }, { signal: controller.signal })
+			.stream(
+				[{ role: "user", content: "x" }],
+				{ onToken: () => {} },
+				{ signal: controller.signal }
+			)
 			.catch((e: unknown) => e);
 		expect(err).toBeInstanceOf(ProviderError);
 		expect((err as ProviderError).message).toBe("Reply stopped.");
@@ -712,7 +721,8 @@ describe("readSse", () => {
 	const chunks = async (...parts: string[]) => {
 		const stream = new ReadableStream<Uint8Array>({
 			start(controller) {
-				for (const part of parts) controller.enqueue(new TextEncoder().encode(part));
+				for (const part of parts)
+					controller.enqueue(new TextEncoder().encode(part));
 				controller.close();
 			}
 		});
@@ -726,10 +736,9 @@ describe("readSse", () => {
 			'{"a":1}',
 			"[DONE]"
 		]);
-		expect(await chunks('data: {"a":1}\r', "\n\r\ndata: [DONE]\r\n\r\n")).toEqual([
-			'{"a":1}',
-			"[DONE]"
-		]);
+		expect(
+			await chunks('data: {"a":1}\r', "\n\r\ndata: [DONE]\r\n\r\n")
+		).toEqual(['{"a":1}', "[DONE]"]);
 	});
 
 	it("keeps a last event the server never closed with a blank line", async () => {
@@ -757,7 +766,10 @@ describe("listModels through the shell (no CORS on the gateway)", () => {
 		const provider = new OpenAICompatProvider("opencode-zen", CONFIG, {
 			listModelsNative: native
 		});
-		await expect(provider.listModels()).resolves.toEqual(["big-pickle", "glm-5.3"]);
+		await expect(provider.listModels()).resolves.toEqual([
+			"big-pickle",
+			"glm-5.3"
+		]);
 		expect(native).toHaveBeenCalledWith("https://example.test/v1", "k");
 		expect(fetchMock).not.toHaveBeenCalled();
 	});

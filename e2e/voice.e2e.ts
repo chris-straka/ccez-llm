@@ -289,9 +289,7 @@ test.describe("ios-voice", () => {
 		await expect(
 			box.getByText("Show message buttons only when tapped")
 		).toBeVisible();
-		await expect(
-			box.getByText("Background on my messages")
-		).toBeVisible();
+		await expect(box.getByText("Background on my messages")).toBeVisible();
 	});
 
 	/** The voice picker lists every installed voice (no quality gate on iOS). */

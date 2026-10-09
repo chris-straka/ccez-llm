@@ -18,4 +18,3 @@ Root keeps what every session needs: `README.md` (what the app is),
 - `archive/android-native` branch — the pre-Tauri-mobile Kotlin app
   (Sep 29 2026 snapshot). Resurrect with
   `git worktree add ../ccez-llm-android archive/android-native`.
-

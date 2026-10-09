@@ -79,7 +79,12 @@ export async function nativeSaveMarkdown(
 	text: string,
 	deps: NativeSaveDeps = {}
 ): Promise<"saved" | "dismissed" | null> {
-	return nativeSaveText(filename, text, { name: "Markdown", extensions: ["md"] }, deps);
+	return nativeSaveText(
+		filename,
+		text,
+		{ name: "Markdown", extensions: ["md"] },
+		deps
+	);
 }
 
 /** Same contract as nativeSaveMarkdown, any one file type. */

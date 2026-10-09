@@ -20,7 +20,10 @@ function componentStyle(): string {
 }
 
 function pageSource(): string {
-	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("../../routes/+page.svelte", import.meta.url),
+		"utf8"
+	);
 }
 
 function pageStyle(): string {
@@ -32,10 +35,7 @@ function pageStyle(): string {
 describe("settings drawer surfaces", () => {
 	it("keeps no drawer selector in page style", () => {
 		const css = pageStyle();
-		for (const selector of [
-			".settings-panel",
-			".settings-inner"
-		]) {
+		for (const selector of [".settings-panel", ".settings-inner"]) {
 			expect(css, selector).not.toContain(selector);
 		}
 	});
@@ -45,9 +45,7 @@ describe("settings drawer surfaces", () => {
 		expect(css).toContain(".settings-panel {");
 		expect(css).toContain(".settings-panel.closed");
 		expect(css).toContain(".settings-inner");
-		expect(css).toContain(
-			":global(.app[data-android]) .settings-panel"
-		);
+		expect(css).toContain(":global(.app[data-android]) .settings-panel");
 		expect(css).toContain(".settings-panel[data-fade-scroll]");
 	});
 });

@@ -25,13 +25,8 @@
 	import { badgeHover } from "$lib/hoverWash";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
-	import {
-	type AnnotationMark,
-	type AnnotationId
-} from "$lib/annotations";
-import {
-	annRefsFor
-} from "$lib/annotation-block";
+	import { type AnnotationMark, type AnnotationId } from "$lib/annotations";
+	import { annRefsFor } from "$lib/annotation-block";
 	import { applyMarks } from "$lib/annotations-stamp";
 
 	interface Props {
@@ -170,7 +165,9 @@ import {
 	}: Props = $props();
 	/** Hyphenation dictionary for giant type (see .app[data-hyphenate]):
 	settled replies only, so streaming never re-scores every token. */
-	const bodyLang = $derived(streaming ? undefined : hyphenationLang(message.content));
+	const bodyLang = $derived(
+		streaming ? undefined : hyphenationLang(message.content)
+	);
 
 	let html = $state("");
 	let bodyEl: HTMLElement | undefined = $state();

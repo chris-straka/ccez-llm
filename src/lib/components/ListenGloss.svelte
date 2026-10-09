@@ -42,7 +42,9 @@ failed (with Try again). -->
 					open = !open;
 				}}
 			>
-				<svg class:open viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+				<svg class:open viewBox="0 0 16 16" aria-hidden="true"
+					><path d="M6 4l4 4-4 4" /></svg
+				>
 				English
 			</button>
 			{#if open}

@@ -17,14 +17,14 @@
 //! Compiled only on Android. Every other platform keeps the tts.rs stubs.
 
 use std::sync::{
-    OnceLock,
     atomic::{AtomicU64, Ordering},
+    OnceLock,
 };
 
 use jni::{
-    JNIEnv,
     objects::{GlobalRef, JClass, JObject, JString, JValue},
     sys::jlong,
+    JNIEnv,
 };
 use tauri::{AppHandle, Emitter};
 
@@ -48,7 +48,10 @@ struct DoneEvent {
     finished: bool,
 }
 
-fn with_env<T>(ctx: &str, f: impl FnOnce(&mut JNIEnv, &GlobalRef) -> Result<T, String>) -> Result<T, String> {
+fn with_env<T>(
+    ctx: &str,
+    f: impl FnOnce(&mut JNIEnv, &GlobalRef) -> Result<T, String>,
+) -> Result<T, String> {
     let vm = VM
         .get()
         .ok_or_else(|| format!("{ctx}: voice bridge not initialized"))?;
@@ -112,7 +115,8 @@ pub fn supported() -> bool {
         let out = env
             .call_static_method(cls, "supported", "()Z", &[])
             .map_err(|e| format!("supported() failed: {e:?}"))?;
-        out.z().map_err(|e| format!("bad supported() return: {e:?}"))
+        out.z()
+            .map_err(|e| format!("bad supported() return: {e:?}"))
     })
     .unwrap_or(false)
 }
@@ -168,9 +172,10 @@ pub fn open_tts_settings() -> Result<(), String> {
             .call_static_method(cls, "openTtsSettings", "()Ljava/lang/String;", &[])
             .map_err(|e| format!("openTtsSettings() failed: {e:?}"))?;
         let err: String = env
-            .get_string(&JString::from(out.l().map_err(|e| {
-                format!("bad openTtsSettings() return: {e:?}")
-            })?))
+            .get_string(&JString::from(
+                out.l()
+                    .map_err(|e| format!("bad openTtsSettings() return: {e:?}"))?,
+            ))
             .map_err(|e| format!("settings result failed: {e:?}"))?
             .to_string_lossy()
             .into_owned();
@@ -189,9 +194,9 @@ pub fn voices(app: &AppHandle) -> Result<Vec<NativeVoice>, String> {
             .call_static_method(cls, "voices", "()Ljava/lang/String;", &[])
             .map_err(|e| format!("voices() failed: {e:?}"))?;
         let text: String = env
-            .get_string(&JString::from(out.l().map_err(|e| {
-                format!("bad voices() return: {e:?}")
-            })?))
+            .get_string(&JString::from(
+                out.l().map_err(|e| format!("bad voices() return: {e:?}"))?,
+            ))
             .map_err(|e| format!("voice text failed: {e:?}"))?
             .to_string_lossy()
             .into_owned();
@@ -251,9 +256,10 @@ pub fn save_to_file(
             )
             .map_err(|e| format!("saveToFile() failed: {e:?}"))?;
         let path: String = env
-            .get_string(&JString::from(out.l().map_err(|e| {
-                format!("bad saveToFile() return: {e:?}")
-            })?))
+            .get_string(&JString::from(
+                out.l()
+                    .map_err(|e| format!("bad saveToFile() return: {e:?}"))?,
+            ))
             .map_err(|e| format!("speech path failed: {e:?}"))?
             .to_string_lossy()
             .into_owned();

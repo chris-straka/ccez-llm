@@ -13,10 +13,12 @@ import type { Page } from "@playwright/test";
 /** First mock headline (ships a feed image, renders an <img>). */
 export const MOCK_TITLE_IMG = "Tour Eiffel sparrows learn the Marseillaise";
 /** Second mock headline (imageless: the miss settles to a tile). */
-export const MOCK_TITLE_MISS = "Bakeries declare a croissant emergency across Lyon";
+export const MOCK_TITLE_MISS =
+	"Bakeries declare a croissant emergency across Lyon";
 export const MOCK_SOURCE_MISS = "Gazette de Lyon";
 /** Third mock headline (direct walls: the hidden leg finds it). */
-export const MOCK_TITLE_WALL = "Ramparts declare a ladder emergency across Carcassonne";
+export const MOCK_TITLE_WALL =
+	"Ramparts declare a ladder emergency across Carcassonne";
 export const MOCK_SOURCE_WALL = "Gazette du Midi";
 
 /** Three-item Google-shaped feed: titles read "Headline - Outlet". */
@@ -63,8 +65,7 @@ export async function seedMockShell(page: Page): Promise<void> {
 	await page.addInitScript(
 		(seed: { rss: string; article: string; zen: string[] }) => {
 			const decode = (link: string): string => {
-				const slug =
-					link.split("/").pop()?.split("?")[0]?.trim() || "story";
+				const slug = link.split("/").pop()?.split("?")[0]?.trim() || "story";
 				return `https://example.com/articles/${slug}`;
 			};
 			const shell = {
@@ -86,8 +87,9 @@ export async function seedMockShell(page: Page): Promise<void> {
 						throw new Error("bad-status:404");
 					}
 					if (cmd === "list_models") {
-						const calls = ((window as unknown as Record<string, unknown>)
-							.__listModelsCalls ??= []) as unknown[];
+						const calls = ((
+							window as unknown as Record<string, unknown>
+						).__listModelsCalls ??= []) as unknown[];
 						calls.push(args);
 						return {
 							status: 200,
@@ -107,8 +109,7 @@ export async function seedMockShell(page: Page): Promise<void> {
 					}
 					// Launch-time calls the app tolerates failing.
 					if (cmd === "keychain_get") return null;
-					if (cmd === "keychain_set" || cmd === "keychain_delete")
-						return null;
+					if (cmd === "keychain_set" || cmd === "keychain_delete") return null;
 					if (cmd === "plugin:event|listen") return 1;
 					throw new Error(`mock-shell: unhandled ${cmd}`);
 				},

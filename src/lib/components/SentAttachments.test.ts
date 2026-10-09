@@ -17,7 +17,6 @@ function componentSource(): string {
 	);
 }
 
-
 describe("sent attachment variants", () => {
 	it("keeps popup surfaces global for {@html}-rendered tags", () => {
 		const source = componentSource();

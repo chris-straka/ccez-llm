@@ -140,9 +140,7 @@ describe("quoteLangFor", () => {
 		// NLLanguageRecognizer reads "l'accident" as Catalan (~0.82);
 		// Catalan is outside the supported set, so orthography wins.
 		mockInvoke.mockResolvedValue("ca");
-		await expect(quoteLangFor("l'accident", "fr-FR")).resolves.toBe(
-			"fr-FR"
-		);
+		await expect(quoteLangFor("l'accident", "fr-FR")).resolves.toBe("fr-FR");
 	});
 
 	it("keeps the bridge tag when it matches the sentence voice", async () => {

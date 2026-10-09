@@ -644,7 +644,12 @@ describe("annotatedRunsWithOffsets", () => {
 			'<span class="frb">&lt;img src=x onerror=alert(1)&gt;<span class="frt">さ</span></span>き'
 		);
 		expect(runs).toEqual([
-			{ text: "<img src=x onerror=alert(1)>", reading: "さ", start: 0, end: 28 },
+			{
+				text: "<img src=x onerror=alert(1)>",
+				reading: "さ",
+				start: 0,
+				end: 28
+			},
 			{ text: "き", reading: null, start: 28, end: 29 }
 		]);
 		for (const run of runs!) {
@@ -695,9 +700,7 @@ describe("sliceRunsForQuote", () => {
 		)!;
 		const sentencePlain = sentenceRuns.map((r) => r.text).join("");
 		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "")).toBe(null);
-		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "富士山")).toBe(
-			null
-		);
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "富士山")).toBe(null);
 		expect(sliceRunsForQuote(null, sentencePlain, "桜")).toBe(null);
 	});
 
@@ -999,11 +1002,17 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("how the words fit together");
 		expect(system!.content).toContain("reusable vocabulary");
 		expect(system!.content).toContain("means on its own, as a bare gloss");
-		expect(system!.content).toContain('"Here it means" and its sense in this paragraph');
+		expect(system!.content).toContain(
+			'"Here it means" and its sense in this paragraph'
+		);
 	});
 
 	it("a bare-A filing gets a short gloss: the word alone, then here", () => {
-		const [system, user] = buildAnnotationAnswerMessages({ ...q, question: "", brief: true });
+		const [system, user] = buildAnnotationAnswerMessages({
+			...q,
+			question: "",
+			brief: true
+		});
 		expect(system!.content).toContain(`${ANNOTATION_BRIEF_WORDS} words`);
 		expect(system!.content).toContain("means on its own, as a bare gloss");
 		expect(system!.content).toContain('"Here it means"');
@@ -1019,7 +1028,9 @@ describe("annotationAnswer", () => {
 
 	it("answers in English even when the passage is not", () => {
 		const [system] = buildAnnotationAnswerMessages(q);
-		expect(system!.content).toContain("Write in English, whatever language the passage is in");
+		expect(system!.content).toContain(
+			"Write in English, whatever language the passage is in"
+		);
 	});
 
 	it("answers in the passage's language when the learner asks for it", () => {
@@ -1056,16 +1067,19 @@ describe("annotationAnswer", () => {
 	});
 
 	it("asks once per filing, rejecting blanks and empties", async () => {
-		const chat = vi.fn(async () => ({ content: "  short answer  ", usage: null }));
+		const chat = vi.fn(async () => ({
+			content: "  short answer  ",
+			usage: null
+		}));
 		const provider = {
 			id: "scripted",
 			chat,
 			stream: chat
 		} as unknown as ChatProvider;
 		await expect(annotationAnswer(provider, q)).resolves.toBe("short answer");
-		await expect(annotationAnswer(provider, { ...q, quote: "  " })).rejects.toThrow(
-			"Nothing to answer about"
-		);
+		await expect(
+			annotationAnswer(provider, { ...q, quote: "  " })
+		).rejects.toThrow("Nothing to answer about");
 		const empty = vi.fn(async () => ({ content: "  ", usage: null }));
 		const emptyProvider = {
 			id: "empty",

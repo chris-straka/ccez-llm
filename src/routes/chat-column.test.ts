@@ -26,7 +26,8 @@ function articleStyle(): string {
 
 function ruleBody(css: string, selector: string): string {
 	const match = css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`));
-	if (!match) throw new Error(`${selector} rule is gone — move the column guard with it`);
+	if (!match)
+		throw new Error(`${selector} rule is gone — move the column guard with it`);
 	return match[1]!;
 }
 

@@ -292,7 +292,9 @@ test("right-clicking kanji in japanese shows furigana and speaks", async ({
 	expect(await panel.locator(".spb").count()).toBe(0);
 	// Speech reads the sentence-correct kana, never the raw kanji
 	// (and waits for the worker conversion behind it).
-	await expect.poll(() => spoken(page), { timeout: 120_000 }).toContain("かんじ");
+	await expect
+		.poll(() => spoken(page), { timeout: 120_000 })
+		.toContain("かんじ");
 });
 
 /** A long pinyin line's glass hugs its longest laid-out line, never

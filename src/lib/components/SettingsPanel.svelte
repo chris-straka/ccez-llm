@@ -167,11 +167,11 @@
 </div>
 <ProviderPanel bind:settings {onCommit} />
 <DefaultsPanel
-		bind:settings
-		{androidUI}
-		{followVoice}
-		gameLineToggle={onGameLineToggle}
-	/>
+	bind:settings
+	{androidUI}
+	{followVoice}
+	gameLineToggle={onGameLineToggle}
+/>
 <AppearancePanel bind:settings />
 <div class="keys-updates">
 	<section aria-labelledby="keys-heading">

@@ -278,7 +278,9 @@ export interface AnchorRect {
  * wrapped group would anchor the same middle and stack. The first
  * fragment starts at the group's own kanji on every layout.
  */
-export function firstContentRect<T extends AnchorRect>(rects: readonly T[]): T | null {
+export function firstContentRect<T extends AnchorRect>(
+	rects: readonly T[]
+): T | null {
 	for (const rect of rects) {
 		if (rect.width > 0 && rect.height > 0) return rect;
 	}
@@ -308,10 +310,7 @@ export function readingPanelPlacement(opts: {
 }): { x: number; y: number; above: boolean } {
 	const { rect, viewportWidth, viewportHeight } = opts;
 	const cx = rect.left + rect.width / 2;
-	const x = Math.min(
-		Math.max(8, cx),
-		Math.max(8, viewportWidth - 8)
-	);
+	const x = Math.min(Math.max(8, cx), Math.max(8, viewportWidth - 8));
 	const headroom = rect.top >= 128;
 	const footroom = rect.bottom + 44 <= viewportHeight;
 	const above = headroom || !footroom;

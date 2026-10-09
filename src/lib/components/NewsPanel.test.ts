@@ -8,7 +8,10 @@ import { readFileSync } from "node:fs";
  * observe is checked here: the stylesheet's motion and color rules.
  */
 function panelCss(): string {
-	const source = readFileSync(new URL("./NewsPanel.svelte", import.meta.url), "utf8");
+	const source = readFileSync(
+		new URL("./NewsPanel.svelte", import.meta.url),
+		"utf8"
+	);
 	return source.split("<style>")[1] ?? "";
 }
 
@@ -19,7 +22,8 @@ describe("news panel stylesheet", () => {
 		expect(keyframes.length).toBeGreaterThan(0);
 		for (const block of keyframes) {
 			const props = [...block.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]);
-			for (const prop of props) expect(["transform", "opacity"]).toContain(prop);
+			for (const prop of props)
+				expect(["transform", "opacity"]).toContain(prop);
 		}
 		expect(css).toContain("prefers-reduced-motion: reduce");
 		expect(css).toContain("animation: none !important");

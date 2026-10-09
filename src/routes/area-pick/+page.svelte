@@ -59,8 +59,6 @@ degrade as every backend call. -->
 		};
 	}
 
-
-
 	function onPointerDown(event: PointerEvent): void {
 		if (event.button !== 0 || event.isPrimary === false) return;
 		if ((event.target as Element | null)?.closest("button")) return;
@@ -131,7 +129,8 @@ degrade as every backend call. -->
 			<span>Drag to set the square · Click for fullscreen · Esc cancels</span>
 			<button
 				type="button"
-				onclick={() => void submit({ rect: null, clear: true, debug: debugInfo() })}
+				onclick={() =>
+					void submit({ rect: null, clear: true, debug: debugInfo() })}
 			>
 				Clear saved area
 			</button>

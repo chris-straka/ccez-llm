@@ -160,10 +160,8 @@ fn turn_path(app: &AppHandle, turn_id: &str) -> Result<std::path::PathBuf, Strin
 }
 
 fn write_turn_file(app: &AppHandle, file: &TurnFile) -> Result<(), String> {
-    let bytes =
-        serde_json::to_vec_pretty(file).map_err(|e| format!("encode turn: {e}"))?;
-    std::fs::write(turn_path(app, &file.turn_id)?, bytes)
-        .map_err(|e| format!("write turn: {e}"))
+    let bytes = serde_json::to_vec_pretty(file).map_err(|e| format!("encode turn: {e}"))?;
+    std::fs::write(turn_path(app, &file.turn_id)?, bytes).map_err(|e| format!("write turn: {e}"))
 }
 
 /// Split freshly arrived SSE text into complete `data:` payloads,
@@ -325,16 +323,16 @@ struct SummaryRefresh {
 /// into a fresh summary; otherwise the prior text stands. A failed
 /// refresh falls back to the prior summary — the turn still runs
 /// windowed — so only the (to_use, refreshed) pair escapes.
-async fn resolve_summary(
-    client: &reqwest::Client,
-    req: &TurnRequest,
-) -> (String, Option<String>) {
+async fn resolve_summary(client: &reqwest::Client, req: &TurnRequest) -> (String, Option<String>) {
     if req.fold_text.is_empty() {
         return (req.prior_summary.clone(), None);
     }
     let history = vec![
         wire_message("system", SUMMARY_REFRESH_SYSTEM),
-        wire_message("user", &refresh_user_text(&req.prior_summary, &req.fold_text)),
+        wire_message(
+            "user",
+            &refresh_user_text(&req.prior_summary, &req.fold_text),
+        ),
     ];
     match post_plain(client, req, &history, false).await {
         Ok((content, _, _)) => {
@@ -392,9 +390,7 @@ fn wire_message(role: &str, content: &str) -> serde_json::Value {
 }
 
 type PageFetch = Arc<
-    dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
-        + Send
-        + Sync,
+    dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, String>> + Send>> + Send + Sync,
 >;
 
 fn default_page_fetch() -> PageFetch {
@@ -404,8 +400,7 @@ fn default_page_fetch() -> PageFetch {
         Box::pin(async move {
             let markup = crate::fetch::fetch_page(url.clone()).await?;
             Ok(crate::page_text::tool_text(&url, &markup))
-        })
-            as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        }) as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
     })
 }
 
@@ -445,9 +440,7 @@ fn join_calls(frags: &[ToolFrag]) -> Vec<ExecCall> {
         })
         // Unknown tools, id-less fragments, and empty URLs never
         // execute — same filter the TypeScript engine applies.
-        .filter(|call| {
-            !call.id.is_empty() && call.name == "fetch_url" && !call.url.is_empty()
-        })
+        .filter(|call| !call.id.is_empty() && call.name == "fetch_url" && !call.url.is_empty())
         .collect();
     out.sort_by(|a, b| a.id.cmp(&b.id));
     out
@@ -609,7 +602,10 @@ async fn post_stream(
     ev: &mut AttemptEvents,
 ) -> Result<(u16, String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
     let mut post = client
-        .post(format!("{}/chat/completions", req.base_url.trim_end_matches('/')))
+        .post(format!(
+            "{}/chat/completions",
+            req.base_url.trim_end_matches('/')
+        ))
         .header("Content-Type", "application/json")
         .header("Accept", "text/event-stream");
     if !req.api_key.is_empty() {
@@ -617,10 +613,8 @@ async fn post_stream(
     }
     // No `json` feature on this reqwest (see Cargo.toml): the body
     // goes out as pre-encoded bytes with the header set above.
-    let encoded =
-        serde_json::to_vec(&stream_body(req, history, tools)).map_err(|error| {
-            AttemptEnd::Fatal(format!("encode request: {error}"))
-        })?;
+    let encoded = serde_json::to_vec(&stream_body(req, history, tools))
+        .map_err(|error| AttemptEnd::Fatal(format!("encode request: {error}")))?;
     let res = post
         .body(encoded)
         .send()
@@ -657,15 +651,16 @@ async fn post_plain(
     tools: bool,
 ) -> Result<(String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
     let mut post = client
-        .post(format!("{}/chat/completions", req.base_url.trim_end_matches('/')))
+        .post(format!(
+            "{}/chat/completions",
+            req.base_url.trim_end_matches('/')
+        ))
         .header("Content-Type", "application/json");
     if !req.api_key.is_empty() {
         post = post.bearer_auth(&req.api_key);
     }
-    let encoded =
-        serde_json::to_vec(&plain_body(req, history, tools)).map_err(|error| {
-            AttemptEnd::Fatal(format!("encode request: {error}"))
-        })?;
+    let encoded = serde_json::to_vec(&plain_body(req, history, tools))
+        .map_err(|error| AttemptEnd::Fatal(format!("encode request: {error}")))?;
     let res = post
         .body(encoded)
         .send()
@@ -784,7 +779,8 @@ async fn run_attempt(
     // 400 with tools: providers that reject tool calls get one plain
     // turn, same fallback the TypeScript engine applies.
     if status == 400 {
-        let (content, _, usage) = post_stream_plain_fallback(client, req, &history, deadline, ev).await?;
+        let (content, _, usage) =
+            post_stream_plain_fallback(client, req, &history, deadline, ev).await?;
         return Ok((content, usage.or(first_usage)));
     }
     let mut pending = join_calls(&first_frags)
@@ -1089,7 +1085,11 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
                     "turn-fetch",
                     FetchEvent {
                         turn_id: turn_id.clone(),
-                        phase: if start { "start".to_string() } else { "end".to_string() },
+                        phase: if start {
+                            "start".to_string()
+                        } else {
+                            "end".to_string()
+                        },
                         url,
                     },
                 );
@@ -1139,7 +1139,14 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
             finish_turn(&app, &req, &live, Ok((content, usage)), refreshed).await;
         }
         TurnOutcome::Stopped => {
-            finish_turn(&app, &req, &live, Err("Reply stopped.".to_string()), refreshed).await;
+            finish_turn(
+                &app,
+                &req,
+                &live,
+                Err("Reply stopped.".to_string()),
+                refreshed,
+            )
+            .await;
         }
         TurnOutcome::Failed(error) => {
             finish_turn(&app, &req, &live, Err(error), refreshed).await;
@@ -1179,7 +1186,7 @@ async fn drive_attempts(
                 // server verdict outlives the retries verbatim instead.
                 return TurnOutcome::Failed(
                     note.unwrap_or_else(|| "Couldn't finish the reply. Try again.".to_string()),
-                )
+                );
             }
             Err(AttemptEnd::Retryable(_)) => {
                 (ev.on_retry_note)();
@@ -1192,7 +1199,6 @@ async fn drive_attempts(
         }
     }
 }
-
 
 async fn finish_turn(
     app: &AppHandle,
@@ -1303,19 +1309,9 @@ pub fn turn_scan(app: AppHandle) -> Result<Vec<TurnFile>, String> {
     let mut entries = std::fs::read_dir(&dir)
         .map_err(|e| format!("turns dir: {e}"))?
         .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            entry
-                .path()
-                .extension()
-                .is_some_and(|ext| ext == "json")
-        })
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
         .collect::<Vec<_>>();
-    entries.sort_by_key(|entry| {
-        entry
-            .metadata()
-            .and_then(|meta| meta.modified())
-            .ok()
-    });
+    entries.sort_by_key(|entry| entry.metadata().and_then(|meta| meta.modified()).ok());
     let mut out = Vec::new();
     for entry in entries {
         let bytes = match std::fs::read(entry.path()) {
@@ -1538,8 +1534,7 @@ mod tests {
 
     #[test]
     fn sse_split_keeps_partial_events() {
-        let (payloads, rest) =
-            extract_sse_payloads("", "data: {\"a\":1}\n\ndata: {\"b\":");
+        let (payloads, rest) = extract_sse_payloads("", "data: {\"a\":1}\n\ndata: {\"b\":");
         assert_eq!(payloads, vec!["{\"a\":1}".to_string()]);
         let (more, rest) = extract_sse_payloads(&rest, "2}\n\n");
         assert_eq!(more, vec!["{\"b\":2}".to_string()]);
@@ -1570,14 +1565,16 @@ mod tests {
         let mut decoder = SseDecoder::default();
         let mut payloads = decoder.push(b"data: {\"a\":1}\n\ndata: {\"usage\":2}\n");
         payloads.extend(decoder.finish());
-        assert_eq!(payloads, vec!["{\"a\":1}".to_string(), "{\"usage\":2}".to_string()]);
+        assert_eq!(
+            payloads,
+            vec!["{\"a\":1}".to_string(), "{\"usage\":2}".to_string()]
+        );
         assert!(SseDecoder::default().finish().is_empty());
     }
 
     #[test]
     fn sse_split_joins_multiline_data_and_crlf() {
-        let (payloads, rest) =
-            extract_sse_payloads("", "data: line1\r\ndata: line2\r\n\r\n");
+        let (payloads, rest) = extract_sse_payloads("", "data: line1\r\ndata: line2\r\n\r\n");
         assert_eq!(payloads, vec!["line1\nline2".to_string()]);
         assert_eq!(rest, "");
     }
@@ -1601,10 +1598,7 @@ mod tests {
 
     #[test]
     fn delta_tolerates_junk() {
-        assert_eq!(
-            delta_from_payload("not json"),
-            (String::new(), Vec::new())
-        );
+        assert_eq!(delta_from_payload("not json"), (String::new(), Vec::new()));
         assert_eq!(delta_from_payload("{}"), (String::new(), Vec::new()));
     }
 
@@ -1640,10 +1634,7 @@ mod tests {
     fn fetch_copy_maps_machine_codes() {
         assert_eq!(fetch_error_copy("timeout"), "That page took too long.");
         assert_eq!(fetch_error_copy("too-big"), "That page is too large.");
-        assert_eq!(
-            fetch_error_copy("failed"),
-            "That page couldn't be fetched."
-        );
+        assert_eq!(fetch_error_copy("failed"), "That page couldn't be fetched.");
     }
 
     #[test]
@@ -1790,8 +1781,7 @@ mod tests {
     }
 
     fn sse_text_body(text: &str) -> Vec<u8> {
-        let wire =
-            serde_json::json!({ "choices": [{ "delta": { "content": text } }] });
+        let wire = serde_json::json!({ "choices": [{ "delta": { "content": text } }] });
         format!("data: {}\n\ndata: [DONE]\n\n", wire).into_bytes()
     }
 
@@ -1894,8 +1884,7 @@ mod tests {
             Box::pin(async move {
                 assert_eq!(url, "http://example.test/page");
                 Ok::<String, String>("page text here".to_string())
-            })
-                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+            }) as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
         });
         let rec = Recorder {
             tokens: Arc::new(Mutex::new(Vec::new())),
@@ -1920,7 +1909,10 @@ mod tests {
         assert_eq!(*rec.tokens.lock().unwrap(), vec!["hi there"]);
         assert_eq!(
             *rec.fetches.lock().unwrap(),
-            vec![(true, "http://example.test/page".to_string()), (false, "http://example.test/page".to_string())]
+            vec![
+                (true, "http://example.test/page".to_string()),
+                (false, "http://example.test/page".to_string())
+            ]
         );
         assert_eq!(*rec.retries.lock().unwrap(), 0);
         // Tool round retracts the streamed prefix (no transport retry).
@@ -2147,10 +2139,7 @@ mod tests {
         // Two requests, not three: the follow-up's text is emitted as
         // the reply instead of discarded for a regenerating re-ask.
         assert_eq!(bodies.lock().unwrap().len(), 2);
-        assert_eq!(
-            *rec.tokens.lock().unwrap(),
-            vec!["answered from the page"]
-        );
+        assert_eq!(*rec.tokens.lock().unwrap(), vec!["answered from the page"]);
     }
 
     #[test]
@@ -2188,8 +2177,7 @@ mod tests {
             Box::pin(async move {
                 seen.lock().unwrap().push(url);
                 Ok::<String, String>("page text here".to_string())
-            })
-                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+            }) as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
         });
         let rec = Recorder {
             tokens: Arc::new(Mutex::new(Vec::new())),
@@ -2240,8 +2228,7 @@ mod tests {
         req.prior_summary = "old stuff".to_string();
         req.fold_text = "User: hi".to_string();
         req.fold_through = "m1".to_string();
-        let (to_use, refreshed) =
-            tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        let (to_use, refreshed) = tauri::async_runtime::block_on(resolve_summary(&client, &req));
         assert_eq!(to_use, "fresh summary");
         assert_eq!(refreshed, Some("fresh summary".to_string()));
         let bodies = bodies.lock().unwrap();
@@ -2260,8 +2247,7 @@ mod tests {
         let client = reqwest_client().unwrap();
         let mut req = test_request(1);
         req.prior_summary = "old stuff".to_string();
-        let (to_use, refreshed) =
-            tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        let (to_use, refreshed) = tauri::async_runtime::block_on(resolve_summary(&client, &req));
         assert_eq!(to_use, "old stuff");
         assert_eq!(refreshed, None);
     }
@@ -2281,8 +2267,7 @@ mod tests {
         let mut req = test_request(port);
         req.prior_summary = "old stuff".to_string();
         req.fold_text = "User: hi".to_string();
-        let (to_use, refreshed) =
-            tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        let (to_use, refreshed) = tauri::async_runtime::block_on(resolve_summary(&client, &req));
         // The turn still runs windowed on the prior text.
         assert_eq!(to_use, "old stuff");
         assert_eq!(refreshed, None);

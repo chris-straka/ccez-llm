@@ -25,13 +25,7 @@ export type ThemeMode = "system" | "light" | "dark";
  * a second field later — this list stays the swatch order.
  */
 export type OwnInkChoice =
-	| "pink"
-	| "blue"
-	| "green"
-	| "amber"
-	| "purple"
-	| "white"
-	| "off";
+	"pink" | "blue" | "green" | "amber" | "purple" | "white" | "off";
 
 /** Swatch order in Settings → Appearance (also the heal allowlist). */
 export const OWN_INK_CHOICES: readonly OwnInkChoice[] = [
@@ -537,7 +531,8 @@ export function validCaptureArea(
 	if (typeof value !== "object" || value === null) return false;
 	const area = value as Record<string, unknown>;
 	for (const key of ["x", "y", "width", "height"] as const) {
-		if (typeof area[key] !== "number" || !Number.isFinite(area[key])) return false;
+		if (typeof area[key] !== "number" || !Number.isFinite(area[key]))
+			return false;
 	}
 	const { x, y, width, height } = area as unknown as {
 		x: number;
@@ -923,9 +918,13 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				Math.max(MESSAGE_GAP_MIN, merged.messageGap)
 			);
 		}
-		if (!["off", "follow", "tap"].includes(merged.readerMode)) merged.readerMode = "off";
+		if (!["off", "follow", "tap"].includes(merged.readerMode))
+			merged.readerMode = "off";
 		if (![0, 1, 2, 3].includes(merged.readerWords)) merged.readerWords = 0;
-		if (typeof merged.voiceSpeed !== "number" || Number.isNaN(merged.voiceSpeed))
+		if (
+			typeof merged.voiceSpeed !== "number" ||
+			Number.isNaN(merged.voiceSpeed)
+		)
 			merged.voiceSpeed = VOICE_SPEED_DEFAULT;
 		else
 			merged.voiceSpeed = Math.min(
@@ -933,15 +932,20 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				Math.max(VOICE_SPEED_MIN, merged.voiceSpeed)
 			);
 		merged.voiceVolume =
-			typeof merged.voiceVolume === "number" && !Number.isNaN(merged.voiceVolume)
+			typeof merged.voiceVolume === "number" &&
+			!Number.isNaN(merged.voiceVolume)
 				? Math.min(1, Math.max(0, merged.voiceVolume))
 				: 1;
 		merged.listenVolume =
-			typeof merged.listenVolume === "number" && !Number.isNaN(merged.listenVolume)
+			typeof merged.listenVolume === "number" &&
+			!Number.isNaN(merged.listenVolume)
 				? Math.min(LISTEN_VOLUME_MAX, Math.max(0, merged.listenVolume))
 				: 1;
 		// Backfill line spacing on older saves; clamp strays into range.
-		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))
+		if (
+			typeof merged.lineHeight !== "number" ||
+			Number.isNaN(merged.lineHeight)
+		)
 			merged.lineHeight = LINE_HEIGHT_DEFAULT;
 		else
 			merged.lineHeight = Math.min(
@@ -1069,8 +1073,5 @@ export function stepFontScale(current: number, delta: number): number {
  * lands back on the current value.
  */
 export function stepChatWidth(current: number, delta: number): number {
-	return Math.min(
-		CHAT_WIDTH_MAX,
-		Math.max(CHAT_WIDTH_MIN, current + delta)
-	);
+	return Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, current + delta));
 }

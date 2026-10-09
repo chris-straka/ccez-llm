@@ -184,7 +184,9 @@ pub fn percent_decode(input: &str) -> String {
                 i += 1;
             }
             b'%' => {
-                let hex = bytes.get(i + 1..i + 3).and_then(|h| std::str::from_utf8(h).ok());
+                let hex = bytes
+                    .get(i + 1..i + 3)
+                    .and_then(|h| std::str::from_utf8(h).ok());
                 match hex.and_then(|h| u8::from_str_radix(h, 16).ok()) {
                     Some(v) => {
                         out.push(v);
@@ -221,7 +223,11 @@ pub fn pick_sent_text(copied: Option<String>, clipboard: Option<String>) -> Opti
     copied
         .as_deref()
         .and_then(crate::annotate::clean_external)
-        .or_else(|| clipboard.as_deref().and_then(crate::annotate::clean_external))
+        .or_else(|| {
+            clipboard
+                .as_deref()
+                .and_then(crate::annotate::clean_external)
+        })
 }
 
 /// Window fit (pure): a window larger than the monitor's work area
@@ -347,7 +353,11 @@ pub struct StudyLine {
 /// whole doc caps at [`MAX_SHEET_CHARS`] with a truncation note.
 pub fn study_sheet_markdown(title: &str, messages: &[StudyLine]) -> String {
     let title = title.trim();
-    let title = if title.is_empty() { "Untitled chat" } else { title };
+    let title = if title.is_empty() {
+        "Untitled chat"
+    } else {
+        title
+    };
     let kept: Vec<(&str, String)> = messages
         .iter()
         .map(|m| {
@@ -541,9 +551,7 @@ fn engage_sleep_guard(reason: &str) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("sleep guard failed to start: {e}"))?;
         let _ = reason;
-        *guard_child_slot()
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some(child);
+        *guard_child_slot().lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
         Ok(())
     }
     #[cfg(target_os = "windows")]
@@ -551,7 +559,7 @@ fn engage_sleep_guard(reason: &str) -> Result<(), String> {
         // Win32 thread execution state (vendored `windows` crate).
         // UNVERIFIED ON DEVICE: compiles only on Windows; covered here
         // by the `windows_sleep_flags` unit test, never run on hardware.
-        use windows::Win32::System::Power::{EXECUTION_STATE, SetThreadExecutionState};
+        use windows::Win32::System::Power::{SetThreadExecutionState, EXECUTION_STATE};
         let _ = reason;
         unsafe {
             SetThreadExecutionState(EXECUTION_STATE(windows_sleep_flags(true)));
@@ -578,9 +586,7 @@ fn engage_sleep_guard(reason: &str) -> Result<(), String> {
             .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|_| "sleep prevention is not supported on this session".to_string())?;
-        *guard_child_slot()
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some(child);
+        *guard_child_slot().lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
         Ok(())
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
@@ -594,16 +600,18 @@ fn engage_sleep_guard(reason: &str) -> Result<(), String> {
 fn disengage_sleep_guard() {
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::System::Power::{EXECUTION_STATE, SetThreadExecutionState};
+        use windows::Win32::System::Power::{SetThreadExecutionState, EXECUTION_STATE};
         unsafe {
             SetThreadExecutionState(EXECUTION_STATE(windows_sleep_flags(false)));
         }
     }
-    #[cfg(all(desktop, not(target_os = "windows"), any(target_os = "macos", target_os = "linux")))]
+    #[cfg(all(
+        desktop,
+        not(target_os = "windows"),
+        any(target_os = "macos", target_os = "linux")
+    ))]
     {
-        let mut slot = guard_child_slot()
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut slot = guard_child_slot().lock().unwrap_or_else(|e| e.into_inner());
         if let Some(mut child) = slot.take() {
             let _ = child.kill();
             let _ = child.wait();
@@ -673,7 +681,10 @@ fn fit_main_window(app: &AppHandle) {
         return;
     };
     let area = monitor.work_area();
-    if let Some((w, h)) = fit_to_work_area((size.width, size.height), (area.size.width, area.size.height)) {
+    if let Some((w, h)) = fit_to_work_area(
+        (size.width, size.height),
+        (area.size.width, area.size.height),
+    ) {
         let _ = window.set_size(tauri::PhysicalSize::new(w, h));
         let _ = window.center();
     }
@@ -754,14 +765,10 @@ fn ensure_single_instance(app: &AppHandle) {
             // so its focus_main actually raises the window.
             #[cfg(target_os = "windows")]
             unsafe {
-                use windows::Win32::UI::WindowsAndMessaging::{
-                    AllowSetForegroundWindow, ASFW_ANY,
-                };
+                use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY};
                 let _ = AllowSetForegroundWindow(ASFW_ANY);
             }
-            if let Ok(mut stream) =
-                std::net::TcpStream::connect(("127.0.0.1", SINGLETON_PORT))
-            {
+            if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", SINGLETON_PORT)) {
                 let msg = match link_arg {
                     Some(url) => encode_singleton(&SingletonMsg::OpenUrl(url)),
                     None => encode_singleton(&SingletonMsg::Focus),
@@ -916,7 +923,10 @@ mod tests {
 
     #[test]
     fn deep_link_new() {
-        assert_eq!(parse_deep_link("ccez://new"), Some(DeepLinkPayload::new_chat()));
+        assert_eq!(
+            parse_deep_link("ccez://new"),
+            Some(DeepLinkPayload::new_chat())
+        );
     }
 
     #[test]
@@ -942,7 +952,10 @@ mod tests {
             parse_deep_link("ccez-llm://chat/abc123"),
             Some(DeepLinkPayload::open_chat("abc123"))
         );
-        assert_eq!(parse_deep_link("ccez-llm://new/"), Some(DeepLinkPayload::new_chat()));
+        assert_eq!(
+            parse_deep_link("ccez-llm://new/"),
+            Some(DeepLinkPayload::new_chat())
+        );
         assert!(is_deep_link("ccez-llm://new"));
         assert!(is_deep_link("ccez://new"));
         assert!(!is_deep_link("ccez-llmx://new"));
@@ -998,9 +1011,15 @@ mod tests {
         // Fits: untouched.
         assert_eq!(fit_to_work_area((1200, 760), (1920, 1040)), None);
         // 1366x768 laptop (taskbar leaves ~720): height shrinks only.
-        assert_eq!(fit_to_work_area((1200, 760), (1366, 720)), Some((1200, 684)));
+        assert_eq!(
+            fit_to_work_area((1200, 760), (1366, 720)),
+            Some((1200, 684))
+        );
         // 125% on 1280x800 is physical 1280x752 here: both shrink.
-        assert_eq!(fit_to_work_area((1600, 1075), (1280, 752)), Some((1216, 715)));
+        assert_eq!(
+            fit_to_work_area((1600, 1075), (1280, 752)),
+            Some((1216, 715))
+        );
         // A monitor reporting nothing never zeroes the window.
         assert_eq!(fit_to_work_area((1200, 760), (0, 0)), None);
     }
@@ -1064,7 +1083,10 @@ mod tests {
 
     #[test]
     fn file_stem_sanitizes() {
-        assert_eq!(sanitize_file_stem("French verbs: être!"), "french-verbs-tre");
+        assert_eq!(
+            sanitize_file_stem("French verbs: être!"),
+            "french-verbs-tre"
+        );
         assert_eq!(sanitize_file_stem("???"), "chat");
         assert_eq!(sanitize_file_stem("  spaced  out  "), "spaced-out");
     }

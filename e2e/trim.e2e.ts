@@ -9,7 +9,10 @@ import { seedChat } from "./helpers";
  */
 const PAD = "padding ".repeat(150);
 
-function seedMessages(): Array<{ role: "user" | "assistant"; content: string }> {
+function seedMessages(): Array<{
+	role: "user" | "assistant";
+	content: string;
+}> {
 	const tags = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"];
 	return tags.map((tag, i) => ({
 		role: i % 2 === 0 ? "user" : "assistant",
@@ -44,7 +47,11 @@ test("trims above the hovered reply, folds the summary, undo restores", async ({
 		() => {
 			const chats = JSON.parse(
 				localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
-			) as Array<{ summary?: string; summaryThrough?: string; trimmedThrough?: string }>;
+			) as Array<{
+				summary?: string;
+				summaryThrough?: string;
+				trimmedThrough?: string;
+			}>;
 			const chat = chats[0];
 			return (
 				typeof chat?.summary === "string" &&
@@ -96,9 +103,12 @@ test("scroll selection stops at the trim point", async ({ page }) => {
 	await expect(page.locator("#msg-5")).toBeVisible({ timeout: 60_000 });
 	await hoverArticle(page, "msg-3");
 	await page.keyboard.press("t");
-	await expect(page.locator(".trim-marker")).toContainText("3 messages trimmed", {
-		timeout: 10_000
-	});
+	await expect(page.locator(".trim-marker")).toContainText(
+		"3 messages trimmed",
+		{
+			timeout: 10_000
+		}
+	);
 	await page.keyboard.press("Control+g");
 	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
 		timeout: 5_000

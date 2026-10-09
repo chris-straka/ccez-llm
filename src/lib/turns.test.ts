@@ -54,7 +54,11 @@ function settingsWith(
 
 function stateWithMessages(messages: ChatMsg[]): {
 	state: ChatState;
-	store: { data: Map<string, string>; getItem(k: string): string | null; setItem(k: string, v: string): void };
+	store: {
+		data: Map<string, string>;
+		getItem(k: string): string | null;
+		setItem(k: string, v: string): void;
+	};
 } {
 	const store = {
 		data: new Map<string, string>(),
@@ -149,7 +153,9 @@ describe("turnHistory", () => {
 		// the block, so both engines see the model's corrections alike
 		// (the render hides them; see renderMessage).
 		const reply = "Bien sûr !\n\n```correction\nJe vais au parc\n```";
-		expect(turnHistory([msg("u1", "user", "hi"), msg("a1", "assistant", reply)])).toEqual([
+		expect(
+			turnHistory([msg("u1", "user", "hi"), msg("a1", "assistant", reply)])
+		).toEqual([
 			{ role: "user", content: "hi" },
 			{ role: "assistant", content: reply }
 		]);
@@ -248,7 +254,11 @@ describe("applyTurnFile", () => {
 	it("fills a finished turn and reports streaming hands-off", () => {
 		const seeded = stateWithPlaceholder();
 		expect(
-			applyTurnFile(seeded.state, file("done", "hello", undefined), seeded.store)
+			applyTurnFile(
+				seeded.state,
+				file("done", "hello", undefined),
+				seeded.store
+			)
 		).toBe("applied");
 		expect(seeded.state.chats[0]!.messages[1]).toMatchObject({
 			content: "hello",
@@ -492,22 +502,14 @@ describe("nativeRouteFor", () => {
 	});
 
 	it("stays TypeScript off the native path", () => {
-		expect(
-			nativeRouteFor({ ...facts, shell: false }, [], settings)
-		).toBeNull();
-		expect(
-			nativeRouteFor({ ...facts, mock: true }, [], settings)
-		).toBeNull();
+		expect(nativeRouteFor({ ...facts, shell: false }, [], settings)).toBeNull();
+		expect(nativeRouteFor({ ...facts, mock: true }, [], settings)).toBeNull();
 	});
 });
 
 describe("errorTurnFile", () => {
 	it("settles an unpollable turn as a failed reply", () => {
-		const file = errorTurnFile(
-			"t" as TurnId,
-			"c" as ChatId,
-			"m" as ChatMsgId
-		);
+		const file = errorTurnFile("t" as TurnId, "c" as ChatId, "m" as ChatMsgId);
 		expect(file).toMatchObject({
 			turn_id: "t",
 			chat_id: "c",
@@ -524,7 +526,10 @@ describe("releaseNativeTurn", () => {
 	function owned(): NativeTurnOwnership {
 		return {
 			turns: new Map([
-				["t1" as TurnId, { chatId: "c1" as ChatId, replyId: "r1" as ChatMsgId }],
+				[
+					"t1" as TurnId,
+					{ chatId: "c1" as ChatId, replyId: "r1" as ChatMsgId }
+				],
 				["t2" as TurnId, { chatId: "c1" as ChatId, replyId: "r2" as ChatMsgId }]
 			]),
 			texts: new Map([["t1" as TurnId, "hi"]]),

@@ -86,7 +86,9 @@ describe("messageKeyAction", () => {
 	it("R over a message reruns it; Shift+R still reads it aloud", () => {
 		const r = { ...msgBase, key: "r", code: "KeyR" };
 		expect(messageKeyAction(r)).toBe("rerun-hovered");
-		expect(messageKeyAction({ ...r, key: "R", shiftKey: true })).toBe("speak-hovered");
+		expect(messageKeyAction({ ...r, key: "R", shiftKey: true })).toBe(
+			"speak-hovered"
+		);
 		expect(messageKeyAction({ ...r, hoveredIdx: -1 })).toBeNull();
 		expect(messageKeyAction({ ...r, inField: true })).toBeNull();
 		expect(messageKeyAction({ ...r, inEditor: true })).toBeNull();
@@ -98,7 +100,12 @@ describe("messageKeyAction", () => {
 			"annotate-selection"
 		);
 		expect(
-			messageKeyAction({ ...msgBase, hasSelection: true, shiftKey: true, key: "A" })
+			messageKeyAction({
+				...msgBase,
+				hasSelection: true,
+				shiftKey: true,
+				key: "A"
+			})
 		).toBe("annotate-empty");
 	});
 
@@ -165,7 +172,11 @@ describe("messageKeyAction", () => {
 		};
 		expect(messageKeyAction(shiftA)).toBe("annotate-empty");
 		expect(
-			messageKeyAction({ ...shiftA, hasSelection: false, hoverWord: "riverbank" })
+			messageKeyAction({
+				...shiftA,
+				hasSelection: false,
+				hoverWord: "riverbank"
+			})
 		).toBe("annotate-empty");
 		// Bare message Shift+A files nothing (no selection, no word).
 		expect(
@@ -176,9 +187,9 @@ describe("messageKeyAction", () => {
 			})
 		).toBe(null);
 		// CapsLock spelling (no shift flag) reads the same chord.
-		expect(
-			messageKeyAction({ ...shiftA, shiftKey: false })
-		).toBe("annotate-empty");
+		expect(messageKeyAction({ ...shiftA, shiftKey: false })).toBe(
+			"annotate-empty"
+		);
 		// Shift+A yields to fields like every other message hotkey.
 		expect(messageKeyAction({ ...shiftA, inField: true })).toBe(null);
 		// Headline hover word, no message index: opens empty too.
@@ -225,16 +236,22 @@ describe("messageKeyAction", () => {
 		const sel = { ...msgBase, key: "c", code: "KeyC", hasSelection: true };
 		expect(messageKeyAction(sel)).toBe("expand-selection");
 		// The pointer already left: a selection standing in message text still owns C.
-		expect(messageKeyAction({ ...sel, hoveredIdx: -1, selInMessage: true })).toBe(
-			"expand-selection"
-		);
-		expect(messageKeyAction({ ...sel, hoveredIdx: -1, selInMessage: false })).toBe(null);
+		expect(
+			messageKeyAction({ ...sel, hoveredIdx: -1, selInMessage: true })
+		).toBe("expand-selection");
+		expect(
+			messageKeyAction({ ...sel, hoveredIdx: -1, selInMessage: false })
+		).toBe(null);
 		expect(messageKeyAction({ ...sel, inField: true })).toBe(null);
 		expect(messageKeyAction({ ...sel, inEditable: true })).toBe(null);
-		expect(messageKeyAction({ ...sel, inEditor: true, selInMessage: false })).toBe(null);
+		expect(
+			messageKeyAction({ ...sel, inEditor: true, selInMessage: false })
+		).toBe(null);
 		expect(messageKeyAction({ ...sel, metaKey: true })).toBe(null);
 		// Shift+C stays the branch key.
-		expect(messageKeyAction({ ...sel, key: "C", shiftKey: true })).toBe("branch-hovered");
+		expect(messageKeyAction({ ...sel, key: "C", shiftKey: true })).toBe(
+			"branch-hovered"
+		);
 	});
 
 	it("trims only hovered, never shifted or in fields", () => {
@@ -296,7 +313,9 @@ describe("messageKeyAction", () => {
 			"speak-hovered"
 		);
 		// Bare letters are never branch/speak (bare R reruns instead).
-		expect(messageKeyAction({ ...msgBase, key: "r", code: "KeyR" })).toBe("rerun-hovered");
+		expect(messageKeyAction({ ...msgBase, key: "r", code: "KeyR" })).toBe(
+			"rerun-hovered"
+		);
 		// Chords, fields, editors, and no hover all yield.
 		expect(
 			messageKeyAction({ ...shifted, key: "C", code: "KeyC", metaKey: true })
@@ -418,18 +437,16 @@ describe("messageKeyAction", () => {
 
 	it("drops a hovered badge on bare Delete/Backspace, nothing else", () => {
 		const badge = { ...msgBase, hoverBadgeId: "ann-1" };
-		expect(messageKeyAction({ ...badge, key: "Delete" })).toBe(
-			"delete-badge"
-		);
+		expect(messageKeyAction({ ...badge, key: "Delete" })).toBe("delete-badge");
 		expect(messageKeyAction({ ...badge, key: "Backspace" })).toBe(
 			"delete-badge"
 		);
 		// No badge hovered: bare Delete stays dead (messages still
 		// need Shift+D, chats need Cmd).
 		expect(messageKeyAction({ ...msgBase, key: "Delete" })).toBe(null);
-		expect(messageKeyAction({ ...badge, hoverBadgeId: null, key: "Delete" })).toBe(
-			null
-		);
+		expect(
+			messageKeyAction({ ...badge, hoverBadgeId: null, key: "Delete" })
+		).toBe(null);
 		// Modifiers and typing targets keep their keys.
 		expect(messageKeyAction({ ...badge, key: "Delete", shiftKey: true })).toBe(
 			null
@@ -443,9 +460,9 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...badge, key: "Delete", inEditor: true })).toBe(
 			null
 		);
-		expect(messageKeyAction({ ...badge, key: "Delete", inEditable: true })).toBe(
-			null
-		);
+		expect(
+			messageKeyAction({ ...badge, key: "Delete", inEditable: true })
+		).toBe(null);
 	});
 });
 
@@ -557,19 +574,19 @@ describe("deleteScope", () => {
 		expect(deleteScope({ ...delBase, shiftKey: true, hovered: false })).toBe(
 			"chat"
 		);
-		expect(
-			deleteScope({ ...delBase, shiftKey: true, inEditor: true })
-		).toBe("chat");
-		expect(
-			deleteScope({ ...delBase, shiftKey: true, inEditable: true })
-		).toBe("chat");
+		expect(deleteScope({ ...delBase, shiftKey: true, inEditor: true })).toBe(
+			"chat"
+		);
+		expect(deleteScope({ ...delBase, shiftKey: true, inEditable: true })).toBe(
+			"chat"
+		);
 	});
 
 	it("keeps the plain chord for typing and line-kill habits", () => {
 		expect(deleteScope({ ...delBase, altKey: true })).toBe(null);
-		expect(
-			deleteScope({ ...delBase, metaKey: false, ctrlKey: false })
-		).toBe(null);
+		expect(deleteScope({ ...delBase, metaKey: false, ctrlKey: false })).toBe(
+			null
+		);
 		expect(deleteScope({ ...delBase, inEditor: true })).toBe(null);
 		expect(deleteScope({ ...delBase, inEditable: true })).toBe(null);
 		expect(deleteScope({ ...delBase, key: "d" })).toBe(null);
@@ -597,15 +614,11 @@ describe("pastesKeyAction", () => {
 
 	it("toggles folds in the editor, swallows elsewhere", () => {
 		expect(pastesKeyAction(pastesBase)).toBe("toggle");
-		expect(pastesKeyAction({ ...pastesBase, inEditor: false })).toBe(
-			"swallow"
-		);
+		expect(pastesKeyAction({ ...pastesBase, inEditor: false })).toBe("swallow");
 	});
 
 	it("ignores other chords", () => {
-		expect(pastesKeyAction({ ...pastesBase, pastesChord: false })).toBe(
-			null
-		);
+		expect(pastesKeyAction({ ...pastesBase, pastesChord: false })).toBe(null);
 	});
 });
 
@@ -614,9 +627,7 @@ describe("sendKeyAction", () => {
 
 	it("sends from anywhere but settings fields", () => {
 		expect(sendKeyAction(sendBase)).toBe("send");
-		expect(sendKeyAction({ ...sendBase, inField: true })).toBe(
-			"field-keeps"
-		);
+		expect(sendKeyAction({ ...sendBase, inField: true })).toBe("field-keeps");
 	});
 
 	it("ignores other chords", () => {
@@ -784,38 +795,58 @@ describe("commandChord", () => {
 		expect(commandChord({ ...win, code: "F11", key: "F11" })).toBe(
 			"toggle-fullscreen"
 		);
-		expect(commandChord({ ...win, ctrlKey: true, code: "KeyE", key: "e" })).toBe(
-			"edit-newest"
-		);
-		// Win+E belongs to Explorer.
-		expect(commandChord({ ...win, metaKey: true, code: "KeyE", key: "e" })).toBe(
-			null
-		);
-		expect(commandChord({ ...win, ctrlKey: true, code: "KeyK", key: "k" })).toBe(
-			"toggle-palette"
-		);
 		expect(
-			commandChord({ ...win, ctrlKey: true, code: "KeyK", key: "k", inShell: false })
+			commandChord({ ...win, ctrlKey: true, code: "KeyE", key: "e" })
+		).toBe("edit-newest");
+		// Win+E belongs to Explorer.
+		expect(
+			commandChord({ ...win, metaKey: true, code: "KeyE", key: "e" })
+		).toBe(null);
+		expect(
+			commandChord({ ...win, ctrlKey: true, code: "KeyK", key: "k" })
+		).toBe("toggle-palette");
+		expect(
+			commandChord({
+				...win,
+				ctrlKey: true,
+				code: "KeyK",
+				key: "k",
+				inShell: false
+			})
 		).toBe(null);
 		// The Mac keeps Ctrl+E (Cocoa end of line) and Ctrl+K (kill line).
-		expect(commandChord({ ...chordBase, ctrlKey: true, code: "KeyE", key: "e" })).toBe(
-			null
-		);
-		expect(commandChord({ ...chordBase, ctrlKey: true, code: "KeyK", key: "k" })).toBe(
-			null
-		);
+		expect(
+			commandChord({ ...chordBase, ctrlKey: true, code: "KeyE", key: "e" })
+		).toBe(null);
+		expect(
+			commandChord({ ...chordBase, ctrlKey: true, code: "KeyK", key: "k" })
+		).toBe(null);
 	});
 
 	it("ignores Ctrl+Alt chords while AltGr types a character", () => {
-		const altGr = { ...chordBase, isMac: false, ctrlKey: true, altKey: true, altGraph: true };
+		const altGr = {
+			...chordBase,
+			isMac: false,
+			ctrlKey: true,
+			altKey: true,
+			altGraph: true
+		};
 		expect(commandChord({ ...altGr, code: "KeyS", key: "ś" })).toBe(null);
 		expect(commandChord({ ...altGr, code: "KeyN", key: "ń" })).toBe(null);
-		expect(commandChord({ ...altGr, key: "ArrowRight", code: "ArrowRight" })).toBe(null);
+		expect(
+			commandChord({ ...altGr, key: "ArrowRight", code: "ArrowRight" })
+		).toBe(null);
 		const ctrlAlt = { ...altGr, altGraph: false };
-		expect(commandChord({ ...ctrlAlt, code: "KeyS", key: "s" })).toBe("toggle-voice");
+		expect(commandChord({ ...ctrlAlt, code: "KeyS", key: "s" })).toBe(
+			"toggle-voice"
+		);
 		// ⌥L types ¬ on a Mac: matched on the physical key.
-		expect(commandChord({ ...ctrlAlt, code: "KeyL", key: "¬" })).toBe("toggle-annotation-lang");
-		expect(commandChord({ ...ctrlAlt, code: "KeyN", key: "n" })).toBe("new-chat");
+		expect(commandChord({ ...ctrlAlt, code: "KeyL", key: "¬" })).toBe(
+			"toggle-annotation-lang"
+		);
+		expect(commandChord({ ...ctrlAlt, code: "KeyN", key: "n" })).toBe(
+			"new-chat"
+		);
 	});
 
 	it("matches every chord-table entry", () => {
@@ -934,7 +965,12 @@ describe("commandChord", () => {
 			"new-chat"
 		);
 		expect(
-			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyT" })
+			commandChord({
+				...chordBase,
+				inShell: false,
+				metaKey: true,
+				code: "KeyT"
+			})
 		).toBeNull();
 		expect(
 			commandChord({ ...chordBase, metaKey: true, altKey: true, code: "KeyT" })
@@ -945,13 +981,28 @@ describe("commandChord", () => {
 		// Print, find, and ⌘E (use selection for find) belong to
 		// the browser outside the shell.
 		expect(
-			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyP" })
+			commandChord({
+				...chordBase,
+				inShell: false,
+				metaKey: true,
+				code: "KeyP"
+			})
 		).toBe(null);
 		expect(
-			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyF" })
+			commandChord({
+				...chordBase,
+				inShell: false,
+				metaKey: true,
+				code: "KeyF"
+			})
 		).toBe(null);
 		expect(
-			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyE" })
+			commandChord({
+				...chordBase,
+				inShell: false,
+				metaKey: true,
+				code: "KeyE"
+			})
 		).toBe(null);
 		// The ⌘+Ctrl+F fullscreen chord has no browser claim: it works
 		// everywhere, as do send and the deliberate Ctrl+O swallow.
@@ -965,7 +1016,12 @@ describe("commandChord", () => {
 			})
 		).toBe("toggle-fullscreen");
 		expect(
-			commandChord({ ...chordBase, inShell: false, metaKey: true, key: "Enter" })
+			commandChord({
+				...chordBase,
+				inShell: false,
+				metaKey: true,
+				key: "Enter"
+			})
 		).toBe("send");
 		expect(
 			commandChord({ ...chordBase, inShell: false, ctrlKey: true, key: "o" })
@@ -1195,16 +1251,21 @@ describe("chromeChord", () => {
 		expect(
 			chromeChord({ ...chromeBase, key: "ArrowDown", code: "ArrowDown" })
 		).toBe("step-chat-newer");
-		expect(chromeChord({ ...chromeBase, key: "ArrowUp", code: "ArrowUp" })).toBe(
-			"step-chat-older"
-		);
-		expect(chromeChord({ ...chromeBase, metaKey: false, key: "ArrowDown" })).toBe(
-			null
-		);
+		expect(
+			chromeChord({ ...chromeBase, key: "ArrowUp", code: "ArrowUp" })
+		).toBe("step-chat-older");
+		expect(
+			chromeChord({ ...chromeBase, metaKey: false, key: "ArrowDown" })
+		).toBe(null);
 		// Browser preview: history, tab switching, and scroll edges
 		// stay native.
 		expect(
-			chromeChord({ ...chromeBase, inShell: false, key: "[", code: "BracketLeft" })
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				key: "[",
+				code: "BracketLeft"
+			})
 		).toBeNull();
 		expect(
 			chromeChord({
@@ -1215,14 +1276,29 @@ describe("chromeChord", () => {
 			})
 		).toBe("toggle-sidebar");
 		expect(
-			chromeChord({ ...chromeBase, inShell: false, key: "ArrowUp", code: "ArrowUp" })
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				key: "ArrowUp",
+				code: "ArrowUp"
+			})
 		).toBeNull();
 		// Fields and the prompt keep the plain brackets for caret travel.
 		expect(
-			chromeChord({ ...chromeBase, key: "[", code: "BracketLeft", inField: true })
+			chromeChord({
+				...chromeBase,
+				key: "[",
+				code: "BracketLeft",
+				inField: true
+			})
 		).toBeNull();
 		expect(
-			chromeChord({ ...chromeBase, key: "ArrowDown", code: "ArrowDown", inEditor: true })
+			chromeChord({
+				...chromeBase,
+				key: "ArrowDown",
+				code: "ArrowDown",
+				inEditor: true
+			})
 		).toBeNull();
 	});
 
@@ -1632,14 +1708,18 @@ describe("sidebarSpeakTarget", () => {
 	};
 
 	it("reads the hovered row first, else the walked row", () => {
-		expect(sidebarSpeakTarget({ ...base, hoveredRowId: "a", walkedRowId: "b" })).toBe("a");
+		expect(
+			sidebarSpeakTarget({ ...base, hoveredRowId: "a", walkedRowId: "b" })
+		).toBe("a");
 		expect(sidebarSpeakTarget({ ...base, walkedRowId: "b" })).toBe("b");
 		expect(sidebarSpeakTarget(base)).toBeNull();
 	});
 
 	it("needs bare Shift+R on an open list outside fields", () => {
 		const row = { ...base, hoveredRowId: "a" };
-		expect(sidebarSpeakTarget({ ...row, shiftKey: false, key: "r" })).toBeNull();
+		expect(
+			sidebarSpeakTarget({ ...row, shiftKey: false, key: "r" })
+		).toBeNull();
 		expect(sidebarSpeakTarget({ ...row, metaKey: true })).toBeNull();
 		expect(sidebarSpeakTarget({ ...row, listOpen: false })).toBeNull();
 		expect(sidebarSpeakTarget({ ...row, inField: true })).toBeNull();

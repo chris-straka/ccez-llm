@@ -4,17 +4,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 /** Shell-mode secrets: `invoke` stands in for the Rust Keychain commands. */
 const keychain = new Map<string, string>();
 let readFails = false;
-const invoke = vi.fn(async (cmd: string, args: { account: string; secret?: string }) => {
-	if (cmd === "keychain_get") {
-		if (readFails) throw new Error("User interaction is not allowed.");
-		return keychain.get(args.account) ?? null;
-	}
-	if (cmd === "keychain_set") {
-		keychain.set(args.account, args.secret ?? "");
+const invoke = vi.fn(
+	async (cmd: string, args: { account: string; secret?: string }) => {
+		if (cmd === "keychain_get") {
+			if (readFails) throw new Error("User interaction is not allowed.");
+			return keychain.get(args.account) ?? null;
+		}
+		if (cmd === "keychain_set") {
+			keychain.set(args.account, args.secret ?? "");
+			return null;
+		}
 		return null;
 	}
-	return null;
-});
+);
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
 const {
@@ -32,10 +34,12 @@ beforeEach(() => {
 	readFails = false;
 	invoke.mockClear();
 	resetSecretCacheForTests();
-	(window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ = {};
+	(window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__ =
+		{};
 });
 afterEach(() => {
-	delete (window as unknown as { __TAURI_INTERNALS__?: object }).__TAURI_INTERNALS__;
+	delete (window as unknown as { __TAURI_INTERNALS__?: object })
+		.__TAURI_INTERNALS__;
 });
 
 describe("secrets in the shell", () => {
@@ -59,7 +63,10 @@ describe("secrets in the shell", () => {
 	});
 
 	it("once the Keychain reads again, the save merges nothing away", async () => {
-		keychain.set(SECRET_BUNDLE_ACCOUNT, encodeSecretBundle({ muse: "muse-key" }));
+		keychain.set(
+			SECRET_BUNDLE_ACCOUNT,
+			encodeSecretBundle({ muse: "muse-key" })
+		);
 		const settings = defaultSettings();
 		settings.providers["muse"]!.apiKey = "";
 		settings.providers["deepseek"]!.apiKey = "";
@@ -78,7 +85,9 @@ describe("secrets in the shell", () => {
 		await hydrateSecrets(settings);
 		settings.providers["muse"]!.apiKey = "first";
 		await persistSecrets(settings);
-		expect(keychain.get(SECRET_BUNDLE_ACCOUNT)).toBe(encodeSecretBundle({ muse: "first" }));
+		expect(keychain.get(SECRET_BUNDLE_ACCOUNT)).toBe(
+			encodeSecretBundle({ muse: "first" })
+		);
 	});
 
 	it("shell storage always outlives a reload", async () => {

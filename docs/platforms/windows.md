@@ -12,9 +12,9 @@
 `.github/workflows/release.yml` builds two NSIS installers on the
 `windows-latest` (x64) runner, each with its updater signature:
 
-| Asset | Rust target |
-| --- | --- |
-| `CcezLLM-windows-x64-setup.exe` | `x86_64-pc-windows-msvc` |
+| Asset                             | Rust target                                |
+| --------------------------------- | ------------------------------------------ |
+| `CcezLLM-windows-x64-setup.exe`   | `x86_64-pc-windows-msvc`                   |
 | `CcezLLM-windows-arm64-setup.exe` | `aarch64-pc-windows-msvc` (cross-compiled) |
 
 `latest.json` carries `windows-x86_64` and `windows-aarch64`, so the in-app

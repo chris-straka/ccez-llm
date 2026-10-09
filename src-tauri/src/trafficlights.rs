@@ -72,21 +72,21 @@ impl ScreenRect {
 #[cfg(target_os = "macos")]
 mod imp {
     use std::ptr::NonNull;
-    use std::sync::OnceLock;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::OnceLock;
 
     use block2::RcBlock;
     use objc2::rc::Retained;
     use objc2::runtime::AnyObject;
-    use objc2::{AllocAnyThread, ClassType, define_class, msg_send};
+    use objc2::{define_class, msg_send, AllocAnyThread, ClassType};
     use objc2_app_kit::{
-        NSAnimationContext, NSButton, NSEvent, NSEventMask, NSResponder, NSWindow,
-        NSWindowButton, NSWindowStyleMask, NSWorkspace,
+        NSAnimationContext, NSButton, NSEvent, NSEventMask, NSResponder, NSWindow, NSWindowButton,
+        NSWindowStyleMask, NSWorkspace,
     };
     use objc2_app_kit::{NSTrackingArea, NSTrackingAreaOptions};
-    use objc2_foundation::{NSPoint, NSRect, NSObjectProtocol};
+    use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect};
 
-    use super::{FADE_SECS, ScreenRect, hover_pad, target_alpha};
+    use super::{hover_pad, target_alpha, ScreenRect, FADE_SECS};
 
     /// Live AppKit handle plus the last shown state (change-only
     /// fades: setting the animator target on every mouse move would
@@ -131,9 +131,7 @@ mod imp {
     );
 
     fn is_fullscreen(window: &NSWindow) -> bool {
-        window
-            .styleMask()
-            .contains(NSWindowStyleMask::FullScreen)
+        window.styleMask().contains(NSWindowStyleMask::FullScreen)
     }
 
     fn reduce_motion() -> bool {
@@ -229,10 +227,7 @@ mod imp {
         // SAFETY: block takes and returns a valid event pointer; the
         // leaked block and monitor token outlive the app.
         let token = unsafe {
-            NSEvent::addLocalMonitorForEventsMatchingMask_handler(
-                NSEventMask::MouseMoved,
-                &watcher,
-            )
+            NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::MouseMoved, &watcher)
         };
         std::mem::forget(watcher);
         // The token only names the monitor for removal; forgetting it
@@ -291,7 +286,7 @@ pub use imp::watch;
 
 #[cfg(test)]
 mod tests {
-    use super::{ScreenRect, hover_pad, target_alpha};
+    use super::{hover_pad, target_alpha, ScreenRect};
 
     #[test]
     fn resting_buttons_hide() {

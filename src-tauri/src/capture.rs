@@ -142,8 +142,7 @@ pub fn capture_failure_message(stderr: &str) -> String {
     if stderr.contains("does not intersect any displays")
         || stderr.contains("requires a valid rect")
     {
-        return "saved capture area is off screen: set it again with Shift+Cmd+U"
-            .to_string();
+        return "saved capture area is off screen: set it again with Shift+Cmd+U".to_string();
     }
     "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
         .to_string()
@@ -301,9 +300,7 @@ pub fn submit_area_rect(app: tauri::AppHandle, pick: AreaPick) -> Result<(), Str
     let mut measured: Option<(f64, f64)> = None;
     if pick.rect.is_some() {
         if let Some(picker) = app.get_webview_window("area-pick") {
-            if let (Ok(pos), Ok(scale)) =
-                (picker.outer_position(), picker.scale_factor())
-            {
+            if let (Ok(pos), Ok(scale)) = (picker.outer_position(), picker.scale_factor()) {
                 if scale > 0.0 {
                     let origin = (pos.x as f64 / scale, pos.y as f64 / scale);
                     measured = Some(origin);
@@ -374,8 +371,8 @@ pub fn capture_window(
 
 #[cfg(target_os = "macos")]
 mod imp {
-    use super::{WindowInfo, choose_source};
-    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    use super::{choose_source, WindowInfo};
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
     use objc2::runtime::AnyObject;
     use objc2_foundation::{NSArray, NSDictionary, NSString};
     use std::ffi::c_void;
@@ -439,8 +436,7 @@ mod imp {
             return Err("the window list is unavailable".to_string());
         }
         let windows = {
-            let array =
-                unsafe { &*(raw as *const NSArray<NSDictionary<NSString, AnyObject>>) };
+            let array = unsafe { &*(raw as *const NSArray<NSDictionary<NSString, AnyObject>>) };
             let own_pid = std::process::id() as i64;
             let mut out = Vec::new();
             for dict in array.iter().take(MAX_WINDOWS) {
@@ -478,8 +474,8 @@ mod imp {
     /// Read a finished capture off disk as base64 PNG, removing the
     /// temp file either way.
     fn read_capture(path: &std::path::Path) -> Result<String, String> {
-        let bytes = std::fs::read(path)
-            .map_err(|_| "the captured image could not be read".to_string())?;
+        let bytes =
+            std::fs::read(path).map_err(|_| "the captured image could not be read".to_string())?;
         let _ = std::fs::remove_file(path);
         Ok(BASE64.encode(&bytes))
     }
@@ -488,7 +484,12 @@ mod imp {
         let path = temp_png();
         let path_arg = path.to_string_lossy().into_owned();
         let output = std::process::Command::new("/usr/sbin/screencapture")
-            .args(["-x", "-o", &super::rect_flag(x, y, width, height), &path_arg])
+            .args([
+                "-x",
+                "-o",
+                &super::rect_flag(x, y, width, height),
+                &path_arg,
+            ])
             .output()
             .map_err(|_| "screen capture could not start".to_string())?;
         if !output.status.success() {
@@ -584,9 +585,9 @@ mod imp {
             .map_err(|_| "screen capture could not start".to_string())?;
         if !output.status.success() {
             let _ = std::fs::remove_file(&path);
-            return Err(super::capture_failure_message(
-                &String::from_utf8_lossy(&output.stderr),
-            ));
+            return Err(super::capture_failure_message(&String::from_utf8_lossy(
+                &output.stderr,
+            )));
         }
         read_capture(&path)
     }
@@ -594,7 +595,7 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    use super::{InteractiveKind, WindowInfo, choose_source, interactive_flag, rect_flag};
+    use super::{choose_source, interactive_flag, rect_flag, InteractiveKind, WindowInfo};
 
     fn window(id: u32, owner: &str) -> WindowInfo {
         WindowInfo {
@@ -648,9 +649,7 @@ mod tests {
             "saved capture area is off screen: set it again with Shift+Cmd+U"
         );
         assert_eq!(
-            super::capture_failure_message(
-                "screencapture: -R requires a valid rect (x,y,w,h)\n"
-            ),
+            super::capture_failure_message("screencapture: -R requires a valid rect (x,y,w,h)\n"),
             "saved capture area is off screen: set it again with Shift+Cmd+U"
         );
     }

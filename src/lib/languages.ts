@@ -66,7 +66,15 @@ export const ASIAN_LANGUAGES: ReplyLanguage[] = [
 	LANG("zh", "Chinese", "zh-CN", "🇹🇼", "中文", "已清除"),
 	LANG("ja", "Japanese", "ja-JP", "🇯🇵", "日本語", "クリア"),
 	LANG("ko", "Korean", "ko-KR", "🇰🇷", "한국어", "지워짐"),
-	LANG("ar", "Arabic (MSA)", "ar-SA", "🇸🇦", "العربية", "تم المسح", "Reply in Modern Standard Arabic."),
+	LANG(
+		"ar",
+		"Arabic (MSA)",
+		"ar-SA",
+		"🇸🇦",
+		"العربية",
+		"تم المسح",
+		"Reply in Modern Standard Arabic."
+	),
 	LANG("hi", "Hindi", "hi-IN", "🇮🇳", "हिन्दी", "साफ़ किया गया"),
 	// No unclaimed flag (🇮🇳/🇵🇰 ride with Hindi/Urdu), so the
 	// Gurmukhi initial marks it — still non-ASCII and menu-unique.
@@ -83,24 +91,104 @@ export const ASIAN_LANGUAGES: ReplyLanguage[] = [
 	LANG("ta", "Tamil", "ta-IN", "🇱🇰", "தமிழ்", "அழிக்கப்பட்டது"),
 	LANG("tl", "Tagalog", "fil-PH", "🇵🇭", "Tagalog", "Na-clear"),
 	LANG("ms", "Malay", "ms-MY", "🇲🇾", "Bahasa Melayu", "Dipadam"),
-	LANG("yue", "Cantonese", "zh-HK", "🇭🇰", "粵語", "已清除", "Reply in Cantonese.")
+	LANG(
+		"yue",
+		"Cantonese",
+		"zh-HK",
+		"🇭🇰",
+		"粵語",
+		"已清除",
+		"Reply in Cantonese."
+	)
 ];
 
 export const CLASSICAL_LANGUAGES: ReplyLanguage[] = [
-	LANG("la", "Latin", "it-IT", "🏛\uFE0F", "Latina", "Deletum", "Reply in Latin."),
-	LANG("grc", "Ancient Greek", "el-GR", "🏺", "Ἀρχαία Ἑλληνικά", "Διαγέγραπται", "Reply in Ancient Greek."),
-	LANG("sa", "Sanskrit", "hi-IN", "🪷", "संस्कृतम्", "विलुप्तम्", "Reply in Sanskrit."),
+	LANG(
+		"la",
+		"Latin",
+		"it-IT",
+		"🏛\uFE0F",
+		"Latina",
+		"Deletum",
+		"Reply in Latin."
+	),
+	LANG(
+		"grc",
+		"Ancient Greek",
+		"el-GR",
+		"🏺",
+		"Ἀρχαία Ἑλληνικά",
+		"Διαγέγραπται",
+		"Reply in Ancient Greek."
+	),
+	LANG(
+		"sa",
+		"Sanskrit",
+		"hi-IN",
+		"🪷",
+		"संस्कृतम्",
+		"विलुप्तम्",
+		"Reply in Sanskrit."
+	),
 	// Voices are modern approximations (Icelandic for Old Norse,
 	// British English for Old English, Iraqi Arabic for the
 	// Mesopotamian isolates, Mandarin for Classical Chinese,
 	// Israeli Hebrew for Biblical Hebrew); runes and cuneiform
 	// badge them.
-	LANG("non", "Old Norse", "is-IS", "ᚠ", "Norrœnt", "Hreinsat", "Reply in Old Norse."),
-	LANG("ang", "Old English", "en-GB", "ᚦ", "Englisċ", "Āclǣnsod", "Reply in Old English."),
-	LANG("sux", "Sumerian", "ar-SA", "𒆠", "Emegir", "dadag-ga", "Reply in Sumerian."),
-	LANG("akk", "Babylonian", "ar-SA", "𒀭", "Akkadûm", "ebbu", "Reply in Babylonian."),
-	LANG("lzh", "Classical Chinese", "zh-CN", "文", "文言文", "已清", "Reply in Classical Chinese."),
-	LANG("hbo", "Biblical Hebrew", "he-IL", "📜", "עברית מקראית", "נמחה", "Reply in Biblical Hebrew.")
+	LANG(
+		"non",
+		"Old Norse",
+		"is-IS",
+		"ᚠ",
+		"Norrœnt",
+		"Hreinsat",
+		"Reply in Old Norse."
+	),
+	LANG(
+		"ang",
+		"Old English",
+		"en-GB",
+		"ᚦ",
+		"Englisċ",
+		"Āclǣnsod",
+		"Reply in Old English."
+	),
+	LANG(
+		"sux",
+		"Sumerian",
+		"ar-SA",
+		"𒆠",
+		"Emegir",
+		"dadag-ga",
+		"Reply in Sumerian."
+	),
+	LANG(
+		"akk",
+		"Babylonian",
+		"ar-SA",
+		"𒀭",
+		"Akkadûm",
+		"ebbu",
+		"Reply in Babylonian."
+	),
+	LANG(
+		"lzh",
+		"Classical Chinese",
+		"zh-CN",
+		"文",
+		"文言文",
+		"已清",
+		"Reply in Classical Chinese."
+	),
+	LANG(
+		"hbo",
+		"Biblical Hebrew",
+		"he-IL",
+		"📜",
+		"עברית מקראית",
+		"נמחה",
+		"Reply in Biblical Hebrew."
+	)
 ];
 
 export const AFRICAN_LANGUAGES: ReplyLanguage[] = [
@@ -316,9 +404,7 @@ export function stepPillVoice(
 	localeForCode: (code: string) => string | null
 ): PillVoiceState {
 	if (activeCode === state.appliedPill) return state;
-	const oldVoice = state.appliedPill
-		? localeForCode(state.appliedPill)
-		: null;
+	const oldVoice = state.appliedPill ? localeForCode(state.appliedPill) : null;
 	const { pillBaseVoice } = state;
 	let { voiceLang, voiceLangPinned } = state;
 	if (oldVoice && pillBaseVoice !== null && voiceLang === oldVoice) {
@@ -442,7 +528,10 @@ export const TYPEAHEAD_RESET_MS = 800;
  * English names first, then native names, in display order. Null
  * when nothing starts with it. Pure.
  */
-export function typeaheadMatch(langs: ReplyLanguage[], query: string): number | null {
+export function typeaheadMatch(
+	langs: ReplyLanguage[],
+	query: string
+): number | null {
 	const q = foldForMatch(query.trim());
 	if (!q) return null;
 	const byName = langs.findIndex((l) => foldForMatch(l.name).startsWith(q));

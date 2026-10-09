@@ -368,7 +368,8 @@ export function ocrScriptLangs(
 	if (name.includes("japan")) return ["jpn", "eng"];
 	// Korean before Chinese: "hangul" contains "han".
 	if (name.includes("korea") || name.includes("hangul")) return ["kor", "eng"];
-	if (name.includes("chin") || name.includes("han")) return ["chi_sim", "chi_tra", "eng"];
+	if (name.includes("chin") || name.includes("han"))
+		return ["chi_sim", "chi_tra", "eng"];
 	// Cyrillic without a country guess: the two big models share the
 	// read (mirrors the bg/sr shared-base convention), English rides
 	// along for mixed UI.
@@ -401,7 +402,9 @@ export async function detectFallbackScript(
 		if (!pending) {
 			pending = (async () => {
 				const { createWorker } = await import("tesseract.js");
-				const worker = (await createWorker(["osd"])) as unknown as FallbackWorker;
+				const worker = (await createWorker([
+					"osd"
+				])) as unknown as FallbackWorker;
 				return worker;
 			})().catch((error: unknown) => {
 				fallbackWorkers.delete(key);

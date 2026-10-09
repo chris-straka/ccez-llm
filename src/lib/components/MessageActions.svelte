@@ -231,8 +231,7 @@ cover an off state. -->
 				{#each localKinds as localKind (localKind)}
 					{@const showOriginal = LOCAL_AID_SHOW_ORIGINAL[localKind]}
 					{#if pinnedKinds.includes(localKind)}
-						{@const furiganaBusy =
-							localKind === "furigana" && aidBusy}
+						{@const furiganaBusy = localKind === "furigana" && aidBusy}
 						<button
 							type="button"
 							class="aid-btn"
@@ -256,8 +255,9 @@ cover an off state. -->
 							onmouseleave={() => actions.unpeekAid()}
 							onclick={() => actions.pinLocalAid(localKind)}
 						>
-							{LOCAL_AID_BUTTON[localKind]}{#if localKind === "furigana" &&
-							aidBusy}<span
+							{LOCAL_AID_BUTTON[
+								localKind
+							]}{#if localKind === "furigana" && aidBusy}<span
 									class="tdots"
 									aria-hidden="true"
 									><span>.</span><span>.</span><span>.</span></span
@@ -411,15 +411,23 @@ cover an off state. -->
 	:global(main.hover-user) :global(article.user) .actions:hover,
 	:global(main.hover-user) :global(article.user) .actions:focus-within,
 	:global(main.hover-assistant) :global(article.assistant:hover) .actions,
-	:global(main.hover-assistant) :global(article.assistant:focus-within) .actions,
+	:global(main.hover-assistant)
+		:global(article.assistant:focus-within)
+		.actions,
 	:global(main.hover-assistant) :global(article.assistant) .actions:hover,
-	:global(main.hover-assistant) :global(article.assistant) .actions:focus-within {
+	:global(main.hover-assistant)
+		:global(article.assistant)
+		.actions:focus-within {
 		opacity: 1;
 	}
 	/* Hovering the refs count never summons the row: the pill is the
 	article's child, so without this the row would rise under it. */
-	:global(main.hover-user) :global(article.user):has(:global(.ann-refs-pill):hover) .actions,
-	:global(main.hover-assistant) :global(article.assistant):has(:global(.ann-refs-pill):hover) .actions {
+	:global(main.hover-user)
+		:global(article.user):has(:global(.ann-refs-pill):hover)
+		.actions,
+	:global(main.hover-assistant)
+		:global(article.assistant):has(:global(.ann-refs-pill):hover)
+		.actions {
 		opacity: 0;
 	}
 	/* A message being read aloud keeps its row up while the audio
@@ -432,7 +440,9 @@ cover an off state. -->
 	/* Same while an aid loads (tashkeel run, furigana conversion):
 	the row summoned the work, so it stays until the work lands. */
 	:global(main.hover-user) :global(article.user.aid-loading) .actions,
-	:global(main.hover-assistant) :global(article.assistant.aid-loading) .actions {
+	:global(main.hover-assistant)
+		:global(article.assistant.aid-loading)
+		.actions {
 		opacity: 1;
 	}
 	@media (hover: none) {
@@ -447,13 +457,18 @@ cover an off state. -->
 	:global(main.hide-messages) :global(article) .actions {
 		opacity: 0;
 	}
-	:global(main.hide-messages) :global(article[data-actions-open="true"]) .actions {
+	:global(main.hide-messages)
+		:global(article[data-actions-open="true"])
+		.actions {
 		opacity: 1;
 	}
 	/* Touch default: action rows hide until their message is tapped
 	open (the open row shows for 3s). Later than the hover rules and
 	outranking them, so it wins ties. */
-	:global(.app[data-android]) :global(main.hide-buttons) :global(article) .actions {
+	:global(.app[data-android])
+		:global(main.hide-buttons)
+		:global(article)
+		.actions {
 		opacity: 0;
 		pointer-events: none;
 		will-change: opacity;
@@ -479,7 +494,10 @@ cover an off state. -->
 	/* The row scales with the text-size opt-in; phones keep the 2x
 	cap while desktop glyphs track to 4x — huge type never strands
 	tiny buttons on either. */
-	:global(.app[data-android]) :global(main.hide-buttons.scale-actions) .actions button {
+	:global(.app[data-android])
+		:global(main.hide-buttons.scale-actions)
+		.actions
+		button {
 		font-size: calc(0.75rem * min(var(--font-scale, 1), 2));
 	}
 	:global(.app[data-android])
@@ -637,7 +655,10 @@ cover an off state. -->
 		button[data-tip="Copy as plain text"] {
 		order: 2;
 	}
-	:global(.app[data-android]) :global(article.user) .actions button[data-tip="Branch from here"] {
+	:global(.app[data-android])
+		:global(article.user)
+		.actions
+		button[data-tip="Branch from here"] {
 		order: 3;
 	}
 	:global(.app[data-android])
@@ -646,13 +667,22 @@ cover an off state. -->
 		button[data-tip^="Delete this message"] {
 		order: 4;
 	}
-	:global(.app[data-android]) :global(article.user) .actions button[data-tip="Edit"] {
+	:global(.app[data-android])
+		:global(article.user)
+		.actions
+		button[data-tip="Edit"] {
 		order: 5;
 	}
-	:global(.app[data-android]) :global(article.user) .actions button[data-tip="Save edit"] {
+	:global(.app[data-android])
+		:global(article.user)
+		.actions
+		button[data-tip="Save edit"] {
 		order: 5;
 	}
-	:global(.app[data-android]) :global(article.user) .actions button[data-tip="Rerun"] {
+	:global(.app[data-android])
+		:global(article.user)
+		.actions
+		button[data-tip="Rerun"] {
 		order: 6;
 	}
 </style>

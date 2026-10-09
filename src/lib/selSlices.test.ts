@@ -68,18 +68,18 @@ describe("selMenuWidthEstimate", () => {
 
 describe("correctSelMenuX", () => {
 	it("pulls desktop overflow back on screen, null when settled", () => {
-		expect(
-			correctSelMenuX({ x: 900, left: 0, w: 10 }, 200, 1000, false)
-		).toBe(792);
+		expect(correctSelMenuX({ x: 900, left: 0, w: 10 }, 200, 1000, false)).toBe(
+			792
+		);
 		expect(correctSelMenuX({ x: 100, left: 0, w: 10 }, 200, 1000, false)).toBe(
 			null
 		);
 	});
 
 	it("centers phones on the highlight middle, clamped on screen", () => {
-		expect(
-			correctSelMenuX({ x: 0, left: 400, w: 100 }, 200, 1000, true)
-		).toBe(350);
+		expect(correctSelMenuX({ x: 0, left: 400, w: 100 }, 200, 1000, true)).toBe(
+			350
+		);
 		expect(
 			correctSelMenuX({ x: 350, left: 400, w: 100 }, 200, 1000, true)
 		).toBe(null);

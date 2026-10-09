@@ -345,7 +345,10 @@ whenever the tray area is active. -->
 	/* Mobile light theme: the blue wash already shouts — the kind
 	pills and OCR read quieter at semibold instead of bold. */
 	:global(html[data-theme="light"]) :global(.app[data-android]) .file-kind,
-	:global(html[data-theme="light"]) :global(.app[data-android]) .attachments .ocr-btn {
+	:global(html[data-theme="light"])
+		:global(.app[data-android])
+		.attachments
+		.ocr-btn {
 		font-weight: 600;
 	}
 	/* Dark theme: the pill × keeps its rule (light --focus against

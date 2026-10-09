@@ -18,9 +18,9 @@ use std::sync::{mpsc, OnceLock};
 #[cfg(desktop)]
 use std::time::{Duration, Instant};
 
-use tauri::AppHandle;
 #[cfg(desktop)]
 use tauri::utils::config::BackgroundThrottlingPolicy;
+use tauri::AppHandle;
 #[cfg(desktop)]
 use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -46,7 +46,8 @@ const META_TIMEOUT: Duration = Duration::from_secs(3);
 /// Ready-state probe: always a JSON string (Windows swallows eval
 /// exceptions, so every snippet try/catches and stringifies).
 #[cfg(any(test, desktop))]
-const READY_JS: &str = r#"(() => { try { return document.readyState; } catch (e) { return "unknown"; } })()"#;
+const READY_JS: &str =
+    r#"(() => { try { return document.readyState; } catch (e) { return "unknown"; } })()"#;
 /// Share metas as one JSON string: og:image first, twitter:image next.
 #[cfg(any(test, desktop))]
 const METAS_JS: &str = r#"(() => { try {
@@ -111,10 +112,7 @@ fn resolve_candidate(page_url: &str, candidate: &str) -> Option<String> {
         return None;
     }
     let lower = cand.to_ascii_lowercase();
-    if lower.starts_with("http://")
-        || lower.starts_with("https://")
-        || lower.starts_with("data:")
-    {
+    if lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("data:") {
         return Some(cand.to_string());
     }
     let scheme_end = page_url.find("://")?;
@@ -176,7 +174,8 @@ fn read_from_window(window: &WebviewWindow, page_url: &str) -> Result<Option<Str
     std::thread::sleep(SETTLE_AFTER_COMPLETE);
     let raw = eval_blocking(window, METAS_JS, META_TIMEOUT).ok_or_else(|| "failed".to_string())?;
     let inner = eval_string(&raw).ok_or_else(|| "failed".to_string())?;
-    let metas: ShareMetas = serde_json::from_str(&inner).unwrap_or(ShareMetas { og: None, tw: None });
+    let metas: ShareMetas =
+        serde_json::from_str(&inner).unwrap_or(ShareMetas { og: None, tw: None });
     let picked = pick_share_image(metas.og.as_deref(), metas.tw.as_deref());
     Ok(picked.and_then(|c| resolve_candidate(page_url, &c)))
 }
@@ -201,7 +200,9 @@ fn read_share_image(app: AppHandle, page_url: &str) -> Result<Option<String>, St
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn fetch_og_image(app: AppHandle, url: String) -> Result<Option<String>, String> {
-    let page = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?.to_string();
+    let page = fetchable_url(&url)
+        .ok_or_else(|| "bad-url".to_string())?
+        .to_string();
     let _lane = lane().lock().await;
     tauri::async_runtime::spawn_blocking(move || read_share_image(app, &page))
         .await
@@ -222,7 +223,10 @@ mod tests {
     #[test]
     fn eval_string_unquotes_bridge_results() {
         assert_eq!(eval_string(r#""complete""#).as_deref(), Some("complete"));
-        assert_eq!(eval_string(r#""{\"og\":null}""#).as_deref(), Some(r#"{"og":null}"#));
+        assert_eq!(
+            eval_string(r#""{\"og\":null}""#).as_deref(),
+            Some(r#"{"og":null}"#)
+        );
         assert!(eval_string("complete").is_none());
     }
 

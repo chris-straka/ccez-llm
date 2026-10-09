@@ -218,7 +218,9 @@ describe("export toasts", () => {
 		expect(exportSuccessToast("picker", false)).toBe("Chat saved");
 		expect(exportSuccessToast("native", false)).toBe("Chat saved");
 		expect(exportSuccessToast("download", false)).toBe("Chat downloaded");
-		expect(exportSuccessToast("download", true)).toBe("Chat copied to clipboard");
+		expect(exportSuccessToast("download", true)).toBe(
+			"Chat copied to clipboard"
+		);
 	});
 
 	it("stays silent on dismissal, honest on failure", () => {

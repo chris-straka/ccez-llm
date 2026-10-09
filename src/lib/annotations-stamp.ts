@@ -10,10 +10,7 @@ import {
 	quoteDirection,
 	type AnnotationMark
 } from "./annotations";
-import {
-	locateQuote,
-	type QuoteLocation
-} from "./quote-match";
+import { locateQuote, type QuoteLocation } from "./quote-match";
 import {
 	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
@@ -1171,11 +1168,7 @@ function paintBadgeClasses(
 	badge.className = `ccez-ann-badge${badgeAnswerClass(answer)}`;
 	if (!settled.has(id)) badge.classList.add("fresh");
 	else badge.classList.remove("fresh");
-	if (
-		wasWaiting &&
-		settled.has(id) &&
-		badge.classList.contains("ans-ready")
-	) {
+	if (wasWaiting && settled.has(id) && badge.classList.contains("ans-ready")) {
 		badge.classList.add("arrived");
 	}
 }
@@ -1286,7 +1279,11 @@ function stampLegacy(
 	// need the full path to re-stamp them.
 	const wantBadges = skip ? 0 : items.filter((i) => !i.preview).length;
 	const haveBadges = root.querySelectorAll("[data-ann-badge]").length;
-	if (!skip && root.dataset.legacyStamped === sig && haveBadges === wantBadges) {
+	if (
+		!skip &&
+		root.dataset.legacyStamped === sig &&
+		haveBadges === wantBadges
+	) {
 		// A steady re-stamp drops the one-shot fades (marks and
 		// badges alike) and moves nothing at all.
 		if (prevWash === wash) {
@@ -1301,7 +1298,10 @@ function stampLegacy(
 		// Badges ride out and back in on their still-mounted anchors:
 		// unwrapping a mark over a live button would bake the
 		// button's digit into text and destroy it.
-		const riders = new Map<string, { badge: HTMLButtonElement; anchor: Element }>();
+		const riders = new Map<
+			string,
+			{ badge: HTMLButtonElement; anchor: Element }
+		>();
 		for (const badge of root.querySelectorAll("[data-ann-badge]")) {
 			if (!(badge instanceof HTMLButtonElement)) continue;
 			const anchor = badge.parentElement;

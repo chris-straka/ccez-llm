@@ -5,53 +5,53 @@ mod dev_icon;
 // iOS keeps keys in the Keychain even in debug builds: the dev key file
 // lives at a path baked in from the build host, which a phone (or a CI
 // Simulator) cannot rely on.
-#[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
-mod dev_secrets;
 mod annotate;
 mod capture;
 mod coderun;
+#[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
+mod dev_secrets;
 mod game_line;
 // Deep-link parsing, routing and the pending-link drain serve every
 // platform (iOS/Android open URLs too); the summon kit, tray and sleep
 // guards inside stay `#[cfg(desktop)]`.
 mod desktop;
-mod dictation;
-mod fetch;
-mod news;
-mod ocr;
-mod og_image;
-mod page_text;
-#[cfg(target_os = "windows")]
-mod ocr_windows;
-#[cfg(target_os = "windows")]
-mod send_selection;
-#[cfg(target_os = "linux")]
-mod ocr_linux;
 mod dictate_linux;
 mod dictate_macos;
 mod dictate_windows;
+mod dictation;
+mod fetch;
 mod keyboard;
 mod langid;
 mod listen;
 mod listen_grade;
-mod models;
-mod ondevice;
 #[cfg(desktop)]
 mod menu;
+mod models;
+mod news;
+mod ocr;
+#[cfg(target_os = "linux")]
+mod ocr_linux;
+#[cfg(target_os = "windows")]
+mod ocr_windows;
+mod og_image;
+mod ondevice;
+mod page_text;
+mod promptmenu;
+#[cfg(target_os = "android")]
+mod secrets_android;
+#[cfg(target_os = "windows")]
+mod send_selection;
 #[cfg(target_os = "macos")]
 mod trafficlights;
 mod tts;
 #[cfg(target_os = "android")]
 mod tts_android;
-mod promptmenu;
+mod tts_linux;
+mod tts_windows;
 mod turn;
 #[cfg(target_os = "android")]
 mod turn_service;
 mod update_android;
-mod tts_linux;
-mod tts_windows;
-#[cfg(target_os = "android")]
-mod secrets_android;
 
 /// Native dictation fallback for platforms without an implementation
 /// (iOS and the remaining stubs): the frontend falls back to Web
@@ -77,14 +77,10 @@ mod dictate_unsupported {
 // Exactly one dictate_start/dictate_stop pair registers per platform:
 // real implementations on Android/macOS/Windows/Linux, Err stubs
 // elsewhere.
-#[cfg(target_os = "android")]
-use dictation::{dictate_start, dictate_stop};
-#[cfg(target_os = "macos")]
-use dictate_macos::{dictate_start, dictate_stop};
-#[cfg(target_os = "windows")]
-use dictate_windows::{dictate_start, dictate_stop};
 #[cfg(target_os = "linux")]
 use dictate_linux::{dictate_start, dictate_stop};
+#[cfg(target_os = "macos")]
+use dictate_macos::{dictate_start, dictate_stop};
 #[cfg(not(any(
     target_os = "android",
     target_os = "macos",
@@ -92,6 +88,10 @@ use dictate_linux::{dictate_start, dictate_stop};
     target_os = "linux"
 )))]
 use dictate_unsupported::{dictate_start, dictate_stop};
+#[cfg(target_os = "windows")]
+use dictate_windows::{dictate_start, dictate_stop};
+#[cfg(target_os = "android")]
+use dictation::{dictate_start, dictate_stop};
 
 /// API-key storage: macOS Keychain / iOS keychain, Windows Credential
 /// Manager, and the Linux Secret Service (GNOME Keyring / KWallet) all
@@ -159,8 +159,7 @@ fn keychain_get(account: String) -> Result<Option<String>, String> {
         if let Some(known) = memo_get(&account) {
             return known;
         }
-        let entry =
-            keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
+        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
         let read = match entry.get_password() {
             Ok(secret) => Ok(Some(secret)),
             Err(keyring::Error::NoEntry) => Ok(None),
@@ -239,11 +238,7 @@ fn open_voice_settings() -> Result<(), String> {
     {
         return tts_android::open_tts_settings();
     }
-    #[cfg(not(any(
-        target_os = "macos",
-        target_os = "windows",
-        target_os = "android"
-    )))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "android")))]
     {
         return Err("opening System Settings requires macOS".into());
     }
@@ -291,8 +286,7 @@ fn keychain_delete(account: String) -> Result<(), String> {
         #[cfg(all(debug_assertions, not(target_os = "ios")))]
         return dev_secrets::record(&dev_secrets::store_path(), &account, None);
         #[cfg(any(not(debug_assertions), target_os = "ios"))]
-        let entry =
-            keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
+        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
         #[cfg(any(not(debug_assertions), target_os = "ios"))]
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => {

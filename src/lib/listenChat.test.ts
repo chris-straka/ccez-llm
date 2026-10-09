@@ -23,7 +23,12 @@ const session: ListenSession = {
 	audio: "dub",
 	clips: [
 		{ i: 0, start: 0, end: 8, text: "Parlons de la peste." },
-		{ i: 1, start: 8, end: 10.7, text: "Nous couvrons ce sujet de manière approfondie." }
+		{
+			i: 1,
+			start: 8,
+			end: 10.7,
+			text: "Nous couvrons ce sujet de manière approfondie."
+		}
 	]
 };
 
@@ -77,17 +82,34 @@ describe("drill chat", () => {
 		advanceDrill(state, chat.id, store);
 		// Clip 2 graded early (prefetch) stays hidden until answered.
 		markGrading(state, chat.id, 1, store);
-		landGrade(state, chat.id, 1, { translation: "We cover it in depth.", notes: [] }, store);
+		landGrade(
+			state,
+			chat.id,
+			1,
+			{ translation: "We cover it in depth.", notes: [] },
+			store
+		);
 		expect(activeChat(state).messages[1]?.content).toBe("");
 		expect(activeChat(state).messages[1]?.clip?.grade).toBe("done");
 		// Clip 1: answered, then graded.
 		answerDrillClip(state, chat.id, first, null, store);
-		landGrade(state, chat.id, 0, { translation: "Let's talk about the plague.", notes: [{ expr: "Parlons de", meaning: "let's talk about" }] }, store);
+		landGrade(
+			state,
+			chat.id,
+			0,
+			{
+				translation: "Let's talk about the plague.",
+				notes: [{ expr: "Parlons de", meaning: "let's talk about" }]
+			},
+			store
+		);
 		// The body stays the transcript; the English rides the clip.
 		const graded = activeChat(state).messages[0];
 		expect(graded?.content).toBe("Parlons de la peste.");
 		expect(graded?.clip?.translation).toBe("Let's talk about the plague.");
-		expect(graded?.clip?.notes).toEqual([{ expr: "Parlons de", meaning: "let's talk about" }]);
+		expect(graded?.clip?.notes).toEqual([
+			{ expr: "Parlons de", meaning: "let's talk about" }
+		]);
 		landGrade(state, chat.id, 0, null, store);
 		expect(activeChat(state).messages[0]?.clip?.grade).toBe("error");
 	});
@@ -111,7 +133,9 @@ describe("drill chat", () => {
 
 	it("an empty clip list never starts", () => {
 		const { state, chat, store } = fresh();
-		expect(startDrill(state, chat.id, { ...session, clips: [] }, store)).toBeNull();
+		expect(
+			startDrill(state, chat.id, { ...session, clips: [] }, store)
+		).toBeNull();
 		expect(activeChat(state).listen).toBeUndefined();
 	});
 });

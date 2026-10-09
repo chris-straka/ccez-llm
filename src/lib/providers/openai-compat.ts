@@ -558,7 +558,8 @@ export async function* readSse(
 	const payload = (block: string): string | null => {
 		const data: string[] = [];
 		for (const line of block.split("\n"))
-			if (line.startsWith("data:")) data.push(line.slice("data:".length).trim());
+			if (line.startsWith("data:"))
+				data.push(line.slice("data:".length).trim());
 		return data.length > 0 ? data.join("\n") : null;
 	};
 	for (;;) {

@@ -138,10 +138,9 @@ test("a d tap at 240% type stays within a viewport fraction", async ({
 		{ timeout: 15_000 }
 	);
 	await expect
-		.poll(
-			() => page.evaluate(() => document.activeElement === document.body),
-			{ timeout: 10_000 }
-		)
+		.poll(() => page.evaluate(() => document.activeElement === document.body), {
+			timeout: 10_000
+		})
 		.toBe(true);
 	const before = await scrollTop(page);
 	const cap = await page.evaluate(() => {
@@ -325,7 +324,9 @@ test("d hold ramps: second window outruns the first, then cruises fast", async (
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		return box ? box.scrollHeight - box.clientHeight : 0;
 	});
-	expect(m2, "the hold ran out of room before window two closed").toBeLessThan(max);
+	expect(m2, "the hold ran out of room before window two closed").toBeLessThan(
+		max
+	);
 	// First window rides the ramp (starts at j/k speed), the second
 	// cruises near peak: the hold accelerates instead of kicking.
 	// Bounds stay wide for headless rAF pacing.
@@ -409,11 +410,17 @@ test("cursor gg/G pulses the landed message", async ({ page }) => {
 		timeout: 5_000
 	});
 	await page.keyboard.press("G");
-	await expect(page.locator("#msg-11.selected")).toBeVisible({ timeout: 5_000 });
-	await expect(page.locator("#msg-11.landed")).toHaveCount(1, { timeout: 3_000 });
+	await expect(page.locator("#msg-11.selected")).toBeVisible({
+		timeout: 5_000
+	});
+	await expect(page.locator("#msg-11.landed")).toHaveCount(1, {
+		timeout: 3_000
+	});
 	await page.keyboard.press("g");
 	await page.keyboard.press("g");
-	await expect(page.locator("#msg-0.landed")).toHaveCount(1, { timeout: 3_000 });
+	await expect(page.locator("#msg-0.landed")).toHaveCount(1, {
+		timeout: 3_000
+	});
 });
 
 test("z/Z land the hovered message top/bottom", async ({ page }) => {
@@ -719,15 +726,12 @@ test("j-step scales with the text size", async ({ page }) => {
 	await expect
 		.poll(
 			() =>
-				page.evaluate(
-					() =>
-						parseFloat(
-							getComputedStyle(
-								document.querySelector(
-									"article .rendered"
-								) as HTMLElement
-							).fontSize
-						)
+				page.evaluate(() =>
+					parseFloat(
+						getComputedStyle(
+							document.querySelector("article .rendered") as HTMLElement
+						).fontSize
+					)
 				),
 			{ timeout: 5_000 }
 		)

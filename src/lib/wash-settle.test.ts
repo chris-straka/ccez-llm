@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { AnnotationMark, AnnotationId } from "./annotations";
-import { applyMarks, quoteTextNodes, repaintLiveWash } from "./annotations-stamp";
+import {
+	applyMarks,
+	quoteTextNodes,
+	repaintLiveWash
+} from "./annotations-stamp";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D2,
@@ -106,16 +110,9 @@ describe("live wash repair", () => {
 		// First grade lands under a twin name on the ramp path; the
 		// repair repaints the live name — read every grade.
 		const painted = () =>
-			[
-				ANN_HIGHLIGHT_NAME,
-				ANN_HIGHLIGHT_D1,
-				ANN_HIGHLIGHT_D2,
-				ANN_HIGHLIGHT_D3
-			]
+			[ANN_HIGHLIGHT_NAME, ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_D2, ANN_HIGHLIGHT_D3]
 				.map((name) =>
-					[...(store.get(name)?.ranges ?? [])]
-						.map((r) => r.toString())
-						.join("")
+					[...(store.get(name)?.ranges ?? [])].map((r) => r.toString()).join("")
 				)
 				.join("");
 		// Second occurrence, pre-surgery.

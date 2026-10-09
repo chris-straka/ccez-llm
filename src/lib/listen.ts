@@ -78,7 +78,10 @@ export interface StoryboardFrame {
 }
 
 /** The storyboard frame showing at `t` seconds (the last one past the end). */
-export function storyboardFrame(board: ListenStoryboard, t: number): StoryboardFrame | null {
+export function storyboardFrame(
+	board: ListenStoryboard,
+	t: number
+): StoryboardFrame | null {
 	const perSheet = board.rows * board.columns;
 	if (perSheet <= 0 || board.fps <= 0 || board.sheets.length === 0) return null;
 	const total = board.sheets.length * perSheet;
@@ -86,7 +89,11 @@ export function storyboardFrame(board: ListenStoryboard, t: number): StoryboardF
 	const sheet = board.sheets[Math.floor(n / perSheet)];
 	if (!sheet) return null;
 	const cell = n % perSheet;
-	return { url: sheet.url, col: cell % board.columns, row: Math.floor(cell / board.columns) };
+	return {
+		url: sheet.url,
+		col: cell % board.columns,
+		row: Math.floor(cell / board.columns)
+	};
 }
 
 /** A channel on the learner's own list (settings; never built in). */
@@ -136,23 +143,36 @@ export interface ClipState {
 /** Error codes from the backend into one sentence each. */
 export function listenErrorCopy(error: unknown, langName: string): string {
 	const message = error instanceof Error ? error.message : String(error);
-	if (message.includes("listen-needs-app")) return "Listening runs in the app, on your Mac or phone.";
-	if (message.includes("listen-no-track")) return `That video has no ${langName} audio.`;
+	if (message.includes("listen-needs-app"))
+		return "Listening runs in the app, on your Mac or phone.";
+	if (message.includes("listen-no-track"))
+		return `That video has no ${langName} audio.`;
 	if (message.includes("listen-no-captions"))
 		return `That video's ${langName} audio has no transcript to check against.`;
-	if (message.includes("listen-timeout")) return "YouTube took too long. Try again.";
-	if (message.includes("listen-network")) return "Can't reach YouTube. Check the connection.";
-	if (message.includes("listen-bot-check")) return "YouTube is asking for a check right now. Try again in a minute.";
-	if (message.includes("listen-unavailable")) return "That video can't be played here.";
-	if (message.includes("listen-no-videos")) return "No videos to drill on this channel.";
-	if (message.includes("listen-bad-channel")) return "That doesn't look like a YouTube channel.";
+	if (message.includes("listen-timeout"))
+		return "YouTube took too long. Try again.";
+	if (message.includes("listen-network"))
+		return "Can't reach YouTube. Check the connection.";
+	if (message.includes("listen-bot-check"))
+		return "YouTube is asking for a check right now. Try again in a minute.";
+	if (message.includes("listen-unavailable"))
+		return "That video can't be played here.";
+	if (message.includes("listen-no-videos"))
+		return "No videos to drill on this channel.";
+	if (message.includes("listen-bad-channel"))
+		return "That doesn't look like a YouTube channel.";
 	// Anything else names its code, so a failure can be traced.
 	const code = /listen-[a-z0-9-]+/.exec(message)?.[0];
-	return code ? `That didn't load (${code}). Try again.` : "That didn't load. Try again.";
+	return code
+		? `That didn't load (${code}). Try again.`
+		: "That didn't load. Try again.";
 }
 
 /** "French dub" / "French audio" / "no French audio yet". */
-export function availabilityLabel(video: ListenVideo | undefined, langName: string): string {
+export function availabilityLabel(
+	video: ListenVideo | undefined,
+	langName: string
+): string {
 	if (!video) return "";
 	if (!video.audio) return `no ${langName} audio yet`;
 	if (!video.captions) return `${langName} audio, no transcript`;
@@ -168,7 +188,8 @@ export function drillable(video: ListenVideo | undefined): boolean {
 /** A channel's status from its probed recent videos. */
 export function channelLabel(videos: ListenVideo[], langName: string): string {
 	if (videos.length === 0) return "";
-	if (videos.some((v) => v.audio?.kind === "native" && v.captions)) return `${langName} audio`;
+	if (videos.some((v) => v.audio?.kind === "native" && v.captions))
+		return `${langName} audio`;
 	if (videos.some((v) => drillable(v))) return `${langName} dubs`;
 	return `no ${langName} audio yet`;
 }
@@ -205,8 +226,14 @@ export function formatDuration(seconds: number): string {
  * diff is local and instant), so it can run before the learner
  * answers and be waiting when they do.
  */
-export function gradePrompt(text: string, langName: string, before: string | null): string {
-	const context = before ? `The line just before it (context only): «${before}»\n` : "";
+export function gradePrompt(
+	text: string,
+	langName: string,
+	before: string | null
+): string {
+	const context = before
+		? `The line just before it (context only): «${before}»\n`
+		: "";
 	return (
 		`A learner of ${langName} is listening to a video, one short clip at a time. ` +
 		`This clip says:\n«${text}»\n${context}\n` +
@@ -221,7 +248,9 @@ export function gradePrompt(text: string, langName: string, before: string | nul
 }
 
 /** Parse the grading reply; null when it isn't the JSON asked for. */
-export function parseGrade(reply: string): { translation: string; notes: ClipNote[] } | null {
+export function parseGrade(
+	reply: string
+): { translation: string; notes: ClipNote[] } | null {
 	const body = reply
 		.trim()
 		.replace(/^```(?:json)?\s*/i, "")
@@ -236,7 +265,10 @@ export function parseGrade(reply: string): { translation: string; notes: ClipNot
 		return null;
 	}
 	if (!parsed || typeof parsed !== "object") return null;
-	const { translation, notes } = parsed as { translation?: unknown; notes?: unknown };
+	const { translation, notes } = parsed as {
+		translation?: unknown;
+		notes?: unknown;
+	};
 	if (typeof translation !== "string" || !translation.trim()) return null;
 	const list = Array.isArray(notes) ? notes : [];
 	return {
@@ -255,7 +287,12 @@ export function parseGrade(reply: string): { translation: string; notes: ClipNot
 }
 
 /** Answer a clip: the diff, instantly. `guess` null is a "?" skip. */
-export function answerClip(text: string, state: ClipState, guess: string | null, lang: string): ClipState {
+export function answerClip(
+	text: string,
+	state: ClipState,
+	guess: string | null,
+	lang: string
+): ClipState {
 	const typed = guess?.trim() ?? "";
 	const diff = diffGuess(text, typed, lang);
 	return {
@@ -342,6 +379,12 @@ export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 	if (f.code === "Space" && f.composerEmpty) return "play";
 	if (f.key === "?" && f.composerEmpty) return "reveal";
 	if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
-	if ((f.key === "a" || f.key === "A") && !f.inComposer && !f.hovered && !f.selection) return "reveal";
+	if (
+		(f.key === "a" || f.key === "A") &&
+		!f.inComposer &&
+		!f.hovered &&
+		!f.selection
+	)
+		return "reveal";
 	return "pass";
 }

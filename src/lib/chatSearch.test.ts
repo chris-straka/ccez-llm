@@ -112,11 +112,45 @@ describe("parseQuery", () => {
 
 describe("querySearch (folding, phrases, filters, pinyin)", () => {
 	const docs: SearchDoc[] = [
-		{ chatId: "de", msgId: "m1", kind: "message", role: "user", text: "Was heißt über auf Englisch?", at: 1 },
-		{ chatId: "de", msgId: "m2", kind: "message", role: "assistant", text: "Über means over or about.", at: 1 },
-		{ chatId: "fr", msgId: "m3", kind: "message", role: "assistant", text: "Un café, s'il vous plaît.", at: 2 },
-		{ chatId: "zh", msgId: "m4", kind: "message", role: "assistant", text: "我们一起学习中文吧", at: 3 },
-		{ chatId: "fr", msgId: "m5", kind: "annotation", text: "café\nask for coffee", at: 2 }
+		{
+			chatId: "de",
+			msgId: "m1",
+			kind: "message",
+			role: "user",
+			text: "Was heißt über auf Englisch?",
+			at: 1
+		},
+		{
+			chatId: "de",
+			msgId: "m2",
+			kind: "message",
+			role: "assistant",
+			text: "Über means over or about.",
+			at: 1
+		},
+		{
+			chatId: "fr",
+			msgId: "m3",
+			kind: "message",
+			role: "assistant",
+			text: "Un café, s'il vous plaît.",
+			at: 2
+		},
+		{
+			chatId: "zh",
+			msgId: "m4",
+			kind: "message",
+			role: "assistant",
+			text: "我们一起学习中文吧",
+			at: 3
+		},
+		{
+			chatId: "fr",
+			msgId: "m5",
+			kind: "annotation",
+			text: "café\nask for coffee",
+			at: 2
+		}
 	];
 	const ids = (q: string) => querySearch(docs, q).map((h) => h.doc.msgId);
 
@@ -157,7 +191,12 @@ describe("querySearch (folding, phrases, filters, pinyin)", () => {
 
 	it("never matches a longer word by its short prefix in the text", () => {
 		const doc: SearchDoc[] = [
-			{ chatId: "a", msgId: "x", kind: "message", text: "I went to the store with a friend." }
+			{
+				chatId: "a",
+				msgId: "x",
+				kind: "message",
+				text: "I went to the store with a friend."
+			}
 		];
 		expect(querySearch(doc, "apple")).toEqual([]);
 		expect(querySearch(doc, "therapy")).toEqual([]);
@@ -169,13 +208,18 @@ describe("querySearch (folding, phrases, filters, pinyin)", () => {
 			[{ chatId: "a", msgId: "x", kind: "message", text: "find it in here" }],
 			"in"
 		);
-		const marked = (hits[0]?.marks ?? []).map(([a, b]) => hits[0]?.snippet.slice(a, b));
+		const marked = (hits[0]?.marks ?? []).map(([a, b]) =>
+			hits[0]?.snippet.slice(a, b)
+		);
 		expect(marked).toEqual(["in"]);
 	});
 
 	it("centers long text on the match with ellipses", () => {
 		const text = `${"lorem ".repeat(30)}needle ${"ipsum ".repeat(30)}`;
-		const [hit] = querySearch([{ chatId: "a", msgId: "x", kind: "message", text }], "needle");
+		const [hit] = querySearch(
+			[{ chatId: "a", msgId: "x", kind: "message", text }],
+			"needle"
+		);
 		expect(hit?.snippet.startsWith("…")).toBe(true);
 		expect(hit?.snippet.endsWith("…")).toBe(true);
 		expect(hit?.snippet).toContain("needle");
@@ -187,7 +231,10 @@ describe("querySearch (folding, phrases, filters, pinyin)", () => {
 			{ chatId: "old", msgId: "o", kind: "message", text: "hallo", at: 1 },
 			{ chatId: "new", msgId: "n", kind: "message", text: "hallo", at: 9 }
 		];
-		expect(querySearch(tie, "hallo").map((h) => h.doc.msgId)).toEqual(["n", "o"]);
+		expect(querySearch(tie, "hallo").map((h) => h.doc.msgId)).toEqual([
+			"n",
+			"o"
+		]);
 	});
 });
 
@@ -222,7 +269,10 @@ describe("buildSearchDocs", () => {
 				" \nlet snake_case = a * b;\n \nUse npm_i and vite."
 		);
 		const [hit] = querySearch(
-			buildSearchDocs([{ id: "c", createdAt: 1, messages: [{ id: "m", content }] }], []),
+			buildSearchDocs(
+				[{ id: "c", createdAt: 1, messages: [{ id: "m", content }] }],
+				[]
+			),
 			"fonde le 14"
 		);
 		expect(hit?.snippet).not.toContain("*");
@@ -298,7 +348,9 @@ describe("chatMatchesQuery", () => {
 		expect(chatMatchesQuery("label", ["sushi recipe"], "sushi ramen")).toBe(
 			false
 		);
-		expect(chatMatchesQuery("label", ["Grüße aus Köln"], "grusse koln")).toBe(true);
+		expect(chatMatchesQuery("label", ["Grüße aus Köln"], "grusse koln")).toBe(
+			true
+		);
 	});
 });
 
@@ -331,9 +383,27 @@ describe("result shaping", () => {
 	});
 
 	it("tags who said it", () => {
-		expect(hitTag({ chatId: "a", msgId: null, kind: "annotation", text: "" })).toBe("note");
-		expect(hitTag({ chatId: "a", msgId: "m", kind: "message", role: "user", text: "" })).toBe("you");
-		expect(hitTag({ chatId: "a", msgId: "m", kind: "message", role: "assistant", text: "" })).toBe("AI");
+		expect(
+			hitTag({ chatId: "a", msgId: null, kind: "annotation", text: "" })
+		).toBe("note");
+		expect(
+			hitTag({
+				chatId: "a",
+				msgId: "m",
+				kind: "message",
+				role: "user",
+				text: ""
+			})
+		).toBe("you");
+		expect(
+			hitTag({
+				chatId: "a",
+				msgId: "m",
+				kind: "message",
+				role: "assistant",
+				text: ""
+			})
+		).toBe("AI");
 	});
 });
 

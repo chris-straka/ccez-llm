@@ -76,7 +76,14 @@ describe("annPopWidth", () => {
 describe("placeAnnCard", () => {
 	it("centers over the anchor inside the viewport", () => {
 		expect(
-			placeAnnCard({ anchorX: 640, anchorY: 400, width: 384, viewportWidth: 1280, viewportHeight: 800, cardHeight: 240 })
+			placeAnnCard({
+				anchorX: 640,
+				anchorY: 400,
+				width: 384,
+				viewportWidth: 1280,
+				viewportHeight: 800,
+				cardHeight: 240
+			})
 		).toEqual({ x: 448, y: 408 });
 	});
 	it("clamps narrow viewports instead of running off-screen", () => {
@@ -92,23 +99,51 @@ describe("placeAnnCard", () => {
 	});
 	it("drops above the anchor past the bottom edge", () => {
 		expect(
-			placeAnnCard({ anchorX: 640, anchorY: 780, width: 384, viewportWidth: 1280, viewportHeight: 800, cardHeight: 240 })
+			placeAnnCard({
+				anchorX: 640,
+				anchorY: 780,
+				width: 384,
+				viewportWidth: 1280,
+				viewportHeight: 800,
+				cardHeight: 240
+			})
 		).toEqual({ x: 448, y: 532 });
 	});
 	it("lands a short card right above a bottom badge", () => {
 		// The old fixed 240px estimate left ~100px of daylight here.
 		expect(
-			placeAnnCard({ anchorX: 200, anchorY: 660, width: 320, viewportWidth: 412, viewportHeight: 700, cardHeight: 140 })
+			placeAnnCard({
+				anchorX: 200,
+				anchorY: 660,
+				width: 320,
+				viewportWidth: 412,
+				viewportHeight: 700,
+				cardHeight: 140
+			})
 		).toEqual({ x: 40, y: 512 });
 	});
 	it("fits below the badge when the keyboard shortens the viewport", () => {
 		expect(
-			placeAnnCard({ anchorX: 200, anchorY: 100, width: 320, viewportWidth: 412, viewportHeight: 400, cardHeight: 140 })
+			placeAnnCard({
+				anchorX: 200,
+				anchorY: 100,
+				width: 320,
+				viewportWidth: 412,
+				viewportHeight: 400,
+				cardHeight: 140
+			})
 		).toEqual({ x: 40, y: 108 });
 	});
 	it("pins an overflowing card to the top", () => {
 		expect(
-			placeAnnCard({ anchorX: 200, anchorY: 150, width: 320, viewportWidth: 412, viewportHeight: 300, cardHeight: 280 })
+			placeAnnCard({
+				anchorX: 200,
+				anchorY: 150,
+				width: 320,
+				viewportWidth: 412,
+				viewportHeight: 300,
+				cardHeight: 280
+			})
 		).toEqual({ x: 40, y: 8 });
 	});
 });
@@ -146,9 +181,10 @@ describe("placeAnnComposer", () => {
 		};
 		// Below the highlight with the 1x breath, never on the word.
 		expect(placeAnnComposer(narrow)).toEqual({ x: 8, y: 302 });
-		expect(
-			placeAnnComposer({ ...narrow, highlightWidth: 500 })
-		).toEqual({ x: 500, y: 302 });
+		expect(placeAnnComposer({ ...narrow, highlightWidth: 500 })).toEqual({
+			x: 500,
+			y: 302
+		});
 	});
 
 	it("scales the below-word gap with the font, flipping above at the edge", () => {
@@ -185,7 +221,14 @@ describe("placeAnnAnswer", () => {
 		fontScale: 1
 	};
 	it("hangs below the quote with the create pill's gap and x math", () => {
-		expect(placeAnnAnswer(base)).toEqual(placeAnnComposer({ ...base, android: false, viewportHeight: 800, highlightTop: 280 }));
+		expect(placeAnnAnswer(base)).toEqual(
+			placeAnnComposer({
+				...base,
+				android: false,
+				viewportHeight: 800,
+				highlightTop: 280
+			})
+		);
 		expect(placeAnnAnswer(base)).toEqual({ x: 8, y: 302 });
 	});
 	it("never flips above at the edge: the page scrolls instead", () => {
@@ -193,7 +236,10 @@ describe("placeAnnAnswer", () => {
 		expect(placeAnnAnswer(edge)).toEqual({ x: 8, y: 792 });
 	});
 	it("scales the gap with the font", () => {
-		expect(placeAnnAnswer({ ...base, fontScale: 3.7 })).toEqual({ x: 8, y: 334 });
+		expect(placeAnnAnswer({ ...base, fontScale: 3.7 })).toEqual({
+			x: 8,
+			y: 334
+		});
 	});
 });
 
@@ -282,7 +328,9 @@ describe("quoteAnchor", () => {
 			anchor: { left: 40, top: 124, right: 120, bottom: 144 },
 			clearTop: 100
 		});
-		expect(quoteAnchor([{ left: 1, top: 50, right: 9, bottom: 60 }], 38)?.clearTop).toBe(38);
+		expect(
+			quoteAnchor([{ left: 1, top: 50, right: 9, bottom: 60 }], 38)?.clearTop
+		).toBe(38);
 	});
 	it("is null without boxes", () => {
 		expect(quoteAnchor([], 10)).toBeNull();

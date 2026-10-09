@@ -168,9 +168,7 @@
 			const { invoke } = await import("@tauri-apps/api/core");
 			const status = await invoke<string>("update_install_apk", { path });
 			if (status === "needs-approval") {
-				sayUpdate(
-					"Allow installs from this app once, then tap Install again."
-				);
+				sayUpdate("Allow installs from this app once, then tap Install again.");
 			} else {
 				sayUpdate("Opening the installer…");
 			}

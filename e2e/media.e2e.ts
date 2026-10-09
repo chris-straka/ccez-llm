@@ -179,8 +179,7 @@ test("short backgrounded reply stays silent (no notification, no badge)", async 
 	// send-time ask this would be two).
 	const permRequests = await page.evaluate(
 		() =>
-			(window as unknown as { __permRequests?: unknown[] }).__permRequests ??
-			[]
+			(window as unknown as { __permRequests?: unknown[] }).__permRequests ?? []
 	);
 	expect(permRequests).toEqual([1]);
 });

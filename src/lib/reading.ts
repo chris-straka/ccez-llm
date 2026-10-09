@@ -1,7 +1,5 @@
 import type { ChatProvider } from "./providers/types";
-import {
-	annRefsFor
-} from "./annotation-block";
+import { annRefsFor } from "./annotation-block";
 import { escapeHtml } from "./render-math";
 
 /**
@@ -341,7 +339,10 @@ export function sentenceBounds(text: string, offset: number): [number, number] {
  * empty span, and empty text reads [0, 0]. Pure — backs keyboard
  * paragraph speech.
  */
-export function paragraphBounds(text: string, offset: number): [number, number] {
+export function paragraphBounds(
+	text: string,
+	offset: number
+): [number, number] {
 	const at = Math.min(Math.max(offset, 0), text.length);
 	const blocks: Array<[number, number]> = [];
 	let i = 0;
@@ -538,62 +539,62 @@ export function speakWord(word: string, fallback = "en-US"): SpeakResult {
  * which the function below expands (ਪੱਤਾ → पत्ता). Pure.
  */
 const GURMUKHI_TO_DEVANAGARI: Record<string, string> = {
-	"ੳ": "ऑ",
-	"ਅ": "अ",
-	"ਆ": "आ",
-	"ਇ": "इ",
-	"ਈ": "ई",
-	"ਉ": "उ",
-	"ਊ": "ऊ",
-	"ਏ": "ए",
-	"ਐ": "ऐ",
-	"ਓ": "ओ",
-	"ਔ": "औ",
-	"ਕ": "क",
-	"ਖ": "ख",
-	"ਗ": "ग",
-	"ਘ": "घ",
-	"ਙ": "ङ",
-	"ਚ": "च",
-	"ਛ": "छ",
-	"ਜ": "ज",
-	"ਝ": "झ",
-	"ਞ": "ञ",
-	"ਟ": "ट",
-	"ਠ": "ठ",
-	"ਡ": "ड",
-	"ਢ": "ढ",
-	"ਣ": "ण",
-	"ਤ": "त",
-	"ਥ": "थ",
-	"ਦ": "द",
-	"ਧ": "ध",
-	"ਨ": "न",
-	"ਪ": "प",
-	"ਫ": "फ",
-	"ਬ": "ब",
-	"ਭ": "भ",
-	"ਮ": "म",
-	"ਯ": "य",
-	"ਰ": "र",
-	"ਲ": "ल",
-	"ਵ": "व",
-	"ਸ਼": "श",
-	"ਸ": "स",
-	"ਹ": "ह",
-	"ਖ਼": "ख़",
-	"ਗ਼": "ग़",
-	"ਜ਼": "ज़",
-	"ੜ": "ड़",
-	"ਫ਼": "फ़",
-	"ੴ": "इक ओंकार",
+	ੳ: "ऑ",
+	ਅ: "अ",
+	ਆ: "आ",
+	ਇ: "इ",
+	ਈ: "ई",
+	ਉ: "उ",
+	ਊ: "ऊ",
+	ਏ: "ए",
+	ਐ: "ऐ",
+	ਓ: "ओ",
+	ਔ: "औ",
+	ਕ: "क",
+	ਖ: "ख",
+	ਗ: "ग",
+	ਘ: "घ",
+	ਙ: "ङ",
+	ਚ: "च",
+	ਛ: "छ",
+	ਜ: "ज",
+	ਝ: "झ",
+	ਞ: "ञ",
+	ਟ: "ट",
+	ਠ: "ठ",
+	ਡ: "ड",
+	ਢ: "ढ",
+	ਣ: "ण",
+	ਤ: "त",
+	ਥ: "थ",
+	ਦ: "द",
+	ਧ: "ध",
+	ਨ: "न",
+	ਪ: "प",
+	ਫ: "फ",
+	ਬ: "ब",
+	ਭ: "भ",
+	ਮ: "म",
+	ਯ: "य",
+	ਰ: "र",
+	ਲ: "ल",
+	ਵ: "व",
+	ਸ਼: "श",
+	ਸ: "स",
+	ਹ: "ह",
+	ਖ਼: "ख़",
+	ਗ਼: "ग़",
+	ਜ਼: "ज़",
+	ੜ: "ड़",
+	ਫ਼: "फ़",
+	ੴ: "इक ओंकार",
 	"ੵ": "्य",
 	"ਁ": "ँ",
 	// Bindi (U+0A02) and tippi (U+0A70) render identically — escapes
 	// keep them distinct. Both nasalize like Devanagari anusvara.
 	"\u0A02": "ं",
 	"\u0A70": "ं",
-"ਃ": "ः",
+	"ਃ": "ः",
 	"਼": "़",
 	"ਾ": "ा",
 	"ਿ": "ि",
@@ -1071,7 +1072,12 @@ export function annotatedRunsWithOffsets(
 	let cursor = 0;
 	const plain = (text: string): void => {
 		if (text !== "") {
-			out.push({ text, reading: null, start: cursor, end: cursor + text.length });
+			out.push({
+				text,
+				reading: null,
+				start: cursor,
+				end: cursor + text.length
+			});
 			cursor += text.length;
 		}
 	};
@@ -1331,8 +1337,6 @@ export function annotatedRuns(html: string): AnnotatedRun[] | null {
 	doc.body.childNodes.forEach(walk);
 	return found ? out : null;
 }
-
-
 
 /**
  * Local-aid kinds a message renders: pinned kinds that
