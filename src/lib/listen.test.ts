@@ -10,7 +10,9 @@ import {
 	listenKeyAction,
 	parseGrade,
 	rankVideos,
+	storyboardFrame,
 	summarizeDrill,
+	type ListenStoryboard,
 	type ListenVideo
 } from "./listen";
 
@@ -155,5 +157,34 @@ describe("listenKeyAction", () => {
 		expect(listenKeyAction({ ...base, inOtherField: true })).toBe("pass");
 		expect(listenKeyAction({ ...base, meta: true })).toBe("pass");
 		expect(listenKeyAction({ ...base, ctrl: true })).toBe("pass");
+	});
+});
+
+describe("storyboardFrame", () => {
+	// The Pakman video's sb0: 3x3 sheets, a frame every ~4.9 s.
+	const board: ListenStoryboard = {
+		width: 320,
+		height: 180,
+		rows: 3,
+		columns: 3,
+		fps: 0.2034548944337812,
+		sheets: [
+			{ url: "https://i.ytimg.com/sb/x/M0.jpg", duration: 44.2 },
+			{ url: "https://i.ytimg.com/sb/x/M1.jpg", duration: 44.2 }
+		]
+	};
+
+	it("finds the sheet and cell for a time", () => {
+		expect(storyboardFrame(board, 0)).toEqual({ url: "https://i.ytimg.com/sb/x/M0.jpg", col: 0, row: 0 });
+		// 5 s → frame 1; 20 s → frame 4 (middle cell).
+		expect(storyboardFrame(board, 5)).toEqual({ url: "https://i.ytimg.com/sb/x/M0.jpg", col: 1, row: 0 });
+		expect(storyboardFrame(board, 20)).toEqual({ url: "https://i.ytimg.com/sb/x/M0.jpg", col: 1, row: 1 });
+		// 45 s → frame 9: the next sheet's first cell.
+		expect(storyboardFrame(board, 45)).toEqual({ url: "https://i.ytimg.com/sb/x/M1.jpg", col: 0, row: 0 });
+	});
+
+	it("holds the last frame past the end and has none without sheets", () => {
+		expect(storyboardFrame(board, 9999)).toEqual({ url: "https://i.ytimg.com/sb/x/M1.jpg", col: 2, row: 2 });
+		expect(storyboardFrame({ ...board, sheets: [] }, 3)).toBeNull();
 	});
 });

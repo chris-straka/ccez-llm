@@ -269,7 +269,8 @@ export class ListenMode {
 				channelUrl: info.channel_url,
 				thumbnail: info.thumbnail,
 				audio: info.audio?.kind ?? "dub",
-				clips
+				clips,
+				storyboard: fetched.storyboard ?? null
 			};
 			// Audio loads alongside; the first clip plays once it lands.
 			const audioReady = this.loadAudio(session);

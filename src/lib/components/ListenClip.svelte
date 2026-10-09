@@ -3,7 +3,7 @@ it sits in the video (with the source link), and once answered the
 guess marked against what was said. The transcript, translation and
 notes are the message body itself (annotatable like any reply). -->
 <script lang="ts">
-	import type { ClipState, ListenSession } from "$lib/listen";
+	import { storyboardFrame, type ClipState, type ListenSession } from "$lib/listen";
 
 	interface Props {
 		session: ListenSession;
@@ -31,6 +31,40 @@ notes are the message body itself (annotatable like any reply). -->
 		const s = Math.floor(span?.start ?? 0);
 		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 	});
+	// The frame mid-clip, as one cell of a storyboard sprite sheet.
+	const frame = $derived(
+		session.storyboard && span
+			? storyboardFrame(session.storyboard, (span.start + span.end) / 2)
+			: null
+	);
+	const frameStyle = $derived.by(() => {
+		const board = session.storyboard;
+		if (!frame || !board) return "";
+		const x = board.columns > 1 ? (frame.col / (board.columns - 1)) * 100 : 0;
+		const y = board.rows > 1 ? (frame.row / (board.rows - 1)) * 100 : 0;
+		return (
+			`background-image: url("${frame.url}"); ` +
+			`background-size: ${board.columns * 100}% ${board.rows * 100}%; ` +
+			`background-position: ${x}% ${y}%; ` +
+			`aspect-ratio: ${board.width} / ${board.height};`
+		);
+	});
+	/** The sheet loaded (a stale or blocked one hides the frame). */
+	let frameOk = $state(false);
+	$effect(() => {
+		const url = frame?.url;
+		frameOk = false;
+		if (!url) return;
+		let live = true;
+		const img = new Image();
+		img.onload = () => {
+			if (live) frameOk = true;
+		};
+		img.src = url;
+		return () => {
+			live = false;
+		};
+	});
 	const words = $derived(clip.ops?.filter((o) => o.kind !== "extra").length ?? 0);
 	const heardWords = $derived(
 		clip.ops?.filter((o) => o.kind === "ok" || o.kind === "near").length ?? 0
@@ -39,6 +73,9 @@ notes are the message body itself (annotatable like any reply). -->
 
 <div class="clip" class:open class:answered>
 	<div class="controls">
+		{#if frameOk}
+			<span class="frame" style={frameStyle} aria-hidden="true"></span>
+		{/if}
 		<button
 			type="button"
 			class="play"
@@ -154,6 +191,17 @@ notes are the message body itself (annotatable like any reply). -->
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+	}
+	.frame {
+		flex: 0 0 auto;
+		width: 4.5rem;
+		border-radius: 0.4rem;
+		background-color: var(--bg-raised);
+		background-repeat: no-repeat;
+	}
+	.clip.open .frame {
+		width: 9rem;
+		border-radius: 0.6rem;
 	}
 	.play {
 		flex: 0 0 auto;

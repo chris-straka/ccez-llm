@@ -6,5 +6,5 @@ pub mod api;
 pub mod pick;
 pub mod ytdlp;
 
-pub use api::{ChannelPage, Entry, Fetched, Listen};
+pub use api::{storyboard_of, ChannelPage, Entry, Fetched, Listen, Sheet, Storyboard};
 pub use pick::{AudioKind, AudioPick, CaptionKind, CaptionPick, VideoInfo};

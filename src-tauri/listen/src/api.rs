@@ -60,6 +60,74 @@ pub struct Fetched {
     /// The json3 caption document, verbatim (the app parses it).
     pub captions: String,
     pub caption_kind: CaptionKind,
+    /// Still frames for the clips, when YouTube has them.
+    pub storyboard: Option<Storyboard>,
+}
+
+/// YouTube's storyboard: sprite sheets of `rows` x `columns` frames,
+/// one frame every `1 / fps` seconds, each sheet covering `duration`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Storyboard {
+    pub width: u32,
+    pub height: u32,
+    pub rows: u32,
+    pub columns: u32,
+    pub fps: f64,
+    pub sheets: Vec<Sheet>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Sheet {
+    pub url: String,
+    pub duration: f64,
+}
+
+/// The largest storyboard in a probe (full or slim), if any.
+pub fn storyboard_of(probe: &Value) -> Option<Storyboard> {
+    let num = |f: &Value, k: &str| f.get(k).and_then(Value::as_f64).unwrap_or(0.0);
+    probe
+        .get("formats")?
+        .as_array()?
+        .iter()
+        .filter(|f| {
+            f.get("format_id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| id.starts_with("sb"))
+        })
+        .filter_map(|f| {
+            let base = f.get("fragment_base_url").and_then(Value::as_str);
+            let sheets: Vec<Sheet> = f
+                .get("fragments")?
+                .as_array()?
+                .iter()
+                .filter_map(|fr| {
+                    let url = match (fr.get("url").and_then(Value::as_str), base) {
+                        (Some(u), _) => u.to_string(),
+                        (None, Some(b)) => format!("{b}{}", fr.get("path")?.as_str()?),
+                        (None, None) => return None,
+                    };
+                    url.starts_with("https://").then(|| Sheet {
+                        url,
+                        duration: num(fr, "duration"),
+                    })
+                })
+                .collect();
+            let board = Storyboard {
+                width: num(f, "width") as u32,
+                height: num(f, "height") as u32,
+                rows: num(f, "rows") as u32,
+                columns: num(f, "columns") as u32,
+                fps: num(f, "fps"),
+                sheets,
+            };
+            let usable = board.width > 0
+                && board.rows > 0
+                && board.columns > 0
+                && board.fps > 0.0
+                && !board.sheets.is_empty();
+            usable.then_some(board)
+        })
+        .max_by_key(|b| b.width)
 }
 
 pub struct Listen {
@@ -187,6 +255,11 @@ fn slim_probe(full: &Value) -> Value {
         .map(|a| {
             a.iter()
                 .filter(|f| f.get("vcodec").and_then(Value::as_str) == Some("none"))
+                .filter(|f| {
+                    !f.get("format_id")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| id.starts_with("sb"))
+                })
                 .map(|f| {
                     let mut m = serde_json::Map::new();
                     for k in fkeep {
@@ -199,6 +272,19 @@ fn slim_probe(full: &Value) -> Value {
                 .collect()
         })
         .unwrap_or_default();
+    let mut formats = formats;
+    // The largest storyboard keeps its sheet list whole.
+    if let Some(sb) = full.get("formats").and_then(Value::as_array).and_then(|a| {
+        a.iter()
+            .filter(|f| {
+                f.get("format_id")
+                    .and_then(Value::as_str)
+                    .is_some_and(|id| id.starts_with("sb"))
+            })
+            .max_by_key(|f| f.get("width").and_then(Value::as_u64).unwrap_or(0))
+    }) {
+        formats.push(sb.clone());
+    }
     out.insert("formats".into(), Value::Array(formats));
     for field in ["subtitles", "automatic_captions"] {
         let keys: serde_json::Map<String, Value> = full
@@ -541,12 +627,14 @@ impl Listen {
             _ => "application/octet-stream",
         }
         .to_string();
+        let storyboard = self.probe(id).ok().as_ref().and_then(storyboard_of);
         Ok(Fetched {
             info,
             audio_path,
             audio_mime,
             captions: captions_doc,
             caption_kind: captions.kind,
+            storyboard,
         })
     }
 }
@@ -554,6 +642,34 @@ impl Listen {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fixture(name: &str) -> Value {
+        let path = format!("{}/tests/fixtures/{name}.json", env!("CARGO_MANIFEST_DIR"));
+        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn storyboard_is_the_largest_and_survives_the_slim_cache() {
+        let full = fixture("pakman-storyboard");
+        let board = storyboard_of(&full).expect("storyboard");
+        assert_eq!((board.width, board.height), (320, 180));
+        assert_eq!((board.rows, board.columns), (3, 3));
+        assert!(board.fps > 0.0);
+        assert!(!board.sheets.is_empty());
+        assert!(board
+            .sheets
+            .iter()
+            .all(|s| s.url.starts_with("https://i.ytimg.com/sb/")));
+        assert_eq!(storyboard_of(&slim_probe(&full)), Some(board));
+    }
+
+    #[test]
+    fn no_storyboard_without_sheets() {
+        let probe = serde_json::json!({"formats": [
+            {"format_id": "sb0", "width": 320, "height": 180, "rows": 3, "columns": 3, "fps": 0.2}
+        ]});
+        assert_eq!(storyboard_of(&probe), None);
+    }
 
     #[test]
     fn channel_refs_normalize_to_the_videos_tab() {

@@ -49,12 +49,43 @@ export interface ListenChannelPage {
 	videos: ListenEntry[];
 }
 
+/** YouTube's storyboard: sprite sheets of `rows` x `columns` frames,
+ * one every `1 / fps` seconds. */
+export interface ListenStoryboard {
+	width: number;
+	height: number;
+	rows: number;
+	columns: number;
+	fps: number;
+	sheets: { url: string; duration: number }[];
+}
+
 /** A fetched track: the json3 captions document plus the info. */
 export interface ListenFetched {
 	info: ListenVideo;
 	audio_mime: string;
 	captions: string;
 	caption_kind: "asr" | "uploaded";
+	storyboard?: ListenStoryboard | null;
+}
+
+/** One storyboard frame: its sheet and cell. */
+export interface StoryboardFrame {
+	url: string;
+	col: number;
+	row: number;
+}
+
+/** The storyboard frame showing at `t` seconds (the last one past the end). */
+export function storyboardFrame(board: ListenStoryboard, t: number): StoryboardFrame | null {
+	const perSheet = board.rows * board.columns;
+	if (perSheet <= 0 || board.fps <= 0 || board.sheets.length === 0) return null;
+	const total = board.sheets.length * perSheet;
+	const n = Math.min(total - 1, Math.max(0, Math.floor(t * board.fps)));
+	const sheet = board.sheets[Math.floor(n / perSheet)];
+	if (!sheet) return null;
+	const cell = n % perSheet;
+	return { url: sheet.url, col: cell % board.columns, row: Math.floor(cell / board.columns) };
 }
 
 /** A channel on the learner's own list (settings; never built in). */
@@ -74,6 +105,8 @@ export interface ListenSession {
 	thumbnail: string;
 	audio: "native" | "dub";
 	clips: ClipSpan[];
+	/** Still frames, when YouTube has them. */
+	storyboard?: ListenStoryboard | null;
 }
 
 export interface ClipNote {
