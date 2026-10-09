@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { flushSync, onMount, tick, untrack } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
-	import { fade } from "svelte/transition";
 
 	// Document theme tokens + print sheet: global CSS
 	// lives in src/app.css, imported here (single route).
@@ -2927,7 +2926,6 @@ import {
 		// Instant: the column eases programmatic jumps, and a smooth
 		// restore retargets (or dies) across the switch transition.
 		scrollBox.scrollTo({ top: saved ?? 0, behavior: "instant" });
-		viewport.missed = false;
 		viewport.anchor = null;
 	}
 
@@ -7933,7 +7931,6 @@ import {
 		});
 		viewport.lastTop = top;
 		if (viewport.stick) {
-			viewport.missed = false;
 			viewport.anchor = null;
 		} else {
 			viewport.anchor = readScrollAnchor(box);
@@ -7991,11 +7988,6 @@ import {
 			if (frame) cancelAnimationFrame(frame);
 		};
 	});
-	/** "Jump to latest": back to the newest text, pinned again. */
-	function jumpToLatest(): void {
-		viewport.missed = false;
-		scrollToBottom();
-	}
 	function scrollToBottom() {
 		viewport.stick = true;
 		// Resisted at submit: a held finger means stay, not scroll.
@@ -8037,8 +8029,7 @@ import {
 		}
 		viewport.lastStreamLen = len;
 		const box = scrollBox;
-		if (!viewport.stick) viewport.missed = true;
-		else if (!viewport.holding && box)
+		if (viewport.stick && !viewport.holding && box)
 			box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
 	});
 	/** Mirror the stick flag onto the scroller for specs: e2e pins
@@ -13953,16 +13944,6 @@ import {
 			</p>
 		{/if}
 
-		{#if viewport.missed && !viewport.stick && viewChat.messages.length > 0}
-			<!-- New reply text landed below a reader who scrolled up:
-			the thread stays put, this offers the way down. -->
-			<button
-				type="button"
-				class="jump-latest"
-				transition:fade={{ duration: 160 }}
-				onclick={jumpToLatest}>Jump to latest ↓</button
-			>
-		{/if}
 		<!-- Composer: file input, prompt card, tools, send, and banner
 		through `Composer.svelte` (the page keeps the editor, state,
 		and behaviors). The inline attach error above stays paged in
@@ -14736,25 +14717,7 @@ import {
 			opacity 0.25s ease,
 			visibility 0s;
 	}
-	.jump-latest {
-		position: absolute;
-		left: 50%;
-		bottom: calc(var(--tail-clear, 6rem) + 0.5rem);
-		transform: translateX(-50%);
-		z-index: 31;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 999px;
-		padding: 0.4rem 0.9rem;
-		background: #fff;
-		background: var(--bg-raised);
-		color: #1c1c1e;
-		color: var(--ink);
-		font: inherit;
-		font-size: 0.8rem;
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-		cursor: pointer;
-	}
+
 	.attach-error.composer-idle {
 		/* Same 0.75rem settle and ramp as the card: the old
 		full-height slide outran the prompt — taller trays visibly

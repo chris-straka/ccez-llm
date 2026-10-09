@@ -68,8 +68,6 @@ export interface ViewportState {
 	/** Reading anchor while unpinned: the message at the top of the
 	view and its offset from the box top, held across re-renders. */
 	anchor: ScrollAnchor | null;
-	/** New reply text landed below an unpinned reader. */
-	missed: boolean;
 }
 
 /** A message the reader is looking at, by element id and offset. */
@@ -87,8 +85,7 @@ export function emptyViewport(): ViewportState {
 		idleTimer: undefined,
 		lastStreamLen: 0,
 		lastTop: 0,
-		anchor: null,
-		missed: false
+		anchor: null
 	};
 }
 

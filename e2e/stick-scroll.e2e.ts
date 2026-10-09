@@ -213,9 +213,8 @@ test("selecting text mid-stream unpins the follow", async ({ page }) => {
 
 /** A small upward nudge mid-stream (a trackpad flick inside the
 stick slop) unpins for good: the stream and its completion never
-move the reader, a "Jump to latest" offers the way down, and taking
-it lands at the bottom pinned again. */
-test("a nudge up mid-stream stays put and offers jump to latest", async ({
+move the reader, and no "Jump to latest" button appears. */
+test("a nudge up mid-stream stays put, with no jump button", async ({
 	page
 }) => {
 	await seedChat(page, [
@@ -242,18 +241,10 @@ test("a nudge up mid-stream stays put and offers jump to latest", async ({
 	await page.mouse.move(400, 300);
 	await page.mouse.wheel(0, -30);
 	await expect(box).toHaveAttribute("data-stick", "false");
-	const jump = page.getByRole("button", { name: "Jump to latest" });
-	await expect(jump).toBeVisible();
 	const held = await box.evaluate((el) => el.scrollTop);
 	// Through the rest of the stream and the completion: no movement.
 	await expect(page.locator(".send-btn")).toHaveText("↑", { timeout: 60_000 });
 	await page.waitForTimeout(800);
 	expect(Math.abs((await box.evaluate((el) => el.scrollTop)) - held)).toBeLessThanOrEqual(1);
-	await jump.click();
-	await expect(box).toHaveAttribute("data-stick", "true");
-	await expect(jump).toHaveCount(0);
-	await page.waitForFunction(() => {
-		const el = document.querySelector(".messages") as HTMLElement;
-		return el.scrollHeight - el.scrollTop - el.clientHeight <= 2;
-	});
+	await expect(page.getByRole("button", { name: "Jump to latest" })).toHaveCount(0);
 });

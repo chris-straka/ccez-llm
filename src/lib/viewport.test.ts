@@ -17,8 +17,7 @@ describe("emptyViewport", () => {
 			idleTimer: undefined,
 			lastStreamLen: 0,
 			lastTop: 0,
-			anchor: null,
-			missed: false
+			anchor: null
 		});
 	});
 
