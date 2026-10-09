@@ -554,6 +554,7 @@ import {
 	} from "$lib/chrome";
 	import {
 		setSpeechRate,
+		setSpeechVolume,
 		speakText,
 		speakMultilingual,
 		speechText,
@@ -2528,6 +2529,7 @@ import {
 	// Voice speed rides module state in voice.ts (every speak path,
 	// web and native, reads it there).
 	$effect(() => setSpeechRate(settings.voiceSpeed ?? 1));
+	$effect(() => setSpeechVolume(settings.voiceVolume));
 	let reader = $state<ReaderState | null>(null);
 	const readerOpen = $derived(reader !== null);
 	let readerLang: string | ((sentence: string) => string) = "en-US";

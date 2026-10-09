@@ -445,6 +445,14 @@ export function setSpeechRate(rate: number): void {
 export function currentSpeechRate(): number {
 	return speechRate;
 }
+/** Read-aloud volume (Settings > Voice volume, 0-1), pushed like the speed. */
+let speechVolume = 1;
+export function setSpeechVolume(volume: number): void {
+	speechVolume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1;
+}
+export function currentSpeechVolume(): number {
+	return speechVolume;
+}
 
 function queueUtterances(
 	synth: SpeechSynthesis,
@@ -456,6 +464,7 @@ function queueUtterances(
 		const utterance = new SpeechSynthesisUtterance(segment.text);
 		utterance.lang = segment.lang;
 		utterance.rate = speechRate;
+		utterance.volume = speechVolume;
 		try {
 			const voice = synth
 				.getVoices()

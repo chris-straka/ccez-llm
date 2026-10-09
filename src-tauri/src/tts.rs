@@ -18,6 +18,8 @@
 //! "unsupported", and the frontend hides the engine toggle unless
 //! `tts_supported` is true.
 
+use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+
 use tauri::AppHandle;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -564,6 +566,8 @@ mod imp {
                     &format!("speak id={id}"),
                     rate,
                 );
+                // Speech only: rendered audio keeps full level.
+                utterance.setVolume(super::current_volume());
                 synth.speakUtterance(&utterance);
             });
         });
@@ -898,8 +902,12 @@ pub fn tts_speak(
     // Voice speed multiplier (Settings > Voice speed; 1.0 = normal).
     // Older frontends omit it.
     rate: Option<f32>,
+    // Read-aloud volume (Settings > Voice volume; 0-1). Older frontends
+    // omit it. Applied on macOS/iOS; other engines keep full volume.
+    volume: Option<f32>,
 ) -> Result<u64, String> {
     let rate = clamp_rate(rate);
+    set_volume(clamp_volume(volume));
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     return imp::speak(&app, text, lang, voice, rate);
     #[cfg(target_os = "android")]
@@ -930,9 +938,40 @@ pub fn clamp_rate(rate: Option<f32>) -> f32 {
     }
 }
 
+/// Read-aloud volume from the frontend, clamped to 0-1 (missing or
+/// non-finite reads as 1.0). Pure.
+pub fn clamp_volume(volume: Option<f32>) -> f32 {
+    match volume {
+        Some(v) if v.is_finite() => v.clamp(0.0, 1.0),
+        _ => 1.0,
+    }
+}
+
+/// The volume of the next utterance: one number, like the speed, but
+/// kept here rather than threaded through every engine's queue.
+static VOLUME: AtomicU32 = AtomicU32::new(0x3f80_0000);
+
+fn set_volume(volume: f32) {
+    VOLUME.store(volume.to_bits(), AtomicOrdering::Relaxed);
+}
+
+#[cfg_attr(not(any(target_os = "macos", target_os = "ios")), allow(dead_code))]
+fn current_volume() -> f32 {
+    f32::from_bits(VOLUME.load(AtomicOrdering::Relaxed))
+}
+
 #[cfg(test)]
 mod rate_tests {
-    use super::clamp_rate;
+    use super::{clamp_rate, clamp_volume};
+
+    #[test]
+    fn clamps_the_volume() {
+        assert_eq!(clamp_volume(None), 1.0);
+        assert_eq!(clamp_volume(Some(f32::NAN)), 1.0);
+        assert_eq!(clamp_volume(Some(-1.0)), 0.0);
+        assert_eq!(clamp_volume(Some(2.0)), 1.0);
+        assert_eq!(clamp_volume(Some(0.4)), 0.4);
+    }
 
     #[test]
     fn clamps_the_speed_multiplier() {

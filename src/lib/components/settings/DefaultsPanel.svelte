@@ -8,6 +8,7 @@
 		LINE_HEIGHT_DEFAULT,
 		LINE_HEIGHT_MAX,
 		LINE_HEIGHT_MIN,
+		LISTEN_VOLUME_MAX,
 		VOICE_SPEED_DEFAULT,
 		VOICE_SPEED_MAX,
 		VOICE_SPEED_MIN,
@@ -287,8 +288,34 @@
 			>
 		</span>
 	</label>
+	<label class="slider-row">
+		Voice volume
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to full volume"
+			onclick={() => (settings.voiceVolume = 1)}>(100%)</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min="0"
+				max="1"
+				step="0.05"
+				value={settings.voiceVolume}
+				aria-label="Voice volume percent"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) => sliderRelease(e, () => (settings.voiceVolume = 1))}
+				oninput={(e) => {
+					settings.voiceVolume = Number(e.currentTarget.value);
+				}}
+			/>
+			<output style="min-width: 3.6rem;">{Math.round(settings.voiceVolume * 100)}%</output>
+		</span>
+	</label>
 	<!-- Drill audio level, here rather than beside the clip so a stray
-	click mid-drill never changes it. -->
+	click mid-drill never changes it. Up to 200%: dubbed tracks can run
+	quieter than the voice. -->
 	<label class="slider-row">
 		Video volume
 		<button
@@ -301,7 +328,7 @@
 			<input
 				type="range"
 				min="0"
-				max="1"
+				max={LISTEN_VOLUME_MAX}
 				step="0.05"
 				value={settings.listenVolume}
 				aria-label="Video volume percent"

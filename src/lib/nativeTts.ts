@@ -4,6 +4,7 @@ import { identifyLangOffline, identifyLangShort } from "./langId";
 import { hasDistinctiveChinese, hasPinyinTones, ttsLangFor } from "./reading";
 import {
 	currentSpeechRate,
+	currentSpeechVolume,
 	effectiveSpeechLang,
 	speechLangsFor,
 	splitGlossHalves,
@@ -510,7 +511,8 @@ export function speakNative(
 				text: utterance,
 				lang,
 				voice: voiceId,
-				rate: currentSpeechRate()
+				rate: currentSpeechRate(),
+				volume: currentSpeechVolume()
 			});
 		})
 		.then((rustId) => {
@@ -595,7 +597,8 @@ export function speakNativeWord(
 		text: word,
 		lang,
 		voice: voiceId,
-		rate: currentSpeechRate()
+		rate: currentSpeechRate(),
+		volume: currentSpeechVolume()
 	}).catch(
 		(error: unknown) => {
 			onError?.(error instanceof Error ? error.message : String(error));

@@ -260,6 +260,23 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).showMessageButtons).toBe(true);
 	});
 
+	it("defaults both volumes to 100% and clamps strays (video up to 200%)", () => {
+		expect(defaultSettings().voiceVolume).toBe(1);
+		expect(defaultSettings().listenVolume).toBe(1);
+		const loud = blankSettings();
+		loud.voiceVolume = 4;
+		loud.listenVolume = 4;
+		saveSettings(loud, memoryStore);
+		expect(loadSettings(memoryStore).voiceVolume).toBe(1);
+		expect(loadSettings(memoryStore).listenVolume).toBe(2);
+		const boosted = blankSettings();
+		boosted.voiceVolume = 0.3;
+		boosted.listenVolume = 1.6;
+		saveSettings(boosted, memoryStore);
+		expect(loadSettings(memoryStore).voiceVolume).toBe(0.3);
+		expect(loadSettings(memoryStore).listenVolume).toBe(1.6);
+	});
+
 	it("defaults voice speed to normal and clamps strays", () => {
 		expect(defaultSettings().voiceSpeed).toBe(1);
 		const slow = blankSettings();

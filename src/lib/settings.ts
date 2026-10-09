@@ -280,7 +280,10 @@ export interface AppSettings {
 	readerWords: number;
 	/** Voice speed multiplier for every read-aloud (0.5-1.5, 1 = normal). */
 	voiceSpeed: number;
-	/** Listening drill audio volume, 0-1 (1 = as the video has it). */
+	/** Read-aloud volume, 0-1 (1 = the voice's full level). */
+	voiceVolume: number;
+	/** Listening drill audio volume, 0-2 (1 = as the video has it; above
+	 * 1 boosts a quiet track). */
 	listenVolume: number;
 	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
@@ -393,6 +396,8 @@ export const MESSAGE_GAP_MAX = 1.5;
 export const LINE_HEIGHT_DEFAULT = 1.5;
 export const LINE_HEIGHT_MIN = 1;
 export const LINE_HEIGHT_MAX = 2.2;
+/** Listening drill volume ceiling: 200%, for a track quieter than the voice. */
+export const LISTEN_VOLUME_MAX = 2;
 /** Voice speed multiplier (1 = the engine's normal pace). */
 export const VOICE_SPEED_DEFAULT = 1;
 export const VOICE_SPEED_MIN = 0.5;
@@ -595,6 +600,7 @@ export function defaultSettings(): AppSettings {
 		readerMode: "off",
 		readerWords: 0,
 		voiceSpeed: VOICE_SPEED_DEFAULT,
+		voiceVolume: 1,
 		listenVolume: 1,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
@@ -926,9 +932,13 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				VOICE_SPEED_MAX,
 				Math.max(VOICE_SPEED_MIN, merged.voiceSpeed)
 			);
+		merged.voiceVolume =
+			typeof merged.voiceVolume === "number" && !Number.isNaN(merged.voiceVolume)
+				? Math.min(1, Math.max(0, merged.voiceVolume))
+				: 1;
 		merged.listenVolume =
 			typeof merged.listenVolume === "number" && !Number.isNaN(merged.listenVolume)
-				? Math.min(1, Math.max(0, merged.listenVolume))
+				? Math.min(LISTEN_VOLUME_MAX, Math.max(0, merged.listenVolume))
 				: 1;
 		// Backfill line spacing on older saves; clamp strays into range.
 		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))

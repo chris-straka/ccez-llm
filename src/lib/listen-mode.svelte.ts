@@ -129,6 +129,11 @@ export class ListenMode {
 	/** Counts play() calls, so only the latest one's failure counts. */
 	private playRun = 0;
 	private volume = 1;
+	/** Web Audio gain under the drill audio, so volume can pass 100%
+	 * (an element's own volume stops at 1). Null where the runtime has
+	 * no AudioContext: the element's volume then caps at 1. */
+	private audioCtx: AudioContext | null = null;
+	private gain: GainNode | null = null;
 	private browseSeq = 0;
 	private typingTimer: ReturnType<typeof setTimeout> | null = null;
 	/** The search last sent (`lang|kind|query`). */
@@ -376,7 +381,7 @@ export class ListenMode {
 				const url = URL.createObjectURL(new Blob([bytes], { type: fetched.audio_mime }));
 				const el = new Audio();
 				el.preload = "auto";
-				el.volume = this.volume;
+				this.wireGain(el);
 				el.src = url;
 				this.audio = el;
 				this.audioUrl = url;
@@ -394,10 +399,35 @@ export class ListenMode {
 		return this.audioLoad;
 	}
 
-	/** The drill audio's volume (0-1), live on the clip playing. */
+	/** The drill audio's volume (0-2), live on the clip playing. */
 	setVolume(volume: number): void {
-		this.volume = Math.min(1, Math.max(0, volume));
-		if (this.audio) this.audio.volume = this.volume;
+		this.volume = Math.min(2, Math.max(0, volume));
+		this.applyVolume(this.audio);
+	}
+
+	/** Route a fresh track through the shared gain node (once per
+	 * element: a media element feeds one source node for life). */
+	private wireGain(el: HTMLAudioElement): void {
+		this.gain = null;
+		try {
+			if (typeof AudioContext === "function") {
+				this.audioCtx ??= new AudioContext();
+				const gain = this.audioCtx.createGain();
+				this.audioCtx.createMediaElementSource(el).connect(gain).connect(this.audioCtx.destination);
+				this.gain = gain;
+			}
+		} catch {
+			this.gain = null;
+		}
+		this.applyVolume(el);
+	}
+
+	private applyVolume(el: HTMLAudioElement | null): void {
+		if (!el) return;
+		if (this.gain) {
+			el.volume = 1;
+			this.gain.gain.value = this.volume;
+		} else el.volume = Math.min(1, this.volume);
 	}
 
 	/** Silence the track (playhead and queue untouched). */
@@ -438,6 +468,8 @@ export class ListenMode {
 		this.halt();
 		this.queued = null;
 		this.paused = null;
+		// A context made before any click starts suspended.
+		if (this.audioCtx?.state === "suspended") void this.audioCtx.resume();
 		el.playbackRate = slow ? SLOW_RATE : 1;
 		el.preservesPitch = true;
 		// Caption end times run late: stop a touch early so the next

@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import {
 	currentSpeechRate,
 	setSpeechRate,
+	setSpeechVolume,
+	currentSpeechVolume,
 	splitScriptRuns,
 	splitSentences,
 	speechText,
@@ -506,6 +508,17 @@ describe("speech rate", () => {
 		expect(currentSpeechRate()).toBe(1.5);
 		setSpeechRate(Number.NaN);
 		expect(currentSpeechRate()).toBe(1);
+	});
+
+	it("clamps the read-aloud volume to 0-1 and falls back to full", () => {
+		setSpeechVolume(0.4);
+		expect(currentSpeechVolume()).toBe(0.4);
+		setSpeechVolume(-1);
+		expect(currentSpeechVolume()).toBe(0);
+		setSpeechVolume(3);
+		expect(currentSpeechVolume()).toBe(1);
+		setSpeechVolume(Number.NaN);
+		expect(currentSpeechVolume()).toBe(1);
 	});
 });
 
