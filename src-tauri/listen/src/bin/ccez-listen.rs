@@ -6,7 +6,7 @@
 //! are held to the app's own origins.
 //!
 //! ```text
-//! ccez-listen serve [--addr 127.0.0.1:8797] [--cache DIR]
+//! ccez-listen serve [--addr 127.0.0.1:8797] [--cache DIR] [--allow-origin URL]...
 //! ```
 
 use std::fs::File;
@@ -111,7 +111,7 @@ fn error_status(e: &str) -> u16 {
     }
 }
 
-fn handle(listen: &Listen, req: Request) {
+fn handle(listen: &Listen, extra_origins: &[String], req: Request) {
     let origin = req
         .headers()
         .iter()
@@ -120,7 +120,7 @@ fn handle(listen: &Listen, req: Request) {
     // A browser page from anywhere else gets nothing; native clients
     // (no Origin) and the app's own origins pass.
     if let Some(o) = &origin {
-        if !ORIGINS.contains(&o.as_str()) {
+        if !ORIGINS.contains(&o.as_str()) && !extra_origins.iter().any(|e| e == o) {
             let _ = req.respond(json_response(403, r#"{"error":"listen-origin"}"#.into()));
             return;
         }
@@ -260,16 +260,20 @@ fn default_cache() -> PathBuf {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) != Some("serve") {
-        eprintln!("usage: ccez-listen serve [--addr 127.0.0.1:8797] [--cache DIR]");
+        eprintln!(
+            "usage: ccez-listen serve [--addr 127.0.0.1:8797] [--cache DIR] [--allow-origin URL]..."
+        );
         std::process::exit(2);
     }
     let mut addr = "127.0.0.1:8797".to_string();
     let mut cache = default_cache();
+    let mut extra_origins: Vec<String> = Vec::new();
     let mut it = args.iter().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
             "--addr" => addr = it.next().cloned().unwrap_or(addr),
             "--cache" => cache = it.next().map(PathBuf::from).unwrap_or(cache),
+            "--allow-origin" => extra_origins.extend(it.next().cloned()),
             other => {
                 eprintln!("unknown argument {other}");
                 std::process::exit(2);
@@ -285,9 +289,11 @@ fn main() {
         cache.display()
     );
     let listen = Arc::new(Listen::new(cache));
+    let extra_origins = Arc::new(extra_origins);
     for req in server.incoming_requests() {
         let listen = Arc::clone(&listen);
-        std::thread::spawn(move || handle(&listen, req));
+        let extra = Arc::clone(&extra_origins);
+        std::thread::spawn(move || handle(&listen, &extra, req));
     }
 }
 

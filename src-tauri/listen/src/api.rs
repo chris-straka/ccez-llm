@@ -437,7 +437,16 @@ impl Listen {
     /// A channel's latest uploads (newest first).
     pub fn channel(&self, input: &str, limit: usize) -> Result<ChannelPage> {
         let url = channel_videos_url(input).ok_or("listen-bad-channel")?;
-        let doc = self.flat_list(&url, limit.clamp(1, 50), LIST_TTL)?;
+        let doc = self
+            .flat_list(&url, limit.clamp(1, 50), LIST_TTL)
+            .map_err(|e| {
+                // Shorts-only and podcast-only channels have no videos tab.
+                if e.contains("does not have a videos tab") {
+                    "listen-no-videos".to_string()
+                } else {
+                    e
+                }
+            })?;
         let name = match s(&doc, "channel") {
             n if n.is_empty() => s(&doc, "title").trim_end_matches(" - Videos").to_string(),
             n => n,
