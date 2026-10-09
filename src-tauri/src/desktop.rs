@@ -47,8 +47,10 @@ pub const LEGACY_DEEP_LINK_SCHEME: &str = "ccez";
 /// Window event carrying a [`DeepLinkPayload`] to the frontend.
 pub const DEEP_LINK_EVENT: &str = "deep-link";
 /// Loopback port for the single-instance handoff. First launch binds
-/// it; a second launch connects, forwards focus/URL, and exits.
-pub const SINGLETON_PORT: u16 = 47471;
+/// it; a second launch connects, forwards focus/URL, and exits. Debug
+/// builds take their own port so a dev shell runs beside the installed
+/// app instead of handing off to it and quitting.
+pub const SINGLETON_PORT: u16 = if cfg!(debug_assertions) { 47472 } else { 47471 };
 /// Tray icon id (single tray per app; Windows/Linux only).
 #[cfg(all(desktop, not(target_os = "macos")))]
 pub const TRAY_ID: &str = "ccez-tray";

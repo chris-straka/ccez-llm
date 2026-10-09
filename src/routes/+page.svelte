@@ -306,6 +306,10 @@ import {
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { NewsMode } from "$lib/news-mode.svelte";
+	import { ListenMode } from "$lib/listen-mode.svelte";
+	import { listenKeyAction, summarizeDrill } from "$lib/listen";
+	import { pickBackend } from "$lib/listenBackend";
+	import { drillStates } from "$lib/listenChat";
 	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
@@ -2170,6 +2174,65 @@ import {
 	collapses the panel and the chat holds only the session.
 	State and behavior live in `NewsMode`; the page only wires
 	its collaborators here. */
+	/** Listening drills: yt-dlp on the desktop shell, the learner's
+	clip server elsewhere (null = none yet; the panel asks for one). */
+	function listenBackend() {
+		return pickBackend({
+			desktopShell:
+				tauriBackendAvailable() &&
+				typeof navigator !== "undefined" &&
+				!isAndroidUserAgent(navigator.userAgent),
+			server: settings.listenServer,
+			invoke: async <T,>(cmd: string, args?: Record<string, unknown>) =>
+				(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
+		});
+	}
+	const listenMode = new ListenMode({
+		getChatState: () => chatState,
+		backend: listenBackend,
+		langName: (code) => replyLanguageFor(code)?.name ?? code,
+		getChannels: () => settings.listenChannels,
+		setChannels: (next) => {
+			settings.listenChannels = next;
+		},
+		getServer: () => settings.listenServer,
+		setServer: (next) => {
+			settings.listenServer = next;
+		},
+		resolveProvider: () => providerKeys.resolveActive(),
+		toast: (message) => flashToast(message),
+		reveal: () => scrollAfterRender(),
+		focusComposer: () => {
+			if (!androidUI) void tick().then(() => editor?.focus());
+		},
+		openUrl: async (url) => {
+			if (tauriBackendAvailable()) {
+				const { invoke } = await import("@tauri-apps/api/core");
+				await invoke("plugin:opener|open_url", { url, with: null }).catch(() => undefined);
+			} else {
+				window.open(url, "_blank", "noopener");
+			}
+		}
+	});
+	/** "Another video": a fresh chat in the same language, browsing. */
+	function anotherDrill(): void {
+		const lang = chat.listen?.lang;
+		if (!lang) return;
+		doNewChat();
+		setChatReplyLang(chatState, chatState.activeChatId, lang);
+		listenMode.enter(lang);
+	}
+	// Leaving a drill chat stops its sound; a chat with messages never
+	// shows the browse screen.
+	$effect(() => {
+		void chatState.activeChatId;
+		const empty = chat.messages.length === 0;
+		untrack(() => {
+			listenMode.leave();
+			if (!empty && listenMode.open) listenMode.close();
+		});
+	});
+
 	const newsMode = new NewsMode({
 		getEditor: () => editor,
 		getAttachments: () => attachments,
@@ -7448,6 +7511,15 @@ import {
 	}
 
 	function onSubmit(kind: SubmitKind) {
+		// A drill waiting for a guess: Enter answers it and the next
+		// clip plays at once (grading runs behind). Never a chat turn.
+		if (listenMode.awaitingGuess(chat)) {
+			const guess = composerText().trim();
+			if (!guess) return;
+			listenMode.submit(guess);
+			editor?.clear();
+			return;
+		}
 		// Guards live in submitAction (guard order pinned in
 		// submit.test.ts); the always-hide blur and both bodies stay
 		// here as effects.
@@ -8392,7 +8464,8 @@ import {
 		// Empty chats open learner news for the picked language (the
 		// submenu and ⌘number share this funnel); anywhere else the
 		// pick just switches and any open panel goes away.
-		if (activeChat(chatState).messages.length === 0) newsMode.enterNewsMode(code);
+		if (activeChat(chatState).messages.length === 0 && listenMode.open) listenMode.enter(code);
+		else if (activeChat(chatState).messages.length === 0) newsMode.enterNewsMode(code);
 		else newsMode.news = null;
 	}
 
@@ -8423,6 +8496,7 @@ import {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
 		newsMode.close();
+		listenMode.close();
 	}
 
 	/** Correction toggle lives on the active chat; default off. */
@@ -10540,6 +10614,30 @@ import {
 				consumeEvent(event);
 				if (readerKey === "close") closeReader();
 				else if (readerKey !== "swallow") stepReader(readerKey);
+				return;
+			}
+			// Listening drill keys: Space plays, S slows, ? reveals
+			// (decided in listenKeyAction; typing a guess stays typing).
+			const listenKey = listenKeyAction({
+				key: event.key,
+				code: event.code,
+				alt: event.altKey,
+				meta: event.metaKey,
+				ctrl: event.ctrlKey,
+				inDrill: Boolean(chat.listen) && !reader && !shortcutsOpen && !palette.open,
+				composerEmpty: !hasText,
+				inComposer: isPromptEditorTarget(event.target),
+				inOtherField:
+					!isPromptEditorTarget(event.target) &&
+					event.target instanceof HTMLElement &&
+					(event.target.isContentEditable ||
+						event.target instanceof HTMLInputElement ||
+						event.target instanceof HTMLTextAreaElement)
+			});
+			if (listenKey !== "pass" && !event.repeat) {
+				consumeEvent(event);
+				if (listenKey === "reveal") listenMode.submit(null);
+				else listenMode.replay(listenKey === "slow");
 				return;
 			}
 			// Flashcards own the keyboard while open; closed, the
@@ -13458,7 +13556,7 @@ import {
 	<!-- Click-off closes the settings panel (keyboard users get Esc and ⌘,). -->
 	<main
 		class:empty={viewChat.messages.length === 0}
-		class:news={newsMode.news !== null}
+		class:news={newsMode.news !== null || listenMode.open}
 		class:hide-messages={settings.hideMessages}
 		class:hide-buttons={settings.hideButtons}
 		class:plain-user={!settings.ownBubble}
@@ -13625,6 +13723,18 @@ import {
 			newsBusy={newsMode.newsBusy}
 			newsImages={newsMode.newsImages}
 			newsActions={newsMode.actions}
+			listen={{
+				mode: listenMode,
+				session: chat.listen ?? null,
+				langName: replyLanguageFor(listenMode.lang ?? activeReplyCode ?? "")?.name ?? "",
+				channels: settings.listenChannels,
+				needsServer: listenBackend() === null,
+				server: settings.listenServer,
+				summary: chat.listen && chat.messages.some((m) => m.drillEnd)
+					? summarizeDrill(drillStates(chat))
+					: null,
+				another: anotherDrill
+			}}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}
 			bind:scrollBox

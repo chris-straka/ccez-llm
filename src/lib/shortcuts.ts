@@ -179,6 +179,11 @@ export function desktopShortcuts(
 			name: "Flashcards",
 			keys: `${shiftMeta}R · Space flips · 1 / 2 grade`
 		},
+		{
+			group: reading,
+			name: "Listening drill",
+			keys: `Space plays · S slow · ? reveals · ${altm}+Space mid-guess`
+		},
 		{ group: reading, name: "Capture window text", keys: `${shiftMeta}O` },
 		{ group: reading, name: "Set capture area", keys: `${shiftMeta}U` },
 		{ group: mouse, name: "Speak text aloud", keys: "Right-click" },

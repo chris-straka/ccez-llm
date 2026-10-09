@@ -6,6 +6,7 @@ import type {
 } from "./providers/types";
 import { messageText } from "./providers/types";
 import { LOWEST_THINKING } from "./providers/thinking";
+import type { ClipState, ListenSession } from "./listen";
 import type { Attachment } from "./attachments";
 import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
@@ -44,6 +45,10 @@ export interface ChatMsg {
 	attachments?: Attachment[];
 	/** Collapsed pastes, captured at send time (persisted with history). */
 	pasteFolds?: PasteFold[];
+	/** Listening drill clip (assistant rows of a drill chat). */
+	clip?: ClipState;
+	/** Listening drill end-of-video tally row. */
+	drillEnd?: true;
 }
 
 export interface Chat {
@@ -102,6 +107,8 @@ export interface Chat {
 	title?: string;
 	/** Who set `title`: a rename always wins over the model. */
 	titleBy?: "user" | "ai";
+	/** Listening drill: the video and its clips (see `listen.ts`). */
+	listen?: ListenSession;
 }
 
 /**

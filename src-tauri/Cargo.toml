@@ -98,6 +98,8 @@ objc2-vision = "0.3"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-mcp-bridge = "0.2"
 tauri-plugin-window-state = "~2.4.1"
+# Listening drills: yt-dlp lookups and fetches (desktop runs them itself).
+ccez-listen = { path = "listen" }
 
 # Android-only native TTS (TextToSpeech over JNI into Tts.kt).
 # jni matches wry's version so JNI types unify (see cargo tree).

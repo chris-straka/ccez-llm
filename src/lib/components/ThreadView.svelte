@@ -33,6 +33,11 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	} from "$lib/news";
 	import { parseNewsLaunch } from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
+	import ListenClip from "./ListenClip.svelte";
+	import ListenEnd from "./ListenEnd.svelte";
+	import ListenPanel from "./ListenPanel.svelte";
+	import type { DrillSummary, ListenChannel, ListenSession } from "$lib/listen";
+	import type { ListenMode } from "$lib/listen-mode.svelte";
 	import EmptyHero from "./EmptyHero.svelte";
 	import LangMenus from "./LangMenus.svelte";
 	import NewsPanel from "./NewsPanel.svelte";
@@ -165,6 +170,17 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			close: () => void;
 			retry: () => void;
 		};
+		/** Listening drills: the mode, plus the active drill if any. */
+		listen: {
+			mode: ListenMode;
+			session: ListenSession | null;
+			langName: string;
+			channels: ListenChannel[];
+			needsServer: boolean;
+			server: string;
+			summary: DrillSummary | null;
+			another: () => void;
+		};
 		/** Flashcards due now (0 hides the hero's entry). */
 		flashcardsDue: number;
 		onFlashcards: () => void;
@@ -221,6 +237,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsBusy,
 		newsImages,
 		newsActions,
+		listen,
 		flashcardsDue,
 		onFlashcards,
 		scrollBox = $bindable<HTMLElement | undefined>(undefined),
@@ -247,7 +264,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		the welcome text on every platform); the page keeps emptiness
 		and the pill state. In news mode the welcome text goes away
 		and the pills rail the story cards below them. -->
-		<EmptyHero mock={useMock} newsMode={newsPanel !== null}>
+		<EmptyHero mock={useMock} newsMode={newsPanel !== null || listen.mode.open}>
 			<LangMenus
 				openId={openLangMenu}
 				anchor={langMenuAnchor}
@@ -263,7 +280,26 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					{flashcardsDue === 1 ? "1 flashcard due" : `${flashcardsDue} flashcards due`}
 				</button>
 			{/if}
-			{#if newsPanel}
+			{#if activeReplyCode && !listen.mode.open && !previewing}
+				<!-- Listening drills follow the picked language. -->
+				<button
+					type="button"
+					class="listen-open"
+					onclick={() => activeReplyCode && listen.mode.enter(activeReplyCode)}
+				>
+					Listen in {listen.langName}
+				</button>
+			{/if}
+			{#if listen.mode.open && listen.mode.lang}
+				<ListenPanel
+					mode={listen.mode}
+					lang={listen.mode.lang}
+					langName={listen.langName}
+					channels={listen.channels}
+					needsServer={listen.needsServer}
+					server={listen.server}
+				/>
+			{:else if newsPanel}
 				<NewsPanel
 					panel={newsPanel}
 					staged={newsStaged}
@@ -318,8 +354,44 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		computed props and action groups. Trimmed rows skip the render
 		(the guard keeps every index and #msg-N anchor stable while
 		the prefix hides). -->
+		{#snippet clipHeader()}
+			{#if listen.session && msg.clip}
+				<ListenClip
+					session={listen.session}
+					clip={msg.clip}
+					open={i === messages.length - 1 && msg.clip.heard === undefined}
+					playing={listen.mode.playing}
+					audioStatus={listen.mode.audioStatus}
+					actions={{
+						play: (slow: boolean) => {
+							const c = msg.clip;
+							if (!c) return;
+							const p = listen.mode.playing;
+							if (p?.i === c.i && p.slow === slow) listen.mode.replay(slow);
+							else listen.mode.play(c.i, slow);
+						},
+						regrade: () => {
+							const c = msg.clip;
+							if (c) listen.mode.regrade(c.i);
+						},
+						openSource: (url: string) => listen.mode.openSource(url)
+					}}
+				/>
+			{:else if listen.session && listen.summary && msg.drillEnd}
+				<ListenEnd
+					session={listen.session}
+					summary={listen.summary}
+					playing={listen.mode.playing}
+					actions={{
+						play: (n: number, slow: boolean) => listen.mode.play(n, slow),
+						another: listen.another
+					}}
+				/>
+			{/if}
+		{/snippet}
 		{#if trimIdx <= 0 || i >= trimIdx}
 		<MessageArticle
+			header={msg.clip || msg.drillEnd ? clipHeader : undefined}
 			{msg}
 			index={i}
 			selected={focusMode === "scroll" && selectedIdx === i}
@@ -640,7 +712,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 
 	/* Chat switching snaps instantly on every platform: no slide,
 	no fade — the next chat replaces the current one in place. */
-	.flashcards-open {
+	.flashcards-open,
+	.listen-open {
 		margin-top: 0.4rem;
 		padding: 0.3rem 0.8rem;
 		border: none;
@@ -655,7 +728,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			color 0.15s ease,
 			background-color 0.15s ease;
 	}
-	.flashcards-open:hover {
+	.flashcards-open:hover,
+	.listen-open:hover {
 		color: var(--ink);
 		background: var(--bg-raised);
 	}
@@ -665,7 +739,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.flashcards-open {
+		.flashcards-open,
+		.listen-open {
 			animation: none;
 		}
 	}
