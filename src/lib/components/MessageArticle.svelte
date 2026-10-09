@@ -185,7 +185,8 @@ import type {
 	);
 	/** Hide a meta dot left at the end of a line (its next item
 	wrapped below): re-checks on every resize and content change. */
-	function endDots(node: HTMLElement): { update: () => void; destroy: () => void } {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- a new key re-runs `update`.
+	function endDots(node: HTMLElement, _key: string): { update: () => void; destroy: () => void } {
 		const run = (): void => {
 			const items = [...node.children] as HTMLElement[];
 			items.forEach((item, i) => {
