@@ -29,7 +29,7 @@ import {
 	openClip,
 	startDrill
 } from "./listenChat";
-import { parseJson3, segmentClips } from "./listenClips";
+import { parseJson3, segmentClips, type ClipSpan } from "./listenClips";
 import type { ChatProvider } from "./providers/types";
 
 export interface ListenModeDeps {
@@ -72,6 +72,10 @@ export interface ChannelView {
 
 /** Slow replay rate (S). */
 export const SLOW_RATE = 0.75;
+/** Trimmed off a clip's caption end time (they run late). */
+const END_TRIM_SEC = 0.15;
+/** A trimmed clip still plays at least this long. */
+const MIN_CLIP_SEC = 0.3;
 /** Grading calls in flight at once. */
 const GRADE_CONCURRENCY = 2;
 /** Clips graded ahead of the one showing. */
@@ -101,6 +105,11 @@ export class ListenMode {
 	error = $state("");
 	/** The clip playing (index), and whether slowly. */
 	playing = $state<{ i: number; slow: boolean } | null>(null);
+	/** A clip stopped mid-way: playing it again resumes there. */
+	paused = $state<{ i: number; slow: boolean } | null>(null);
+	/** The playhead (media seconds) of the clip playing or paused:
+	 * the scrubber's thumb. Null once a clip plays to its end. */
+	position = $state<{ i: number; t: number } | null>(null);
 	/** The drill's audio: loading or failed. */
 	audioStatus = $state<"idle" | "loading" | "ready" | "error">("idle");
 
@@ -111,6 +120,8 @@ export class ListenMode {
 	private audioLoad: Promise<boolean> | null = null;
 	private stopAt = 0;
 	private stopTimer: ReturnType<typeof setInterval> | null = null;
+	/** The next clip, waiting for the one playing to finish. */
+	private queued: number | null = null;
 	private browseSeq = 0;
 	private gradeQueue: { chatId: ChatId; i: number }[] = [];
 	private gradesRunning = 0;
@@ -347,51 +358,122 @@ export class ListenMode {
 		return this.audioLoad;
 	}
 
-	private stop(): void {
+	/** Silence the track (playhead and queue untouched). */
+	private halt(): void {
 		if (this.stopTimer) clearInterval(this.stopTimer);
 		this.stopTimer = null;
 		this.audio?.pause();
 		this.playing = null;
 	}
 
-	/** Play clip `i` of the active drill from its start. */
-	play(i: number, slow: boolean): void {
+	/** Stop outright: nothing paused, nothing queued. */
+	private stop(): void {
+		this.halt();
+		this.queued = null;
+		this.paused = null;
+		this.position = null;
+	}
+
+	/** Clip `i` of the active drill. */
+	private span(i: number): ClipSpan | undefined {
+		return activeChat(this.deps.getChatState()).listen?.clips[i];
+	}
+
+	/** Play clip `i` of the active drill from its start, or from `from`
+	 * (a resume or a scrub). */
+	play(i: number, slow: boolean, from?: number): void {
 		const chat = activeChat(this.deps.getChatState());
 		const session = chat.listen;
 		const clip = session?.clips[i];
 		if (!session || !clip) return;
 		if (!this.audio || this.audioFor !== infoKey(session.videoId, session.lang)) {
 			void this.loadAudio(session).then((ok) => {
-				if (ok) this.play(i, slow);
+				if (ok) this.play(i, slow, from);
 			});
 			return;
 		}
 		const el = this.audio;
-		this.stop();
+		this.halt();
+		this.queued = null;
+		this.paused = null;
 		el.playbackRate = slow ? SLOW_RATE : 1;
 		el.preservesPitch = true;
-		el.currentTime = clip.start;
-		this.stopAt = clip.end;
+		// Caption end times run late: stop a touch early so the next
+		// sentence's first sound never leaks in.
+		this.stopAt = Math.max(clip.start + MIN_CLIP_SEC, clip.end - END_TRIM_SEC);
+		const at = from !== undefined && from >= clip.start && from < this.stopAt ? from : clip.start;
+		el.currentTime = at;
+		this.position = { i, t: at };
 		this.playing = { i, slow };
 		el.play().catch(() => {
 			this.playing = null;
 		});
 		// timeupdate fires every ~250 ms; a tight poll stops on the word.
 		this.stopTimer = setInterval(() => {
-			if (el.paused || el.currentTime >= this.stopAt) this.stop();
+			if (el.paused) {
+				this.halt();
+				return;
+			}
+			this.position = { i, t: el.currentTime };
+			if (el.currentTime >= this.stopAt) this.finish();
 		}, 30);
 	}
 
-	/** Space: replay the clip waiting for a guess (or stop it). */
+	/** The clip played to its end: the queued one (if any) goes next. */
+	private finish(): void {
+		const next = this.queued;
+		this.stop();
+		if (next !== null) this.play(next, false);
+	}
+
+	/** Stop clip playback where it is; playing it again resumes. */
+	pause(): void {
+		const p = this.playing;
+		if (!p || !this.audio) return;
+		const t = this.audio.currentTime;
+		this.halt();
+		this.queued = null;
+		this.paused = p;
+		this.position = { i: p.i, t };
+	}
+
+	/** A clip's play button: stop it if playing at that speed, resume
+	 * it if paused at that speed, otherwise play it from the start. */
+	toggle(i: number, slow: boolean): void {
+		const p = this.playing;
+		if (p?.i === i && p.slow === slow) {
+			this.pause();
+			return;
+		}
+		const at = this.position;
+		if (this.paused?.i === i && this.paused.slow === slow && at?.i === i) this.play(i, slow, at.t);
+		else this.play(i, slow);
+	}
+
+	/** Scrub clip `i` to `t`: a playing clip jumps there, any other
+	 * waits there for its next play. */
+	seek(i: number, t: number): void {
+		const clip = this.span(i);
+		if (!clip) return;
+		const at = Math.min(Math.max(t, clip.start), clip.end);
+		if (this.playing?.i === i && this.audio) {
+			this.audio.currentTime = at;
+			this.position = { i, t: at };
+			return;
+		}
+		const slow = this.paused?.i === i ? this.paused.slow : false;
+		this.halt();
+		this.queued = null;
+		this.paused = { i, slow };
+		this.position = { i, t: at };
+	}
+
+	/** Space: play, pause, or resume the clip waiting for a guess. */
 	replay(slow: boolean): void {
 		const chat = activeChat(this.deps.getChatState());
 		const clip = openClip(chat)?.clip ?? chat.messages.findLast((m) => m.clip)?.clip;
 		if (!clip) return;
-		if (this.playing?.i === clip.i && this.playing.slow === slow) {
-			this.stop();
-			return;
-		}
-		this.play(clip.i, slow);
+		this.toggle(clip.i, slow);
 	}
 
 	/** Is the active chat a drill waiting for a guess? */
@@ -415,9 +497,13 @@ export class ListenMode {
 		const next = openClip(activeChat(state))?.clip;
 		if (next) {
 			this.catchUpGrade(chatId, next.i);
-			this.play(next.i, false);
+			// A clip still playing finishes first; the next one follows.
+			if (this.playing) {
+				this.paused = null;
+				this.queued = next.i;
+			} else this.play(next.i, false);
 		}
-		else this.stop();
+		else if (!this.playing) this.stop();
 		this.queueGrades(chatId);
 		this.deps.reveal();
 		return true;

@@ -374,14 +374,16 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					clip={msg.clip}
 					open={i === messages.length - 1 && msg.clip.heard === undefined}
 					playing={listen.mode.playing}
+					position={listen.mode.position}
 					audioStatus={listen.mode.audioStatus}
 					actions={{
 						play: (slow: boolean) => {
 							const c = msg.clip;
-							if (!c) return;
-							const p = listen.mode.playing;
-							if (p?.i === c.i && p.slow === slow) listen.mode.replay(slow);
-							else listen.mode.play(c.i, slow);
+							if (c) listen.mode.toggle(c.i, slow);
+						},
+						seek: (t: number) => {
+							const c = msg.clip;
+							if (c) listen.mode.seek(c.i, t);
 						},
 						openSource: (url: string) => listen.mode.openSource(url)
 					}}
@@ -392,7 +394,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					summary={listen.summary}
 					playing={listen.mode.playing}
 					actions={{
-						play: (n: number, slow: boolean) => listen.mode.play(n, slow),
+						play: (n: number, slow: boolean) => listen.mode.toggle(n, slow),
 						another: listen.another
 					}}
 				/>

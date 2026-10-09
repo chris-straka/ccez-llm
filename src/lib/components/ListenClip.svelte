@@ -12,18 +12,25 @@ fold under it (`ListenGloss`). -->
 		/** This clip waits for the guess. */
 		open: boolean;
 		playing: { i: number; slow: boolean } | null;
+		/** The playhead of the clip playing or paused. */
+		position: { i: number; t: number } | null;
 		audioStatus: "idle" | "loading" | "ready" | "error";
 		actions: {
 			play: (slow: boolean) => void;
+			seek: (t: number) => void;
 			openSource: (url: string) => void;
 		};
 	}
 
-	let { session, clip, open, playing, audioStatus, actions }: Props = $props();
+	let { session, clip, open, playing, position, audioStatus, actions }: Props = $props();
 
 	const span = $derived(session.clips[clip.i]);
 	const here = $derived(playing?.i === clip.i);
 	const answered = $derived(clip.heard !== undefined);
+	/** Scrubber: on the clip awaiting a guess and on any clip playing
+	 * or paused mid-way. */
+	const at = $derived(position?.i === clip.i ? position.t : null);
+	const scrub = $derived(Boolean(span) && (open || at !== null));
 	const source = $derived(
 		`https://www.youtube.com/watch?v=${session.videoId}&t=${Math.floor(span?.start ?? 0)}s`
 	);
@@ -80,7 +87,7 @@ fold under it (`ListenGloss`). -->
 			type="button"
 			class="play"
 			class:on={here && !playing?.slow}
-			aria-label={here && !playing?.slow ? "Stop" : "Play clip"}
+			aria-label={here && !playing?.slow ? "Pause" : "Play clip"}
 			title="Play (Space)"
 			disabled={audioStatus === "error"}
 			onclick={(e) => {
@@ -89,7 +96,9 @@ fold under it (`ListenGloss`). -->
 			}}
 		>
 			{#if here && !playing?.slow}
-				<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" /></svg>
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><rect x="4" y="3.5" width="2.8" height="9" rx="1" /><rect x="9.2" y="3.5" width="2.8" height="9" rx="1" /></svg
+				>
 			{:else}
 				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z" /></svg>
 			{/if}
@@ -105,6 +114,22 @@ fold under it (`ListenGloss`). -->
 				actions.play(true);
 			}}>0.75×</button
 		>
+		{#if scrub && span}
+			<input
+				class="scrub"
+				type="range"
+				min={span.start}
+				max={span.end}
+				step="0.05"
+				value={at ?? span.start}
+				aria-label="Position in the clip"
+				disabled={audioStatus !== "ready"}
+				style="--fill: {(((at ?? span.start) - span.start) / Math.max(span.end - span.start, 0.01)) * 100}%"
+				oninput={(e) => actions.seek(Number(e.currentTarget.value))}
+				onchange={(e) => e.currentTarget.blur()}
+				onclick={(e) => e.stopPropagation()}
+			/>
+		{/if}
 		<span class="where">
 			{clip.i + 1} / {session.clips.length}
 			{#if audioStatus === "loading"}
@@ -329,5 +354,46 @@ fold under it (`ListenGloss`). -->
 	:global(.app[data-mac]:not([data-android])) .reveal-mac,
 	:global(.app[data-android]) .reveal-phone {
 		display: inline;
+	}
+	/* A slim track that fills to the playhead. Blurs after a drag so
+	Space goes back to play / pause. */
+	.scrub {
+		flex: 0 1 9rem;
+		min-width: 4rem;
+		height: 1rem;
+		margin: 0;
+		background: transparent;
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+	}
+	.scrub::-webkit-slider-runnable-track {
+		height: 3px;
+		border-radius: 999px;
+		background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill));
+	}
+	.scrub::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		width: 0.7rem;
+		height: 0.7rem;
+		margin-top: calc(1.5px - 0.35rem);
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.scrub::-moz-range-track {
+		height: 3px;
+		border-radius: 999px;
+		background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill));
+	}
+	.scrub::-moz-range-thumb {
+		width: 0.7rem;
+		height: 0.7rem;
+		border: none;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.scrub:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 </style>

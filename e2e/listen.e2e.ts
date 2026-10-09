@@ -198,3 +198,39 @@ test("emptying the search box drops the results", async ({ page }) => {
 	await expect(results).toHaveCount(0);
 	await expect(panel).toContainText("Learner Channel");
 });
+
+test("Space pauses and resumes mid-clip; answering lets the clip finish first", async ({ page }) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	const first = clips.first();
+	const pause = first.getByRole("button", { name: "Pause" });
+	const scrub = first.getByRole("slider", { name: "Position in the clip" });
+	// The first clip starts on its own (a new clip row never cuts it).
+	await expect(pause).toBeVisible();
+	await expect.poll(async () => Number(await scrub.inputValue())).toBeGreaterThan(0.3);
+
+	// Space pauses where it is; the playhead holds.
+	const box = page.locator(".prompt textarea").first();
+	await box.press("Space");
+	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
+	const held = Number(await scrub.inputValue());
+	await page.waitForTimeout(400);
+	expect(Number(await scrub.inputValue())).toBe(held);
+	await expect(box).toHaveValue("");
+
+	// Space again resumes from there, not from the top.
+	await box.press("Space");
+	await expect(pause).toBeVisible();
+	expect(Number(await scrub.inputValue())).toBeGreaterThanOrEqual(held);
+
+	// A guess while it plays: clip 2 shows, clip 1 keeps playing, then
+	// clip 2 follows on its own.
+	await box.fill("bonjour");
+	await box.press("Enter");
+	await expect(clips).toHaveCount(2);
+	await expect(pause).toBeVisible();
+	await expect(clips.nth(1).getByRole("button", { name: "Pause" })).toBeVisible({ timeout: 6_000 });
+	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
+});
