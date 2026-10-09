@@ -388,7 +388,14 @@ import type {
 	{:else if launch}
 		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else}
-		<div class:bubble={msg.role === "user"}>{@render body(textOverride, folded, contentOverride)}</div>
+		<!-- A drill clip's transcript arrives with the answer: the key
+		remounts its body once (empty → text) so it eases in rather than
+		popping. Every other message keeps one body for life. -->
+		{#key msg.clip ? msg.content !== "" : false}
+			<div class:bubble={msg.role === "user"} class:clip-text={msg.clip && msg.content !== ""}
+				>{@render body(textOverride, folded, contentOverride)}</div
+			>
+		{/key}
 	{/if}
 	{#if footer}
 		{@render footer()}
@@ -967,5 +974,19 @@ import type {
 	message stands off the full height there. */
 	:global(.app[data-titlebar="overlay"]) article:first-of-type {
 		margin-top: calc(1.75rem + 1.15rem);
+	}
+	.clip-text {
+		animation: clip-text-in 0.32s ease both;
+	}
+	@keyframes clip-text-in {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.clip-text {
+			animation: none;
+		}
 	}
 </style>

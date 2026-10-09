@@ -44,28 +44,34 @@ fold under it (`ListenGloss`). -->
 			? storyboardFrame(session.storyboard, (span.start + span.end) / 2)
 			: null
 	);
+	/** The sheet's state: a loading one holds the frame's box (no jump
+	 * when it lands), a stale or blocked one hides it. */
+	let frameState = $state<"loading" | "ok" | "error">("loading");
 	const frameStyle = $derived.by(() => {
 		const board = session.storyboard;
 		if (!frame || !board) return "";
+		const box = `aspect-ratio: ${board.width} / ${board.height};`;
+		if (frameState !== "ok") return box;
 		const x = board.columns > 1 ? (frame.col / (board.columns - 1)) * 100 : 0;
 		const y = board.rows > 1 ? (frame.row / (board.rows - 1)) * 100 : 0;
 		return (
 			`background-image: url("${frame.url}"); ` +
 			`background-size: ${board.columns * 100}% ${board.rows * 100}%; ` +
 			`background-position: ${x}% ${y}%; ` +
-			`aspect-ratio: ${board.width} / ${board.height};`
+			box
 		);
 	});
-	/** The sheet loaded (a stale or blocked one hides the frame). */
-	let frameOk = $state(false);
 	$effect(() => {
 		const url = frame?.url;
-		frameOk = false;
+		frameState = "loading";
 		if (!url) return;
 		let live = true;
 		const img = new Image();
 		img.onload = () => {
-			if (live) frameOk = true;
+			if (live) frameState = "ok";
+		};
+		img.onerror = () => {
+			if (live) frameState = "error";
 		};
 		img.src = url;
 		return () => {
@@ -80,8 +86,8 @@ fold under it (`ListenGloss`). -->
 
 <div class="clip" class:open class:answered>
 	<div class="controls">
-		{#if frameOk}
-			<span class="frame" style={frameStyle} aria-hidden="true"></span>
+		{#if frame && frameState !== "error"}
+			<span class="frame" class:shown={frameState === "ok"} style={frameStyle} aria-hidden="true"></span>
 		{/if}
 		<button
 			type="button"
@@ -197,8 +203,13 @@ fold under it (`ListenGloss`). -->
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.clip {
+		.clip,
+		.frame.shown {
 			animation: none;
+		}
+		.frame,
+		.play {
+			transition: none;
 		}
 	}
 	.controls {
@@ -212,6 +223,19 @@ fold under it (`ListenGloss`). -->
 		border-radius: 0.4rem;
 		background-color: var(--bg-raised);
 		background-repeat: no-repeat;
+		/* Answering shrinks the open clip's frame and play button to the
+		row size: eased, so the eye follows the clip instead of losing it. */
+		transition:
+			width 0.28s ease,
+			border-radius 0.28s ease;
+	}
+	.frame.shown {
+		animation: frame-in 0.25s ease;
+	}
+	@keyframes frame-in {
+		from {
+			opacity: 0;
+		}
 	}
 	.clip.open .frame {
 		width: 9rem;
@@ -228,7 +252,12 @@ fold under it (`ListenGloss`). -->
 		display: grid;
 		place-items: center;
 		cursor: pointer;
-		transition: transform 0.12s ease;
+		transition:
+			transform 0.12s ease,
+			width 0.28s ease,
+			height 0.28s ease,
+			background-color 0.28s ease,
+			color 0.28s ease;
 	}
 	.play:active {
 		transform: scale(0.94);
