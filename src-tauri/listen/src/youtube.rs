@@ -451,6 +451,41 @@ pub fn video_info(player: &Value, target: &str) -> VideoInfo {
 }
 
 /// The picked track's download URL and size in bytes (0 = unknown).
+/// Picture-only formats the drill can show: H.264 in MP4, which every
+/// webview the app runs in decodes (AV1 and VP9 are not everywhere),
+/// at most 480p.
+pub fn video_formats(player: &Value) -> Vec<&Value> {
+    player
+        .pointer("/streamingData/adaptiveFormats")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter(|f| {
+                    let mime = str_at(f, &["mimeType"]);
+                    mime.starts_with("video/mp4") && mime.contains("avc1")
+                })
+                .filter(|f| f.get("height").and_then(Value::as_u64).unwrap_or(0) <= 480)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The drill's picture: the H.264 format nearest 360p (small enough to
+/// fetch beside the audio, sharp enough for a centered clip), as its
+/// URL and byte length. None when YouTube offers no plain URL.
+pub fn video_source(player: &Value) -> Option<(String, u64)> {
+    let best = video_formats(player).into_iter().min_by_key(|f| {
+        let h = f.get("height").and_then(Value::as_u64).unwrap_or(0) as i64;
+        (h - 360).abs()
+    })?;
+    let url = str_at(best, &["url"]);
+    if !url.starts_with("https://") {
+        return None;
+    }
+    let len = str_at(best, &["contentLength"]).parse().unwrap_or(0);
+    Some((url.to_string(), len))
+}
+
 pub fn audio_source(player: &Value, pick: &AudioPick) -> Option<(String, u64)> {
     let f = audio_formats(player).into_iter().find(|f| {
         f.get("itag").and_then(Value::as_u64) == Some(pick.itag as u64)
@@ -749,6 +784,29 @@ pub fn valid_video_id(id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn picks_h264_nearest_360p_with_a_plain_url() {
+        let f = |itag: u32, mime: &str, h: u64, url: &str| serde_json::json!({ "itag": itag, "mimeType": mime, "height": h, "contentLength": "1000", "url": url });
+        let avc = "video/mp4; codecs=\"avc1.4D401E\"";
+        let player = serde_json::json!({ "streamingData": { "adaptiveFormats": [
+            f(137, avc, 1080, "https://v/1080"),
+            f(135, avc, 480, "https://v/480"),
+            f(134, avc, 360, "https://v/360"),
+            f(243, "video/webm; codecs=\"vp9\"", 360, "https://v/vp9"),
+            f(396, "video/mp4; codecs=\"av01.0.01M.08\"", 360, "https://v/av1"),
+            f(133, avc, 240, "https://v/240"),
+            f(140, "audio/mp4; codecs=\"mp4a.40.2\"", 0, "https://a/140")
+        ] } });
+        assert_eq!(video_source(&player), Some(("https://v/360".into(), 1000)));
+        // Over 480p never qualifies; no plain URL means no picture.
+        assert_eq!(video_formats(&player).len(), 3);
+        let ciphered = serde_json::json!({ "streamingData": { "adaptiveFormats": [
+            serde_json::json!({ "itag": 134, "mimeType": avc, "height": 360, "signatureCipher": "s=…" })
+        ] } });
+        assert_eq!(video_source(&ciphered), None);
+    }
+
     use super::*;
 
     fn fixture(name: &str) -> Value {

@@ -59,3 +59,12 @@ pub async fn listen_audio(
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     Ok(tauri::ipc::Response::new(bytes))
 }
+
+/// The video's picture (H.264, no sound), raw: an ArrayBuffer on the
+/// JS side, played muted beside the language track.
+#[tauri::command]
+pub async fn listen_video(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
+    let path = listen(&app)?.video_path(&id).await?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    Ok(tauri::ipc::Response::new(bytes))
+}

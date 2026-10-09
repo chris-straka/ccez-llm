@@ -21,6 +21,8 @@ fold under it (`ListenGloss`). -->
 		/** The playhead of the clip playing or paused. */
 		position: { i: number; t: number } | null;
 		audioStatus: "idle" | "loading" | "ready" | "error";
+		/** The video's picture once downloaded (null: still frames). */
+		videoUrl: string | null;
 		actions: {
 			play: (slow: boolean) => void;
 			seek: (t: number) => void;
@@ -34,8 +36,16 @@ fold under it (`ListenGloss`). -->
 		};
 	}
 
-	let { session, clip, open, playing, position, audioStatus, actions }: Props =
-		$props();
+	let {
+		session,
+		clip,
+		open,
+		playing,
+		position,
+		audioStatus,
+		videoUrl,
+		actions
+	}: Props = $props();
 
 	const span = $derived(session.clips[clip.i]);
 	const here = $derived(playing?.i === clip.i);
@@ -44,6 +54,24 @@ fold under it (`ListenGloss`). -->
 	 * or paused mid-way. */
 	const at = $derived(position?.i === clip.i ? position.t : null);
 	const scrub = $derived(Boolean(span) && (open || at !== null));
+	/** The moving picture shows on the clip in play: the one waiting,
+	 * or any playing or paused mid-way. Others keep their still frame. */
+	const screen = $derived(Boolean(videoUrl && span) && (open || at !== null));
+	let video = $state<HTMLVideoElement | null>(null);
+	// The picture follows the sound: muted, same playhead, same speed.
+	// The audio element owns time; the video only corrects when it
+	// drifts past a few frames, so playback stays smooth.
+	$effect(() => {
+		const v = video;
+		if (!v || !span) return;
+		const mine = playing?.i === clip.i;
+		const t = at ?? span.start;
+		v.playbackRate = mine && playing?.slow ? 0.75 : 1;
+		if (Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
+		if (mine) {
+			if (v.paused) v.play().catch(() => {});
+		} else if (!v.paused) v.pause();
+	});
 	const source = $derived(
 		`https://www.youtube.com/watch?v=${session.videoId}&t=${Math.floor(span?.start ?? 0)}s`
 	);
@@ -99,9 +127,26 @@ fold under it (`ListenGloss`). -->
 	);
 </script>
 
-<div class="clip" class:open class:answered>
+<div class="clip" class:open class:answered class:has-screen={screen}>
+	{#if screen}
+		<div class="screen">
+			<video
+				bind:this={video}
+				src={videoUrl}
+				muted
+				playsinline
+				preload="auto"
+				disablepictureinpicture
+				aria-label="The clip's video"
+				onloadedmetadata={(e) => {
+					// A seek before metadata is dropped: land on the clip now.
+					if (span) e.currentTarget.currentTime = at ?? span.start;
+				}}
+			></video>
+		</div>
+	{/if}
 	<div class="controls">
-		{#if frame && frameState !== "error"}
+		{#if !screen && frame && frameState !== "error"}
 			<span
 				class="frame"
 				class:shown={frameState === "ok"}
@@ -533,5 +578,32 @@ fold under it (`ListenGloss`). -->
 	}
 	.step.next {
 		color: var(--accent);
+	}
+	/* The clip in play shows its video centered above the controls,
+	16:9, as wide as the column allows (the still frame steps aside). */
+	.screen {
+		align-self: center;
+		width: min(100%, 36rem);
+		aspect-ratio: 16 / 9;
+		border-radius: 0.6rem;
+		overflow: hidden;
+		background: #000;
+		animation: screen-in 0.25s ease;
+	}
+	.screen video {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+	@keyframes screen-in {
+		from {
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.screen {
+			animation: none;
+		}
 	}
 </style>

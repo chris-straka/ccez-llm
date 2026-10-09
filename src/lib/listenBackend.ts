@@ -19,6 +19,8 @@ export interface ListenBackend {
 	fetch: (id: string, lang: string) => Promise<ListenFetched>;
 	/** The fetched track's bytes (call after `fetch`). */
 	audio: (id: string, lang: string) => Promise<ArrayBuffer>;
+	/** The video's picture (H.264, no sound), downloaded once. */
+	video: (id: string) => Promise<ArrayBuffer>;
 }
 
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
@@ -32,6 +34,7 @@ export function shellBackend(invoke: Invoke): ListenBackend {
 		videos: (ids, lang) =>
 			invoke<ListenVideo[]>("listen_videos", { ids, lang }),
 		fetch: (id, lang) => invoke<ListenFetched>("listen_fetch", { id, lang }),
-		audio: (id, lang) => invoke<ArrayBuffer>("listen_audio", { id, lang })
+		audio: (id, lang) => invoke<ArrayBuffer>("listen_audio", { id, lang }),
+		video: (id) => invoke<ArrayBuffer>("listen_video", { id })
 	};
 }

@@ -385,6 +385,7 @@ pub fn run() {
             listen::listen_channel,
             listen::listen_videos,
             listen::listen_fetch,
+            listen::listen_video,
             listen::listen_audio,
             listen_grade::listen_grade_start,
             listen_grade::listen_grade_results,

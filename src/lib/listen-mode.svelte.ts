@@ -117,6 +117,11 @@ export class ListenMode {
 	position = $state<{ i: number; t: number } | null>(null);
 	/** The drill's audio: loading or failed. */
 	audioStatus = $state<"idle" | "loading" | "ready" | "error">("idle");
+	/** The drill video's picture (a blob URL), once it has downloaded;
+	 * null before then, or when YouTube has none (the still frame
+	 * stays). Plays muted beside the language track. */
+	videoUrl = $state<string | null>(null);
+	private videoFor: string | null = null;
 
 	private readonly deps: ListenModeDeps;
 	private audio: HTMLAudioElement | null = null;
@@ -402,6 +407,8 @@ export class ListenMode {
 				this.audio = el;
 				this.audioUrl = url;
 				this.audioStatus = "ready";
+				// The picture follows the sound: bigger, and optional.
+				void this.loadVideo(session.videoId);
 				return true;
 			} catch (error) {
 				if (this.audioFor === key) {
@@ -415,6 +422,24 @@ export class ListenMode {
 			}
 		})();
 		return this.audioLoad;
+	}
+
+	/** Fetch the video's picture once per video (a blob URL). A miss
+	 * leaves the still frames: the drill never waits on it. */
+	private async loadVideo(videoId: string): Promise<void> {
+		if (this.videoFor === videoId) return;
+		this.videoFor = videoId;
+		if (this.videoUrl) URL.revokeObjectURL(this.videoUrl);
+		this.videoUrl = null;
+		try {
+			const bytes = await this.needBackend().video(videoId);
+			if (this.videoFor !== videoId) return;
+			this.videoUrl = URL.createObjectURL(
+				new Blob([bytes], { type: "video/mp4" })
+			);
+		} catch {
+			if (this.videoFor === videoId) this.videoFor = null;
+		}
 	}
 
 	/** The drill audio's volume (0-2), live on the clip playing. */

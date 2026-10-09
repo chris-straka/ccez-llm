@@ -105,6 +105,11 @@ async function mockListenShell(page: Page): Promise<void> {
 							storyboard: null
 						};
 					if (cmd === "listen_audio") return silentWav(12);
+					if (cmd === "listen_video") {
+						if (!(window as unknown as { __withVideo?: boolean }).__withVideo)
+							throw new Error("listen-no-video");
+						return silentWav(1);
+					}
 					// Launch-time calls the app tolerates failing.
 					if (cmd === "keychain_get") return null;
 					if (cmd === "keychain_set" || cmd === "keychain_delete") return null;
@@ -472,4 +477,34 @@ test("the Listen panel follows the text size", async ({ page }) => {
 			?.style.setProperty("--font-scale", "2")
 	);
 	await expect.poll(size).toBeCloseTo(base * 2, 1);
+});
+
+test("the clip in play shows the video, centered; others keep a still", async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		(window as unknown as { __withVideo: boolean }).__withVideo = true;
+	});
+	await page.reload();
+	await expect(page.locator(".empty-state")).toBeVisible({ timeout: 60_000 });
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	const screen = clips.first().locator(".screen video");
+	await expect(screen).toBeVisible({ timeout: 10_000 });
+	await expect(screen).toHaveJSProperty("muted", true);
+	const [clipBox, screenBox] = await Promise.all([
+		clips.first().boundingBox(),
+		clips.first().locator(".screen").boundingBox()
+	]);
+	const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
+	expect(Math.abs(mid(clipBox!) - mid(screenBox!))).toBeLessThan(2);
+	// Moving on: the new clip carries the picture, the answered one not.
+	await clips.first().getByRole("button", { name: "Next ›" }).click();
+	await expect(clips).toHaveCount(2);
+	await expect(clips.nth(1).locator(".screen video")).toBeVisible();
+	await expect(clips.first().locator(".screen")).toHaveCount(0, {
+		timeout: 10_000
+	});
 });

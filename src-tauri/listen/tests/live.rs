@@ -51,6 +51,13 @@ async fn live_search_channel_and_fetch() {
     assert_eq!(again.audio_path, fetched.audio_path);
     eprintln!("{} · {} bytes · {}", dubbed.title, size, fetched.audio_mime);
 
+    // The picture: a few MB of H.264, cached like the audio.
+    let video = listen.video_path(&dubbed.id).await.expect("video");
+    let vsize = std::fs::metadata(&video).expect("video file").len();
+    assert!(vsize > 1_000_000, "video {vsize} bytes");
+    assert_eq!(listen.video_path(&dubbed.id).await.expect("cached"), video);
+    eprintln!("video · {vsize} bytes");
+
     let native = listen
         .search("FRANCE 24 Le Canada peut-il résister à Trump", "video", 5)
         .await

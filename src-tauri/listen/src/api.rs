@@ -16,8 +16,8 @@ use serde_json::Value;
 use crate::client::Yt;
 use crate::youtube::{
     audio_source, base_lang, caption_url, channel_id_of, channel_page, channel_url,
-    playability_error, search_entries, storyboard, valid_video_id, video_info, CaptionKind,
-    ChannelPage, Entry, Storyboard, VideoInfo,
+    playability_error, search_entries, storyboard, valid_video_id, video_info, video_source,
+    CaptionKind, ChannelPage, Entry, Storyboard, VideoInfo,
 };
 use crate::Result;
 
@@ -118,9 +118,15 @@ fn slim_player(full: &Value) -> Value {
                 .collect()
         })
         .unwrap_or_default();
+    // Plus the picture formats the drill can show (a handful).
+    let video: Vec<Value> = crate::youtube::video_formats(full)
+        .into_iter()
+        .cloned()
+        .collect();
+    let formats: Vec<Value> = audio.into_iter().chain(video).collect();
     out.insert(
         "streamingData".into(),
-        serde_json::json!({ "adaptiveFormats": audio }),
+        serde_json::json!({ "adaptiveFormats": formats }),
     );
     Value::Object(out)
 }
@@ -326,6 +332,41 @@ impl Listen {
             captions: doc,
             ..fetched
         })
+    }
+
+    /// The video's picture for the drill (no sound: the drill plays
+    /// the language track beside it), downloaded once into the media
+    /// cache. A cached player from before pictures were kept, or a
+    /// stream URL YouTube turns down, re-asks for a fresh player once.
+    pub async fn video_path(&self, id: &str) -> Result<PathBuf> {
+        if !valid_video_id(id) {
+            return Err("listen-bad-id".into());
+        }
+        let path = self.cache.join("media").join(id).join("video.mp4");
+        let lock = video_lock(&format!("{id}/video"));
+        let _guard = lock.lock().await;
+        if path.is_file() {
+            return Ok(path);
+        }
+        let player = self.player(id, URL_TTL).await?;
+        let player = if video_source(&player).is_some() {
+            player
+        } else {
+            self.player(id, Duration::ZERO).await?
+        };
+        if let Some(code) = playability_error(&player) {
+            return Err(code);
+        }
+        let (url, len) = video_source(&player).ok_or("listen-no-video")?;
+        match self.yt.download(&url, len, &path).await {
+            Err(e) if e == "listen-http-403" || e == "listen-download-failed" => {
+                let fresh = self.player(id, Duration::ZERO).await?;
+                let (url, len) = video_source(&fresh).ok_or("listen-no-video")?;
+                self.yt.download(&url, len, &path).await?;
+            }
+            done => done?,
+        }
+        Ok(path)
     }
 
     /// Where a fetched track's audio sits (call after `fetch`).

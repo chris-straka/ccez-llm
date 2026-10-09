@@ -48,6 +48,13 @@ the phone.
   track with its language and an `acont` tag (original, dubbed,
   dubbed-auto). Its media URLs need no signature solving or
   proof-of-origin token. Native audio in the language wins over a dub.
+- Picture: the same response's picture-only formats (no muxed ones
+  come back). The drill takes H.264 nearest 360p (every webview
+  decodes it; about 20-25 MB for eight minutes), downloads it once
+  after the audio, and plays it muted in step with the language track
+  (the audio owns time; the picture corrects past a quarter second of
+  drift). It shows centered on the clip in play; until it lands, or
+  when there is none, the storyboard still stays.
 - Captions: YouTube's speech recognition of the picked track
   (`kind: asr` in its language) carries word timings, so no Whisper
   pass is needed. Uploaded subtitles are used when they exist.

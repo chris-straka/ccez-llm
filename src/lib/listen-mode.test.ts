@@ -164,7 +164,8 @@ describe("search box", () => {
 			channel: () => new Promise<never>(() => {}),
 			videos: () => Promise.resolve([]),
 			fetch: () => new Promise<never>(() => {}),
-			audio: () => new Promise<never>(() => {})
+			audio: () => new Promise<never>(() => {}),
+			video: () => new Promise<never>(() => {})
 		} satisfies ListenBackend;
 		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
 		const state = createChatState(store);
