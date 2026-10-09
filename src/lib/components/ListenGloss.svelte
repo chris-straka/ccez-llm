@@ -1,16 +1,19 @@
 <!-- Under an answered drill clip: its English translation and notes,
 folded behind one quiet "English" toggle so the row stays the French
-alone until asked. Also where grading shows it is still running or
-failed (with Try again). -->
+alone until asked. Nothing translates before the fold opens: opening it
+asks for this clip's translation, shows it running, and offers Try
+again if it failed. -->
 <script lang="ts">
 	import type { ClipState } from "$lib/listen";
 
 	interface Props {
 		clip: ClipState;
+		/** The fold opened: translate this clip (a no-op once asked). */
+		translate: () => void;
 		regrade: () => void;
 	}
 
-	let { clip, regrade }: Props = $props();
+	let { clip, translate, regrade }: Props = $props();
 
 	let open = $state(false);
 	const notes = $derived(clip.notes ?? []);
@@ -18,36 +21,37 @@ failed (with Try again). -->
 
 {#if clip.heard !== undefined}
 	<div class="gloss">
-		{#if clip.grade === "pending"}
-			<p class="line busy">translating…</p>
-		{:else if clip.grade === "error"}
-			<p class="line">
-				No translation ·
-				<button
-					type="button"
-					class="link"
-					onclick={(e) => {
-						e.stopPropagation();
-						regrade();
-					}}>Try again</button
-				>
-			</p>
-		{:else if clip.translation}
-			<button
-				type="button"
-				class="link toggle"
-				aria-expanded={open}
-				onclick={(e) => {
-					e.stopPropagation();
-					open = !open;
-				}}
+		<button
+			type="button"
+			class="link toggle"
+			aria-expanded={open}
+			onclick={(e) => {
+				e.stopPropagation();
+				open = !open;
+				if (open) translate();
+			}}
+		>
+			<svg class:open viewBox="0 0 16 16" aria-hidden="true"
+				><path d="M6 4l4 4-4 4" /></svg
 			>
-				<svg class:open viewBox="0 0 16 16" aria-hidden="true"
-					><path d="M6 4l4 4-4 4" /></svg
-				>
-				English
-			</button>
-			{#if open}
+			English
+		</button>
+		{#if open}
+			{#if clip.grade === "pending"}
+				<p class="line busy">translating…</p>
+			{:else if clip.grade === "error"}
+				<p class="line">
+					No translation ·
+					<button
+						type="button"
+						class="link"
+						onclick={(e) => {
+							e.stopPropagation();
+							regrade();
+						}}>Try again</button
+					>
+				</p>
+			{:else if clip.translation}
 				<div class="body">
 					<p class="translation">{clip.translation}</p>
 					{#if notes.length > 0}

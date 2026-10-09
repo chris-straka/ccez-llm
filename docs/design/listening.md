@@ -1,9 +1,9 @@
 # Listening drills
 
 Short clips of a YouTube video's audio in the learner's language. Type
-what you hear, and the next clip plays at once. The real transcript,
-an English translation and short notes land behind you. Everything
-follows the reply language picked in the app.
+what you hear, and the next clip plays at once. The real transcript
+lands behind you, with an English translation and short notes one
+click away. Everything follows the reply language picked in the app.
 
 ## The loop
 
@@ -17,18 +17,17 @@ follows the reply language picked in the app.
    ⌥Space / ⌥S work mid-guess.
 3. Enter submits the guess. The diff is local, so it shows instantly
    on clip 1 (heard, misspelled, misheard, missed), and clip 2 appears
-   and plays in the same frame. "?" on an empty prompt reveals the
-   clip as a skip.
-4. Translation and notes come from the active provider, two at a
-   time, starting two clips ahead of the one playing. The prompt never
-   sees the guess, so grading can start before you answer. A failed
-   one offers Try again.
+   and plays in the same frame. ⌘Enter (or "?" on an empty prompt,
+   or A outside it) reveals the clip as a skip.
+4. Nothing is translated on the way. Opening a clip's "English" fold
+   asks the active provider for that clip's translation and notes
+   (once; "translating…" while it runs, Try again if it fails).
 5. After the last clip: words heard, and the clips missed most, each
    with replay buttons. "Another video" opens a fresh drill chat.
 
 Clip bodies are ordinary assistant messages holding just the
 transcript, so annotation, read-aloud and reading aids work on them.
-The translation and notes fold under the clip behind an "English"
+The translation and notes fold under the clip behind that "English"
 toggle, closed by default.
 
 ## Pipeline

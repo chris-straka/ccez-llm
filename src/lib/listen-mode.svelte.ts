@@ -81,8 +81,6 @@ const END_TRIM_SEC = 0.15;
 const MIN_CLIP_SEC = 0.3;
 /** Grading calls in flight at once. */
 const GRADE_CONCURRENCY = 2;
-/** Clips graded ahead of the one showing. */
-const GRADE_AHEAD = 2;
 /** Recent videos probed per channel row. */
 const CHANNEL_PROBE = 6;
 /** Typing pause before the search box searches by itself. */
@@ -367,7 +365,6 @@ export class ListenMode {
 			startDrill(state, chatId, session);
 			this.close();
 			this.deps.reveal();
-			this.queueGrades(chatId);
 			this.deps.focusComposer();
 			if (await audioReady) this.play(0, false);
 		} catch (error) {
@@ -613,29 +610,20 @@ export class ListenMode {
 				this.queued = next.i;
 			} else this.play(next.i, false);
 		} else if (!this.playing) this.stop();
-		this.queueGrades(chatId);
 		this.deps.reveal();
 		return true;
 	}
 
-	/** Grade the open clip, the ones after it, and any answered clip
-	 * still ungraded (failed ones retry once per session). */
-	private queueGrades(chatId: ChatId, retry: number | null = null): void {
+	/** Ask for clip translations, each once per session (a retry
+	 * re-asks one that failed). */
+	private requestGrades(
+		chatId: ChatId,
+		wanted: number[],
+		retry: number | null = null
+	): void {
 		const chat = this.deps.getChatState().chats.find((c) => c.id === chatId);
 		const session = chat?.listen;
 		if (!chat || !session) return;
-		const open = openClip(chat)?.clip?.i ?? session.clips.length;
-		const wanted: number[] = [];
-		for (const m of chat.messages) {
-			if (m.clip && m.clip.grade !== "done" && m.clip.grade !== "pending")
-				wanted.push(m.clip.i);
-		}
-		for (
-			let i = open;
-			i < Math.min(session.clips.length, open + 1 + GRADE_AHEAD);
-			i++
-		)
-			wanted.push(i);
 		const fresh: number[] = [];
 		for (const i of wanted) {
 			const key = `${chatId}|${i}`;
@@ -837,11 +825,21 @@ export class ListenMode {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
 	private inFlight = new Set<string>();
 
+	/** The English fold opened on answered clip `i` of the active
+	 * drill: translate it now (nothing translates before it's asked). */
+	translate(i: number): void {
+		const chat = activeChat(this.deps.getChatState());
+		const clip = chat.messages.find((m) => m.clip?.i === i)?.clip;
+		if (!chat.listen || !clip || clip.heard === undefined) return;
+		if (clip.grade === "done" || clip.grade === "pending") return;
+		this.requestGrades(chat.id, [i]);
+	}
+
 	/** Retry a failed grading in the active drill ("Try again"). */
 	regrade(i: number): void {
 		const chatId = activeChat(this.deps.getChatState()).id;
 		this.gradeAsked.delete(`${chatId}|${i}`);
-		this.queueGrades(chatId, i);
+		this.requestGrades(chatId, [i], i);
 	}
 
 	/** The clip's moment on YouTube, in the system browser. */

@@ -127,17 +127,22 @@ const GRADE = {
 	notes: [{ expr: "bienvenue", meaning: "welcome" }]
 };
 
+/** Translation requests the grading stub answered. */
+let graded = 0;
+
 test.beforeEach(async ({ page }) => {
 	await mockListenShell(page);
-	await page.route("http://grade.test/v1/chat/completions", (route) =>
-		route.fulfill({
+	graded = 0;
+	await page.route("http://grade.test/v1/chat/completions", (route) => {
+		if (route.request().method() === "POST") graded++;
+		return route.fulfill({
 			headers: {
 				"access-control-allow-origin": "*",
 				"access-control-allow-headers": "*"
 			},
 			json: { choices: [{ message: { content: JSON.stringify(GRADE) } }] }
-		})
-	);
+		});
+	});
 	await seedChat(page, [], "fr", {
 		listenChannels: [{ url: CHANNEL, name: "Learner Channel" }],
 		activeProviderId: "deepseek",
@@ -203,16 +208,18 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({
 		end.getByRole("button", { name: "Another video" })
 	).toBeVisible();
 
-	// Grading ran behind: the English folds under each clip, the body
-	// stays the French.
+	// Nothing translated on the way: the body stays the French, and
+	// opening a clip's English asks for that clip alone.
 	const first = page.locator("#msg-0");
 	const english = first.getByRole("button", { name: "English" });
-	await expect(english).toBeVisible({ timeout: 15_000 });
+	await expect(english).toBeVisible();
 	await expect(first).not.toContainText(GRADE.translation);
+	expect(graded).toBe(0);
 	await english.click();
 	await expect(english).toHaveAttribute("aria-expanded", "true");
 	await expect(first).toContainText(GRADE.translation);
 	await expect(first).toContainText("welcome");
+	expect(graded).toBe(1);
 });
 
 test("the search box searches on a typing pause; emptying it drops the results", async ({

@@ -87,18 +87,23 @@ function harness() {
 }
 
 describe("native grading", () => {
-	it("hands the answered clip and the next ones to the runner at once", () => {
+	it("translates nothing until asked, then just the clip asked for", () => {
 		const h = harness();
 		expect(h.mode.submit("parlons de la peste")).toBe(true);
-		const items = h.starts.flat();
-		expect(items.map((x) => x.i).sort()).toEqual([0, 1, 2, 3]);
-		expect(items.every((x) => !x.retry)).toBe(true);
-		expect(items.find((x) => x.i === 1)?.prompt).toContain(
-			"Nous couvrons ce sujet"
-		);
-		// Rows on screen show the grading as in flight.
+		expect(h.starts).toEqual([]);
+		expect(h.clip(0)?.grade).toBeUndefined();
+		// Opening clip 2's English (not answered yet) asks nothing.
+		h.mode.translate(1);
+		expect(h.starts).toEqual([]);
+		h.mode.translate(0);
+		expect(h.starts).toEqual([
+			[expect.objectContaining({ i: 0, retry: false })]
+		]);
+		expect(h.starts[0]?.[0]?.prompt).toContain("Parlons de la peste");
 		expect(h.clip(0)?.grade).toBe("pending");
-		expect(h.clip(1)?.grade).toBe("pending");
+		// Asked once: reopening the fold doesn't ask again.
+		h.mode.translate(0);
+		expect(h.starts).toHaveLength(1);
 	});
 
 	it("lands results on their rows, and holds early ones until the clip appears", () => {

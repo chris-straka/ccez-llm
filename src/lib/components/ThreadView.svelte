@@ -408,6 +408,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			{#if msg.clip}
 				<ListenGloss
 					clip={msg.clip}
+					translate={() => {
+						const c = msg.clip;
+						if (c) listen.mode.translate(c.i);
+					}}
 					regrade={() => {
 						const c = msg.clip;
 						if (c) listen.mode.regrade(c.i);
