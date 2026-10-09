@@ -41,7 +41,7 @@ mod imp {
         AVSpeechUtterance,
     };
     use objc2_foundation::{
-        NSDictionary, NSRange, NSUserDefaults, NSObject, NSObjectProtocol, NSString,
+        NSDictionary, NSNumber, NSRange, NSUserDefaults, NSObject, NSObjectProtocol, NSString,
     };
     use tauri::{AppHandle, Emitter};
 
@@ -329,10 +329,41 @@ mod imp {
     /// None when the sample is too short to classify or the recognizer is
     /// uncertain — callers fall back to script detection. Stateless class
     /// call; runs on the invoke handler thread.
-    pub fn identify_lang(text: &str) -> Option<String> {
+    /// Languages the hint spreads its prior over: the ones the app
+    /// reads Latin text in (the offline scorer's set).
+    const HINT_LANGS: [&str; 7] = ["en", "fr", "de", "es", "it", "pt", "nl"];
+
+    /// `hint`: the language of the text around a short sample (the
+    /// sentence a highlighted word sits in). Alone, Apple reads lone
+    /// words wildly ("panne" as Polish, "trempé" as Catalan, "menu" as
+    /// Indonesian); a prior over the supported languages, heavier on
+    /// the hint, keeps the sentence's language unless the word clearly
+    /// belongs to another ("the" in French text stays English, "tomber
+    /// en panne" in English text stays French).
+    pub fn identify_lang(text: &str, hint: Option<&str>) -> Option<String> {
         let trimmed = text.trim();
         if trimmed.is_empty() {
             return None;
+        }
+        let hint = hint
+            .map(|h| h.split(['-', '_']).next().unwrap_or(h).to_lowercase())
+            .filter(|h| HINT_LANGS.contains(&h.as_str()));
+        if let Some(hint) = hint {
+            unsafe {
+                let keys: Vec<Retained<NSString>> =
+                    HINT_LANGS.iter().map(|l| NSString::from_str(l)).collect();
+                let weights: Vec<Retained<NSNumber>> = HINT_LANGS
+                    .iter()
+                    .map(|l| NSNumber::new_f64(if *l == hint { 0.5 } else { 0.1 }))
+                    .collect();
+                let key_refs: Vec<&NSString> = keys.iter().map(|k| &**k).collect();
+                let weight_refs: Vec<&NSNumber> = weights.iter().map(|w| &**w).collect();
+                let hints = NSDictionary::from_slices(&key_refs, &weight_refs);
+                let recognizer = NLLanguageRecognizer::new();
+                recognizer.setLanguageHints(&hints);
+                recognizer.processString(&NSString::from_str(trimmed));
+                return recognizer.dominantLanguage().map(|id| id.to_string());
+            }
         }
         // No length floor: single words ("dissoudre", "neigeait") are
         // exactly what the recognizer is for — it returns nil itself
@@ -821,11 +852,31 @@ mod imp {
             // "dissoudre" as English; that is Apple's call, surfaced
             // instead of masked. Device-dependent by nature: a future
             // OS verdict change fails loudly here for re-examination.
-            assert_eq!(identify_lang(""), None);
-            assert_eq!(identify_lang("   "), None);
+            assert_eq!(identify_lang("", None), None);
+            assert_eq!(identify_lang("   ", None), None);
             for word in ["dissoudre", "neigeait", "dissous"] {
-                assert!(identify_lang(word).is_some(), "{word}");
+                assert!(identify_lang(word, None).is_some(), "{word}");
             }
+        }
+
+        #[test]
+        fn a_sentence_hint_steers_lone_words_without_overruling_them() {
+            // Device-dependent like the test above: Apple's verdicts
+            // on this Mac, pinned so an OS change fails loudly.
+            let fr = |w: &str, h: &str| identify_lang(w, Some(h)).as_deref() == Some("fr");
+            // Unhinted, "panne" reads as Polish; in French text, French.
+            assert!(fr("panne", "fr"));
+            assert!(fr("menu", "fr-FR"));
+            assert!(fr("trempé", "fr"));
+            // The word still wins when it clearly isn't the hint's.
+            assert_eq!(identify_lang("the", Some("fr")).as_deref(), Some("en"));
+            assert!(fr("tomber en panne", "en"));
+            assert!(fr("dissoudre", "en"));
+            // An unsupported hint is ignored, not trusted.
+            assert_eq!(
+                identify_lang("panne", Some("xx")),
+                identify_lang("panne", None)
+            );
         }
 
         #[test]
@@ -1036,11 +1087,12 @@ pub fn tts_save_speech(
 /// Returns a BCP-47-ish tag, or null when the recognizer is uncertain
 /// (callers fall back to script detection, then the offline scorer).
 #[tauri::command]
-pub fn tts_identify_lang(text: String) -> Option<String> {
+pub fn tts_identify_lang(text: String, hint: Option<String>) -> Option<String> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    return imp::identify_lang(&text);
+    return imp::identify_lang(&text, hint.as_deref());
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
+        let _ = hint;
         // No `NLLanguageRecognizer` off Apple platforms: the offline
         // stop-word scorer answers instead (same contract — None when
         // the sample is too short or unscorable).

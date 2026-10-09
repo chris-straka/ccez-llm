@@ -191,8 +191,12 @@ export async function quoteLangFor(
 	// marks are pinyin-exclusive, so they route to Chinese first.
 	if (hasPinyinTones(quote)) return "zh-CN";
 	try {
+		// The fallback is the surrounding sentence's voice: as a hint it
+		// keeps a lone word in its sentence's language ("panne" alone
+		// reads as Polish) unless the word clearly isn't.
 		const tag = await invoke<string | null>("tts_identify_lang", {
-			text: quote
+			text: quote,
+			hint: fallback
 		});
 		const bridge = tag?.trim() ? tag.trim() : null;
 		const verdict = reconcileQuoteLang(

@@ -107,6 +107,15 @@ describe("quoteLangFor", () => {
 		).resolves.toBe("en-US");
 	});
 
+	it("hints the bridge with the sentence's voice", async () => {
+		mockInvoke.mockResolvedValue("fr");
+		await expect(quoteLangFor("panne", "fr-FR")).resolves.toBe("fr");
+		expect(mockInvoke).toHaveBeenCalledWith("tts_identify_lang", {
+			text: "panne",
+			hint: "fr-FR"
+		});
+	});
+
 	it("uses the offline scorer when the bridge answers null", async () => {
 		mockInvoke.mockResolvedValue(null);
 		await expect(
