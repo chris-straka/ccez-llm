@@ -1,10 +1,15 @@
-//! Backend for ccez-llm's listening drills. The desktop shell calls
-//! [`api::Listen`] directly; the `ccez-listen` binary serves the same
-//! calls over HTTP for the phone and the web build.
+//! Listening drills backend: find a video's audio in a language and
+//! fetch it with its word-timed captions, straight from YouTube's own
+//! API (no yt-dlp), so it runs on desktop and phone alike.
 
-pub mod api;
-pub mod pick;
-pub mod ytdlp;
+mod api;
+mod client;
+pub mod youtube;
 
-pub use api::{storyboard_of, ChannelPage, Entry, Fetched, Listen, Sheet, Storyboard};
-pub use pick::{AudioKind, AudioPick, CaptionKind, CaptionPick, VideoInfo};
+pub use api::{Fetched, Listen};
+pub use youtube::{
+    AudioKind, AudioPick, CaptionKind, CaptionPick, ChannelPage, Entry, Sheet, Storyboard,
+    VideoInfo,
+};
+
+pub type Result<T> = std::result::Result<T, String>;

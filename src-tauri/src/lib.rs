@@ -32,7 +32,6 @@ mod dictate_macos;
 mod dictate_windows;
 mod keyboard;
 mod langid;
-#[cfg(desktop)]
 mod listen;
 mod models;
 mod ondevice;
@@ -387,15 +386,10 @@ pub fn run() {
             #[cfg(desktop)]
             desktop::desktop_export_study_sheet,
             desktop::desktop_drain_pending_link,
-            #[cfg(desktop)]
             listen::listen_search,
-            #[cfg(desktop)]
             listen::listen_channel,
-            #[cfg(desktop)]
             listen::listen_videos,
-            #[cfg(desktop)]
             listen::listen_fetch,
-            #[cfg(desktop)]
             listen::listen_audio,
             keychain_get,
             keychain_set,
