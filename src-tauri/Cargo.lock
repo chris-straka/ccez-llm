@@ -620,6 +620,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tokio",
  "windows",
 ]
 

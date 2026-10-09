@@ -306,9 +306,10 @@ import {
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { NewsMode } from "$lib/news-mode.svelte";
-	import { ListenMode } from "$lib/listen-mode.svelte";
+	import { ListenMode, type NativeGradeResult } from "$lib/listen-mode.svelte";
 	import { listenKeyAction, summarizeDrill } from "$lib/listen";
 	import { shellBackend } from "$lib/listenBackend";
+	import { nativeRouteFor } from "$lib/turns";
 	import { drillStates } from "$lib/listenChat";
 	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
@@ -1354,11 +1355,15 @@ import {
 				shell: tauriBackendAvailable()
 			});
 			void nativeTurns.reconcile();
+			void listenMode.resync();
 		};
 		// Native turn events (Android shell): token stream, fetch phase,
 		// retry resets, and completion. Suspension-safe by design —
 		// anything missed lands through the return/boot scan instead.
 		const unlistenTurns = nativeTurns.listen(listen);
+		// Native drill grading (Android shell): same suspension-safe
+		// pair, events while visible and a file read on return.
+		const unlistenGrades = tauriBackendAvailable() ? listenMode.listenNative(listen) : () => {};
 		window.addEventListener("pointerdown", stampPress, { passive: true });
 		window.addEventListener("keydown", stampPress);
 		document.addEventListener("visibilitychange", onVisible);
@@ -1373,11 +1378,13 @@ import {
 		// died with the process restarts here (dots again, reply
 		// completes) instead of stranding its placeholder.
 		void nativeTurns.reconcile();
+		void listenMode.resync();
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
 			document.removeEventListener("visibilitychange", onVisible);
 			unlistenTurns();
+			unlistenGrades();
 			window.removeEventListener("touchstart", trackAnnTouchStart);
 			window.removeEventListener("touchmove", trackAnnTouchMove);
 		};
@@ -2203,6 +2210,40 @@ import {
 			} else {
 				window.open(url, "_blank", "noopener");
 			}
+		},
+		// Phone: grading runs in Rust like a native turn, so it keeps
+		// going after the app leaves the screen.
+		nativeGrader: () => {
+			const config = nativeRouteFor(
+				{
+					androidUI,
+					shell: tauriBackendAvailable(),
+					mock: useMock,
+					onDevice: isOnDeviceProvider(settings.activeProviderId)
+				},
+				[],
+				settings
+			);
+			if (!config) return null;
+			return {
+				start: async (chatId, items) => {
+					const { invoke } = await import("@tauri-apps/api/core");
+					await invoke("listen_grade_start", {
+						req: {
+							chat_id: chatId,
+							base_url: config.baseUrl,
+							api_key: config.apiKey,
+							model: config.model,
+							extra_body: config.extraBody,
+							items
+						}
+					});
+				},
+				results: async (chatId) => {
+					const { invoke } = await import("@tauri-apps/api/core");
+					return invoke<NativeGradeResult[]>("listen_grade_results", { chatId });
+				}
+			};
 		}
 	});
 	/** "Another video": a fresh chat in the same language, browsing. */

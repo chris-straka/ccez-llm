@@ -1371,22 +1371,22 @@ pub fn turn_dismiss(app: AppHandle, turn_id: String) -> Result<bool, String> {
 /// last settle stops it. Without this a backgrounded app is killed
 /// mid-turn; killed turns auto-resume with dots on return instead.
 #[cfg(target_os = "android")]
-fn turn_service_claim(chat_id: &str) {
+pub(crate) fn turn_service_claim(chat_id: &str) {
     crate::turn_service::service_claim(chat_id);
 }
 
 /// Non-Android builds keep no service: the turn still outlives page
 /// stalls wherever the process itself lives (desktop).
 #[cfg(not(target_os = "android"))]
-fn turn_service_claim(_chat_id: &str) {}
+pub(crate) fn turn_service_claim(_chat_id: &str) {}
 
 #[cfg(target_os = "android")]
-fn turn_service_settle() {
+pub(crate) fn turn_service_settle() {
     crate::turn_service::service_settle();
 }
 
 #[cfg(not(target_os = "android"))]
-fn turn_service_settle() {}
+pub(crate) fn turn_service_settle() {}
 
 /// Cap for an inbound notice-tap chat id (same flood rule as the
 /// desktop deep-link ids).

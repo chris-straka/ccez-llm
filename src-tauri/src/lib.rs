@@ -33,6 +33,7 @@ mod dictate_windows;
 mod keyboard;
 mod langid;
 mod listen;
+mod listen_grade;
 mod models;
 mod ondevice;
 #[cfg(desktop)]
@@ -391,6 +392,9 @@ pub fn run() {
             listen::listen_videos,
             listen::listen_fetch,
             listen::listen_audio,
+            listen_grade::listen_grade_start,
+            listen_grade::listen_grade_results,
+            listen_grade::listen_grade_forget,
             keychain_get,
             keychain_set,
             models::list_models,
