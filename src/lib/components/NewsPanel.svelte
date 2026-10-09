@@ -406,11 +406,13 @@ everything else is theme tokens, never raw hex. -->
 
 <style>
 	.news-panel {
-		/* The panel follows the text size like messages do: every size
-		below rides --u (1rem at 100%, scaled with --font-scale). */
-		--u: calc(1rem * var(--font-scale, 1));
+		/* Controls stay put at any text size (--u, a fixed 1rem): pills,
+		segments and boxes don't grow. Only reading text rides --t
+		(1rem at 100%, scaled with --font-scale) and clamps with an
+		ellipsis where it runs out of room. */
+		--u: 1rem;
+		--t: calc(1rem * var(--font-scale, 1));
 		font-size: var(--u);
-		container-type: inline-size;
 		display: flex;
 		flex-direction: column;
 		gap: calc(0.55 * var(--u, 1rem));
@@ -557,19 +559,19 @@ everything else is theme tokens, never raw hex. -->
 		cursor: pointer;
 	}
 
-	/* Grid: as many ~calc(16 * var(--u, 1rem)) columns as fit (three on a laptop, one
-	list column on a phone); rem-based, so giant text sizes drop
-	columns instead of squeezing headlines. */
+	/* Grid: as many 12.5em columns as fit (three on a laptop at 100%,
+	two at big text in a mid window). The list is the query container
+	and its em is --t, so giant text sizes drop columns instead of
+	squeezing headlines. */
 	.news-cards {
+		font-size: var(--t);
+		container-type: inline-size;
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(
-			auto-fill,
-			minmax(min(100%, calc(16 * var(--u, 1rem))), 1fr)
-		);
-		gap: calc(0.75 * var(--u, 1rem));
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5em), 1fr));
+		gap: 0.6em;
 	}
 	.news-item {
 		display: flex;
@@ -688,7 +690,7 @@ everything else is theme tokens, never raw hex. -->
 		min-width: 0;
 	}
 	.news-headline {
-		font-size: calc(0.93 * var(--u, 1rem));
+		font-size: calc(0.93 * var(--t, 1rem));
 		font-weight: 600;
 		line-height: 1.32;
 		color: #1c1c1e;
@@ -703,7 +705,7 @@ everything else is theme tokens, never raw hex. -->
 		min-height: calc(1.32em * 3);
 	}
 	.news-source {
-		font-size: calc(0.76 * var(--u, 1rem));
+		font-size: calc(0.76 * var(--t, 1rem));
 		color: #6e6e73;
 		color: var(--muted);
 		white-space: nowrap;
@@ -713,8 +715,8 @@ everything else is theme tokens, never raw hex. -->
 	.skel-line {
 		position: relative;
 		display: block;
-		height: calc(0.8 * var(--u, 1rem));
-		margin: calc(0.22 * var(--u, 1rem)) 0;
+		height: calc(0.8 * var(--t, 1rem));
+		margin: calc(0.22 * var(--t, 1rem)) 0;
 		border-radius: calc(0.3 * var(--u, 1rem));
 		overflow: hidden;
 		background: #e5e5ea;
@@ -725,7 +727,7 @@ everything else is theme tokens, never raw hex. -->
 	}
 	.skel-line.tiny {
 		width: 35%;
-		height: calc(0.6 * var(--u, 1rem));
+		height: calc(0.6 * var(--t, 1rem));
 	}
 	.skel-card {
 		box-sizing: border-box;
@@ -743,16 +745,16 @@ everything else is theme tokens, never raw hex. -->
 	.skel-card .news-text {
 		/* Same footprint as a real headline block plus source. */
 		min-height: calc(
-			calc(0.93 * var(--u, 1rem)) * 1.32 * 3 + calc(1.3 * var(--u, 1rem))
+			calc(0.93 * var(--t, 1rem)) * 1.32 * 3 + calc(1.3 * var(--t, 1rem))
 		);
 	}
 
-	/* Phone column: list rows with a thumbnail, many stories per
-	screen instead of one huge picture each. */
-	@container (max-width: 33rem) {
-		.news-cards {
-			gap: calc(0.5 * var(--u, 1rem));
-		}
+	/* List rows with a thumbnail wherever the grid would fall to one
+	column (two 12.5em columns plus the 0.6em gap), so no width or
+	text size ever gets one huge picture per story. em in a container
+	query is the container's font size (--t), so this follows the text
+	size; calc(var()) is not allowed here (lightningcss rejects it). */
+	@container (width < 25.75em) {
 		.news-card,
 		.skel-card {
 			display: grid;
@@ -839,6 +841,8 @@ everything else is theme tokens, never raw hex. -->
 		background: transparent;
 		color: #6e6e73;
 		color: var(--muted);
+		font-size: calc(0.95 * var(--u, 1rem));
+		line-height: 1;
 		cursor: pointer;
 		transition: color 0.15s ease;
 	}

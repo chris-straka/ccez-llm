@@ -463,20 +463,25 @@ test("a channel's videos fold by its chevron or hover + F, and stay folded", asy
 	await expect(videos).toBeVisible();
 });
 
-test("the Listen panel follows the text size", async ({ page }) => {
+test("Listen titles follow the text size; its controls stay put", async ({
+	page
+}) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	const panel = page.locator(".listen-panel");
 	const title = panel.locator(".video-title").first();
+	const search = panel.locator(".search input");
 	await expect(title).toBeVisible();
-	const size = async () =>
-		parseFloat(await title.evaluate((el) => getComputedStyle(el).fontSize));
-	const base = await size();
+	const px = async (el: typeof title) =>
+		parseFloat(await el.evaluate((n) => getComputedStyle(n).fontSize));
+	const base = await px(title);
+	const control = await px(search);
 	await page.evaluate(() =>
 		document
 			.querySelector<HTMLElement>(".app")
 			?.style.setProperty("--font-scale", "2")
 	);
-	await expect.poll(size).toBeCloseTo(base * 2, 1);
+	await expect.poll(() => px(title)).toBeCloseTo(base * 2, 1);
+	expect(await px(search)).toBe(control);
 });
 
 test("the clip in play shows the video, centered; others keep a still", async ({

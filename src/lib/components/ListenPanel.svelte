@@ -272,9 +272,12 @@ channel or start a video. State lives in `ListenMode`. -->
 
 <style>
 	.listen-panel {
-		/* The panel follows the text size like messages do: every size
-		below rides --u (1rem at 100%, scaled with --font-scale). */
-		--u: calc(1rem * var(--font-scale, 1));
+		/* Controls stay put at any text size (--u, a fixed 1rem), as in
+		the News panel. Only reading text (titles, meta, channel names)
+		rides --t (scaled with --font-scale) and ends in an ellipsis
+		where it runs out of room. */
+		--u: 1rem;
+		--t: calc(1rem * var(--font-scale, 1));
 		font-size: var(--u);
 		display: flex;
 		flex-direction: column;
@@ -484,7 +487,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		flex: 1 1 auto;
 	}
 	.video-title {
-		font-size: calc(0.95 * var(--u, 1rem));
+		font-size: calc(0.95 * var(--t, 1rem));
 		line-height: 1.3;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
@@ -493,8 +496,11 @@ channel or start a video. State lives in `ListenMode`. -->
 		overflow: hidden;
 	}
 	.video-meta {
-		font-size: calc(0.8 * var(--u, 1rem));
+		font-size: calc(0.8 * var(--t, 1rem));
 		color: var(--muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.avail {
 		color: var(--ok);
@@ -524,7 +530,11 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.channel-name {
 		font-weight: 600;
-		font-size: calc(0.95 * var(--u, 1rem));
+		font-size: calc(0.95 * var(--t, 1rem));
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.fold {
 		align-self: center;

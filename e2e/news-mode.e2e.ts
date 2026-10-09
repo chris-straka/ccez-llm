@@ -248,6 +248,28 @@ test.describe("mock shell feed", () => {
 		expect(before).toBe(false);
 	});
 
+	test("big text never strands one huge card column", async ({ page }) => {
+		await page.setViewportSize({ width: 920, height: 700 });
+		await openFrenchNews(page);
+		const panel = page.locator(".news-panel");
+		await expect(panel.locator(".news-card")).toHaveCount(3);
+		// Columns and the list switch both follow the text size: a mid
+		// window at 1.6x keeps two grid columns, 2.2x turns to list rows.
+		const layoutAt = (scale: number) =>
+			panel.evaluate((el, s) => {
+				el.style.setProperty("--font-scale", String(s));
+				const grid = getComputedStyle(el.querySelector(".news-cards")!);
+				const card = getComputedStyle(el.querySelector(".news-card")!);
+				return {
+					cols: grid.gridTemplateColumns.split(" ").length,
+					list: card.display === "grid"
+				};
+			}, scale);
+		expect(await layoutAt(1)).toEqual({ cols: 3, list: false });
+		expect(await layoutAt(1.6)).toEqual({ cols: 2, list: false });
+		expect(await layoutAt(2.2)).toEqual({ cols: 1, list: true });
+	});
+
 	test("image miss settles to a letter tile", async ({ page }) => {
 		await openFrenchNews(page);
 		const panel = page.locator(".news-panel");
