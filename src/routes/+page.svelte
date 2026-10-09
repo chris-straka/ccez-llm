@@ -13556,7 +13556,7 @@ import {
 	<!-- Click-off closes the settings panel (keyboard users get Esc and ⌘,). -->
 	<main
 		class:empty={viewChat.messages.length === 0}
-		class:news={newsMode.news !== null}
+		class:news={newsMode.news !== null || listenMode.open}
 		class:hide-messages={settings.hideMessages}
 		class:hide-buttons={settings.hideButtons}
 		class:plain-user={!settings.ownBubble}

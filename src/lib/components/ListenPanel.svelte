@@ -306,7 +306,6 @@ channel or start a video. State lives in `ListenMode`. -->
 		gap: 0.5rem;
 		align-items: center;
 	}
-	.search input,
 	.server-line {
 		margin-top: 0.6rem;
 		font-size: 0.8rem;
@@ -319,6 +318,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		color: var(--accent);
 		cursor: pointer;
 	}
+	.search input,
 	.server input {
 		flex: 1 1 auto;
 		min-width: 0;
