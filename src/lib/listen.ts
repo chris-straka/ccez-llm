@@ -146,7 +146,9 @@ export function listenErrorCopy(error: unknown, langName: string): string {
 	if (message.includes("listen-unavailable")) return "That video can't be played here.";
 	if (message.includes("listen-no-videos")) return "No videos to drill on this channel.";
 	if (message.includes("listen-bad-channel")) return "That doesn't look like a YouTube channel.";
-	return "That didn't load. Try again.";
+	// Anything else names its code, so a failure can be traced.
+	const code = /listen-[a-z0-9-]+/.exec(message)?.[0];
+	return code ? `That didn't load (${code}). Try again.` : "That didn't load. Try again.";
 }
 
 /** "French dub" / "French audio" / "no French audio yet". */

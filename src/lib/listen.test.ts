@@ -57,6 +57,8 @@ describe("labels", () => {
 		expect(listenErrorCopy(new Error("listen-needs-app"), "French")).toMatch(/runs in the app/);
 		expect(listenErrorCopy(new Error("listen-network"), "French")).toMatch(/Can't reach YouTube/);
 		expect(listenErrorCopy(new Error("listen-no-track"), "German")).toBe("That video has no German audio.");
+		expect(listenErrorCopy("listen-http-403", "French")).toBe("That didn't load (listen-http-403). Try again.");
+		expect(listenErrorCopy(new Error("boom"), "French")).toBe("That didn't load. Try again.");
 	});
 });
 

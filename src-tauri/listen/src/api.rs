@@ -282,14 +282,30 @@ impl Listen {
             }
         }
         let player = self.player(id, URL_TTL).await?;
-        if let Some(code) = playability_error(&player) {
+        match self.download(lang, &dir, &player).await {
+            // A stream URL YouTube turned down (or a cut-short download):
+            // ask for a fresh player response once and try again.
+            Err(e) if e == "listen-http-403" || e == "listen-download-failed" => {
+                let fresh = self.player(id, Duration::ZERO).await?;
+                self.download(lang, &dir, &fresh).await
+            }
+            done => done,
+        }
+    }
+
+    /// `fetch`'s download half: the track and captions `player` points
+    /// at, into `dir`, plus the meta that marks it done.
+    async fn download(&self, lang: &str, dir: &Path, player: &Value) -> Result<Fetched> {
+        if let Some(code) = playability_error(player) {
             return Err(code);
         }
-        let info = video_info(&player, lang);
+        let meta_path = dir.join("meta.json");
+        let captions_path = dir.join("captions.json3");
+        let info = video_info(player, lang);
         let audio = info.audio.clone().ok_or("listen-no-track")?;
         let captions = info.captions.clone().ok_or("listen-no-captions")?;
-        let (url, len) = audio_source(&player, &audio).ok_or("listen-no-track")?;
-        let cap_url = caption_url(&player, &captions).ok_or("listen-no-captions")?;
+        let (url, len) = audio_source(player, &audio).ok_or("listen-no-track")?;
+        let cap_url = caption_url(player, &captions).ok_or("listen-no-captions")?;
         let doc = self.yt.text(&cap_url).await?;
         if !doc.trim_start().starts_with('{') {
             return Err("listen-no-captions".into());
@@ -303,7 +319,7 @@ impl Listen {
             audio_mime: audio.mime.clone(),
             captions: String::new(),
             caption_kind: captions.kind,
-            storyboard: storyboard(&player),
+            storyboard: storyboard(player),
         };
         write_json(&meta_path, &fetched)?;
         Ok(Fetched {
