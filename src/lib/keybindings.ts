@@ -102,6 +102,7 @@ export type MessageKeyAction =
 	| "delete-hovered"
 	| "delete-badge"
 	| "branch-hovered"
+	| "rerun-hovered"
 	| "speak-hovered"
 	| "speak-word"
 	| "speak-sentence"
@@ -174,6 +175,8 @@ export function messageKeyAction(
 		!facts.inField
 	)
 		return "edit-hovered";
+	if (facts.code === "KeyR" && hovered && bare(facts) && !facts.inField && !facts.inEditable)
+		return "rerun-hovered";
 	if (
 		(facts.key === "t" || facts.key === "T") &&
 		hovered &&

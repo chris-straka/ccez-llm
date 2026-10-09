@@ -83,6 +83,15 @@ const delBase: DeleteKeyFacts = {
 };
 
 describe("messageKeyAction", () => {
+	it("R over a message reruns it; Shift+R still reads it aloud", () => {
+		const r = { ...msgBase, key: "r", code: "KeyR" };
+		expect(messageKeyAction(r)).toBe("rerun-hovered");
+		expect(messageKeyAction({ ...r, key: "R", shiftKey: true })).toBe("speak-hovered");
+		expect(messageKeyAction({ ...r, hoveredIdx: -1 })).toBeNull();
+		expect(messageKeyAction({ ...r, inField: true })).toBeNull();
+		expect(messageKeyAction({ ...r, inEditor: true })).toBeNull();
+	});
+
 	it("files a live selection on A, toggles aids on bare message A", () => {
 		expect(messageKeyAction(msgBase)).toBe("toggle-aids");
 		expect(messageKeyAction({ ...msgBase, hasSelection: true })).toBe(
@@ -286,8 +295,8 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...shifted, key: "r", code: "KeyR" })).toBe(
 			"speak-hovered"
 		);
-		// Bare letters are never branch/speak.
-		expect(messageKeyAction({ ...msgBase, key: "r", code: "KeyR" })).toBe(null);
+		// Bare letters are never branch/speak (bare R reruns instead).
+		expect(messageKeyAction({ ...msgBase, key: "r", code: "KeyR" })).toBe("rerun-hovered");
 		// Chords, fields, editors, and no hover all yield.
 		expect(
 			messageKeyAction({ ...shifted, key: "C", code: "KeyC", metaKey: true })

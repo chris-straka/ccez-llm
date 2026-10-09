@@ -49,6 +49,7 @@ test("list runs in sections, hovered-message keys first", async ({ page }) => {
 	for (const name of [
 		"Scroll",
 		"Edit your message",
+		"Rerun / regenerate",
 		"Summon / hide window",
 		"Pin / unpin annotation",
 		"Speak text aloud"

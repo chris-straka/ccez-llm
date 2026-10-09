@@ -133,6 +133,7 @@ export function desktopShortcuts(
 		{ group: hover, name: "Read word / sentence / paragraph", keys: "Shift+W / Shift+S / Shift+P" },
 		{ group: hover, name: "Annotate word", keys: "A" },
 		{ group: hover, name: "Edit your message", keys: "E" },
+		{ group: hover, name: "Rerun / regenerate", keys: "R" },
 		{ group: hover, name: "Cut", keys: "X" },
 		{ group: hover, name: "Branch from here", keys: "Shift+C" },
 		{ group: hover, name: "Trim above here", keys: "T" },

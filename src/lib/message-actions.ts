@@ -50,3 +50,20 @@ export function canEditMessage(
 ): boolean {
 	return messages[hoveredIdx]?.role === "user";
 }
+
+/**
+ * R over a message: the user turn to rerun from. Your own message
+ * reruns itself; a reply (failed or not) reruns the turn it answered,
+ * which regenerates it. Null mid-send or with no turn of yours above.
+ */
+export function rerunIndexFor(
+	messages: { role: string }[],
+	hoveredIdx: number,
+	sending: boolean
+): number | null {
+	if (sending || !messages[hoveredIdx]) return null;
+	for (let i = hoveredIdx; i >= 0; i--) {
+		if (messages[i]?.role === "user") return i;
+	}
+	return null;
+}

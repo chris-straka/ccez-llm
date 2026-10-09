@@ -160,6 +160,7 @@
 	} from "$lib/secrets";
 	import {
 		canEditMessage,
+		rerunIndexFor,
 		toggleAidKinds,
 		toggleSingleAid
 	} from "$lib/message-actions";
@@ -11415,6 +11416,16 @@ import {
 				if (canEditMessage(chat.messages, hoveredIdx)) {
 					event.preventDefault();
 					editMessage(hoveredIdx);
+					return;
+				}
+			}
+			if (msgAction === "rerun-hovered") {
+				// R reruns the hovered turn: your message resends, a reply
+				// regenerates from the message it answered.
+				const at = rerunIndexFor(chat.messages, hoveredIdx, chatState.sending);
+				if (at !== null) {
+					event.preventDefault();
+					rerunFrom(at);
 					return;
 				}
 			}
