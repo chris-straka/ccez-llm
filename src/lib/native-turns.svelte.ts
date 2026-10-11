@@ -265,9 +265,23 @@ export class NativeTurns {
 	returned teardown is best-effort and never throws. */
 	listen(listen: TurnListen): () => void {
 		const offs: Array<() => void> = [];
+		// A teardown can land before `listen` resolves: the late
+		// subscription unlistens at once, or it outlives its owner
+		// and every token appends twice (a re-run's listener too).
+		let gone = false;
 		if (this.deps.isShell()) {
 			const add = (p: Promise<() => void>): void => {
-				void p.then((off) => offs.push(off));
+				void p.then((off) => {
+					if (!gone) {
+						offs.push(off);
+						return;
+					}
+					try {
+						off();
+					} catch {
+						// Already unlistened; shutdown is best-effort.
+					}
+				});
 			};
 			add(listen<TurnTokenEvent>("turn-token", (e) => this.onToken(e.payload)));
 			add(listen<TurnFetchEvent>("turn-fetch", (e) => this.onFetch(e.payload)));
@@ -279,6 +293,7 @@ export class NativeTurns {
 			);
 		}
 		return () => {
+			gone = true;
 			for (const off of offs.splice(0)) {
 				try {
 					off();

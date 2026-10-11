@@ -448,6 +448,21 @@ describe("NativeTurns.listen", () => {
 		expect(offs).toEqual(events);
 	});
 
+	it("a teardown before subscribing lands still unlistens", async () => {
+		const offs: string[] = [];
+		const listen: TurnListen = async (event) => () => void offs.push(event);
+		const stop = harness().turns.listen(listen);
+		stop();
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(offs).toEqual([
+			"turn-token",
+			"turn-fetch",
+			"turn-retry",
+			"turn-done"
+		]);
+	});
+
 	it("subscribes nothing outside the shell", () => {
 		let subscribed = 0;
 		const listen: TurnListen = async () => {

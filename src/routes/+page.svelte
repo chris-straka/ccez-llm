@@ -1370,8 +1370,12 @@
 		// starts visible), so reconcile on mount too — a turn that
 		// died with the process restarts here (dots again, reply
 		// completes) instead of stranding its placeholder.
-		void nativeTurns.reconcile();
-		void listenMode.resync();
+		// Untracked: resync reads every chat's messages, so a tracked
+		// call re-ran this whole mount effect on every streamed token.
+		untrack(() => {
+			void nativeTurns.reconcile();
+			void listenMode.resync();
+		});
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
