@@ -76,7 +76,7 @@ export interface ChannelView {
 /** Slow replay rate (S). */
 export const SLOW_RATE = 0.75;
 /** Trimmed off a clip's caption end time (they run late). */
-const END_TRIM_SEC = 0.15;
+const END_TRIM_SEC = 0.3;
 /** A trimmed clip still plays at least this long. */
 const MIN_CLIP_SEC = 0.3;
 /** Grading calls in flight at once. */
