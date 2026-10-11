@@ -697,6 +697,14 @@ export function identifyLangShort(text: string): string | null {
 	if (/[«»]/.test(trimmed)) bump("fr-FR", 2);
 	const elisions = trimmed.match(/\b[ldcjnmqstvy]['’]/gi)?.length ?? 0;
 	bump("fr-FR", Math.min(2, elisions));
+	// Verb-subject inversion ("arrive-t-il", "pouvez-vous", "est-ce"):
+	// no other list hyphenates a pronoun onto its verb. Bare "-on"
+	// stays out (English "add-on", "hands-on"); only "-t-on" counts.
+	const inversions =
+		trimmed.match(
+			/\p{L}-(?:t-(?:il|elle|on)|il|elle|ils|elles|je|tu|nous|vous|ce)(?![\p{L}-])/giu
+		)?.length ?? 0;
+	bump("fr-FR", Math.min(2, inversions * 2));
 	// Spanish: ñ, accented vowels, inverted marks.
 	if (/ñ/i.test(trimmed)) bump("es-ES", 3);
 	const esWords = tokens.filter((t) => /[áéíóúü]/.test(t)).length;

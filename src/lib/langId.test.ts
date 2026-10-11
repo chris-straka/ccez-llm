@@ -114,6 +114,17 @@ describe("identifyLangShort", () => {
 		// back to the seed voice (English TTS on French text).
 		expect(identifyLangShort("avec un tiret")).toBe("fr-FR");
 	});
+
+	it("reads French verb-subject inversion as French", () => {
+		// Only "vous" scores here: without the inversion vote the
+		// question fell back to the seed voice (English on Android).
+		expect(identifyLangShort("Vous arrive-t-il de...")).toBe("fr-FR");
+		expect(identifyLangShort("Pouvez-vous répéter ?")).toBe("fr-FR");
+		expect(identifyLangShort("Est-ce que tu viens ?")).toBe("fr-FR");
+		expect(identifyLangShort("Y a-t-on pensé ?")).toBe("fr-FR");
+		// English hyphenated words never vote French.
+		expect(identifyLangShort("a hands-on add-on")).toBe(null);
+	});
 });
 
 describe("hyphenationLang", () => {
