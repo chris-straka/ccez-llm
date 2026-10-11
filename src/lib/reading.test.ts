@@ -24,6 +24,7 @@ import {
 	runModelAid,
 	annotationAnswer,
 	buildAnnotationAnswerMessages,
+	tidyAnnotationAnswer,
 	ANNOTATION_BRIEF_WORDS,
 	ANNOTATION_QUESTION_WORDS,
 	ANNOTATION_ANSWER_WORDS,
@@ -1002,6 +1003,9 @@ describe("annotationAnswer", () => {
 			);
 			expect(system!.content).toContain("never the quote restated");
 			expect(system!.content).toContain('"Crossed (franchir)."');
+			expect(system!.content).toContain(
+				"Skip it when it is the quote with only the ending changed"
+			);
 			expect(user!.content).toContain('Quoted: "la neige"');
 			expect(user!.content).toContain("Regarde la neige");
 		}
@@ -1047,7 +1051,54 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("Write in the passage's own language");
 		expect(system!.content).toContain("common synonym");
 		expect(system!.content).not.toContain("Write in English");
-		expect(system!.content).toContain("Quote the passage's words as they are");
+		expect(system!.content).toContain("keep its words as they are");
+	});
+
+	it("never repeats the highlighted quote back", () => {
+		expect(
+			tidyAnnotationAnswer(
+				"Attacks (s'en prendre).\n\"s'en prend\"",
+				"s'en prend"
+			)
+		).toBe("Attacks.");
+		expect(
+			tidyAnnotationAnswer(
+				"Attacks (s\u2019en prendre).\n\u00ab s\u2019en prend \u00bb",
+				"s'en prend"
+			)
+		).toBe("Attacks.");
+		expect(tidyAnnotationAnswer("Crossed (franchir).", "franchi")).toBe(
+			"Crossed."
+		);
+		expect(
+			tidyAnnotationAnswer('"s\'en prend": attacks, goes after.', "s'en prend")
+		).toBe("attacks, goes after.");
+	});
+
+	it("keeps infinitives that look different and everything else", () => {
+		expect(tidyAnnotationAnswer("Was (être).", "fut")).toBe("Was (être).");
+		expect(tidyAnnotationAnswer("Pounds (sterling).", "livres")).toBe(
+			"Pounds (sterling)."
+		);
+		expect(
+			tidyAnnotationAnswer("Took (prendre).\nAlso: to catch (a train).", "prit")
+		).toBe("Took (prendre).\nAlso: to catch (a train).");
+		expect(tidyAnnotationAnswer('"prend"', "prend")).toBe('"prend"');
+	});
+
+	it("tidies the reply it files", async () => {
+		const chat = vi.fn(async () => ({
+			content: "Attacks (s'en prendre).\n\"s'en prend\"",
+			usage: null
+		}));
+		const provider = {
+			id: "scripted",
+			chat,
+			stream: chat
+		} as unknown as ChatProvider;
+		await expect(
+			annotationAnswer(provider, { ...q, quote: "s'en prend" })
+		).resolves.toBe("Attacks.");
 	});
 
 	it("asks once per filing, rejecting blanks and empties", async () => {

@@ -932,9 +932,11 @@ export function buildAnnotationAnswerMessages(
 		`The learner is reading the passage right now, so never retell ` +
 		`or explain it. ${equivalent}: never a definition, never a ` +
 		`preamble such as "Here it means", and never the quote restated. ` +
-		`When the quote is a single inflected verb or participle, add its infinitive in ` +
-		`parentheses: "Crossed (franchir)." Quote the passage's words as ` +
-		`they are.`;
+		`When the quote is a single inflected verb or participle whose ` +
+		`infinitive looks different, add the infinitive in parentheses: ` +
+		`"Crossed (franchir)." Skip it when it is the quote with only the ` +
+		`ending changed (prend, prendre). If a note cites the passage, ` +
+		`keep its words as they are.`;
 	const user = `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`;
 	if (q.brief && !asked) {
 		return [
@@ -996,9 +998,61 @@ export async function annotationAnswer(
 		}>,
 		{ signal }
 	);
-	const answer = result.content.trim();
+	const answer = tidyAnnotationAnswer(result.content, q.quote);
 	if (!answer) throw new Error("Empty annotation answer.");
 	return answer;
+}
+
+/** Compare forms: case, curly apostrophes, quote marks and edge
+punctuation never make two spellings differ. */
+function sameForm(text: string): string {
+	return text
+		.toLowerCase()
+		.replace(/[\u2018\u2019\u02bc]/g, "'")
+		.replace(/["\u201c\u201d\u00ab\u00bb\u2039\u203a]/g, "")
+		.replace(/^[\s'.,:;!?\u2014\u2013-]+|[\s'.,:;!?\u2014\u2013-]+$/g, "")
+		.replace(/\s+/g, " ");
+}
+
+/**
+ * Strip what repeats the highlighted quote from an answer: the reader
+ * is already looking at the word, so a line that only restates it
+ * ("\"s'en prend\"") goes, a leading restatement before a colon or
+ * dash goes, and a parenthesized infinitive that is just the quote
+ * with its ending changed ("Attacks (s'en prendre)." for "s'en
+ * prend") goes. Differing infinitives ("Was (être).") stay. Pure.
+ */
+export function tidyAnnotationAnswer(answer: string, quote: string): string {
+	const q = sameForm(quote);
+	if (!q) return answer.trim();
+	const esc = quote
+		.trim()
+		.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+		.replace(/['\u2019]/g, "['\u2019]");
+	const lead = new RegExp(
+		`^["\u201c\u00ab\u2018']?\\s*${esc}\\s*["\u201d\u00bb\u2019']?\\s*[:\u2014\u2013-]\\s+`,
+		"i"
+	);
+	const nearQuote = (inner: string): boolean => {
+		const f = sameForm(inner);
+		return f === q || (f.startsWith(q) && f.length - q.length <= 3);
+	};
+	const tidy = answer
+		.split("\n")
+		.map((line) =>
+			line
+				.replace(lead, "")
+				.replace(/\s*\(([^()]*)\)/g, (m, inner: string) =>
+					nearQuote(inner) ? "" : m
+				)
+				.trim()
+		)
+		.filter((line) => sameForm(line) !== "" && sameForm(line) !== q)
+		.join("\n")
+		.trim();
+	// Never tidy a reply away entirely: an answer that was nothing
+	// but the quote still shows as the model wrote it.
+	return tidy || answer.trim();
 }
 
 /**

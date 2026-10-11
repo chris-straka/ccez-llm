@@ -429,6 +429,7 @@
 		messageAidKinds,
 		readingsOnly,
 		annotationAnswer,
+		tidyAnnotationAnswer,
 		annotatedRunsWithOffsets,
 		sliceRunsForQuote,
 		speechKanaForQuote,
@@ -14288,7 +14289,7 @@
 		{@const answered = drafts.list.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
 			<AnnAnswer
-				answer={answered.answer}
+				answer={tidyAnnotationAnswer(answered.answer, answered.quote)}
 				closing={annotateMode.answerClosing}
 				anchor={pop.anchor}
 				clearTop={pop.clearTop}
