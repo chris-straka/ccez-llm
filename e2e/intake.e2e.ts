@@ -268,15 +268,9 @@ test("long paste becomes a pill with a positional tag", async ({ page }) => {
 	// …and the tag rides the caret line with one trailing space.
 	const box = page.locator(".ta-input").first();
 	await expect(box).toHaveValue("[Pasted 540 chars] ");
-	// Tap toggles the full scrollable text…
-	const excerpt = `${pasted.slice(0, 240).trimEnd()}…`;
-	await expect(pill).toHaveText(excerpt);
-	await pill.click();
-	await expect(pill).toHaveAttribute("aria-expanded", "true");
-	await expect(pill).toHaveText(pasted);
-	await pill.click();
-	await expect(pill).toHaveAttribute("aria-expanded", "false");
-	await expect(pill).toHaveText(excerpt);
+	// The full text is available immediately in the scrolling preview.
+	await expect(pill).toHaveValue(pasted);
+	await expect(pill).toHaveAttribute("readonly", "");
 	// …while Ctrl+O leaves the tag alone (no in-box collapse to toggle).
 	await box.click();
 	await page.keyboard.press("Control+o");
@@ -314,9 +308,10 @@ test("pasted text renders as an image-sized card", async ({ page }) => {
 	const thumbBox = await page.locator(".attachments .thumb img").boundingBox();
 	if (!previewBox || !thumbBox) throw new Error("preview or thumb has no box");
 	expect(Math.abs(previewBox.height - thumbBox.height)).toBeLessThanOrEqual(2);
-	// Expanding scrolls in place: the card keeps its footprint.
-	await pill.click();
-	await expect(pill).toHaveAttribute("aria-expanded", "true");
+	// Scrolling keeps the card's footprint.
+	await pill.evaluate((el) => {
+		el.scrollTop = el.scrollHeight;
+	});
 	const openBox = await pill.boundingBox();
 	if (!openBox) throw new Error("open preview has no box");
 	expect(Math.abs(openBox.height - previewBox.height)).toBeLessThanOrEqual(2);
@@ -726,7 +721,9 @@ test("removing the image pill keeps the pasted-text pill", async ({ page }) => {
 	await expect(box).toHaveValue("[Pasted 540 chars]");
 });
 
-test("pasted-text pill expands to the full text and back", async ({ page }) => {
+test("pasted-text preview contains the full text and stays read-only", async ({
+	page
+}) => {
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
 	await page.locator(".ta-input").first().click();
 	await page.evaluate((text) => {
@@ -743,17 +740,11 @@ test("pasted-text pill expands to the full text and back", async ({ page }) => {
 	}, pasted);
 	const pill = page.locator(".attachments .paste-body");
 	await expect(pill).toBeVisible();
-	// Collapsed: the 240-char excerpt preview, not the whole paste.
-	const excerpt = `${pasted.slice(0, 240).trimEnd()}…`;
-	await expect(pill).toHaveText(excerpt);
-	// Tap: the full scrollable text.
+	await expect(pill).toHaveValue(pasted);
+	await expect(pill).toHaveAttribute("readonly", "");
 	await pill.click();
-	await expect(pill).toHaveAttribute("aria-expanded", "true");
-	await expect(pill).toHaveText(pasted);
-	// Tap again: back to the excerpt.
-	await pill.click();
-	await expect(pill).toHaveAttribute("aria-expanded", "false");
-	await expect(pill).toHaveText(excerpt);
+	await page.keyboard.type("extra text");
+	await expect(pill).toHaveValue(pasted);
 });
 
 test("tray docks a fixed margin above the prompt", async ({ page }) => {

@@ -4208,7 +4208,6 @@
 		annPop = null;
 		annDraft = "";
 		attachments = [];
-		expandedPastes = [];
 		// Pills are gone: their tags go too, or a stale marker would
 		// reconcile away the next chat's first image.
 		markerSyncMuted = true;
@@ -4596,7 +4595,6 @@
 		const removed = attachments[at];
 		if (!removed) return;
 		attachments = attachments.filter((a) => a.id !== id);
-		expandedPastes = expandedPastes.filter((k) => k !== id);
 		clearNotice(notices, "inline");
 		if (editor) {
 			markerSyncMuted = true;
@@ -4630,16 +4628,6 @@
 				markerSyncMuted = false;
 			}
 		}
-	}
-
-	/** Expanded pasted-text pills (excerpt ↔ full text), ephemeral UI state. */
-	let expandedPastes = $state<string[]>([]);
-
-	/** Pasted-text pill excerpt toggle (independent across pills). */
-	function togglePastedExpand(id: string): void {
-		expandedPastes = expandedPastes.includes(id)
-			? expandedPastes.filter((k) => k !== id)
-			: [...expandedPastes, id];
 	}
 
 	/**
@@ -7445,7 +7433,6 @@
 		// captured them for the send).
 		editor?.clear();
 		attachments = [];
-		expandedPastes = [];
 		pendingAnn = null;
 		reviewOpen = false;
 		highlightAnnId = null;
@@ -7631,7 +7618,6 @@
 			);
 			stageMessage(chatState, staged, stagedKept);
 			attachments = [];
-			expandedPastes = [];
 			editor?.clear();
 			if (stuck) scrollAfterRender();
 			return;
@@ -14067,13 +14053,12 @@
 
 		<!-- Attachment strip: pills and image/pasted-text cards over the
 		thread. Attachments.svelte owns the strip markup, card buttons,
-		and surfaces; the page keeps the array, drag/expand/busy flags,
+		and surfaces; the page keeps the array, drag/busy flags,
 		and the editor/toast side effects. The inline error stays paged
 		in the shared `.error` look (Svelte scoping binds page CSS to
 		page markup, so moving it would drop the red pairing). -->
 		<Attachments
 			{attachments}
-			expanded={expandedPastes}
 			dragging={stripDragging}
 			busyId={ocrBusyId}
 			idle={promptIdle}
@@ -14083,7 +14068,6 @@
 				dragMove: stripDragMove,
 				dragEnd: stripDragEnd,
 				clickGate: stripClickGate,
-				toggleExpand: togglePastedExpand,
 				copy: copyAttachment,
 				recognize: (att: Attachment) => void recognizeAttachment(att),
 				remove: removeAttachment

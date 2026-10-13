@@ -8,7 +8,6 @@ page's shared `.error` look, while the strip renders (possibly empty)
 whenever the tray area is active. -->
 <script lang="ts">
 	import {
-		fileExcerpt,
 		formatTokenCount,
 		isPastedTextAttachment,
 		type Attachment
@@ -21,7 +20,6 @@ whenever the tray area is active. -->
 		dragMove: (event: PointerEvent) => void;
 		dragEnd: (event: Event) => void;
 		clickGate: (event: MouseEvent) => void;
-		toggleExpand: (id: string) => void;
 		copy: (att: Attachment) => void;
 		recognize: (att: Attachment) => void;
 		remove: (id: string) => void;
@@ -30,8 +28,6 @@ whenever the tray area is active. -->
 	interface Props {
 		/** Owned by the page (add/remove sync the editor markers). */
 		attachments: Attachment[];
-		/** Expanded pasted-text pill ids (excerpt ↔ full text). */
-		expanded: string[];
 		/** Strip pan in progress: cards show the fist. */
 		dragging: boolean;
 		/** Attachment id with OCR in flight (its button shows …). */
@@ -44,15 +40,8 @@ whenever the tray area is active. -->
 		actions: AttachmentsActions;
 	}
 
-	let {
-		attachments,
-		expanded,
-		dragging,
-		busyId,
-		idle,
-		inlineError,
-		actions
-	}: Props = $props();
+	let { attachments, dragging, busyId, idle, inlineError, actions }: Props =
+		$props();
 </script>
 
 {#if attachments.length > 0 || inlineError}
@@ -71,7 +60,6 @@ whenever the tray area is active. -->
 		{#each attachments as att (att.id)}
 			{@const pasted = isPastedTextAttachment(att) && att.text !== null}
 			{@const pastedBody = att.text ?? ""}
-			{@const pastedOpen = expanded.includes(att.id)}
 			<li class:card={(att.kind === "image" && !!att.dataUrl) || pasted}>
 				{#if att.kind === "image" && att.dataUrl}
 					<!-- Inert thumbnail: clicking previews nothing
@@ -83,24 +71,13 @@ whenever the tray area is active. -->
 					<span class="file-kind" aria-hidden="true">FILE</span>
 				{/if}
 				{#if pasted}
-					<!-- Pasted-text card: same card as images, with
-					the text filling the thumbnail's seat (clamped,
-					ellipsis) instead of a picture. The preview
-					toggles the full text; copy and remove below are
-					the shared card buttons. -->
-					<button
-						type="button"
+					<!-- The whole paste scrolls in the thumbnail's seat. -->
+					<textarea
 						class="paste-body"
-						class:open={pastedOpen}
-						aria-expanded={pastedOpen}
-						aria-label={pastedOpen
-							? "Collapse pasted text"
-							: "Expand pasted text"}
-						onmousedown={(e) => e.preventDefault()}
-						onclick={() => actions.toggleExpand(att.id)}
-					>
-						{pastedOpen ? pastedBody : fileExcerpt(pastedBody)}
-					</button>
+						readonly
+						aria-label="Pasted text preview"
+						value={pastedBody}
+						onpointerdown={(event) => event.stopPropagation()}></textarea>
 					<span class="file-kind" aria-hidden="true">PASTE</span>
 					<span class="tok" title="{att.tokens} tokens"
 						>{pastedBody.length} chars</span
@@ -224,26 +201,6 @@ whenever the tray area is active. -->
 		color: #6e6e73;
 		color: var(--muted);
 	}
-	/* Pasted-text pill body: excerpt preview, single-line like the
-	file name; expanded it scrolls in place instead of growing the
-	strip. */
-	.attachments .paste-body {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		max-width: 16rem;
-		text-align: left;
-		border-radius: 0.5rem;
-		padding: 0.1rem 0.3rem;
-	}
-	.attachments .paste-body.open {
-		white-space: pre-wrap;
-		word-break: break-word;
-		max-height: 8rem;
-		max-width: 20rem;
-		overflow: auto;
-		text-overflow: clip;
-	}
 	.attachments button {
 		border: 0;
 		background: none;
@@ -282,36 +239,31 @@ whenever the tray area is active. -->
 		object-fit: cover;
 		border-radius: 8px;
 	}
-	/* Pasted-text cards: the same 12rem card as images, with the
-	pasted text filling the thumbnail's seat (same 4.5rem) instead
-	of a picture — four clamped lines with an ellipsis, never a
-	tall pill. The footer (PASTE, chars, copy, X) matches the image
-	card's row. */
+	/* Full pasted text scrolls in a fixed-height preview; its footer
+	stays outside the scrolling area, like the image card's footer. */
 	.attachments li.card .paste-body {
 		flex: 1 1 100%;
+		width: 100%;
 		max-width: none;
 		height: 4.5rem;
+		box-sizing: border-box;
+		font: inherit;
 		line-height: 1.4;
-		display: -webkit-box;
-		-webkit-line-clamp: 4;
-		line-clamp: 4;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		white-space: normal;
+		display: block;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		touch-action: pan-y;
+		resize: none;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		cursor: text;
 		text-align: left;
 		border-radius: 8px;
 		padding: 0.1rem 0.3rem;
-	}
-	/* Expanded preview scrolls in place like the old pill: same
-	card footprint, full text, no strip growth. */
-	.attachments li.card .paste-body.open {
-		display: block;
-		max-width: none;
-		max-height: none;
-		white-space: pre-wrap;
-		word-break: break-word;
-		overflow-y: auto;
-		text-overflow: clip;
 	}
 	/* Card buttons are icon-only (message-button copy glyph, close
 	glyph), sized to the card's font so they track it. */
