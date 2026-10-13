@@ -58,7 +58,7 @@ export const DARK_STYLES: readonly DarkStyle[] = [
 	"contrast"
 ];
 
-/** One side of the Light | Dark toggle. */
+/** A side of the scheme: which tiles a style press sets. */
 export type SchemeSide = "light" | "dark";
 
 /** The settings the color-scheme picker owns. */
@@ -66,18 +66,6 @@ export interface SchemeChoice {
 	theme: ThemeMode;
 	lightStyle: LightStyle;
 	darkStyle: DarkStyle;
-}
-
-/**
- * The Light | Dark toggle. Pinned: the side becomes the theme.
- * Following the system: the OS owns the side, so the toggle only
- * switches which tiles show (no change here).
- */
-export function pickSchemeSide(
-	choice: SchemeChoice,
-	side: SchemeSide
-): SchemeChoice {
-	return choice.theme === "system" ? choice : { ...choice, theme: side };
 }
 
 /**
@@ -95,20 +83,6 @@ export function pickSchemeStyle(
 			? { ...choice, lightStyle: style as LightStyle }
 			: { ...choice, darkStyle: style as DarkStyle };
 	return choice.theme === "system" ? next : { ...next, theme: side };
-}
-
-/**
- * The follow-system switch. Turning it off pins whatever shows right
- * now, so the screen never jumps on the click.
- */
-export function setFollowSystem(
-	choice: SchemeChoice,
-	follow: boolean,
-	systemDark: boolean
-): SchemeChoice {
-	if (follow) return { ...choice, theme: "system" };
-	if (choice.theme !== "system") return choice;
-	return { ...choice, theme: systemDark ? "dark" : "light" };
 }
 
 /** Resolved scheme for a mode: pins hold, system mirrors the OS. */

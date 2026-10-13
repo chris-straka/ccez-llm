@@ -34,9 +34,7 @@ import {
 	CORRECTION_HINT,
 	systemLocale,
 	resolveTheme,
-	pickSchemeSide,
 	pickSchemeStyle,
-	setFollowSystem,
 	LIGHT_STYLES,
 	DARK_STYLES,
 	OWN_INK_CHOICES,
@@ -976,12 +974,6 @@ describe("color-scheme picker", () => {
 		darkStyle: "graphite"
 	} as const;
 
-	it("pins the toggled side, and only views it while following", () => {
-		expect(pickSchemeSide(base, "dark")).toEqual({ ...base, theme: "dark" });
-		const follow = { ...base, theme: "system" } as const;
-		expect(pickSchemeSide(follow, "dark")).toEqual(follow);
-	});
-
 	it("sets the side's style and moves a pinned theme to that side", () => {
 		expect(pickSchemeStyle(base, "dark", "ink")).toEqual({
 			theme: "dark",
@@ -1006,16 +998,6 @@ describe("color-scheme picker", () => {
 		expect(pickSchemeStyle(follow, "light", "mist")).toEqual({
 			...follow,
 			lightStyle: "mist"
-		});
-	});
-
-	it("pins what shows when following turns off", () => {
-		const follow = { ...base, theme: "system", darkStyle: "warm" } as const;
-		expect(setFollowSystem(follow, false, true).theme).toBe("dark");
-		expect(setFollowSystem(follow, false, false).theme).toBe("light");
-		expect(setFollowSystem({ ...base, theme: "dark" }, true, false)).toEqual({
-			...base,
-			theme: "system"
 		});
 	});
 

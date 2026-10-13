@@ -3,15 +3,14 @@
 		DARK_STYLES,
 		LIGHT_STYLES,
 		OWN_INK_CHOICES,
-		pickSchemeSide,
 		pickSchemeStyle,
-		setFollowSystem,
 		type AppSettings,
 		type DarkStyle,
 		type LightStyle,
 		type OwnInkChoice,
 		type SchemeChoice,
-		type SchemeSide
+		type SchemeSide,
+		type ThemeMode
 	} from "$lib/settings";
 	import "./panels.css";
 
@@ -55,23 +54,35 @@
 		darkStyle: settings.darkStyle
 	});
 
-	/** Which side's tiles show while following the system (the OS
-	owns the scheme then, so the toggle only browses). Opens on the
-	side that is showing. */
-	let browsed: SchemeSide = $state(
-		document.documentElement.dataset["theme"] === "dark" ? "dark" : "light"
-	);
-	const side = $derived<SchemeSide>(
-		settings.theme === "system" ? browsed : settings.theme
-	);
-	const styles = $derived<readonly (LightStyle | DarkStyle)[]>(
-		side === "light" ? LIGHT_STYLES : DARK_STYLES
-	);
-	const current = $derived(
-		side === "light" ? settings.lightStyle : settings.darkStyle
+	const MODE_LABELS: Record<ThemeMode, string> = {
+		light: "Light",
+		dark: "Dark",
+		system: "System"
+	};
+	const MODES: readonly ThemeMode[] = ["light", "dark", "system"];
+	const SIDE_LABELS: Record<SchemeSide, string> = {
+		light: "Light",
+		dark: "Dark"
+	};
+
+	/** Tile rows: a pinned theme shows its own side; following the
+	system shows both, since the OS picks which one paints. */
+	const sides = $derived<readonly SchemeSide[]>(
+		settings.theme === "system" ? ["light", "dark"] : [settings.theme]
 	);
 
-	function meta(style: LightStyle | DarkStyle): [string, string] {
+	function stylesFor(side: SchemeSide): readonly (LightStyle | DarkStyle)[] {
+		return side === "light" ? LIGHT_STYLES : DARK_STYLES;
+	}
+
+	function currentFor(side: SchemeSide): LightStyle | DarkStyle {
+		return side === "light" ? settings.lightStyle : settings.darkStyle;
+	}
+
+	function meta(
+		side: SchemeSide,
+		style: LightStyle | DarkStyle
+	): [string, string] {
 		return side === "light"
 			? STYLE_META.light[style as LightStyle]
 			: STYLE_META.dark[style as DarkStyle];
@@ -82,16 +93,6 @@
 		settings.lightStyle = next.lightStyle;
 		settings.darkStyle = next.darkStyle;
 	}
-
-	function pickSide(next: SchemeSide): void {
-		browsed = next;
-		apply(pickSchemeSide(choice, next));
-	}
-
-	/** OS scheme for the follow switch; jsdom has no matchMedia. */
-	function systemDark(): boolean {
-		return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-	}
 </script>
 
 <section aria-labelledby="color-scheme-heading">
@@ -100,57 +101,51 @@
 		<div
 			class="segmented scheme-side"
 			role="radiogroup"
-			aria-label="Light or dark"
+			aria-label="Light, dark, or system"
 		>
-			{#each ["light", "dark"] as const as option (option)}
+			{#each MODES as mode (mode)}
 				<button
 					type="button"
 					role="radio"
-					aria-checked={side === option}
-					class:selected={side === option}
-					onclick={() => pickSide(option)}
-					>{option === "light" ? "Light" : "Dark"}</button
+					aria-checked={settings.theme === mode}
+					class:selected={settings.theme === mode}
+					title={mode === "system" ? "Match the system appearance" : undefined}
+					onclick={() => (settings.theme = mode)}>{MODE_LABELS[mode]}</button
 				>
 			{/each}
 		</div>
-		<!-- Each tile is a small painting of its style (raw preview
-		hexes: the tokens only resolve for the active theme). -->
-		<div
-			class="theme-tiles"
-			role="group"
-			aria-label="{side === 'light' ? 'Light' : 'Dark'} style"
-		>
-			{#each styles as style (`${side}-${style}`)}
-				<button
-					type="button"
-					class="theme-tile"
-					data-tile="{side}-{style}"
-					aria-pressed={current === style}
-					title={meta(style)[1]}
-					onclick={() => apply(pickSchemeStyle(choice, side, style))}
-				>
-					<span class="theme-preview" aria-hidden="true">
-						<span class="tp-drawer"></span>
-						<span class="tp-line tp-own"></span>
-						<span class="tp-line"></span>
-						<span class="tp-line tp-short"></span>
-						<span class="tp-composer"></span>
-					</span>
-					<span class="theme-name">{meta(style)[0]}</span>
-				</button>
-			{/each}
-		</div>
-		<label class="check">
-			<input
-				type="checkbox"
-				checked={settings.theme === "system"}
-				onchange={(event) =>
-					apply(
-						setFollowSystem(choice, event.currentTarget.checked, systemDark())
-					)}
-			/>
-			<span>Follow the system</span>
-		</label>
+		{#each sides as side (side)}
+			{#if sides.length > 1}
+				<span class="tiles-side" aria-hidden="true">{SIDE_LABELS[side]}</span>
+			{/if}
+			<!-- Each tile is a small painting of its style (raw preview
+			hexes: the tokens only resolve for the active theme). -->
+			<div
+				class="theme-tiles"
+				role="group"
+				aria-label="{SIDE_LABELS[side]} style"
+			>
+				{#each stylesFor(side) as style (`${side}-${style}`)}
+					<button
+						type="button"
+						class="theme-tile"
+						data-tile="{side}-{style}"
+						aria-pressed={currentFor(side) === style}
+						title={meta(side, style)[1]}
+						onclick={() => apply(pickSchemeStyle(choice, side, style))}
+					>
+						<span class="theme-preview" aria-hidden="true">
+							<span class="tp-drawer"></span>
+							<span class="tp-line tp-own"></span>
+							<span class="tp-line"></span>
+							<span class="tp-line tp-short"></span>
+							<span class="tp-composer"></span>
+						</span>
+						<span class="theme-name">{meta(side, style)[0]}</span>
+					</button>
+				{/each}
+			</div>
+		{/each}
 	</fieldset>
 	<fieldset>
 		<legend>My message color</legend>
