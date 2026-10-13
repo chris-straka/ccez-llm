@@ -142,6 +142,11 @@ ignores the styles: a raw `#fff` button stays white inside Sepia.
 
 ## Log
 
+- **2026-10-12 — System joins the scheme toggle.** The Follow the
+  system checkbox became a third pill: Light | Dark | System. While
+  following, both tile rows show under quiet Light and Dark captions,
+  so each side's style is pickable without leaving System; a pinned
+  theme shows only its own row.
 - **2026-10-04 — Light styles and high contrast.** The picker
   became a Light | Dark toggle over four tiles per side: Paper, Mist,
   Sepia, Contrast and Graphite, Ink, Warm, Contrast. The contrast

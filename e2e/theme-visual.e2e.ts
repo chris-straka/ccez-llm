@@ -834,10 +834,10 @@ test.describe("mobile attachment pills", () => {
 	});
 });
 
-/** The scheme picker: a Light | Dark toggle over four style tiles
-per side. Pinned, the toggle and tiles set the theme; following the
-system, the toggle only browses and tiles set that side's style.
-Playwright emulates a light OS. */
+/** The scheme picker: a Light | Dark | System toggle over four style
+tiles per side. Pinned, one side's tiles show; following the system,
+both rows show and each tile sets its side's style without leaving
+System. Playwright emulates a light OS. */
 test("scheme toggle and style tiles", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
@@ -853,34 +853,30 @@ test("scheme toggle and style tiles", async ({ page }) => {
 		panel.getByRole("radio", { name, exact: true });
 	const tile = (name: string) =>
 		panel.locator(`.theme-tile[data-tile="${name}"]`);
-	const follow = panel.getByRole("checkbox", { name: "Follow the system" });
-	// Default: following a light OS, Paper showing.
-	await expect(follow).toBeChecked();
-	await expect(sideBtn("Light")).toHaveAttribute("aria-checked", "true");
+	// Default: following a light OS, both rows show, Paper and Graphite.
+	await expect(sideBtn("System")).toHaveAttribute("aria-checked", "true");
 	await expect(tile("light-paper")).toHaveAttribute("aria-pressed", "true");
-	// Following: the toggle browses the dark tiles without switching.
-	await sideBtn("Dark").click();
 	await expect(tile("dark-graphite")).toHaveAttribute("aria-pressed", "true");
-	await expect(html).toHaveAttribute("data-theme", "light");
+	// A dark tile sets the dark style without switching the theme.
 	await tile("dark-ink").click();
 	await expect(html).toHaveAttribute("data-dark-style", "ink");
 	await expect(html).toHaveAttribute("data-theme", "light");
+	await expect(sideBtn("System")).toHaveAttribute("aria-checked", "true");
 	// Light styles apply live on the light side.
-	await sideBtn("Light").click();
 	await tile("light-sepia").click();
 	await expect(html).toHaveAttribute("data-light-style", "sepia");
 	await expect(app).toHaveCSS("background-color", "rgb(246, 238, 219)");
 	await expect(app).toHaveCSS("color", "rgb(58, 46, 33)");
-	// Pinned: the toggle switches the theme itself.
-	await follow.uncheck();
+	// Pinned: the toggle switches the theme and shows only that side.
 	await sideBtn("Dark").click();
 	await expect(html).toHaveAttribute("data-theme", "dark");
+	await expect(tile("light-paper")).toHaveCount(0);
 	await expect(app).toHaveCSS("background-color", "rgb(0, 0, 0)");
 	await expect(app).toHaveCSS("color", "rgb(230, 228, 223)");
 	await tile("dark-contrast").click();
 	await expect(app).toHaveCSS("color", "rgb(255, 255, 255)");
-	// A light tile while dark is pinned moves to light.
 	await sideBtn("Light").click();
+	await expect(html).toHaveAttribute("data-theme", "light");
 	await tile("light-contrast").click();
 	await expect(html).toHaveAttribute("data-theme", "light");
 	await expect(app).toHaveCSS("color", "rgb(0, 0, 0)");
