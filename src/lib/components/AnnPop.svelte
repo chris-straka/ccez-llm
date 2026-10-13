@@ -7,6 +7,7 @@ the CSS to this markup). Draft and field element ride bindables so
 the page's save/focus paths keep working. -->
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
+	import { annComposerWidth } from "$lib/annPop";
 
 	/** Open pill state (rendered fields only). */
 	export interface AnnPopState {
@@ -53,6 +54,13 @@ the page's save/focus paths keep working. -->
 		actions
 	}: Props = $props();
 
+	let resizeField = $state<(() => void) | undefined>();
+	$effect(() => {
+		void draft;
+		void pop.id;
+		resizeField?.();
+	});
+
 	function growPill(node: HTMLTextAreaElement): { destroy(): void } {
 		// The insert cursor must never yank the messages list. Phones
 		// re-pin behind the mount focus too: the create/edit paths
@@ -67,39 +75,84 @@ the page's save/focus paths keep working. -->
 		} else {
 			node.focus({ preventScroll: true });
 		}
-		// field-sizing: content sizes the pill in CSS (capped at 168px
-		// there); only measure by hand where it is unsupported.
+		// CSS owns height where field-sizing is supported.
 		const cssOwnsHeight =
 			typeof CSS !== "undefined" && CSS.supports("field-sizing: content");
+		const card = node.closest<HTMLElement>(".ann-pop");
+		const context = document.createElement("canvas").getContext("2d");
+		let widest = 0;
+		let openedId = pop.id;
+		let anchorX = pop.x;
 		const fit = () => {
-			if (cssOwnsHeight) return;
-			node.style.height = "auto";
-			node.style.height = `${Math.min(node.scrollHeight, 168)}px`;
+			const style = getComputedStyle(node);
+			const fontPx = parseFloat(style.fontSize);
+			if (openedId !== pop.id) {
+				openedId = pop.id;
+				widest = 0;
+				anchorX = pop.x;
+			}
+			if (pop.fresh && card && context) {
+				context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+				const contentWidth = node.value
+					.split("\n")
+					.reduce(
+						(width, line) => Math.max(width, context.measureText(line).width),
+						0
+					);
+				const chromeWidth =
+					card.getBoundingClientRect().width -
+					node.getBoundingClientRect().width;
+				widest = annComposerWidth({
+					fontPx,
+					viewportWidth: window.innerWidth,
+					contentWidth: contentWidth + fontPx,
+					chromeWidth,
+					previousWidth: widest,
+					android
+				});
+				card.style.width = `${widest}px`;
+				// Only shift left when growth would cross the screen edge.
+				card.style.left = `${Math.max(8, Math.min(anchorX, window.innerWidth - widest - 8))}px`;
+			} else if (card && !pop.fresh) {
+				card.style.removeProperty("width");
+				card.style.left = `${pop.x}px`;
+			}
+			if (!cssOwnsHeight) {
+				node.style.height = "auto";
+				node.style.height = `${Math.min(node.scrollHeight, Math.max(168, 5.6 * fontPx))}px`;
+			}
 		};
+		resizeField = fit;
 		node.addEventListener("input", fit);
+		window.addEventListener("resize", fit);
 		fit();
 		// A grown box drops its corner radius (see .ann-pop.tall): the
 		// full pill radius reads over-rounded once the field is tall.
-		// Measured on the field itself: the card chrome differs
-		// between the fresh pill and the edit card, but both fields
-		// start at the same 3rem floor, so one threshold splits short
-		// from tall for both — at three lines, not five (the old
-		// 4.5rem floor plus 100px gate kept the capsule too long).
-		// clientHeight counts CSS-owned growth too, not just the
-		// hand-measured fallback.
-		const card = node.closest(".ann-pop");
-		const TALL_PX = 64;
+		// Measure against one line at the current type size, including
+		// padding, so large single-line notes still read as capsules.
 		const mark = () => {
 			const h = node.clientHeight ?? 0;
-			card?.classList.toggle("tall", h > TALL_PX);
+			const style = getComputedStyle(node);
+			const oneLine =
+				parseFloat(style.lineHeight) +
+				parseFloat(style.paddingTop) +
+				parseFloat(style.paddingBottom);
+			card?.classList.toggle("tall", h > oneLine + 1);
 		};
 		mark();
 		const ro =
-			typeof ResizeObserver === "undefined" ? null : new ResizeObserver(mark);
+			typeof ResizeObserver === "undefined"
+				? null
+				: new ResizeObserver(() => {
+						fit();
+						mark();
+					});
 		if (card && ro) ro.observe(node);
 		return {
 			destroy: () => {
+				resizeField = undefined;
 				node.removeEventListener("input", fit);
+				window.removeEventListener("resize", fit);
 				ro?.disconnect();
 			}
 		};
@@ -123,7 +176,8 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	class="ann-pop"
 	class:fresh={pop.fresh}
 	class:closing
-	style="left: {pop.x}px; top: {pop.y}px"
+	style:left={`${pop.x}px`}
+	style:top={`${pop.y}px`}
 	role="dialog"
 	aria-label={pop.fresh ? "Annotate" : "Edit annotation"}
 >
@@ -309,9 +363,8 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		/* Two-line floor: the pill reads as a prompt, and the tall
 		gate below trips at three lines instead of five. */
 		min-height: 3rem;
-		/* Cap mirrors growPill's 168px: with field-sizing the CSS owns
-		the height and the JS stands down (see guard there). */
-		max-height: 168px;
+		/* Four lines remain available even at very large text sizes. */
+		max-height: max(168px, 5.6em);
 		field-sizing: content;
 	}
 	.ann-pop textarea:focus {
@@ -418,12 +471,8 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		/* Same 90%-of-column width as the edit card: the pill
-		stretches into a long capsule on wide columns (its 999px
-		radius still rounds the ends), and the save arrow rides
-		along via font inheritance. popWidth mirrors this math
-		for centering. */
-		width: min(calc(var(--chat-width, 36) * 0.9rem), calc(100vw - 1rem));
+		/* Starts compact; growPill measures the note up to 30em. */
+		width: min(18em, calc(100vw - 1rem));
 		padding: 0.55rem 0.6rem 0.55rem 1rem;
 		border-radius: 999px;
 		/* Own size track (--annpop-scale, set on .app from the

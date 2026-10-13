@@ -7,8 +7,8 @@ import { seedChat } from "./helpers";
  *
  * Covers, with real layout:
  * 1. create marker snaps to word edges (never splits a word in half);
- * 2. create textbox centers over narrow highlights, keeps cursor
- *    placement for wide ones; the Annotate button never moves;
+ * 2. create textbox anchors below highlights and grows with the note;
+ *    the Annotate button never moves;
  * 3. numbered badges scale with the message font size;
  * 4. empty annotations bake a "?" so the model sees the confusion;
  * 5. annotations-only messages render as an em-dash with the count UI above;
@@ -105,7 +105,7 @@ test("desktop right-click never opens the native menu", async ({ page }) => {
 	expect(kept).toBe(false);
 });
 
-test("create box centers over narrow highlights, wide ones clamp to the viewport", async ({
+test("create box anchors beneath highlights and clamps to the viewport", async ({
 	page
 }) => {
 	await seedChat(page, [
@@ -118,7 +118,7 @@ test("create box centers over narrow highlights, wide ones clamp to the viewport
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
 
-	// Narrow: double-click picks one word; the box centers over it
+	// Narrow: double-click picks one word; the box starts beneath it
 	// while the Annotate button stays at the cursor end.
 	const paraBox = await para.boundingBox();
 	if (!paraBox) throw new Error("paragraph has no box");
@@ -146,9 +146,7 @@ test("create box centers over narrow highlights, wide ones clamp to the viewport
 	});
 	if (!popBox) throw new Error("missing pop box");
 	if (highlight && highlight.width < 300) {
-		const popCX = popBox.x + popBox.width / 2;
-		const hlCX = highlight.left + highlight.width / 2;
-		expect(Math.abs(popCX - hlCX)).toBeLessThanOrEqual(8);
+		expect(Math.abs(popBox.x - highlight.left)).toBeLessThanOrEqual(8);
 	}
 	// The menu itself sits at the cursor end, not centered.
 	if (!menuBox) throw new Error("missing menu box");
@@ -159,7 +157,7 @@ test("create box centers over narrow highlights, wide ones clamp to the viewport
 	// scrolls the list) — measuring or dragging mid-fade races both.
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 
-	// Wide: dragging the whole paragraph opens the 90%-column
+	// Wide: dragging the whole paragraph opens the compact
 	// pill below the highlight, clamped inside the viewport —
 	// never hugging the selection end, never covering the word.
 	const wide = await para.boundingBox();
@@ -218,17 +216,62 @@ test("creation pill and Annotate button scale with font size", async ({
 	expect(parseFloat(areaSize)).toBeGreaterThan(parseFloat(btnSmall));
 	const pillBox = await pop.boundingBox();
 	if (!pillBox) throw new Error("fresh pill has no box");
-	// 90% of the chat column (the rem-cap era is over): read the
-	// live --chat-width var with the CSS fallback (36), never a
-	// fixed pixel number.
-	const expected = await page.evaluate(() => {
-		const raw = getComputedStyle(
-			document.querySelector(".app")!
-		).getPropertyValue("--chat-width");
-		const rem = parseFloat(raw);
-		return (Number.isFinite(rem) && rem > 0 ? rem : 36) * 16 * 0.9;
-	});
+	const expected = Math.min(
+		18 * parseFloat(areaSize),
+		(page.viewportSize()?.width ?? 1280) - 16
+	);
 	expect(Math.abs(pillBox.width - expected)).toBeLessThanOrEqual(4);
+});
+
+test("creation pill grows without moving its text, wraps, and holds width on deletion", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1600, height: 1000 });
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content: "Au lendemain de la fusillade survenue lundi matin."
+		}
+	]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible();
+	await para.dblclick({ position: { x: 10, y: 10 } });
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	const pop = page.locator(".ann-pop.fresh");
+	const field = pop.locator("textarea");
+	await expect(field).toBeFocused();
+	const start = await pop.boundingBox();
+	if (!start) throw new Error("missing creation pill");
+	await field.fill(
+		"Does this mean the next day or the day after the event? I want to understand the difference in this sentence."
+	);
+	await expect
+		.poll(async () => (await pop.boundingBox())?.width ?? 0)
+		.toBeGreaterThan(start.width);
+	await expect(pop).toHaveClass(/tall/);
+	const grown = await pop.boundingBox();
+	if (!grown) throw new Error("missing grown pill");
+	expect(grown.x).toBeCloseTo(start.x, 0);
+	expect(grown.height).toBeGreaterThan(start.height);
+	await field.fill("Next day?");
+	await expect(pop).not.toHaveClass(/tall/);
+	expect((await pop.boundingBox())?.width).toBeCloseTo(grown.width, 0);
+	await page.screenshot({ path: ".screenshots/annotation-growth.png" });
+	await field.fill("x".repeat(400));
+	expect(
+		(await pop.boundingBox())!.x + (await pop.boundingBox())!.width
+	).toBeLessThanOrEqual(1592);
+	await page.setViewportSize({ width: 320, height: 800 });
+	await expect
+		.poll(async () => (await pop.boundingBox())?.width ?? 0)
+		.toBeLessThanOrEqual(304);
+	const narrow = await pop.boundingBox();
+	if (!narrow) throw new Error("missing narrow pill");
+	expect(narrow.x).toBeGreaterThanOrEqual(8);
+	expect(narrow.x + narrow.width).toBeLessThanOrEqual(312);
+	await page.keyboard.press("Escape");
+	await expect(pop).toHaveCount(0);
 });
 
 /** The sent card spans the message (not a 24rem strip) at twice

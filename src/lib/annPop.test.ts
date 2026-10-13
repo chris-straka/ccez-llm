@@ -4,6 +4,7 @@ import {
 	annPopCancelKind,
 	annPopSaveKind,
 	annPopWidth,
+	annComposerWidth,
 	pillWashId,
 	placeAnnAnswer,
 	placeAnnCard,
@@ -70,6 +71,32 @@ describe("annPopWidth", () => {
 	});
 	it("clamps to the viewport on narrow phones", () => {
 		expect(annPopWidth({ chatWidthRem: 36, viewportWidth: 300 })).toBe(284);
+	});
+});
+
+describe("annComposerWidth", () => {
+	it("starts compact and holds its width when text is deleted", () => {
+		const base = { fontPx: 16, viewportWidth: 1280 };
+		expect(annComposerWidth(base)).toBe(288);
+		const grown = annComposerWidth({
+			...base,
+			contentWidth: 330,
+			chromeWidth: 30
+		});
+		expect(grown).toBe(360);
+		expect(annComposerWidth({ ...base, previousWidth: grown })).toBe(grown);
+	});
+	it("caps long notes and refits to a narrower viewport", () => {
+		expect(
+			annComposerWidth({ fontPx: 16, viewportWidth: 1280, contentWidth: 2000 })
+		).toBe(480);
+		expect(
+			annComposerWidth({ fontPx: 16, viewportWidth: 300, previousWidth: 480 })
+		).toBe(284);
+		expect(annComposerWidth({ fontPx: 32, viewportWidth: 1280 })).toBe(576);
+		expect(
+			annComposerWidth({ fontPx: 16, viewportWidth: 400, android: true })
+		).toBe(384);
 	});
 });
 
@@ -166,7 +193,7 @@ describe("placeAnnComposer", () => {
 		).toEqual({ x: 50, y: 96 });
 	});
 
-	it("centers narrow desktop highlights, keeps wide cursor ends", () => {
+	it("anchors the left edge beneath both narrow and wide highlights", () => {
 		const narrow = {
 			android: false,
 			viewportWidth: 1000,
@@ -180,9 +207,9 @@ describe("placeAnnComposer", () => {
 			fontScale: 1
 		};
 		// Below the highlight with the 1x breath, never on the word.
-		expect(placeAnnComposer(narrow)).toEqual({ x: 8, y: 302 });
+		expect(placeAnnComposer(narrow)).toEqual({ x: 100, y: 302 });
 		expect(placeAnnComposer({ ...narrow, highlightWidth: 500 })).toEqual({
-			x: 500,
+			x: 100,
 			y: 302
 		});
 	});
@@ -201,7 +228,7 @@ describe("placeAnnComposer", () => {
 			fontScale: 3.7
 		};
 		// 2 + 2.7 × 12 ≈ 34px below the highlight bottom.
-		expect(placeAnnComposer(base)).toEqual({ x: 8, y: 334 });
+		expect(placeAnnComposer(base)).toEqual({ x: 100, y: 334 });
 		// No room below: the box goes above the highlight top.
 		const edge = { ...base, highlightTop: 700, highlightBottom: 720 };
 		const placed = placeAnnComposer(edge);
@@ -220,14 +247,14 @@ describe("placeAnnAnswer", () => {
 		width: 304,
 		fontScale: 1
 	};
-	it("hangs below the quote with the create pill's gap and x math", () => {
-		expect(placeAnnAnswer(base)).toEqual(
+	it("hangs below the quote with the create pill's gap", () => {
+		expect(placeAnnAnswer(base).y).toEqual(
 			placeAnnComposer({
 				...base,
 				android: false,
 				viewportHeight: 800,
 				highlightTop: 280
-			})
+			}).y
 		);
 		expect(placeAnnAnswer(base)).toEqual({ x: 8, y: 302 });
 	});

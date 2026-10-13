@@ -23,7 +23,12 @@ import {
 	quoteRange,
 	quoteTextNodes
 } from "./annotations-stamp";
-import { placeAnnComposer, quoteAnchor, type AnchorRect } from "./annPop";
+import {
+	annComposerWidth,
+	placeAnnComposer,
+	quoteAnchor,
+	type AnchorRect
+} from "./annPop";
 import { aidDisplayText } from "./reading";
 import { vibrateTick } from "./studyMedia";
 import type { NewsPanelState } from "./news";
@@ -92,6 +97,7 @@ export interface AnnotateModeDeps {
 	getNews: () => NewsPanelState | null;
 	getSettings: () => {
 		fontScale: number;
+		annPopScale?: number;
 		inspectEnabled: boolean;
 		hapticsEnabled: boolean;
 	};
@@ -619,11 +625,13 @@ export class AnnotateMode {
 			if (settings.hapticsEnabled) vibrateTick(6);
 			return;
 		}
-		const width = this.deps.popWidth();
+		const width = annComposerWidth({
+			fontPx: 16 * settings.fontScale * (settings.annPopScale ?? 1),
+			viewportWidth: window.innerWidth
+		});
 		// The comment box hangs below the highlight itself (never
-		// covering the word, at any font size): narrow highlights
-		// center the box over themselves; wide ones keep the
-		// end-of-selection placement. The Annotate button itself
+		// covering the word, at any font size), with its left edge
+		// anchored beneath the quote. The Annotate button itself
 		// never moves (stays at the cursor end). Phone: the keyboard
 		// eats the lower screen, so the composer pins high and
 		// centered instead of at the selection — it is never

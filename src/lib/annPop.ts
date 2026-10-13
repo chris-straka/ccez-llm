@@ -80,6 +80,28 @@ export function annPopWidth(facts: {
 	return Math.min(facts.chatWidthRem * 0.9 * 16, facts.viewportWidth - 16);
 }
 
+/** Creation fields grow rightward, retaining their widest size until reopened. */
+export function annComposerWidth(facts: {
+	fontPx: number;
+	viewportWidth: number;
+	contentWidth?: number;
+	chromeWidth?: number;
+	previousWidth?: number;
+	android?: boolean;
+}): number {
+	const available = Math.max(1, facts.viewportWidth - 16);
+	if (facts.android || available <= 18 * facts.fontPx) return available;
+	return Math.min(
+		available,
+		30 * facts.fontPx,
+		Math.max(
+			18 * facts.fontPx,
+			facts.previousWidth ?? 0,
+			(facts.contentWidth ?? 0) + (facts.chromeWidth ?? 0)
+		)
+	);
+}
+
 /**
  * Edit-card placement from a badge anchor: centered over the anchor,
  * clamped inside the viewport; drops above the anchor when the card
@@ -109,18 +131,8 @@ export function placeAnnCard(facts: {
 }
 
 /**
- * Compose-box placement from the selection-menu anchor: phones pin
- * high and centered (the keyboard eats the lower screen, so the box
- * is never covered wherever the quote sits); desktop centers narrow
- * highlights over themselves and keeps the end-of-selection
- * placement for wide ones, hanging below the highlight itself with
- * an em-scaled gap — never covering the word, at any font size —
- * and clamped inside the viewport (above fallback when the bottom
- * edge would clip).
- */
-/**
  * Answer-card placement from the quote rect: always below the
- * highlight with the create pill's em-scaled gap and x math —
+ * highlight with the create pill's em-scaled gap —
  * never flipped above, never covering the word. When the bottom
  * edge would clip, the page scrolls the thread to make room
  * instead (the card stays glued to its quote). Pure.
@@ -149,6 +161,7 @@ export function placeAnnAnswer(facts: {
 	};
 }
 
+/** Creation fields start beneath the quote's left edge, clamped to fit. */
 export function placeAnnComposer(facts: {
 	android: boolean;
 	viewportWidth: number;
@@ -178,13 +191,10 @@ export function placeAnnComposer(facts: {
 			? below
 			: Math.max(8, facts.highlightTop - gap - estH);
 	return {
-		x: placeAnnPopX({
-			cursorX: facts.menuX,
-			highlightLeft: facts.highlightLeft,
-			highlightWidth: facts.highlightWidth,
-			popWidth: facts.width,
-			viewportWidth: facts.viewportWidth
-		}),
+		x: Math.max(
+			8,
+			Math.min(facts.highlightLeft, facts.viewportWidth - facts.width - 8)
+		),
 		y
 	};
 }
