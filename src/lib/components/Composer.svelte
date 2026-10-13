@@ -135,6 +135,30 @@ shared `.error` look. -->
 	}: Props = $props();
 
 	let attachInput: HTMLInputElement | undefined = $state();
+
+	/** Reserve the toolbar's actual width, including variable-width badges. */
+	function measureToolbar(node: HTMLElement): { destroy(): void } {
+		const prompt = node.closest<HTMLElement>(".prompt");
+		const fit = () => {
+			if (!prompt) return;
+			prompt.style.setProperty(
+				"--tools-space",
+				`${Math.ceil(node.getBoundingClientRect().width) + 8}px`
+			);
+		};
+		fit();
+		const observer =
+			typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+		observer?.observe(node);
+		window.addEventListener("resize", fit);
+		return {
+			destroy: () => {
+				observer?.disconnect();
+				window.removeEventListener("resize", fit);
+				prompt?.style.removeProperty("--tools-space");
+			}
+		};
+	}
 	/** The dock lists pinned annotations only: unpinned rows live
 	at their badges (the orange popup edits/deletes, the answer
 	card reads) until a double-click pins them here — a second
@@ -220,7 +244,7 @@ stop, so both rules below stay suppressed. -->
 		}
 	}}
 >
-	<div class="prompt-tools">
+	<div class="prompt-tools" use:measureToolbar>
 		{#if android && hasSelMenu && !preview}
 			<!-- Phone action dock: Speak and Inspect (Annotate
 			and Copy live in the floating selection menu).
@@ -519,6 +543,7 @@ stop, so both rules below stay suppressed. -->
 		right-side reservation (desktop keeps its overlaid cluster). */
 		--tools-pad: 0rem;
 		--tools-extra: 0rem;
+		--tools-space: 0px;
 		padding: 0 0 0.1rem;
 		/* Small single line (~26px): the old 2rem floor read 60/40
 		against the button bar. The field owns its height where
@@ -1108,7 +1133,8 @@ stop, so both rules below stay suppressed. -->
 		glyphs beside it. The composer carries no ruby, so it keeps
 		its own closer rhythm. */
 		line-height: 1.4;
-		padding: 0.6rem calc(var(--tools-pad) + var(--tools-extra)) 0.6rem 0;
+		padding: 0.6rem
+			var(--tools-space, calc(var(--tools-pad) + var(--tools-extra))) 0.6rem 0;
 		caret-color: #1c1c1e;
 		caret-color: var(--ink);
 		/* Mechanical twin of the cm rules: same pairs, Android-only node. */

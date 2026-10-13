@@ -56,14 +56,14 @@ export default defineConfig({
 		{
 			name: "webkit",
 			use: { browserName: "webkit" },
-			// Field-typing regressions are WebKit-only (the mouseup
-			// caret wipe Chromium never sees); sel-menu stays for its
-			// selectionchange coverage; lang-pills pins WebKit's taller
-			// emoji line box.
+			// Cover selection, field typing, and composer layout in the
+			// Mac shell's engine as well as Chromium.
 			testMatch: [
 				"**/sel-menu.e2e.ts",
 				"**/scroll-field.e2e.ts",
-				"**/lang-pills.e2e.ts"
+				"**/lang-pills.e2e.ts",
+				"**/annotations-ux.e2e.ts",
+				"**/composer-tools.e2e.ts"
 			]
 		}
 	],

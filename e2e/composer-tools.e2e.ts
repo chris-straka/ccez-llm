@@ -254,6 +254,51 @@ test("composer text clears the tools cluster", async ({ page }) => {
 	expect(pad).toBeGreaterThanOrEqual(toolsBox.width);
 });
 
+test("composer text clears a growing toolbar at large prompt sizes", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1600, height: 1000 });
+	await addAnnotation(page);
+	const field = page.locator(".ta-input").first();
+	const tools = page.locator(".prompt-tools");
+	await field.fill(
+		'For this "[Pasted 246 chars]", I am a little confused about the meaning of this expression.'
+	);
+	await page.evaluate(() => {
+		const pill = document.querySelector(".prompt-tools .ann-pill");
+		if (!pill) throw new Error("missing annotation counter");
+		pill.textContent = "600";
+		pill.setAttribute("style", "font-size: 2rem");
+		document
+			.querySelector<HTMLElement>(".app")
+			?.style.setProperty("--prompt-font", "2");
+	});
+	const clearsTools = () =>
+		field.evaluate((el) => {
+			const tools = document.querySelector(".prompt-tools");
+			if (!tools) throw new Error("missing prompt toolbar");
+			const fieldRight = el.getBoundingClientRect().right;
+			const pad = parseFloat(getComputedStyle(el).paddingRight);
+			return tools.getBoundingClientRect().left - (fieldRight - pad);
+		});
+	await expect.poll(clearsTools).toBeGreaterThanOrEqual(4);
+	await page.evaluate(() => {
+		const pill = document.querySelector<HTMLElement>(".prompt-tools .ann-pill");
+		if (!pill) throw new Error("missing annotation counter");
+		pill.style.fontSize = "4rem";
+	});
+	await expect.poll(clearsTools).toBeGreaterThanOrEqual(4);
+	await expect(field).toHaveValue(/confused about the meaning/);
+	await tools.evaluate((el) => {
+		const pill = el.querySelector<HTMLElement>(".ann-pill");
+		if (pill) pill.style.removeProperty("font-size");
+	});
+	await expect.poll(clearsTools).toBeGreaterThanOrEqual(4);
+	await page
+		.locator(".prompt")
+		.screenshot({ path: ".screenshots/composer-text-spacing.png" });
+});
+
 /** Drop a canvas-painted PNG onto the composer (in-page DataTransfer). */
 async function dropImage(page: Page): Promise<void> {
 	await page.evaluate(() => {
