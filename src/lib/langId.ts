@@ -22,7 +22,11 @@ import { ttsLangFor } from "./reading";
  * un, entre, mais, …) — the margin rule below lets the majority
  * decide. Kept OUT are one-list words that collide with another
  * list's core (an/am/im/is/was/do/we/on/sur/no/ma/si/da/su/mi/tu,
- * war/hat/alle/rond/door/via/plus/will/son). The Rust scorer in
+ * war/hat/alle/rond/door/via/plus/will/son), and French pronouns
+ * that are everyday words elsewhere (je in Dutch; il/qui/ne/lui in
+ * Italian). The French pronouns that are French alone (ce, moi, toi,
+ * nous, elle) do vote, so short lines like "Dis-moi ce que tu en
+ * penses." score French. The Rust scorer in
  * src-tauri/src/langid.rs carries the same lists so shell and
  * preview agree.
  */
@@ -154,7 +158,15 @@ const STOP_WORDS: Array<{ lang: string; words: string[] }> = [
 			"où",
 			"ça",
 			"mais",
-			"entre"
+			"entre",
+			"ce",
+			"moi",
+			"toi",
+			"nous",
+			"elle",
+			"elles",
+			"oui",
+			"aussi"
 		]
 	},
 	{
@@ -236,7 +248,12 @@ const STOP_WORDS: Array<{ lang: string; words: string[] }> = [
 			"über",
 			"dich",
 			"euch",
-			"uns"
+			"uns",
+			"ich",
+			"mich",
+			"mir",
+			"dir",
+			"wir"
 		]
 	},
 	{
@@ -690,6 +707,10 @@ export function identifyLangShort(text: string): string | null {
 			t.length > 4 && /(ung|heit|keit|isch|lich|los|bar|sam|haft|tum)$/.test(t)
 	).length;
 	bump("de-DE", Math.min(2, deSuffix));
+	// A clause-final "du" is German ("Was denkst du?", "Weißt du,
+	// ..."): French "du" always leads into a noun ("du pain"), so
+	// this outweighs the French list's "du" hit.
+	if (/\bdu\s*(?:[?!.,;:]|$)/iu.test(trimmed)) bump("de-DE", 3);
 	// French: accented words, guillemets, single-letter elisions
 	// (raw text: tokenizing strips straight apostrophes).
 	const frWords = tokens.filter((t) => /[éèêëàâîïôùûçœæ]/.test(t)).length;
@@ -697,12 +718,14 @@ export function identifyLangShort(text: string): string | null {
 	if (/[«»]/.test(trimmed)) bump("fr-FR", 2);
 	const elisions = trimmed.match(/\b[ldcjnmqstvy]['’]/gi)?.length ?? 0;
 	bump("fr-FR", Math.min(2, elisions));
-	// Verb-subject inversion ("arrive-t-il", "pouvez-vous", "est-ce"):
-	// no other list hyphenates a pronoun onto its verb. Bare "-on"
-	// stays out (English "add-on", "hands-on"); only "-t-on" counts.
+	// Pronouns hyphenated onto their verb: inversion ("arrive-t-il",
+	// "pouvez-vous", "est-ce") and imperatives ("dis-moi",
+	// "allons-y", "donne-le-moi"). No other list does this. Bare
+	// "-on" stays out (English "add-on", "hands-on"; only "-t-on"
+	// counts), and so does "-la" ("Shangri-La", "ooh-la-la").
 	const inversions =
 		trimmed.match(
-			/\p{L}-(?:t-(?:il|elle|on)|il|elle|ils|elles|je|tu|nous|vous|ce)(?![\p{L}-])/giu
+			/\p{L}-(?:t-(?:il|elle|on)|il|elle|ils|elles|je|tu|nous|vous|ce|moi|toi|lui|leur|le|les|y|en)(?![\p{L}-])/giu
 		)?.length ?? 0;
 	bump("fr-FR", Math.min(2, inversions * 2));
 	// Spanish: ñ, accented vowels, inverted marks.

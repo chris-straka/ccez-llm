@@ -29,7 +29,9 @@ pub const MIN_SCORE: usize = 2;
 /// un, entre, mais, …) — the majority decides. Kept OUT are one-list
 /// words colliding with another list's core (an/am/im/is/was/do/we/
 /// on/sur/no/ma/si/da/su/mi/tu, war/hat/alle/rond/door/via/plus/
-/// will/son). Must match src/lib/langId.ts so shell and preview agree.
+/// will/son), and French pronouns that are everyday words elsewhere
+/// (je in Dutch; il/qui/ne/lui in Italian). Must match
+/// src/lib/langId.ts so shell and preview agree.
 const STOP_WORDS: &[(&str, &[&str])] = &[
     (
         "en-US",
@@ -50,7 +52,8 @@ const STOP_WORDS: &[(&str, &[&str])] = &[
             "les", "des", "une", "que", "est", "dans", "pour", "vous", "avec", "pas", "la", "le",
             "un", "du", "au", "aux", "et", "sont", "ont", "fait", "tout", "tous", "toute",
             "toutes", "cette", "ces", "ses", "mes", "leur", "leurs", "notre", "votre", "mon",
-            "sous", "suis", "sommes", "êtes", "où", "ça", "mais", "entre",
+            "sous", "suis", "sommes", "êtes", "où", "ça", "mais", "entre", "ce", "moi", "toi",
+            "nous", "elle", "elles", "oui", "aussi",
         ],
     ),
     (
@@ -63,7 +66,8 @@ const STOP_WORDS: &[(&str, &[&str])] = &[
             "diese", "dieses", "diesen", "diesem", "jeder", "jede", "jedes", "jeden", "allem",
             "aller", "alles", "beim", "zum", "zur", "vom", "aus", "bei", "nach", "durch", "gegen",
             "ohne", "zwischen", "bis", "zu", "vor", "hinter", "neben", "seit", "statt", "trotz",
-            "während", "wegen", "für", "über", "dich", "euch", "uns",
+            "während", "wegen", "für", "über", "dich", "euch", "uns", "ich", "mich", "mir", "dir",
+            "wir",
         ],
     ),
     (
@@ -329,6 +333,17 @@ mod tests {
             identify_lang_offline("Je ne sais pas où est la gare parce que je suis perdu ici")
                 .as_deref(),
             Some("fr-FR")
+        );
+        // Pronoun-led lines: French and German pronouns vote too.
+        assert_eq!(
+            identify_lang_offline("Elle pense à toi et à moi aussi, oui, vraiment beaucoup")
+                .as_deref(),
+            Some("fr-FR")
+        );
+        assert_eq!(
+            identify_lang_offline("Ich glaube, mir gefällt es hier, wir bleiben gern lange")
+                .as_deref(),
+            Some("de-DE")
         );
     }
 }

@@ -282,6 +282,36 @@ test.describe("web-speech-utterances", () => {
 		// The browser stores rate as a 32-bit float.
 		for (const u of await utterances(page)) expect(u.rate).toBeCloseTo(0.25, 5);
 	});
+
+	test("a short French line in an English reply reads in the French voice", async ({
+		page
+	}) => {
+		await recordSpeech(page);
+		await seedChat(
+			page,
+			[
+				{
+					role: "assistant",
+					content:
+						"Here is a phrase you can use when you want an opinion from a friend.\n\nDis-moi ce que tu en penses."
+				}
+			],
+			null,
+			{ voiceEngine: "web" }
+		);
+		await page.goto("/");
+		const article = page.locator("article.assistant");
+		await expect(article).toBeVisible({ timeout: 60_000 });
+		await article.hover();
+		await article
+			.locator('button[aria-label="Read this message aloud"]')
+			.click();
+		await expect.poll(async () => (await utterances(page)).length).toBe(2);
+		const spoken = await utterances(page);
+		expect(spoken[0]?.lang).toMatch(/^en/);
+		expect(spoken[1]?.text).toBe("Dis-moi ce que tu en penses.");
+		expect(spoken[1]?.lang).toMatch(/^fr/);
+	});
 });
 
 test.describe("ios-voice", () => {

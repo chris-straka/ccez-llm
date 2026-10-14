@@ -125,6 +125,50 @@ describe("identifyLangShort", () => {
 		// English hyphenated words never vote French.
 		expect(identifyLangShort("a hands-on add-on")).toBe(null);
 	});
+
+	it("reads short French lines with pronouns and imperatives as French", () => {
+		// Read in the English voice before: only the shared "que"
+		// scored, too little to decide, so speech kept the seed.
+		for (const line of [
+			"Dis-moi ce que tu en penses.",
+			"Dis-moi.",
+			"Laisse-moi tranquille.",
+			"Explique-moi pourquoi.",
+			"Donne-le-moi.",
+			"Allons-y !",
+			"Vas-y.",
+			"C'est ce que je pense.",
+			"Je pense que oui.",
+			"Tu viens ce soir ?",
+			"Moi aussi.",
+			"Elle est là.",
+			"Nous verrons."
+		]) {
+			expect(identifyLangShort(line), line).toBe("fr-FR");
+		}
+	});
+
+	it("keeps short English and German lines off French", () => {
+		for (const line of [
+			"Tell me what you think.",
+			"Let me know what you think.",
+			"Can you tell me more?",
+			"We stayed at the Shangri-La.",
+			"Sign-in is required.",
+			"Sag mir, was du denkst."
+		]) {
+			expect(identifyLangShort(line), line).not.toBe("fr-FR");
+		}
+		// A clause-final "du" is German; French "du" leads into a noun.
+		expect(identifyLangShort("Was denkst du?")).toBe("de-DE");
+		expect(identifyLangShort("Weißt du, was ich meine?")).toBe("de-DE");
+		expect(identifyLangShort("Sag mir bitte, was du davon hältst.")).toBe(
+			"de-DE"
+		);
+		expect(identifyLangShort("Ich weiß es nicht.")).toBe("de-DE");
+		expect(identifyLangShort("Je veux du pain.")).toBe("fr-FR");
+		expect(identifyLangShort("Le chat du voisin.")).toBe("fr-FR");
+	});
 });
 
 describe("hyphenationLang", () => {

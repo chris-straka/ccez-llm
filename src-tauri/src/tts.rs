@@ -887,6 +887,8 @@ mod imp {
             assert_eq!(identify_lang("the", Some("fr")).as_deref(), Some("en"));
             assert!(fr("tomber en panne", "en"));
             assert!(fr("dissoudre", "en"));
+            // A short French line inside an English reply.
+            assert!(fr("Dis-moi ce que tu en penses.", "en"));
             // An unsupported hint is ignored, not trusted.
             assert_eq!(
                 identify_lang("panne", Some("xx")),

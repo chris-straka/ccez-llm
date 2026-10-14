@@ -126,6 +126,19 @@ describe("quoteLangFor", () => {
 		).resolves.toBe("fr-FR");
 	});
 
+	it("reads a short French line in an English reply in French", async () => {
+		// The off-Apple bridge needs ten words, so short lines rest on
+		// the short scorer (Android: null; browser: no bridge at all).
+		mockInvoke.mockResolvedValue(null);
+		await expect(
+			quoteLangFor("Dis-moi ce que tu en penses.", "en-US")
+		).resolves.toBe("fr-FR");
+		mockInvoke.mockRejectedValue(new Error("no bridge"));
+		await expect(
+			quoteLangFor("Dis-moi ce que tu en penses.", "en-US")
+		).resolves.toBe("fr-FR");
+	});
+
 	it("prefers the bridge answer over the offline scorer", async () => {
 		mockInvoke.mockResolvedValue("de-DE");
 		await expect(
