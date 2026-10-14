@@ -152,8 +152,10 @@ test("prompt sliders resize the composer only and persist", async ({
 	);
 	await expect(size).toBeVisible();
 	await expect(width).toBeVisible();
-	// Prompt text to 200%: its own var moves, the message scale stays.
-	await size.fill("200");
+	// Prompt text to 200% (log travel: position 285 of 1000): its own
+	// var moves, the message scale stays.
+	await size.fill("285");
+	await expect(size).toHaveAttribute("aria-valuetext", "200%");
 	expect(await appVar("--prompt-font")).toBe("2");
 	expect(await appVar("--font-scale")).toBe("1");
 	// Prompt width to 32rem under the 36rem column: the var follows.
