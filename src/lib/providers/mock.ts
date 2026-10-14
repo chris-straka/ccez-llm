@@ -34,6 +34,30 @@ export class MockProvider implements ChatProvider {
 		opts?: ChatOptions
 	): Promise<ChatResult> {
 		const full = canned(messages);
+		// Test hook: count stream calls so specs can prove a chat
+		// switch never resends.
+		if (typeof window !== "undefined") {
+			const w = window as unknown as { __ccezMockStreams?: number };
+			w.__ccezMockStreams = (w.__ccezMockStreams ?? 0) + 1;
+		}
+		// Test hook: hold the first token (ms) so specs can act while
+		// the reply still reads as thinking. Unset streams at once.
+		const firstMs = mockFlagMs("ccez-mock-first-ms");
+		if (firstMs !== null) {
+			// Abortable like a real request: a stop lands at once.
+			await new Promise<void>((resolve, reject) => {
+				const signal = opts?.signal;
+				const timer = setTimeout(resolve, firstMs);
+				signal?.addEventListener(
+					"abort",
+					() => {
+						clearTimeout(timer);
+						reject(new DOMException("aborted", "AbortError"));
+					},
+					{ once: true }
+				);
+			});
+		}
 		// Test hook: slow the word cadence (ms) so specs can act
 		// mid-stream (new-chat-while-thinking). Dev/test-only provider;
 		// unset or invalid keeps the 15ms default.
