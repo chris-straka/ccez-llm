@@ -22,7 +22,11 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - `e2e/*.e2e.ts` — Playwright, seeded via `e2e/helpers.ts`. Specs import
   `test`/`expect` from `e2e/fixtures.ts`, which fails any test that
   throws an uncaught page error; Tauri stubs need `transformCallback`
-  (copy `e2e/mock-shell.ts`).
+  (copy `e2e/mock-shell.ts`). CI (`check.yml` e2e, four shards) runs
+  the whole suite headless on Linux, so specs must not lean on the
+  host: Mac-only rows pin `pinMacPlatform`, speech specs stub
+  `SpeechSynthesis.prototype.getVoices`, and timing specs measure in
+  the page, never across Playwright round trips.
 - `scripts/` — release, dev-shell signing, data generators.
 - `docs/` — platform notes and standing design decisions (index:
   `docs/README.md`).
