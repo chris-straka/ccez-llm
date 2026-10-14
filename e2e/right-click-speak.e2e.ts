@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, settleScroller } from "./helpers";
 
 /**
  * Right-click reads aloud on desktop: a live selection first, else the
@@ -446,4 +446,71 @@ test("right-click press that extends the highlight repoints the new word", async
 	await expect.poll(resel, { timeout: 10_000 }).toContain("很");
 	await expect.poll(resel, { timeout: 10_000 }).not.toContain("声调");
 	await expect.poll(() => spoken(page), { timeout: 10_000 }).toContain("很");
+});
+
+/** Select `quote` inside the nth rendered message (badge and ruby
+text skipped, like the app's own quote text) and return its center. */
+async function selectQuote(
+	page: import("@playwright/test").Page,
+	quote: string,
+	nth = 0
+): Promise<{ x: number; y: number }> {
+	await settleScroller(page);
+	const point = await page.evaluate(
+		({ quote, nth }) => {
+			const body = document.querySelectorAll("article .rendered")[nth];
+			if (!body) throw new Error("no rendered message");
+			const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+			while (walker.nextNode()) {
+				const node = walker.currentNode as Text;
+				if (node.parentElement?.closest("[data-ann-badge], rt, rp, .frt"))
+					continue;
+				const i = (node.textContent ?? "").indexOf(quote);
+				if (i < 0) continue;
+				const range = document.createRange();
+				range.setStart(node, i);
+				range.setEnd(node, i + quote.length);
+				const live = window.getSelection();
+				live?.removeAllRanges();
+				live?.addRange(range);
+				// First line fragment: a wrapped range's union box can
+				// center between lines, off the highlight.
+				const rect = range.getClientRects()[0];
+				if (!rect) return null;
+				return {
+					x: rect.left + rect.width / 2,
+					y: rect.top + rect.height / 2
+				};
+			}
+			return null;
+		},
+		{ quote, nth }
+	);
+	if (!point) throw new Error(`quote ${quote} not found`);
+	return point;
+}
+
+test("right-click the Japanese half of a mixed bullet reads only the highlight", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content:
+				"- She's changed a lot - 彼女はすごく変わった\n- That book changed my life - その本は私の人生を変えた\n- change your mind - 考えを変える"
+		}
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered li").nth(1)).toBeVisible({
+		timeout: 60_000
+	});
+	const at = await selectQuote(page, "その本は私の人生を変えた");
+	await page.mouse.click(at.x, at.y, { button: "right" });
+	await expect
+		.poll(() => spoken(page), { timeout: 30_000 })
+		.not.toHaveLength(0);
+	const texts = await spoken(page);
+	expect(texts.join("")).not.toMatch(/[A-Za-z]/);
+	expect(texts.join("")).toBe("そのほんはわたしのじんせいをかえた");
+	expect(await spokenLang(page)).toEqual(["ja-JP"]);
 });

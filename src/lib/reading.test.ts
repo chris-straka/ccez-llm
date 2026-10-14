@@ -820,6 +820,39 @@ describe("speechKanaForQuote", () => {
 		const umareruPlain = umareru.map((r) => r.text).join("");
 		expect(speechKanaForQuote(umareru, umareruPlain, "生")).toBe("う");
 	});
+
+	it("clips a plain run straddling the highlight start", () => {
+		// The converter merges reading-less text into one run: the
+		// particle before すり合わせ (and any digit beside it) shares
+		// the run with すり, and must not ride along.
+		const suri = annotatedRunsWithOffsets(
+			'<span class="frb">綿密<span class="frt">めんみつ</span></span>な1すり<span class="frb">合わせ<span class="frt">あわせ</span></span>を'
+		)!;
+		const suriPlain = suri.map((r) => r.text).join("");
+		expect(speechKanaForQuote(suri, suriPlain, "すり合わせ")).toBe(
+			"すりあわせ"
+		);
+	});
+
+	it("never speaks the English half of a mixed bullet", () => {
+		const bullet = annotatedRunsWithOffsets(
+			'That book changed my life - その<span class="frb">本<span class="frt">ほん</span></span>は<span class="frb">私<span class="frt">わたし</span></span>の<span class="frb">人生<span class="frt">じんせい</span></span>を<span class="frb">変えた<span class="frt">かえた</span></span>'
+		)!;
+		const bulletPlain = bullet.map((r) => r.text).join("");
+		expect(
+			speechKanaForQuote(bullet, bulletPlain, "その本は私の人生を変えた")
+		).toBe("そのほんはわたしのじんせいをかえた");
+	});
+
+	it("sheds an all-kana head cut off a reading run", () => {
+		const oshirase = annotatedRunsWithOffsets(
+			'<span class="frb">お知らせ<span class="frt">おしらせ</span></span>です'
+		)!;
+		const oshirasePlain = oshirase.map((r) => r.text).join("");
+		expect(speechKanaForQuote(oshirase, oshirasePlain, "知らせ")).toBe(
+			"しらせ"
+		);
+	});
 });
 
 describe("wordBoundsAt", () => {

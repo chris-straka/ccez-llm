@@ -1297,14 +1297,15 @@ export function sliceRunsForQuote(
 
 /**
  * Spoken kana for a highlight, for speech assembly only. Speaks
- * exactly the selection: slice readings joined, with one trim — a
- * highlight ending strictly inside a run whose remainder is all
- * kana sheds that okurigana tail from the reading (心地 cut from
- * 心地よい speaks ここち, not ここちよい). Nothing crosses a run
- * boundary, so trailing particles never ride along (味覚が speaks
- * みかく). A highlight ending mid-run on non-kana keeps the full
- * token reading (best effort: mora alignment is unknowable). Popup
- * ruby and tints keep the untrimmed slice. Pure.
+ * exactly the selection: covered readings joined. Reading-less runs
+ * clip to their covered text at both edges. A reading-bearing run
+ * cut by an edge sheds an all-kana uncovered part from its reading
+ * (心地 cut from 心地よい speaks ここち, not ここちよい; 知らせ from
+ * お知らせ speaks しらせ). Nothing crosses a run boundary, so
+ * neighbouring particles never ride along (味覚が speaks みかく). A
+ * run cut on non-kana keeps the full token reading (best effort:
+ * mora alignment is unknowable). Popup ruby and tints keep the
+ * untrimmed slice. Pure.
  */
 export function speechKanaForQuote(
 	sentenceRuns: AnnotatedRunWithOffsets[] | null,
@@ -1321,35 +1322,34 @@ export function speechKanaForQuote(
 			: sentencePlain.indexOf(quote);
 	if (qStart < 0) return null;
 	const qEnd = qStart + quote.length;
+	const allKana = /^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u;
 	let kana = "";
 	for (const run of sentenceRuns) {
 		if (run.end <= qStart) continue;
 		if (run.start >= qEnd) break;
-		const reading = run.reading ?? run.text;
-		if (run.end <= qEnd) {
-			kana += reading;
+		// The covered slice of this run: a run can straddle either
+		// highlight edge.
+		const lo = Math.max(run.start, qStart) - run.start;
+		const hi = Math.min(run.end, qEnd) - run.start;
+		// A reading-less run (kana, Latin, punctuation, digits)
+		// contributes only its covered text: the plain run before
+		// すり合わせ can hold the whole English half of a bullet
+		// ("That book changed my life - その") or a neighbour's
+		// particle (な).
+		if (run.reading === null) {
+			kana += run.text.slice(lo, hi);
 			continue;
 		}
-		// The quote ends strictly inside this run: a reading-less
-		// run contributes only its covered text; a reading-bearing
-		// one sheds an all-kana remainder (okurigana) from the
-		// reading.
-		const cut = qEnd - run.start;
-		if (run.reading === null) {
-			kana += run.text.slice(0, cut);
-			break;
-		}
-		const rest = run.text.slice(cut);
-		if (
-			rest !== "" &&
-			/^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(rest) &&
-			reading.length >= rest.length
-		) {
-			kana += reading.slice(0, reading.length - rest.length);
-		} else {
-			kana += reading;
-		}
-		break;
+		// A reading-bearing run sheds an all-kana uncovered head or
+		// tail (okurigana, honorific お) from its reading.
+		let reading = run.reading;
+		const head = run.text.slice(0, lo);
+		const tail = run.text.slice(hi);
+		if (tail !== "" && allKana.test(tail) && reading.length > tail.length)
+			reading = reading.slice(0, reading.length - tail.length);
+		if (head !== "" && allKana.test(head) && reading.length > head.length)
+			reading = reading.slice(head.length);
+		kana += reading;
 	}
 	return kana === "" ? null : kana;
 }
