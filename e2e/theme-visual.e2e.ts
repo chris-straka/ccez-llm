@@ -746,18 +746,28 @@ test("action buttons read 85 percent of message size", async ({ page }) => {
 	expect(sizes.button / sizes.body).toBeCloseTo(0.85, 2);
 });
 
-test("composer holds its first line clear of the tools", async ({ page }) => {
+test("composer text sits above the tools row at full width", async ({
+	page
+}) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
-	const pad = await page.evaluate(() => {
+	const layout = await page.evaluate(() => {
 		const el = document.querySelector(".prompt .ta-input");
-		return el ? parseFloat(getComputedStyle(el).paddingRight) : 0;
+		const tools = document.querySelector(".prompt-tools");
+		if (!el || !tools) throw new Error("missing composer");
+		return {
+			pad: parseFloat(getComputedStyle(el).paddingRight),
+			below:
+				tools.getBoundingClientRect().top - el.getBoundingClientRect().bottom
+		};
 	});
-	// 4.6rem ≈ 74px at the default root size; tools must never overlap text.
-	expect(pad).toBeGreaterThan(60);
+	// No side reservation: tools never overlap text because they sit
+	// in their own row below it.
+	expect(layout.pad).toBe(0);
+	expect(layout.below).toBeGreaterThanOrEqual(0);
 });
 
 const ANDROID_UA =
