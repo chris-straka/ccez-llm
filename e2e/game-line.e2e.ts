@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { seedChat } from "./helpers";
+import { pinMacPlatform, seedChat } from "./helpers";
 
 test("game-line route explains itself outside the shell", async ({ page }) => {
 	await seedChat(page, []);
@@ -13,6 +13,8 @@ test("game-line route explains itself outside the shell", async ({ page }) => {
 test("game-line toggle degrades to a toast in the browser", async ({
 	page
 }) => {
+	// The overlay row is Mac-only.
+	await pinMacPlatform(page);
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible({

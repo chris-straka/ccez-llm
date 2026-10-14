@@ -958,7 +958,8 @@ test("rtl drag from the top-right selects the whole paragraph", async ({
 	await page.goto("/");
 	const body = page.locator("article .rendered").first();
 	await expect(body).toBeVisible();
-	await expect(body.locator("p").first()).toHaveAttribute("dir", "auto");
+	// Majority-Arabic text settles to rtl (render.ts bidiDirection).
+	await expect(body.locator("p").first()).toHaveAttribute("dir", "rtl");
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
 	await page.mouse.move(box.x + box.width - 4, box.y + 8);
@@ -1573,7 +1574,7 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	);
 });
 
-test("create box centers over narrow highlights, wide ones open at the cursor", async ({
+test("create box opens beneath the quote's left edge, narrow or wide", async ({
 	page
 }) => {
 	await seedChat(page, [
@@ -1586,11 +1587,10 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
-	const box = await para.boundingBox();
-	if (!box) throw new Error("message has no box");
 
-	// Narrow: double-click picks one word; the box centers over it
-	// while the Annotate button stays at the cursor end.
+	// Narrow: double-click picks one word; the box hangs below it
+	// with its left edge under the word, while the Annotate button
+	// stays at the cursor end.
 	const paraBox = await para.boundingBox();
 	if (!paraBox) throw new Error("paragraph has no box");
 	await para.dblclick({ position: { x: 10, y: 10 } });
@@ -1611,15 +1611,14 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 		const ranges = [...(reg?.get("ccez-ann") ?? [])];
 		const r = ranges[0]?.getBoundingClientRect();
 		if (!r) return null;
-		return { left: r.left, width: r.width };
+		return { left: r.left, width: r.width, bottom: r.bottom };
 	});
 	if (!popBox) throw new Error("missing pop box");
-	if (highlight && highlight.width < 300) {
-		const popCX = popBox.x + popBox.width / 2;
-		const hlCX = highlight.left + highlight.width / 2;
-		expect(Math.abs(popCX - hlCX)).toBeLessThanOrEqual(8);
-	}
-	// The menu itself sits at the cursor end, not centered.
+	if (!highlight) throw new Error("no pending wash");
+	expect(highlight.width).toBeLessThan(popBox.width);
+	expect(Math.abs(popBox.x - highlight.left)).toBeLessThanOrEqual(2);
+	expect(popBox.y).toBeGreaterThanOrEqual(highlight.bottom);
+	// The menu itself sits at the cursor end.
 	if (!menuBox) throw new Error("missing menu box");
 	expect(Math.abs(menuBox.x - (paraBox.x + 10 - 16))).toBeLessThanOrEqual(8);
 	await page.keyboard.press("Escape");
@@ -1628,13 +1627,10 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	// scrolls the list) — measuring or dragging mid-fade races both.
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 
-	// Wide: dragging the whole paragraph keeps the cursor placement —
-	// the box opens at the selection end, clamped on screen (the box
-	// is 90% of the chat column now, wider than a full-width
-	// highlight, so the clamp — not the cursor — sets x here). Drag
-	// the first visual line: the seeded paragraph wraps, and the
-	// middle of its box is the line boundary (a collapsed pick there
-	// never summons).
+	// Wide: dragging the first visual line keeps the same rule — the
+	// box starts under the quote's left edge, not at the cursor end.
+	// The seeded paragraph wraps, and the middle of its box is the
+	// line boundary (a collapsed pick there never summons).
 	const wide = await para.boundingBox();
 	if (!wide) throw new Error("message lost its box");
 	const wideY = wide.y + 8;
@@ -1648,12 +1644,8 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	await expect(pop).toBeVisible();
 	const wideBox = await pop.boundingBox();
 	if (!wideBox) throw new Error("missing wide box");
-	const vw = await page.evaluate(() => window.innerWidth);
-	// Cursor end would run past the viewport edge: the box right
-	// edge parks at the edge instead, never past the cursor.
-	expect(Math.abs(wideBox.x - (vw - wideBox.width - 8))).toBeLessThanOrEqual(
-		24
-	);
+	// The drag snaps out to the first word's start: the paragraph edge.
+	expect(Math.abs(wideBox.x - wide.x)).toBeLessThanOrEqual(2);
 	expect(wideBox.x).toBeLessThanOrEqual(endX - 16);
 	await page.keyboard.press("Escape");
 });

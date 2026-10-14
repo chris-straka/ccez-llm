@@ -280,8 +280,9 @@ test.describe("ios-voice", () => {
 		).toBeVisible();
 	});
 
-	/** Both message checkboxes share one Messages box (no awkward gap). */
-	test("message toggles grouped in one fieldset", async ({ page }) => {
+	/** Message behavior sits in one Messages box; the bubble background
+	is an on/off feature, so it lives under Enable. */
+	test("message toggles grouped by kind", async ({ page }) => {
 		const box = page.locator(".settings-panel fieldset", {
 			hasText: "only when tapped"
 		});
@@ -289,7 +290,9 @@ test.describe("ios-voice", () => {
 		await expect(
 			box.getByText("Show message buttons only when tapped")
 		).toBeVisible();
-		await expect(box.getByText("Background on my messages")).toBeVisible();
+		const enable = page.locator(".settings-panel fieldset.toggles");
+		await expect(enable.locator("legend")).toHaveText("Enable");
+		await expect(enable.getByText("Background on my messages")).toBeVisible();
 	});
 
 	/** The voice picker lists every installed voice (no quality gate on iOS). */

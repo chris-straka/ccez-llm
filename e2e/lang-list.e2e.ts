@@ -47,11 +47,16 @@ test("picking a language leaves the composer unfocused", async ({ page }) => {
 
 /** The pick toast seats top-center over the sheets: reopening any
 submenu folds the lingering confirmation instead of painting
-over the options. */
+over the options. An empty chat opens News for a pick rather than
+toasting, so the toast here is the clear one: re-picking a language
+with no number key releases it. */
 test("opening a submenu dismisses the pick toast", async ({ page }) => {
-	await page.locator('.lang-menu button:has-text("Europe")').click();
 	const list = page.locator(".lang-list");
-	await list.getByRole("menuitem", { name: "French" }).click();
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await list.getByRole("menuitem", { name: "Italian" }).click();
+	await expect(list).toHaveCount(0);
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await list.getByRole("menuitem", { name: "Italian" }).click();
 	await expect(page.locator(".toast")).toBeVisible();
 	await page.locator('.lang-menu button:has-text("Asia")').click();
 	await expect(list).toBeVisible();

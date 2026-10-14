@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat } from "./helpers";
+import { pinMacPlatform, seedChat } from "./helpers";
 
 /**
  * Capture chord without a backend (browser preview): the chord fires,
@@ -25,13 +25,15 @@ test("capture chord degrades to an error toast in the preview", async ({
 });
 
 /**
- * Capture enable checkbox: on by default, persists off across reload.
+ * Capture enable checkbox (a Mac-only row, so the platform is pinned):
+ * on by default, persists off across reload.
  * The composer button never renders in the preview (no backend probe),
  * so this pins the settings half of the kill-switch here.
  */
 test("capture checkbox persists and the preview shows no button", async ({
 	page
 }) => {
+	await pinMacPlatform(page);
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible({
@@ -73,6 +75,7 @@ test("capture checkbox persists and the preview shows no button", async ({
  * stored value, never a hardcoded default.
  */
 test("seeded-off capture checkbox renders unchecked", async ({ page }) => {
+	await pinMacPlatform(page);
 	await seedChat(page, [{ role: "assistant", content: "hello" }], null, {
 		captureEnabled: false
 	});

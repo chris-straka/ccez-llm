@@ -647,6 +647,28 @@ test.describe("ios", () => {
 	}) => {
 		const filler =
 			"秋が近づくと空が高くなり紅葉が美しく色づきます温かいお茶を飲みながらゆっくりと読書をしたり散歩を楽しんだりするのにぴったりの季節です";
+		// Filing reads the quote aloud: give the page a Japanese voice
+		// (headless Linux WebKit has none, and the no-voice toast
+		// would cover "Annotation sent").
+		await page.addInitScript(() => {
+			const voice = {
+				name: "Kyoko",
+				lang: "ja-JP",
+				localService: true,
+				default: true,
+				voiceURI: "Kyoko"
+			};
+			const proto = SpeechSynthesis.prototype;
+			Object.defineProperty(proto, "getVoices", {
+				value: () => [voice],
+				configurable: true
+			});
+			Object.defineProperty(proto, "speak", {
+				value: () => undefined,
+				writable: true,
+				configurable: true
+			});
+		});
 		await seedChat(page, [
 			{ role: "user", content: "first" },
 			{ role: "assistant", content: filler },

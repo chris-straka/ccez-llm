@@ -73,6 +73,22 @@ export async function seedChat(
  * Shift+Cmd+[ toggles on web but resizes the prompt in the shell —
  * so specs pick the chord per runtime.
  */
+/**
+ * Report macOS to the page (`navigator.platform` and Client Hints), so
+ * Mac-only settings rows render on any CI or dev host. Call before
+ * `page.goto`.
+ */
+export async function pinMacPlatform(page: Page): Promise<void> {
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, "platform", {
+			get: () => "MacIntel"
+		});
+		Object.defineProperty(navigator, "userAgentData", {
+			get: () => ({ platform: "macOS", mobile: false, brands: [] })
+		});
+	});
+}
+
 export async function toggleSidebar(page: Page): Promise<void> {
 	const inShell = await page.evaluate(() => "__TAURI_INTERNALS__" in window);
 	await page.keyboard.press(inShell ? "Meta+b" : "Meta+Shift+BracketLeft");
