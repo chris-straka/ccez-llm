@@ -621,17 +621,10 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	above. The field grows with the note under the card's height cap
 	(the room on its side, at most ~15 lines), then scrolls. No clip:
 	the tail hangs outside, and the padding keeps a selection inside
-	the rounded corners. Unplaced first frame stays invisible. */
-	@keyframes ann-note-in {
-		from {
-			opacity: 0;
-			transform: translateY(var(--ann-rise, -6px)) scale(0.94);
-		}
-		to {
-			opacity: 1;
-			transform: none;
-		}
-	}
+	the rounded corners. Unplaced first frame stays invisible. It
+	fades in (the pill's own ramp) rather than scaling out of the
+	word like the answer card: the caret is live from the first
+	frame, and a box moving under it reads as a jump. */
 	.ann-pop.note {
 		visibility: hidden;
 		overflow: visible;
@@ -643,17 +636,11 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		border-radius: 14px;
 		font-size: calc(0.92rem * var(--font-scale, 1) * var(--annpop-scale, 1));
 		line-height: var(--msg-line-height, 1.5);
-		transform-origin: var(--ann-tail-x, 24px) 0;
-		--ann-rise: -6px;
 		animation: none;
 	}
 	.ann-pop.note.placed {
 		visibility: visible;
-		animation: ann-note-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
-	}
-	.ann-pop.note.above {
-		transform-origin: var(--ann-tail-x, 24px) 100%;
-		--ann-rise: 6px;
+		animation: ann-pop-in 0.16s ease;
 	}
 	.ann-pop.note.closing {
 		animation: none;
