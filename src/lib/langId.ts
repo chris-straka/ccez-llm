@@ -154,7 +154,11 @@ const STOP_WORDS: Array<{ lang: string; words: string[] }> = [
 			"où",
 			"ça",
 			"mais",
-			"entre"
+			"entre",
+			"moi",
+			"toi",
+			"donc",
+			"aussi"
 		]
 	},
 	{
@@ -663,10 +667,23 @@ export function identifyLangOffline(text: string): string | null {
  * Pure and unit-tested.
  */
 export function identifyLangShort(text: string): string | null {
+	return identifyLangShortScored(text)?.lang ?? null;
+}
+
+/**
+ * Short-fragment verdict with its evidence: `confident` when the
+ * leader scored at least 3 with a 2-point lead (an exclusive word
+ * plus a structural vote, say), which is enough to overrule a
+ * recognizer that leaned on its hint — a bare tiebreak or lone
+ * hit is not. Script verdicts are always confident.
+ */
+export function identifyLangShortScored(
+	text: string
+): { lang: string; confident: boolean } | null {
 	const trimmed = text.trim();
 	if (trimmed.length === 0) return null;
 	const scriptLang = ttsLangFor(trimmed, "");
-	if (scriptLang) return scriptLang;
+	if (scriptLang) return { lang: scriptLang, confident: true };
 	const tokens = latinTokens(trimmed);
 	if (tokens.length === 0) return null;
 	const counts = stopCounts(tokens);
@@ -697,12 +714,13 @@ export function identifyLangShort(text: string): string | null {
 	if (/[«»]/.test(trimmed)) bump("fr-FR", 2);
 	const elisions = trimmed.match(/\b[ldcjnmqstvy]['’]/gi)?.length ?? 0;
 	bump("fr-FR", Math.min(2, elisions));
-	// Verb-subject inversion ("arrive-t-il", "pouvez-vous", "est-ce"):
-	// no other list hyphenates a pronoun onto its verb. Bare "-on"
-	// stays out (English "add-on", "hands-on"); only "-t-on" counts.
+	// Verb-subject inversion ("arrive-t-il", "pouvez-vous", "est-ce")
+	// and imperative clitics ("dis-moi", "donne-lui"): no other list
+	// hyphenates a pronoun onto its verb. Bare "-on" stays out
+	// (English "add-on", "hands-on"); only "-t-on" counts.
 	const inversions =
 		trimmed.match(
-			/\p{L}-(?:t-(?:il|elle|on)|il|elle|ils|elles|je|tu|nous|vous|ce)(?![\p{L}-])/giu
+			/\p{L}-(?:t-(?:il|elle|on)|il|elle|ils|elles|je|tu|nous|vous|ce|moi|toi|lui|leur)(?![\p{L}-])/giu
 		)?.length ?? 0;
 	bump("fr-FR", Math.min(2, inversions * 2));
 	// Spanish: ñ, accented vowels, inverted marks.
@@ -719,13 +737,18 @@ export function identifyLangShort(text: string): string | null {
 	const ijWords = tokens.filter((t) => /ij/.test(t)).length;
 	bump("nl-NL", Math.min(3, ijWords));
 	const { lang, score, margin } = leader(counts);
+	const verdict = (
+		found: string | null,
+		confident = false
+	): { lang: string; confident: boolean } | null =>
+		found === null ? null : { lang: found, confident };
 	// A lone hit with no contest still reads on a tiny fragment
 	// (der Hund, the cat); anything longer or contested needs a
 	// real lead.
 	if (lang === null) return null;
 	if (score < 2) {
-		if (score === 1 && margin === 1 && tokens.length <= 4) return lang;
-		return frenchTiebreak(tokens, trimmed);
+		if (score === 1 && margin === 1 && tokens.length <= 4) return verdict(lang);
+		return verdict(frenchTiebreak(tokens, trimmed));
 	}
 	if (margin < 2 && score < 3) {
 		// Contested but decided: a stop word the leader alone owns
@@ -737,9 +760,9 @@ export function identifyLangShort(text: string): string | null {
 		const decided = tokens.some(
 			(token) => leaderWords.has(token) && STOP_WORD_OWNERS.get(token) === 1
 		);
-		if (!decided) return frenchTiebreak(tokens, trimmed);
+		if (!decided) return verdict(frenchTiebreak(tokens, trimmed));
 	}
-	return lang;
+	return verdict(lang, score >= 3 && margin >= 2);
 }
 
 /** Latin-script languages the stop-word scorer knows (all hyphenate). */

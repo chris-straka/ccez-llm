@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	hyphenationLang,
+	identifyLangShortScored,
 	identifyLangOffline,
 	identifyLangShort
 } from "./langId";
@@ -124,6 +125,20 @@ describe("identifyLangShort", () => {
 		expect(identifyLangShort("Y a-t-on pensé ?")).toBe("fr-FR");
 		// English hyphenated words never vote French.
 		expect(identifyLangShort("a hands-on add-on")).toBe(null);
+	});
+
+	it("reads imperative clitics as French, confidently", () => {
+		// No accent, no elision: "que" votes three ways, so only the
+		// clitic and "moi" carry it — and together they outrank a
+		// recognizer that leaned English on its hint.
+		expect(identifyLangShort("Dis-moi ce que tu en penses.")).toBe("fr-FR");
+		expect(identifyLangShortScored("Dis-moi ce que tu en penses.")).toEqual({
+			lang: "fr-FR",
+			confident: true
+		});
+		expect(identifyLangShort("Donne-lui le livre")).toBe("fr-FR");
+		// A decided-but-thin lead stays tentative.
+		expect(identifyLangShortScored("avec un tiret")?.confident).toBe(false);
 	});
 });
 

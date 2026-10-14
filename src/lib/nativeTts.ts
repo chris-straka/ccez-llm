@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { identifyLangOffline, identifyLangShort } from "./langId";
+import {
+	identifyLangOffline,
+	identifyLangShort,
+	identifyLangShortScored
+} from "./langId";
 import { hasDistinctiveChinese, hasPinyinTones, ttsLangFor } from "./reading";
 import {
 	currentSpeechRate,
@@ -155,7 +159,8 @@ const SUPPORTED_BRIDGE_PRIMARIES: Set<string> = new Set([
 export function reconcileQuoteLang(
 	bridge: string | null,
 	short: string | null,
-	fallback: string
+	fallback: string,
+	confidentShort = false
 ): string | null {
 	if (!bridge) return short;
 	if (!short) return bridge;
@@ -164,6 +169,10 @@ export function reconcileQuoteLang(
 	const bridgePrimary = primary(bridge);
 	const shortPrimary = primary(short);
 	if (bridgePrimary === shortPrimary) return bridge;
+	// Strong orthographic evidence ("Dis-moi ce que tu en penses.":
+	// an exclusive word plus an imperative clitic) outranks a
+	// recognizer that leaned on its hint toward the seed voice.
+	if (confidentShort) return short;
 	if (!SUPPORTED_BRIDGE_PRIMARIES.has(bridgePrimary)) return short;
 	const seedPrimary = primary(fallback);
 	if (shortPrimary === seedPrimary) return short;
@@ -199,10 +208,12 @@ export async function quoteLangFor(
 			hint: fallback
 		});
 		const bridge = tag?.trim() ? tag.trim() : null;
+		const short = identifyLangShortScored(quote);
 		const verdict = reconcileQuoteLang(
 			bridge,
-			identifyLangShort(quote),
-			fallback
+			short?.lang ?? null,
+			fallback,
+			short?.confident ?? false
 		);
 		if (verdict) return verdict;
 	} catch {

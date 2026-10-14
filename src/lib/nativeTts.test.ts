@@ -126,14 +126,20 @@ describe("quoteLangFor", () => {
 		).resolves.toBe("fr-FR");
 	});
 
-	it("prefers the bridge answer over the offline scorer", async () => {
+	it("prefers the bridge answer over a tentative offline verdict", async () => {
 		mockInvoke.mockResolvedValue("de-DE");
+		// Two stop words, one shared: French leads but thinly, so
+		// the recognizer's answer stands.
+		await expect(quoteLangFor("jouent dans le jardin", "en-US")).resolves.toBe(
+			"de-DE"
+		);
+	});
+
+	it("lets strong offline evidence overrule the bridge", async () => {
+		mockInvoke.mockResolvedValue("en");
 		await expect(
-			quoteLangFor(
-				"Les enfants jouent dans le jardin avec leurs amis pour feter la fin",
-				"en-US"
-			)
-		).resolves.toBe("de-DE");
+			quoteLangFor("Dis-moi ce que tu en penses.", "en-US")
+		).resolves.toBe("fr-FR");
 	});
 
 	it("reads a French elision with the sentence voice over a stray bridge tag", async () => {
@@ -170,6 +176,14 @@ describe("reconcileQuoteLang", () => {
 		expect(reconcileQuoteLang("en", "fr-FR", "en-US")).toBe("en");
 		// Neither matches the seed: the bridge stands (old behavior).
 		expect(reconcileQuoteLang("pt", "fr-FR", "es-ES")).toBe("pt");
+	});
+
+	it("lets a confident short verdict overrule the bridge", () => {
+		// "Dis-moi ce que tu en penses." under an English hint.
+		expect(reconcileQuoteLang("en", "fr-FR", "en-US", true)).toBe("fr-FR");
+		expect(reconcileQuoteLang("pt", "fr-FR", "es-ES", true)).toBe("fr-FR");
+		// Agreement still returns the bridge's richer tag.
+		expect(reconcileQuoteLang("fr", "fr-FR", "en-US", true)).toBe("fr");
 	});
 
 	it("lets orthography beat bridge guesses outside the supported set", () => {

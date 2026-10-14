@@ -50,7 +50,8 @@ const STOP_WORDS: &[(&str, &[&str])] = &[
             "les", "des", "une", "que", "est", "dans", "pour", "vous", "avec", "pas", "la", "le",
             "un", "du", "au", "aux", "et", "sont", "ont", "fait", "tout", "tous", "toute",
             "toutes", "cette", "ces", "ses", "mes", "leur", "leurs", "notre", "votre", "mon",
-            "sous", "suis", "sommes", "êtes", "où", "ça", "mais", "entre",
+            "sous", "suis", "sommes", "êtes", "où", "ça", "mais", "entre", "moi", "toi", "donc",
+            "aussi",
         ],
     ),
     (
