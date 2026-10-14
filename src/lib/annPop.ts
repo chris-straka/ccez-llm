@@ -267,6 +267,95 @@ export function placeAnswerPopover(facts: {
 }
 
 /**
+ * Note editor width (create pill and edit card): the note's natural
+ * width (its longest line plus the card chrome) between an 18em floor
+ * and the article column, never narrower than the widest it has been
+ * since it opened, so deleting text never jitters the box. Long notes
+ * wrap at the column width and grow downward from there. Pure.
+ */
+export function noteEditorWidth(facts: {
+	fontPx: number;
+	columnWidth: number;
+	contentWidth: number;
+	chromeWidth: number;
+	previousWidth: number;
+}): number {
+	const cap = Math.max(1, Math.floor(facts.columnWidth));
+	return Math.min(
+		cap,
+		Math.max(
+			18 * facts.fontPx,
+			facts.previousWidth,
+			Math.ceil(facts.contentWidth + facts.chromeWidth)
+		)
+	);
+}
+
+/** The article column a note editor stays inside (viewport px). */
+export interface NoteColumn {
+	left: number;
+	right: number;
+}
+
+/** Where a desktop note editor hangs: the quote's last line, the top
+edge kept clear above it (its badge), and the article column. */
+export interface NoteAnchor {
+	anchor: AnchorRect;
+	clearTop: number;
+	column: NoteColumn;
+}
+
+/**
+ * Note editor placement, the answer card's sibling: just below the
+ * quote's last line with the tail pointing back at it, inside the
+ * article column (shifted left when the box would cross the column's
+ * right edge), above the quote only when the room below is too short
+ * and the top has more. Never covers the quote or its badge
+ * (`clearTop`). `side` pins the side chosen at open, so a growing
+ * note never flips mid-typing; the height cap is the room on that
+ * side (the field scrolls past it). Pure.
+ */
+export function placeNoteEditor(facts: {
+	anchor: AnchorRect;
+	clearTop: number;
+	column: NoteColumn;
+	cardWidth: number;
+	cardHeight: number;
+	/** Lowest edge the card may reach (composer top or viewport bottom). */
+	floor: number;
+	gap: number;
+	tail: number;
+	side?: "below" | "above";
+	margin?: number;
+}): AnswerPlacement {
+	const m = facts.margin ?? 8;
+	const { anchor, column, cardWidth: w } = facts;
+	const tailInset = Math.min(18, w / 2);
+	const lineWidth = Math.max(0, anchor.right - anchor.left);
+	// Short quotes take the tail at their middle, long last lines
+	// near their start (where reading resumes).
+	const target = anchor.left + Math.min(lineWidth / 2, 24);
+	const x = Math.max(
+		column.left,
+		Math.min(target - tailInset, column.right - w)
+	);
+	const tailX = Math.min(Math.max(target - x, tailInset), w - tailInset);
+	const reach = facts.gap + facts.tail;
+	const below = facts.floor - m - (anchor.bottom + reach);
+	const above = Math.min(anchor.top, facts.clearTop) - reach - m;
+	const h = Math.max(1, Math.ceil(facts.cardHeight));
+	const side: "below" | "above" =
+		facts.side ?? (h <= below || below >= above ? "below" : "above");
+	const maxHeight = Math.max(48, Math.floor(side === "below" ? below : above));
+	const shown = Math.min(h, maxHeight);
+	const y =
+		side === "below"
+			? Math.floor(anchor.bottom + reach)
+			: Math.ceil(Math.min(anchor.top, facts.clearTop) - reach - shown);
+	return { x: Math.round(x), y, side, maxHeight, tailX: Math.round(tailX) };
+}
+
+/**
  * Popover anchor from a quote's line-box rects (Range.getClientRects):
  * the last line's fragment, where the badge sits and the tail points,
  * with the whole quote (and its badge) kept clear above it, so an

@@ -5,11 +5,13 @@ import {
 	annPopSaveKind,
 	annPopWidth,
 	annComposerWidth,
+	noteEditorWidth,
 	pillWashId,
 	placeAnnAnswer,
 	placeAnnCard,
 	placeAnnComposer,
 	placeAnswerPopover,
+	placeNoteEditor,
 	quoteAnchor
 } from "./annPop";
 
@@ -361,5 +363,92 @@ describe("quoteAnchor", () => {
 	});
 	it("is null without boxes", () => {
 		expect(quoteAnchor([], 10)).toBeNull();
+	});
+});
+
+describe("noteEditorWidth", () => {
+	const base = {
+		fontPx: 16,
+		columnWidth: 600,
+		contentWidth: 0,
+		chromeWidth: 40,
+		previousWidth: 0
+	};
+	it("starts at the 18em floor", () => {
+		expect(noteEditorWidth(base)).toBe(288);
+	});
+	it("grows with the note up to the column, then wraps", () => {
+		expect(noteEditorWidth({ ...base, contentWidth: 400 })).toBe(440);
+		expect(noteEditorWidth({ ...base, contentWidth: 2000 })).toBe(600);
+	});
+	it("keeps its widest size while text is deleted", () => {
+		expect(noteEditorWidth({ ...base, previousWidth: 500 })).toBe(500);
+	});
+	it("never passes a narrow column, floor included", () => {
+		expect(noteEditorWidth({ ...base, columnWidth: 200 })).toBe(200);
+	});
+});
+
+describe("placeNoteEditor", () => {
+	const base = {
+		anchor: { left: 400, top: 300, right: 460, bottom: 320 },
+		clearTop: 288,
+		column: { left: 100, right: 900 },
+		cardWidth: 300,
+		cardHeight: 120,
+		floor: 800,
+		gap: 2,
+		tail: 9
+	};
+	it("opens just below the quote, tail on the word", () => {
+		const p = placeNoteEditor(base);
+		expect(p.side).toBe("below");
+		expect(p.y).toBe(331);
+		// Short quote: the tail aims at its middle, capped 24px in.
+		expect(p.x).toBe(424 - 18);
+		expect(p.x + p.tailX).toBe(424);
+		expect(p.maxHeight).toBe(800 - 8 - 331);
+	});
+	it("shifts left to stay inside the column", () => {
+		const p = placeNoteEditor({
+			...base,
+			anchor: { left: 820, top: 300, right: 880, bottom: 320 }
+		});
+		expect(p.x + 300).toBe(900);
+		// The tail still points at the quote.
+		expect(p.x + p.tailX).toBe(844);
+	});
+	it("never starts left of the column", () => {
+		const p = placeNoteEditor({
+			...base,
+			anchor: { left: 90, top: 300, right: 110, bottom: 320 }
+		});
+		expect(p.x).toBe(100);
+	});
+	it("goes above, clear of the badge, only when below is short", () => {
+		const low = { left: 400, top: 700, right: 460, bottom: 720 };
+		const p = placeNoteEditor({ ...base, anchor: low, clearTop: 688 });
+		expect(p.side).toBe("above");
+		expect(p.y + 120).toBeLessThanOrEqual(688 - 11);
+		// Pinned below, a growing note stays below and scrolls.
+		const pinned = placeNoteEditor({
+			...base,
+			anchor: low,
+			clearTop: 688,
+			side: "below"
+		});
+		expect(pinned.side).toBe("below");
+		expect(pinned.maxHeight).toBe(800 - 8 - 731);
+	});
+	it("never covers the quote when it flips", () => {
+		const p = placeNoteEditor({
+			...base,
+			anchor: { left: 400, top: 500, right: 460, bottom: 520 },
+			clearTop: 470,
+			cardHeight: 400,
+			floor: 600
+		});
+		expect(p.side).toBe("above");
+		expect(p.y + Math.min(400, p.maxHeight)).toBeLessThanOrEqual(470 - 11);
 	});
 });

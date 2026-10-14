@@ -488,7 +488,8 @@
 		annPopWidth,
 		pillWashId,
 		placeAnnAnswer,
-		placeAnnCard
+		placeAnnCard,
+		type NoteAnchor
 	} from "$lib/annPop";
 	import {
 		idleTapAction,
@@ -753,7 +754,24 @@
 			const dy = scrollBox.scrollTop - annPopTop;
 			if (dy !== 0) {
 				annPopTop = scrollBox.scrollTop;
-				annPop = { ...annPop, y: annPop.y - dy };
+				const note = annPop.note;
+				annPop = {
+					...annPop,
+					y: annPop.y - dy,
+					...(note
+						? {
+								note: {
+									...note,
+									anchor: {
+										...note.anchor,
+										top: note.anchor.top - dy,
+										bottom: note.anchor.bottom - dy
+									},
+									clearTop: note.clearTop - dy
+								}
+							}
+						: {})
+				};
 			}
 		}
 		if (annotateMode.answerPop && !annotateMode.answerClosing && scrollBox) {
@@ -1132,6 +1150,8 @@
 		x: number;
 		y: number;
 		fresh: boolean;
+		/** Desktop: hangs off the quote (see placeNoteEditor). */
+		note?: NoteAnchor;
 	} | null>(null);
 	/** Thread scroll offset when the pill opened: the pill sticks to
 	its document point (never the viewport), so scrolls shift it by
@@ -2449,10 +2469,16 @@
 			void readingsForQuote(quoted, pin);
 		},
 		dismissSelPanels: () => dismissSelPanels(),
-		openCreatePill: (id, x, y, draft) => {
+		openCreatePill: (id, x, y, draft, note) => {
 			annDraft = draft;
 			settleAnnPop();
-			annPop = { id, x, y, fresh: true };
+			annPop = {
+				id,
+				x,
+				y,
+				fresh: true,
+				...(note && !androidUI ? { note } : {})
+			};
 			annPopTop = scrollBox?.scrollTop ?? 0;
 			// The pill mounts async: land the caret once it flushes, or
 			// phone users get a comment box with no keyboard (and desktop
@@ -5717,6 +5743,19 @@
 		if (annPop) annPop = { ...annPop, y };
 	}
 
+	/** Re-hang an open desktop note editor after the window resized:
+	the column and the quote's line boxes moved under it. */
+	function reanchorNote(): void {
+		const open = annPop;
+		if (!open?.note || annPopClosing) return;
+		const ann =
+			drafts.list.find((a) => a.id === open.id) ??
+			(pendingAnn?.id === open.id ? pendingAnn : null);
+		if (!ann) return;
+		annPop = { ...open, note: annotateMode.noteAnchor(ann, open.note.anchor) };
+		annPopTop = scrollBox?.scrollTop ?? 0;
+	}
+
 	/**
 	 * Orange pencil (answer card or dock row): the filed answer
 	 * reopens in the edit card, in place where its answer sat. The
@@ -5771,10 +5810,22 @@
 						// to the measured card on Android.
 						cardHeight: 240
 					});
+		// Desktop hangs the card off the quote like the answer card it
+		// replaces (placeNoteEditor); phones keep the centered card.
+		const note =
+			!androidUI && quoteRect
+				? annotateMode.noteAnchor(current, quoteRect)
+				: undefined;
 		highlightAnnId = id;
 		annDraft = current.comment;
 		settleAnnPop();
-		annPop = { id, x: placed.x, y: placed.y, fresh: false };
+		annPop = {
+			id,
+			x: placed.x,
+			y: placed.y,
+			fresh: false,
+			...(note ? { note } : {})
+		};
 		annPopTop = scrollBox?.scrollTop ?? 0;
 		if (androidUI) void tick().then(() => refitAndroidCard(id));
 		// The card mounts async: land the caret once it flushes,
@@ -14074,6 +14125,7 @@
 		};
 		window.addEventListener("scroll", trackSelMenu, true);
 		window.addEventListener("resize", trackSelMenu);
+		window.addEventListener("resize", reanchorNote);
 		window.addEventListener("mouseup", onMouseUp);
 		window.addEventListener("dblclick", onDoubleClick);
 		// Middle-click anywhere opens the shortcuts modal (no autoscroll).
@@ -14126,6 +14178,7 @@
 			window.removeEventListener("resize", trackSelPinyin);
 			window.removeEventListener("scroll", trackSelMenu, true);
 			window.removeEventListener("resize", trackSelMenu);
+			window.removeEventListener("resize", reanchorNote);
 			window.removeEventListener("mouseup", onMouseUp);
 			window.removeEventListener("dblclick", onDoubleClick);
 			window.removeEventListener("auxclick", onMiddleClick);

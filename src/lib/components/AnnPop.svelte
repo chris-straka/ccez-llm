@@ -1,20 +1,34 @@
-<!-- Annotation pill: cursor-anchored create pill plus the edit card,
-fresh (Annotate) or filed (badge edit). The page owns the pop state
-(position, fresh flag, open/close timing) and the draft save paths;
-this component owns the pill markup, the field, the mic/save/delete
-buttons, the grow action, and their surfaces (Svelte scoping binds
-the CSS to this markup). Draft and field element ride bindables so
-the page's save/focus paths keep working. -->
+<!-- Annotation note editor: the create pill (Annotate) and the edit
+card (a filed note), fresh or filed. On desktop it is the answer
+card's sibling: the same dark bubble with a tail, just below the
+quote (above only when the bottom has no room), inside the article
+column, wrapping and growing downward as the note gets longer, then
+scrolling. Phones keep the centered card at x/y (keyboard geometry).
+The page owns the pop state (anchor, fresh flag, open/close timing)
+and the draft save paths; this component owns the markup, the field,
+the mic/save/delete buttons, sizing and placement, and their surfaces
+(Svelte scoping binds the CSS to this markup). Draft and field
+element ride bindables so the page's save/focus paths keep working. -->
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
-	import { annComposerWidth } from "$lib/annPop";
+	import {
+		annComposerWidth,
+		noteEditorWidth,
+		placeNoteEditor,
+		type AnchorRect,
+		type AnswerPlacement,
+		type NoteAnchor
+	} from "$lib/annPop";
 
 	/** Open pill state (rendered fields only). */
 	export interface AnnPopState {
 		id: string;
+		/** Phone placement (no note anchor). */
 		x: number;
 		y: number;
 		fresh: boolean;
+		/** Desktop placement: hangs off the quote. */
+		note?: NoteAnchor;
 	}
 
 	/** Page-owned pill behaviors. */
@@ -54,12 +68,62 @@ the page's save/focus paths keep working. -->
 		actions
 	}: Props = $props();
 
+	/** Tail depth past the card edge (the answer card's). */
+	const TAIL = 9;
+
 	let resizeField = $state<(() => void) | undefined>();
 	$effect(() => {
 		void draft;
 		void pop.id;
 		resizeField?.();
 	});
+
+	/** Measured card size (natural height: the field unscrolled). */
+	let size = $state<{ w: number; h: number } | null>(null);
+	/** Side picked at open: a growing note never flips mid-typing. */
+	let side = $state<"below" | "above" | undefined>();
+	let sideFor = "";
+	/** The composer's top when it floats under the quote: the card's
+	floor, like the answer card's. */
+	function floorFor(anchor: AnchorRect): number {
+		const vh = window.innerHeight;
+		const prompt = document.querySelector(".prompt");
+		const top =
+			prompt instanceof HTMLElement ? prompt.getBoundingClientRect().top : null;
+		return top !== null && top > anchor.bottom + 24 && top < vh ? top : vh;
+	}
+	const place = $derived.by((): AnswerPlacement | null => {
+		const note = pop.note;
+		if (!note || !size) return null;
+		const gap = Math.max(3, Math.round(3 + (fontScale() - 1) * 10));
+		return placeNoteEditor({
+			anchor: note.anchor,
+			clearTop: note.clearTop,
+			column: note.column,
+			cardWidth: size.w,
+			cardHeight: size.h,
+			floor: floorFor(note.anchor),
+			gap,
+			tail: TAIL,
+			...(side ? { side } : {})
+		});
+	});
+	$effect(() => {
+		const p = place;
+		if (!p) return;
+		if (sideFor !== pop.id) {
+			sideFor = pop.id;
+			side = p.side;
+		}
+	});
+	function fontScale(): number {
+		const app = document.querySelector(".app");
+		const raw = app
+			? getComputedStyle(app).getPropertyValue("--font-scale")
+			: "";
+		const n = parseFloat(raw);
+		return Number.isFinite(n) && n > 0 ? n : 1;
+	}
 
 	function growPill(node: HTMLTextAreaElement): { destroy(): void } {
 		// The insert cursor must never yank the messages list. Phones
@@ -83,6 +147,16 @@ the page's save/focus paths keep working. -->
 		let widest = 0;
 		let openedId = pop.id;
 		let anchorX = pop.x;
+		const measureText = (style: CSSStyleDeclaration): number => {
+			if (!context) return 0;
+			context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+			return node.value
+				.split("\n")
+				.reduce(
+					(width, line) => Math.max(width, context.measureText(line).width),
+					0
+				);
+		};
 		const fit = () => {
 			const style = getComputedStyle(node);
 			const fontPx = parseFloat(style.fontSize);
@@ -90,6 +164,33 @@ the page's save/focus paths keep working. -->
 				openedId = pop.id;
 				widest = 0;
 				anchorX = pop.x;
+			}
+			const note = pop.note;
+			if (note && card) {
+				// Desktop: the note's own width between the 18em floor
+				// and the article column; placement lands from the
+				// measured size (see place).
+				const chromeWidth =
+					card.getBoundingClientRect().width -
+					node.getBoundingClientRect().width;
+				widest = noteEditorWidth({
+					fontPx,
+					columnWidth: Math.min(
+						note.column.right - note.column.left,
+						window.innerWidth - 16
+					),
+					contentWidth: measureText(style) + fontPx,
+					chromeWidth,
+					previousWidth: widest
+				});
+				card.style.width = `${widest}px`;
+				if (!cssOwnsHeight) {
+					node.style.height = "auto";
+					node.style.height = `${node.scrollHeight}px`;
+				}
+				const h = card.offsetHeight - node.clientHeight + node.scrollHeight;
+				if (!size || size.w !== widest || size.h !== h) size = { w: widest, h };
+				return;
 			}
 			if (pop.fresh && card && context) {
 				context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
@@ -176,8 +277,13 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	class="ann-pop"
 	class:fresh={pop.fresh}
 	class:closing
-	style:left={`${pop.x}px`}
-	style:top={`${pop.y}px`}
+	class:note={pop.note !== undefined}
+	class:placed={place !== null}
+	class:above={place?.side === "above"}
+	style:left={`${place?.x ?? pop.x}px`}
+	style:top={`${place?.y ?? pop.y}px`}
+	style:--ann-max-h={place ? `${place.maxHeight}px` : null}
+	style:--ann-tail-x={place ? `${place.tailX}px` : null}
 	role="dialog"
 	aria-label={pop.fresh ? "Annotate" : "Edit annotation"}
 >
@@ -509,6 +615,130 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	}
 	.ann-pop:not(.fresh) textarea {
 		font-size: 1.05em;
+	}
+	/* Desktop note editor: the answer card's bubble (same surface,
+	edge, radius, type and tail), hung off the quote by the placement
+	above. The field grows with the note under the card's height cap
+	(the room on its side, at most ~15 lines), then scrolls. No clip:
+	the tail hangs outside, and the padding keeps a selection inside
+	the rounded corners. Unplaced first frame stays invisible. */
+	@keyframes ann-note-in {
+		from {
+			opacity: 0;
+			transform: translateY(var(--ann-rise, -6px)) scale(0.94);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	.ann-pop.note {
+		visibility: hidden;
+		overflow: visible;
+		display: flex;
+		flex-direction: column;
+		max-width: none;
+		max-height: min(var(--ann-max-h, 60vh), 22em);
+		padding: 0.55em 0.75em 0.55em 1em;
+		border-radius: 14px;
+		font-size: calc(0.92rem * var(--font-scale, 1) * var(--annpop-scale, 1));
+		line-height: var(--msg-line-height, 1.5);
+		transform-origin: var(--ann-tail-x, 24px) 0;
+		--ann-rise: -6px;
+		animation: none;
+	}
+	.ann-pop.note.placed {
+		visibility: visible;
+		animation: ann-note-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+	}
+	.ann-pop.note.above {
+		transform-origin: var(--ann-tail-x, 24px) 100%;
+		--ann-rise: 6px;
+	}
+	.ann-pop.note.closing {
+		animation: none;
+	}
+	.ann-pop.note.fresh {
+		flex-direction: row;
+		align-items: flex-end;
+		gap: 0.4em;
+		width: auto;
+		border-radius: 14px;
+		font-size: calc(0.92rem * var(--font-scale, 1) * var(--annpop-scale, 1));
+	}
+	.ann-pop.note:global(.tall),
+	.ann-pop.note.fresh:global(.tall) {
+		border-radius: 14px;
+	}
+	/* Tail: a rotated square sharing the card's surface and edge,
+	half tucked inside so the ring runs unbroken into it. */
+	.ann-pop.note::before {
+		content: "";
+		position: absolute;
+		left: calc(var(--ann-tail-x, 24px) - 6px);
+		top: -7px;
+		width: 12px;
+		height: 12px;
+		box-sizing: border-box;
+		background: inherit;
+		border: inherit;
+		border-right-color: transparent;
+		border-bottom-color: transparent;
+		border-radius: 2px 0 0 0;
+		transform: rotate(45deg);
+	}
+	.ann-pop.note.above::before {
+		top: auto;
+		bottom: -7px;
+		border: inherit;
+		border-left-color: transparent;
+		border-top-color: transparent;
+		border-radius: 0 0 2px 0;
+	}
+	.ann-pop.note textarea,
+	.ann-pop.note.fresh textarea,
+	.ann-pop.note:not(.fresh) textarea {
+		flex: 0 1 auto;
+		min-height: 0;
+		max-height: none;
+		font-size: 1em;
+		line-height: inherit;
+		padding: 0.1em 0;
+	}
+	.ann-pop.note.fresh textarea {
+		flex: 1 1 auto;
+		min-width: 0;
+		max-height: calc(min(var(--ann-max-h, 60vh), 22em) - 1.1em - 2px);
+	}
+	/* Room for a two-line note on an edit card from the start. */
+	.ann-pop.note:not(.fresh) textarea {
+		min-height: 3em;
+	}
+	.ann-pop.note .ann-pop-row {
+		flex: none;
+		margin-top: 0.35em;
+	}
+	/* Tools scale with the card's type: buttons don't inherit font
+	size on their own, so em would read the UA's 13px. */
+	.ann-pop.note .ann-tool {
+		font-size: inherit;
+		width: 1.8em;
+		height: 1.8em;
+	}
+	.ann-pop.note .ann-tool :global(.action-glyph) {
+		width: 0.95em;
+		height: 0.95em;
+	}
+	@media (prefers-contrast: more) {
+		.ann-pop.note {
+			border: 1px solid #1c1c1e;
+			border-color: var(--strong);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.ann-pop.note.placed {
+			animation: none;
+		}
 	}
 	/* The create pill's arrow rides round like the composer's send:
 	compact pill, compact button. */

@@ -26,7 +26,8 @@ import {
 	annComposerWidth,
 	placeAnnComposer,
 	quoteAnchor,
-	type AnchorRect
+	type AnchorRect,
+	type NoteAnchor
 } from "./annPop";
 import { aidDisplayText } from "./reading";
 import { vibrateTick } from "./studyMedia";
@@ -132,12 +133,14 @@ export interface AnnotateModeDeps {
 		pin: boolean
 	) => void;
 	dismissSelPanels: () => void;
-	/** Desktop create pill open (draft seed, focus, haptic inside). */
+	/** Desktop create pill open (draft seed, focus, haptic inside);
+	`note` hangs it off the quote. */
 	openCreatePill: (
 		id: AnnotationId,
 		x: number,
 		y: number,
-		draft: string
+		draft: string,
+		note?: NoteAnchor
 	) => void;
 	/** Cancel the pill when it addresses id; true when it did. */
 	cancelPillFor: (id: string) => boolean;
@@ -652,9 +655,18 @@ export class AnnotateMode {
 			highlightBottom: menu.hlBottom,
 			fontScale: settings.fontScale
 		});
+		// The note editor hangs off the quote's last line (the pending
+		// wash locates it), inside the article column; the selection
+		// rect stands in when the quote has no message to sit in.
+		const note = this.noteAnchor(pending, {
+			left: menu.left,
+			top: menu.hlTop,
+			right: menu.left + menu.w,
+			bottom: menu.hlBottom
+		});
 		this.selMenu = null;
 		this.deps.setHighlight(pending.id);
-		this.deps.openCreatePill(pending.id, x, y, initialComment);
+		this.deps.openCreatePill(pending.id, x, y, initialComment, note);
 	}
 
 	/** Submit the annotation being composed (Enter or Save). The id is
@@ -716,6 +728,37 @@ export class AnnotateMode {
 				clearTop: fallback.top
 			}
 		);
+	}
+
+	/**
+	 * Where a desktop note editor hangs for a quote (see
+	 * placeNoteEditor): its last line with the quote and badge kept
+	 * clear above, inside its message's article column (the thread
+	 * column, else the viewport, for quotes outside a message).
+	 */
+	noteAnchor(ann: Annotation, fallback: AnchorRect): NoteAnchor {
+		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
+		const badgeTop = badge?.getBoundingClientRect().top ?? null;
+		const placed = quoteAnchor(this.quoteRects(ann), badgeTop) ??
+			quoteAnchor([fallback], badgeTop) ?? {
+				anchor: fallback,
+				clearTop: fallback.top
+			};
+		const index = ann.messageId
+			? this.deps.getChatMessages().findIndex((m) => m.id === ann.messageId)
+			: -1;
+		const host =
+			(index >= 0 ? document.querySelector(`article#msg-${index}`) : null) ??
+			document.querySelector(".messages");
+		const box = host?.getBoundingClientRect();
+		const m = 8;
+		const vw = window.innerWidth;
+		const left = Math.max(m, box ? box.left : m);
+		const right = Math.min(vw - m, box ? box.right : vw - m);
+		return {
+			...placed,
+			column: right - left > 0 ? { left, right } : { left: m, right: vw - m }
+		};
 	}
 
 	/** Re-read an open answer card's anchor from the live layout (the
