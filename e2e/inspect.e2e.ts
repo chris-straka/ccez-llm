@@ -173,13 +173,14 @@ test("single-char Inspect guesses Japanese from surrounding kana", async ({
 	await expect(
 		modal.getByRole("button", { name: "Show Japanese reading" })
 	).toHaveAttribute("aria-pressed", "true");
-	// JP face: Japanese readings only, no Mandarin row.
-	await expect(modal).toContainText("On/Kun:");
+	// JP face: Japanese readings only (On and Kun rows, or Unihan's
+	// one On/Kun line), no Mandarin row.
+	await expect(modal).toContainText("Kun:");
 	await expect(modal).not.toContainText("Mandarin:");
 	// Flipping to 中文 swaps faces: Mandarin appears, Japanese rows go.
 	await modal.getByRole("button", { name: "Show Chinese reading" }).click();
 	await expect(modal).toContainText("Mandarin:");
-	await expect(modal).not.toContainText("On/Kun:");
+	await expect(modal).not.toContainText("Kun:");
 });
 
 test("single-char Inspect defaults to Chinese without kana", async ({
@@ -195,7 +196,7 @@ test("single-char Inspect defaults to Chinese without kana", async ({
 	).toHaveAttribute("aria-pressed", "true");
 	// CN face: Mandarin only, no Japanese rows.
 	await expect(modal).toContainText("Mandarin:");
-	await expect(modal).not.toContainText("On/Kun:");
+	await expect(modal).not.toContainText("Kun:");
 });
 
 test("settings panel gates the feature behind a checkbox", async ({ page }) => {

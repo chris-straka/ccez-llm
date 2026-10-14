@@ -59,9 +59,10 @@ test("Inspect overlay shows Unihan definition and readings for a covered char", 
 	await expect(modal).toContainText("Mandarin");
 	await expect(modal).toContainText("yǔ");
 	await modal.getByRole("button", { name: "Show Japanese reading" }).click();
-	await expect(modal).toContainText("On/Kun:");
-	await expect(modal).toContainText("go,gyo");
-	await expect(modal).toContainText("kataru");
+	await expect(modal).toContainText("On:");
+	await expect(modal).toContainText("ゴ");
+	await expect(modal).toContainText("Kun:");
+	await expect(modal).toContainText("かたる");
 	// Unihan strokes + Kangxi radical (語: 14 strokes, 言 + 7).
 	await expect(modal).toContainText("Strokes:");
 	await expect(modal).toContainText("14");
