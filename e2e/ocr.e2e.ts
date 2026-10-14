@@ -137,7 +137,7 @@ test("history card OCR reports a textless image without the Mac shell", async ({
 	const card = page.locator("article.user .sent-open").first();
 	await expect(card).toBeVisible();
 	await card.locator("button", { hasText: "OCR" }).click();
-	await expect(page.locator(".toast")).toContainText("No text found", {
+	await expect(page.locator(".toast.error")).toContainText("No text found", {
 		timeout: 120_000
 	});
 });

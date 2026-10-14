@@ -161,9 +161,10 @@ test("removing the pill collapses the strip", async ({ page }) => {
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// No bridge in the preview: the fallback runs on the solid square
-	// and reports the miss, never the red inline slot.
+	// and reports the miss, never the red inline slot (the progress
+	// toast can still be fading out beside it).
 	await card.locator('button[aria-label="Recognize text in image"]').click();
-	await expect(page.locator(".toast")).toContainText("No text found", {
+	await expect(page.locator(".toast.error")).toContainText("No text found", {
 		timeout: 120_000
 	});
 	await expect(page.locator(".attach-error")).toHaveCount(0);
