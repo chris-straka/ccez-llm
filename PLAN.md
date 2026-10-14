@@ -8,8 +8,6 @@ the record). Screenshots the owner attached are in
 
 ## Annotations (A, the overlay, badges)
 
-- In the "A" annotation text bar the text sits too close to the left edge
-  when there is little text.
 - Add a keyboard or mouse shortcut that deletes all annotations on a
   message.
 - Remove the feature where annotations attach to the main text prompt to

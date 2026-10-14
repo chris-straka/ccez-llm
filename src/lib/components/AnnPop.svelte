@@ -473,7 +473,10 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		gap: 0.5rem;
 		/* Starts compact; growPill measures the note up to 30em. */
 		width: min(18em, calc(100vw - 1rem));
-		padding: 0.55rem 0.6rem 0.55rem 1rem;
+		/* em, not rem: the capsule's round end grows with the text,
+		so the note starts where the curve ends at every size (a
+		short note never hugs the left edge). */
+		padding: 0.5em 0.55em 0.5em 1.25em;
 		border-radius: 999px;
 		/* Own size track (--annpop-scale, set on .app from the
 		popup-size setting): rides on top of message text, so huge
