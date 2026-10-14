@@ -186,7 +186,18 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
-	await page.keyboard.press("Meta+,");
+	// Open settings and wait for it: under load the chord can land
+	// while the gutter double-click's word pick is still settling, so
+	// press again until the panel is really open (never toggles it
+	// shut: the press only fires while it is closed).
+	const panel = page.locator(".settings-panel");
+	const openSettings = () =>
+		expect(async () => {
+			if (await panel.evaluate((el) => el.classList.contains("closed")))
+				await page.keyboard.press("Meta+,");
+			await expect(panel).not.toHaveClass(/closed/, { timeout: 2_000 });
+		}).toPass({ timeout: 20_000 });
+	await openSettings();
 	const slider = page.locator(
 		'.settings-panel input[aria-label="Chat width in rem"]'
 	);
@@ -219,7 +230,7 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await page.mouse.dblclick(leftEdge + 20, 400);
 	await expect(sidebar).toHaveClass(/collapsed/);
 	// Narrow column: x=100 is gutter, so the chats list opens.
-	await page.keyboard.press("Meta+,");
+	await openSettings();
 	await page
 		.locator('.settings-panel input[aria-label="Chat width in rem"]')
 		.fill("28");

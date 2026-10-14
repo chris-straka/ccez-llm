@@ -1600,19 +1600,25 @@ test("create box opens beneath the quote's left edge, narrow or wide", async ({
 	const pop = page.locator(".ann-pop");
 	await expect(pop).toBeVisible();
 	const popBox = await pop.boundingBox();
-	const highlight = await page.evaluate(() => {
-		// Annotate consumed the live highlight, so read the pending
-		// wash range it painted instead (Highlight API: no DOM marks).
-		const reg = (
-			window as unknown as {
-				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
-			}
-		).CSS?.highlights;
-		const ranges = [...(reg?.get("ccez-ann") ?? [])];
-		const r = ranges[0]?.getBoundingClientRect();
-		if (!r) return null;
-		return { left: r.left, width: r.width, bottom: r.bottom };
-	});
+	// Annotate consumed the live highlight, so read the pending wash
+	// range it painted instead (Highlight API: no DOM marks). The wash
+	// paints a frame after the box, so wait for it.
+	const pendingWash = () =>
+		page.evaluate(() => {
+			const reg = (
+				window as unknown as {
+					CSS?: {
+						highlights?: { get(name: string): Set<Range> | undefined };
+					};
+				}
+			).CSS?.highlights;
+			const ranges = [...(reg?.get("ccez-ann") ?? [])];
+			const r = ranges[0]?.getBoundingClientRect();
+			if (!r) return null;
+			return { left: r.left, width: r.width, bottom: r.bottom };
+		});
+	await expect.poll(pendingWash).not.toBeNull();
+	const highlight = await pendingWash();
 	if (!popBox) throw new Error("missing pop box");
 	if (!highlight) throw new Error("no pending wash");
 	expect(highlight.width).toBeLessThan(popBox.width);
