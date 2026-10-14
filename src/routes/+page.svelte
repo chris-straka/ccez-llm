@@ -178,7 +178,12 @@
 	import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
 	import SearchPalette from "$lib/components/SearchPalette.svelte";
 	import InspectOverlay from "$lib/components/InspectOverlay.svelte";
-	import { hasHangul, romajaOf } from "$lib/romaja";
+	import { romajaOf } from "$lib/romaja";
+	import {
+		hanjaReading,
+		quoteReadingLang,
+		type QuoteReadingLang
+	} from "$lib/hanja";
 	import { escapeHtml } from "$lib/render-math";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
@@ -1548,6 +1553,23 @@
 			if (androidUI) liftSelMenuAboveReadings();
 			return;
 		}
+		// Hanja in Korean text speak their Korean reading with the
+		// Korean voice, the panel showing the same.
+		const hanja =
+			[...menu.quote].some((ch) => isHanChar(ch)) &&
+			readingsLangFor(menu) === "ko"
+				? hanjaReading(menu.quote)
+				: null;
+		if (hanja !== null) {
+			if (menu.messageId)
+				placeSelPinyin(
+					{ quote: menu.quote, messageId: menu.messageId },
+					escapeHtml(hanja)
+				);
+			if (androidUI) liftSelMenuAboveReadings();
+			void speakQuote(hanja, selSpeakKey(menu), true, menu.context, "ko-KR");
+			return;
+		}
 		if (menu.messageId) {
 			void popupSelectionReadings(
 				menu.quote,
@@ -1997,29 +2019,24 @@
 	): Promise<string | null> {
 		if (!pin) panelsPinned = false;
 		else panelsPinned = true;
-		const probe =
-			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
-		if (![...quoted.quote].some((ch) => isHanChar(ch))) {
+		const lang = readingsLangFor(quoted);
+		if (lang === "ko") {
 			// Hangul earns its romaja the way Han earns pinyin: flat
-			// panel, Revised Romanization, syllable by syllable.
-			if (hasHangul(quoted.quote)) {
-				placeSelPinyin(quoted, escapeHtml(romajaOf(quoted.quote)));
-				if (pin && !selPinyin) panelsPinned = false;
-				return null;
-			}
-			if (pin) panelsPinned = false;
-			return null;
+			// panel, Revised Romanization, syllable by syllable. Hanja
+			// in Korean text show (and speak) their Korean reading.
+			const hanja = [...quoted.quote].some((ch) => isHanChar(ch));
+			const korean = hanja ? hanjaReading(quoted.quote) : null;
+			placeSelPinyin(quoted, escapeHtml(korean ?? romajaOf(quoted.quote)));
+			if (pin && !selPinyin) panelsPinned = false;
+			return korean;
 		}
-		if (
-			hanOverlayLangFor(probe) !== "ja" &&
-			offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")
-		) {
+		if (lang === "zh") {
 			const readings = readingsOnly(pinyinRuby(quoted.quote), " ", "rt");
 			if (readings) placeSelPinyin(quoted, readings);
 			if (pin && !selPinyin) panelsPinned = false;
 			return null;
 		}
-		if (hanOverlayLangFor(probe) === "ja") {
+		if (lang === "ja") {
 			const kana = await showSelectionFurigana(
 				quoted,
 				pin ? quoted.context : undefined
@@ -2030,22 +2047,36 @@
 		if (pin) panelsPinned = false;
 		return null;
 	}
-	/** Which readings a Han quote earns (the same call readingsForQuote
-	makes): ja furigana, zh pinyin, or none. The voice follows this
-	too, so the panel and the reading never disagree (a pinyin panel
-	over a Korean-script answer used to read Korean). */
+	/** Which readings a quote earns (the call readingsForQuote
+	makes): ja furigana, zh pinyin, ko romaja or hanja readings, or
+	none. The voice follows this too, so the panel and the reading
+	never disagree (a pinyin panel over a Korean-script answer used to
+	read Korean; hanja in Korean text now show Korean instead). */
 	function readingsLangFor(quoted: {
 		quote: string;
 		context: string;
-	}): "ja" | "zh" | "ko" | null {
+	}): QuoteReadingLang | null {
 		const probe =
 			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
-		if (![...quoted.quote].some((ch) => isHanChar(ch)))
-			return hasHangul(quoted.quote) ? "ko" : null;
-		if (hanOverlayLangFor(probe) === "ja") return "ja";
-		if (offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin"))
-			return "zh";
-		return null;
+		return quoteReadingLang(
+			quoted.quote,
+			probe,
+			quoted.context,
+			offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")
+		);
+	}
+	/** The voice a readings panel implies: pinyin reads Mandarin, a
+	Korean panel Korean; furigana and none leave it to the context, as
+	does a quote with Latin text (a mixed selection reads each line in
+	its own voice). */
+	function panelVoice(
+		panel: QuoteReadingLang | null,
+		quote = ""
+	): string | undefined {
+		if (/\p{Script=Latin}/u.test(quote)) return undefined;
+		if (panel === "zh") return "zh-CN";
+		if (panel === "ko") return "ko-KR";
+		return undefined;
 	}
 	/** Sync offer check behind readingsForQuote: creation keeps
 	the highlight (instead of clearing it) exactly when panels
@@ -13470,15 +13501,38 @@
 						// A disturbed selection keeps its wash; speech
 						// still follows the point.
 					}
-					void speakQuote(word, msg.id, false, speechText(msg.content));
 					// The repoint leaves a live highlight on the clicked
 					// word: show its readings like the quoted branch
 					// would below — a second right-click reads like the
-					// first, panel included. Speech already ran above;
-					// readingsForQuote only places the panel.
+					// first, panel and voice included. Japanese kanji
+					// and hanja wait for the reading the panel shows
+					// (露 in 露軍 is ろ, never the bare word's つゆ);
+					// everything else speaks at once.
 					const fresh = annotateMode.currentQuote();
-					if (fresh?.messageId)
-						void readingsForQuote({ ...fresh, messageId: fresh.messageId });
+					const panel = fresh?.messageId ? readingsLangFor(fresh) : null;
+					const waits =
+						fresh !== null &&
+						fresh.quote === word &&
+						(panel === "ja" ||
+							(panel === "ko" && [...word].some((ch) => isHanChar(ch))));
+					if (!waits)
+						void speakQuote(word, msg.id, false, speechText(msg.content));
+					if (fresh?.messageId) {
+						const reading = readingsForQuote({
+							...fresh,
+							messageId: fresh.messageId
+						});
+						if (waits)
+							void reading.then((kana) =>
+								speakQuote(
+									kana ?? word,
+									msg.id,
+									false,
+									speechText(msg.content),
+									panelVoice(panel)
+								)
+							);
+					}
 					return;
 				}
 			}
@@ -13494,15 +13548,16 @@
 					const kana = quoted.messageId
 						? await readingsForQuote({ ...quoted, messageId: quoted.messageId })
 						: null;
-					// A pinyin panel reads Mandarin, whatever script the
-					// rest of the paragraph is in.
+					// A pinyin panel reads Mandarin and a Korean one
+					// Korean, whatever script the rest of the paragraph
+					// is in.
 					const panel = quoted.messageId ? readingsLangFor(quoted) : null;
 					void speakQuote(
 						kana ?? quoted.quote,
 						selSpeakKey(quoted),
 						false,
 						quoted.context,
-						panel === "zh" ? "zh-CN" : undefined
+						panelVoice(panel, quoted.quote)
 					);
 				})();
 				return;

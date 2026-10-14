@@ -369,7 +369,8 @@ test("right-click on CJK repoints a missed highlight onto the clicked word", asy
 	});
 	await page.mouse.click(point.x, point.y, { button: "right" });
 	// The audio reads the clicked word, and the wash repoints onto
-	// that same word — highlight and audio never disagree.
+	// that same word — highlight and audio never disagree. Japanese
+	// speaks the word's sentence reading, like a second right-click.
 	await expect
 		.poll(() => spoken(page), { timeout: 10_000 })
 		.not.toHaveLength(0);
@@ -377,8 +378,8 @@ test("right-click on CJK repoints a missed highlight onto the clicked word", asy
 	const sel = await page.evaluate(
 		() => window.getSelection()?.toString() ?? ""
 	);
-	expect(sel).toContain("答");
-	expect(texts.join("")).toContain(sel);
+	expect(sel).toBe("お答え");
+	expect(texts).toEqual(["おこたえ"]);
 });
 
 test("right-click press that extends the highlight repoints the new word", async ({

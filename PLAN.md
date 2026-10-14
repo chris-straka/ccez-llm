@@ -12,16 +12,6 @@ the record). Screenshots the owner attached are in
   dropped from the highlight (the tint colour replaces the selection
   colour on them; `right-click-kanji-furigana-overlap.jpg`). The popups
   no longer overlap (2026-10-14); only the tint look is open.
-- 露軍: right-clicking the first kanji gives つゆ the first time and ろ
-  every time after; annotating both gives つゆぐん, right-click gives
-  ろぐん (correct here). Single-kanji readings use the standalone reading,
-  not the reading the kanji has in this sentence. Owner is not sure of the
-  best handling.
-- In the Korean/Japanese plural answer (`들` vs `たち`): right-clicking
-  接尾辞 showed Chinese pinyin but read 접미 (Korean). Since 2026-10-14 the
-  voice follows the panel (a pinyin panel reads Mandarin, wave dashes are
-  never read); whether a Han-only word inside a Korean paragraph should
-  show pinyin at all is still open.
 
 ## Selection and inspect
 

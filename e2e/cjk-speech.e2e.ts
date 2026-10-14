@@ -101,7 +101,8 @@ test("right-click speaks ruby-wrapped furigana words", async ({ page }) => {
 			timeout: 10_000
 		})
 		.toBeGreaterThan(0);
-	expect((await spoken(page)).join("")).toContain("知");
+	// The word speaks its sentence reading: 知 in お知らせ is し.
+	expect((await spoken(page)).join("")).toContain("し");
 });
 
 test("right-click on open message space speaks nothing", async ({ page }) => {

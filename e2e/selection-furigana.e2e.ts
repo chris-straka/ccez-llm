@@ -613,3 +613,85 @@ test("right-clicking Korean shows its romaja", async ({ page }) => {
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	await expect(panel).toHaveText("jeommisa");
 });
+
+test("one kanji of a compound reads its share of the word", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: "露軍の攻撃が続く。" }]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({ timeout: 60_000 });
+	// 露 alone is つゆ; in 露軍 (ろぐん) it is ろ, and the voice
+	// says the same.
+	const selected = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!text) return "";
+		window.getSelection()?.setBaseAndExtent(text, 0, text, 1);
+		return window.getSelection()?.toString() ?? "";
+	});
+	expect(selected).toBe("露");
+	await clickInsideHighlight(page);
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	await expect(panels).toHaveText("ろ");
+	await expect.poll(() => spoken(page), { timeout: 120_000 }).toEqual(["ろ"]);
+	await page.screenshot({ path: ".screenshots/compound-kanji-share.png" });
+});
+
+/** Seed one paragraph, highlight `word` in it, right-click it. */
+async function rightClickWordIn(page: Page, content: string, word: string) {
+	await page.addInitScript(() => {
+		(window as unknown as { __langs: string[] }).__langs = [];
+		const synth = window.speechSynthesis;
+		if (synth) {
+			const speak = synth.speak.bind(synth);
+			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
+				(window as unknown as { __langs: string[] }).__langs.push(
+					utterance.lang
+				);
+				speak(utterance);
+			}) as typeof synth.speak;
+		}
+	});
+	await seedChat(page, [{ role: "assistant", content }]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({ timeout: 60_000 });
+	const selected = await page.evaluate((target) => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!(text instanceof Text)) return "";
+		const i = text.data.indexOf(target);
+		window.getSelection()?.setBaseAndExtent(text, i, text, i + target.length);
+		return window.getSelection()?.toString() ?? "";
+	}, word);
+	expect(selected).toBe(word);
+	await clickInsideHighlight(page);
+}
+
+test("hanja in Korean text read in Korean, in Chinese text in pinyin", async ({
+	page
+}) => {
+	await rightClickWordIn(
+		page,
+		"한국어의 복수 접미사 들은 일본어로 接尾辞 라고 합니다.",
+		"接尾辞"
+	);
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toHaveText("접미사", { timeout: 10_000 });
+	await expect.poll(() => spoken(page)).toEqual(["접미사"]);
+	const langs = await page.evaluate(
+		() => (window as unknown as { __langs: string[] }).__langs
+	);
+	expect(langs.every((lang) => lang.startsWith("ko"))).toBe(true);
+	await page.screenshot({ path: ".screenshots/hanja-in-korean.png" });
+
+	await rightClickWordIn(page, "韩语的复数后缀是들，日语叫接尾辞。", "接尾辞");
+	await expect(panel).toHaveText("jiē wěi cí", { timeout: 10_000 });
+	await page.screenshot({ path: ".screenshots/hanzi-in-chinese.png" });
+});
