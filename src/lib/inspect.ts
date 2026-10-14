@@ -14,6 +14,7 @@
  * and definition.
  */
 import { CJKDECOMP_SUBSET } from "./cjkdecomp-subset.generated";
+import { toHiragana, toKatakana } from "wanakana";
 import { hanOverlayLangFor, type HanOverlayLang } from "./reading";
 import { UNIHAN } from "./unihan.generated";
 
@@ -144,6 +145,38 @@ function joinReadings(raw: string | null): string {
 		.filter((r) => r.length > 0)
 		.map((r) => r.toLowerCase())
 		.join(",");
+}
+
+/** One Japanese reading as the overlay lists it: the kana the voice
+speaks (on in katakana, kun in hiragana) with its Unihan romaji. */
+export interface ReadingChip {
+	kana: string;
+	romaji: string;
+}
+
+/**
+ * Japanese readings as chips, kana first: Unihan carries romaji
+ * ("RO", "TSUYU"), the learner reads kana, and the voice speaks kana.
+ * Empty sides stay empty. Pure and unit-tested.
+ */
+export function readingChips(
+	data: Pick<InspectData, "japaneseOn" | "japaneseKun">
+): { on: ReadingChip[]; kun: ReadingChip[] } {
+	const split = (raw: string | null): string[] =>
+		(raw ?? "")
+			.split(/\s+/)
+			.filter((r) => r.length > 0)
+			.map((r) => r.toLowerCase());
+	return {
+		on: split(data.japaneseOn).map((romaji) => ({
+			romaji,
+			kana: toKatakana(romaji)
+		})),
+		kun: split(data.japaneseKun).map((romaji) => ({
+			romaji,
+			kana: toHiragana(romaji)
+		}))
+	};
 }
 
 /**

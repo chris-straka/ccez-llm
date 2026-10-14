@@ -19,6 +19,14 @@ import {
 } from "./sel-geometry";
 
 describe("snapOffsetsToWordEdges", () => {
+	it("leaves a Hangul syllable block alone inside its eojeol", () => {
+		// 들 picked out of 들은: a syllable is a unit of its own.
+		expect(snapOffsetsToWordEdges("학생들은 왔다", 2, 3)).toEqual({
+			start: 2,
+			end: 3
+		});
+	});
+
 	it("expands mid-word cuts out to the word's edges", () => {
 		// "hell|o wo|rld": start cut inside "hello", end cut inside "world".
 		expect(snapOffsetsToWordEdges("hello world", 2, 9)).toEqual({

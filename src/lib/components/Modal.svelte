@@ -137,10 +137,11 @@ move here verbatim. -->
 		margin-top: 8dvh;
 		padding: 0.7rem 0.9rem 0.8rem;
 	}
-	/* Character Inspect box: narrow modal, big glyph beside the
-	facts, schematic stroke progress below. */
+	/* Character Inspect box: big glyph beside the facts, decomposition
+	below. Wider on desktop since the readings are chips now; phones
+	are bounded by the viewport either way. */
 	.inspect-modal {
-		width: min(28rem, calc(100vw - 3rem));
+		width: min(36rem, calc(100vw - 3rem));
 	}
 	/* Flashcards box: one card wide, sized like a real card. */
 	.flashcards-modal {

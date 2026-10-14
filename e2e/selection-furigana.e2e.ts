@@ -587,3 +587,28 @@ test("a neighbouring badge number never reaches the reading", async ({
 	await expect.poll(() => spoken(page), { timeout: 120_000 }).toEqual(["かき"]);
 	await expect(page.locator(".sel-pinyin")).not.toContainText("1");
 });
+
+/** Hangul earns a readings panel too: Revised Romanization of the
+highlight, syllable by syllable, above it. */
+test("right-clicking Korean shows its romaja", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "한국어의 접미사 들은 복수를 나타냅니다." }
+	]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({ timeout: 60_000 });
+	const selected = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!(text instanceof Text)) return "";
+		const i = text.data.indexOf("접미사");
+		window.getSelection()?.setBaseAndExtent(text, i, text, i + 3);
+		return window.getSelection()?.toString() ?? "";
+	});
+	expect(selected).toBe("접미사");
+	await clickInsideHighlight(page);
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	await expect(panel).toHaveText("jeommisa");
+});

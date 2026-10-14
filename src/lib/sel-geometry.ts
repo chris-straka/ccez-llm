@@ -11,12 +11,15 @@ const SURROGATE_RE = /[\uD800-\uDFFF]/u;
 const PUNCT_RE = /\p{P}/u;
 const SPACE_RE = /\s/;
 /**
- * Spaceless scripts have no words to pick: every character is a
- * letter (Lo), so snapping would glue whole sentences together.
- * The native pick already stands for these (see the Japanese
+ * Scripts whose drags never snap: spaceless ones have no words to
+ * pick (every character is a letter, so snapping would glue whole
+ * sentences together), and Hangul spaces its phrases, not its words
+ * — snapping a syllable block out to the eojeol took 들 to 들은. The
+ * native pick already stands for these (see the Japanese
  * double-click specs) and stays untouched.
  */
-const SPACELESS_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+const SPACELESS_RE =
+	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
 export function isWordChar(ch: string): boolean {
 	return WORD_CHAR_RE.test(ch) && !SPACELESS_RE.test(ch);

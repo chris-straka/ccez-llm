@@ -2,14 +2,20 @@
 review with stroke order, components, count, radical, definition,
 and readings (Mandarin, Japanese on/kun) — all offline. Rendered
 through the shared `Modal.svelte` shell. The page owns the open
-character, the stroke vectors, the step, and the reading locale
-default; this component owns the overlay markup, the stepper, the
-locale toggle, and their surfaces (Svelte scoping binds the CSS to
-this markup). Data lookups already live in `$lib/inspect` and
-`$lib/reading` (unit-pinned). -->
+character, its trail (components open in place, Back returns), the
+stroke vectors, the step, the reading locale default, and the
+voice; this component owns the overlay markup, the stepper, the
+locale toggle, the reading chips, and their surfaces (Svelte
+scoping binds the CSS to this markup). Data lookups already live in
+`$lib/inspect` and `$lib/reading` (unit-pinned). -->
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
-	import { decomposeTree, onKunLine, type InspectData } from "$lib/inspect";
+	import {
+		decomposeTree,
+		isHanChar,
+		readingChips,
+		type InspectData
+	} from "$lib/inspect";
 	import {
 		HAN_OVERLAY_LANG_TAG,
 		isHanOverlayLangUncertain,
@@ -20,6 +26,12 @@ this markup). Data lookups already live in `$lib/inspect` and
 	/** Page-owned inspect behaviors. */
 	export interface InspectOverlayActions {
 		close: () => void;
+		/** Back along the trail of opened components. */
+		back: () => void;
+		/** Open a component character in place (pushes the trail). */
+		open: (ch: string) => void;
+		/** Read one reading aloud in the given voice. */
+		speak: (text: string, lang: string) => void;
 		/** Manual stroke step (click; hold repeats via holdStart). */
 		step: (delta: 1 | -1) => void;
 		holdStart: (delta: 1 | -1) => void;
@@ -37,6 +49,8 @@ this markup). Data lookups already live in `$lib/inspect` and
 		/** Reading locale (the page defaults it on open; the
 		toggle writes it here). */
 		lang?: HanOverlayLang;
+		/** A component was opened from a parent: Back shows. */
+		canBack?: boolean;
 		actions: InspectOverlayActions;
 	}
 
@@ -46,12 +60,13 @@ this markup). Data lookups already live in `$lib/inspect` and
 		strokes,
 		stroke,
 		lang = $bindable("zh"),
+		canBack = false,
 		actions
 	}: Props = $props();
 
 	const total = $derived(strokes?.length ?? data.strokeCount ?? 0);
 	const shown = $derived(Math.min(stroke, Math.max(total, 1)));
-	const onKun = $derived(onKunLine(data));
+	const readings = $derived(readingChips(data));
 	const decomp = $derived(char ? decomposeTree(char) : null);
 	const uncertain = $derived(isHanOverlayLangUncertain(char));
 
@@ -70,6 +85,15 @@ this markup). Data lookups already live in `$lib/inspect` and
 	onBoxTouchEnd={actions.buzz}
 >
 	<div class="modal-head">
+		{#if canBack}
+			<button
+				type="button"
+				class="inspect-back"
+				aria-label="Back to the previous character"
+				title="Back"
+				onclick={actions.back}>‹</button
+			>
+		{/if}
 		<h2 id="inspect-heading">
 			Inspect <span lang={HAN_OVERLAY_LANG_TAG[lang]}>{data.char}</span>
 		</h2>
@@ -158,9 +182,22 @@ this markup). Data lookups already live in `$lib/inspect` and
 		</div>
 		<div class="inspect-facts">
 			{#if data.components.length > 0}
-				<p>
+				<p class="inspect-components">
 					<strong>Components:</strong>
-					{data.components.join(" + ")}
+					{#each data.components as part, pi (pi)}
+						{#if pi > 0}<span aria-hidden="true"> + </span>{/if}
+						{#if isHanChar(part)}
+							<button
+								type="button"
+								class="inspect-part"
+								title="Inspect {part}"
+								aria-label="Inspect {part}"
+								onclick={() => actions.open(part)}>{part}</button
+							>
+						{:else}
+							{part}
+						{/if}
+					{/each}
 				</p>
 			{:else}
 				<p class="note">
@@ -185,19 +222,59 @@ this markup). Data lookups already live in `$lib/inspect` and
 					Unihan definition unavailable offline for this character.
 				</p>
 			{/if}
+			<!-- Readings are chips that read themselves aloud: the
+			Mandarin chip speaks the character (its tone comes from
+			the voice), the on/kun chips speak their kana. -->
 			{#if lang === "zh"}
 				{#if data.mandarin !== null}
-					<p>
+					<p class="inspect-readings">
 						<strong>Mandarin:</strong>
-						<span lang="zh-Latn-pinyin">{data.mandarin}</span>
+						<button
+							type="button"
+							class="inspect-reading"
+							lang="zh-Latn-pinyin"
+							title="Listen"
+							aria-label="Listen to {data.mandarin}"
+							onclick={() => actions.speak(data.char, "zh-CN")}
+							>{data.mandarin}</button
+						>
 					</p>
 				{:else}
 					<p class="note">
 						Mandarin reading unavailable offline for this character.
 					</p>
 				{/if}
-			{:else if onKun !== null}
-				<p class="inspect-onkun">{onKun}</p>
+			{:else if readings.on.length > 0 || readings.kun.length > 0}
+				<p class="inspect-readings inspect-onkun">
+					{#if readings.on.length > 0}
+						<strong>On:</strong>
+						{#each readings.on as chip (chip.romaji)}
+							<button
+								type="button"
+								class="inspect-reading"
+								lang="ja"
+								title="Listen ({chip.romaji})"
+								aria-label="Listen to {chip.kana}"
+								onclick={() => actions.speak(chip.kana, "ja-JP")}
+								>{chip.kana}</button
+							>
+						{/each}
+					{/if}
+					{#if readings.kun.length > 0}
+						<strong>Kun:</strong>
+						{#each readings.kun as chip (chip.romaji)}
+							<button
+								type="button"
+								class="inspect-reading"
+								lang="ja"
+								title="Listen ({chip.romaji})"
+								aria-label="Listen to {chip.kana}"
+								onclick={() => actions.speak(chip.kana, "ja-JP")}
+								>{chip.kana}</button
+							>
+						{/each}
+					{/if}
+				</p>
 			{:else}
 				<p class="note">
 					Japanese readings unavailable offline for this character.
@@ -206,17 +283,30 @@ this markup). Data lookups already live in `$lib/inspect` and
 		</div>
 	</div>
 	{#if decomp && decomp.children.length > 0}
+		<!-- Every part is a door: tapping one inspects it in place
+		(Back returns to this character). -->
 		<div class="inspect-decomp" aria-label="Character decomposition">
 			<span class="inspect-decomp-char root">{decomp.char}</span>
 			<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
 			{#each decomp.children as child, ci (ci)}
 				<span class="inspect-decomp-group">
-					<span class="inspect-decomp-char">{child.char}</span>
+					<button
+						type="button"
+						class="inspect-decomp-char"
+						title="Inspect {child.char}"
+						aria-label="Inspect {child.char}"
+						onclick={() => actions.open(child.char)}>{child.char}</button
+					>
 					{#if child.children.length > 0}
 						<span class="inspect-decomp-sub">
 							<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
 							{#each child.children as grand, gi (gi)}
-								<span class="inspect-decomp-char sub">{grand.char}</span
+								<button
+									type="button"
+									class="inspect-decomp-char sub"
+									title="Inspect {grand.char}"
+									aria-label="Inspect {grand.char}"
+									onclick={() => actions.open(grand.char)}>{grand.char}</button
 								>{#if gi < child.children.length - 1}<span
 										class="inspect-decomp-plus"
 										aria-hidden="true"
@@ -330,12 +420,13 @@ this markup). Data lookups already live in `$lib/inspect` and
 		margin: 0.4rem 0 0.6rem;
 	}
 	.inspect-char {
-		font-size: 3.4rem;
+		font-size: 5rem;
 		line-height: 1.1;
 	}
 	.inspect-facts {
 		flex: 1;
 		min-width: 0;
+		font-size: 1.08rem;
 	}
 	.inspect-facts p {
 		margin: 0.3rem 0;
@@ -354,8 +445,8 @@ this markup). Data lookups already live in `$lib/inspect` and
 		min-width: 5.5rem;
 	}
 	.inspect-svg {
-		width: 5.5rem;
-		height: 5.5rem;
+		width: 8rem;
+		height: 8rem;
 	}
 	.inspect-svg path {
 		fill: none;
@@ -403,6 +494,59 @@ this markup). Data lookups already live in `$lib/inspect` and
 	.inspect-onkun {
 		overflow-wrap: anywhere;
 	}
+	/* Reading chips and component doors: quiet buttons in the facts'
+	own type, a hairline that firms up on hover. */
+	.inspect-readings {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.3rem 0.4rem;
+	}
+	.inspect-reading,
+	.inspect-part {
+		font: inherit;
+		padding: 0.05em 0.45em;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 999px;
+		background: none;
+		color: inherit;
+	}
+	.inspect-reading:hover,
+	.inspect-part:hover {
+		border-color: #1c1c1e;
+		border-color: var(--strong);
+	}
+	.inspect-back {
+		font-size: 1.3rem;
+		line-height: 1;
+		padding: 0.05rem 0.5rem;
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+		border-radius: 8px;
+		background: none;
+		color: inherit;
+	}
+	.inspect-back:hover {
+		border-color: #1c1c1e;
+		border-color: var(--strong);
+	}
+	/* Decomposition parts are buttons now: same ink and type as the
+	spans they replaced, a hairline underline on hover as the only
+	tell. */
+	button.inspect-decomp-char {
+		font: inherit;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: inherit;
+		text-decoration: underline transparent;
+		text-underline-offset: 0.15em;
+		transition: text-decoration-color 0.15s ease;
+	}
+	button.inspect-decomp-char:hover {
+		text-decoration-color: currentColor;
+	}
 	/* Decomposition tree (mdbg-style, two levels): root → parts,
 	nested splits inline. */
 	.inspect-decomp {
@@ -415,6 +559,21 @@ this markup). Data lookups already live in `$lib/inspect` and
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
 		border-radius: 8px;
+		font-size: 1.4rem;
+	}
+	/* Phones keep the compact box: the modal already fills the
+	width there, and the bigger desktop type would wrap the facts. */
+	:global(.app[data-android]) .inspect-char {
+		font-size: 3.4rem;
+	}
+	:global(.app[data-android]) .inspect-svg {
+		width: 5.5rem;
+		height: 5.5rem;
+	}
+	:global(.app[data-android]) .inspect-facts {
+		font-size: 1rem;
+	}
+	:global(.app[data-android]) .inspect-decomp {
 		font-size: 1.15rem;
 	}
 	.inspect-decomp-group {

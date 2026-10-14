@@ -168,6 +168,8 @@
 	import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
 	import SearchPalette from "$lib/components/SearchPalette.svelte";
 	import InspectOverlay from "$lib/components/InspectOverlay.svelte";
+	import { hasHangul, romajaOf } from "$lib/romaja";
+	import { escapeHtml } from "$lib/render-math";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
@@ -303,7 +305,7 @@
 	import { drillStates } from "$lib/listenChat";
 	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
-	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
+	/* decomposeTree + readingChips render in `InspectOverlay.svelte`. */
 	import {
 		getInspectData,
 		inspectLangFor,
@@ -1981,6 +1983,13 @@
 		const probe =
 			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
 		if (![...quoted.quote].some((ch) => isHanChar(ch))) {
+			// Hangul earns its romaja the way Han earns pinyin: flat
+			// panel, Revised Romanization, syllable by syllable.
+			if (hasHangul(quoted.quote)) {
+				placeSelPinyin(quoted, escapeHtml(romajaOf(quoted.quote)));
+				if (pin && !selPinyin) panelsPinned = false;
+				return null;
+			}
 			if (pin) panelsPinned = false;
 			return null;
 		}
@@ -2011,10 +2020,11 @@
 	function readingsLangFor(quoted: {
 		quote: string;
 		context: string;
-	}): "ja" | "zh" | null {
+	}): "ja" | "zh" | "ko" | null {
 		const probe =
 			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
-		if (![...quoted.quote].some((ch) => isHanChar(ch))) return null;
+		if (![...quoted.quote].some((ch) => isHanChar(ch)))
+			return hasHangul(quoted.quote) ? "ko" : null;
 		if (hanOverlayLangFor(probe) === "ja") return "ja";
 		if (offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin"))
 			return "zh";
@@ -2631,6 +2641,39 @@
 	 * backdrop click, or the × button.
 	 */
 	let inspectChar = $state<string | null>(null);
+	/** Characters inspected before the open one (a component tapped
+	in the decomposition pushes the parent here): Back pops. */
+	let inspectHistory = $state<string[]>([]);
+	/** Close the overlay and forget its trail. */
+	function closeInspect(): void {
+		inspectChar = null;
+		inspectHistory = [];
+	}
+	/** Open a component from the decomposition in place, keeping the
+	parent on the trail so Back returns to it. */
+	function inspectInto(ch: string): void {
+		if (!inspectChar || !isHanChar(ch) || ch === inspectChar) return;
+		inspectHistory = [...inspectHistory, inspectChar];
+		inspectChar = ch;
+	}
+	function inspectBack(): void {
+		const prev = inspectHistory.at(-1);
+		if (prev === undefined) return;
+		inspectHistory = inspectHistory.slice(0, -1);
+		inspectChar = prev;
+	}
+	/** Read one Inspect reading aloud in its own voice: kana for the
+	Japanese on/kun chips, the character itself for Mandarin (the
+	voice gives it its tone). */
+	function speakInspectReading(text: string, lang: string): void {
+		const voices = webVoices();
+		const voiceLang = effectiveSpeechLang(lang, voices);
+		if (!speechAttemptable(settings.voiceEngine, voiceLang, voices)) {
+			setVoiceError("No voice for this language.");
+			return;
+		}
+		startSpeech("inspect", text, voiceLang);
+	}
 	/**
 	 * Reading locale for the Inspect overlay: kana present reads as
 	 * Japanese, else Chinese — the same rule as `ttsLangFor`.
@@ -2710,6 +2753,7 @@
 		// One delegated tick for every open path (dock, menu, key):
 		// Android-only and toggle-gated inside, so desktop stays silent.
 		buzzTap();
+		inspectHistory = [];
 		inspectChar = quote;
 		inspectLang = inspectLangFor(quote, annotateMode.selMenu.context);
 		annotateMode.clearSelection();
@@ -10719,7 +10763,7 @@
 			if (shortcutsOpen || inspectChar) {
 				// A modal always wins Esc, even from inside the prompt.
 				shortcutsOpen = false;
-				inspectChar = null;
+				closeInspect();
 			} else if (chatSwitcherOpen) {
 				// The phone switcher dismisses like any modal.
 				closeChatSwitcher();
@@ -10800,7 +10844,7 @@
 				cancelAnnPop();
 				annotateMode.selMenu = null;
 				dismissSelPanels();
-				inspectChar = null;
+				closeInspect();
 				openLangMenu = null;
 				settingsOpen = false;
 				shortcutsOpen = false;
@@ -14533,8 +14577,12 @@
 			strokes={inspectStrokes}
 			stroke={inspectStroke}
 			bind:lang={inspectLang}
+			canBack={inspectHistory.length > 0}
 			actions={{
-				close: () => (inspectChar = null),
+				close: closeInspect,
+				back: inspectBack,
+				open: inspectInto,
+				speak: speakInspectReading,
 				step: strokeStep,
 				holdStart: startStrokeHold,
 				holdStop: stopStrokeHold,

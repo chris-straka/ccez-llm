@@ -8,6 +8,7 @@ import {
 	isHanChar,
 	isSingleHanChar,
 	onKunLine,
+	readingChips,
 	parseKangxi,
 	shouldShowInspect,
 	clampStrokeStep,
@@ -305,6 +306,24 @@ describe("decomposeTree", () => {
 	it("depth 1 never nests", () => {
 		const tree = decomposeTree("通", 1);
 		for (const child of tree.children) expect(child.children).toEqual([]);
+	});
+});
+
+describe("readingChips", () => {
+	it("turns Unihan romaji into the kana the voice speaks", () => {
+		expect(
+			readingChips({ japaneseOn: "RO", japaneseKun: "TSUYU ARAWARERU" })
+		).toEqual({
+			on: [{ romaji: "ro", kana: "ロ" }],
+			kun: [
+				{ romaji: "tsuyu", kana: "つゆ" },
+				{ romaji: "arawareru", kana: "あらわれる" }
+			]
+		});
+		expect(readingChips({ japaneseOn: null, japaneseKun: null })).toEqual({
+			on: [],
+			kun: []
+		});
 	});
 });
 

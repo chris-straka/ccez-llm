@@ -269,18 +269,69 @@ test("holding an arrow repeats strokes, taps still single-step", async ({
 	expect(at).toBeLessThanOrEqual(14);
 });
 
-test("readings render as one comma-joined on/kun line", async ({ page }) => {
+test("readings are kana chips that read themselves aloud", async ({ page }) => {
+	await page.addInitScript(() => {
+		const seen: string[] = [];
+		(window as unknown as Record<string, unknown>).__spoken = seen;
+		const synth = window.speechSynthesis;
+		synth.speak = ((u: SpeechSynthesisUtterance) => {
+			seen.push(`${u.lang}|${u.text}`);
+		}) as typeof synth.speak;
+	});
 	await seedWithInspect(page, true, "語");
 	await selectWord(page);
 	await page.locator('.sel-menu button:has-text("Inspect")').click();
 	const modal = page.locator(".inspect-modal");
 	await expect(modal).toBeVisible();
+	// Mandarin: the pinyin chip speaks the character itself.
+	const mandarin = modal.locator(".inspect-readings .inspect-reading");
+	await expect(mandarin).toHaveText("yǔ");
+	await mandarin.click();
+	const spoken = () =>
+		page.evaluate(
+			() =>
+				((window as unknown as Record<string, unknown>).__spoken as string[]) ??
+				[]
+		);
+	await expect.poll(spoken).toEqual(["zh-CN|語"]);
+	// Japanese: on in katakana, kun in hiragana, each one a voice.
 	await modal.locator('button:has-text("日本語")').click();
 	const line = modal.locator(".inspect-onkun");
 	await expect(line).toBeVisible();
-	await expect(line).toContainText("On/Kun:");
-	await expect(line).not.toContainText("On:");
-	// "Kun:" alone can't be asserted — it sits inside "On/Kun:".
-	// The single-line shape below proves there is no second row.
-	await expect(line).toHaveText(/^On\/Kun: .+ \| .+$/);
+	await expect(line).toContainText("On:");
+	await expect(line).toContainText("Kun:");
+	const chips = line.locator(".inspect-reading");
+	await expect(chips.first()).toHaveText("ゴ");
+	const kataru = chips.filter({ hasText: "かたる" });
+	await expect(kataru).toHaveCount(1);
+	await kataru.click();
+	await expect.poll(spoken).toEqual(["zh-CN|語", "ja-JP|かたる"]);
+});
+
+/** A component in the decomposition opens in place, with Back
+returning to the character it came from. */
+test("components open in place and Back returns", async ({ page }) => {
+	await seedWithInspect(page, true, "語");
+	await selectWord(page);
+	await page.locator('.sel-menu button:has-text("Inspect")').click();
+	const modal = page.locator(".inspect-modal");
+	await expect(modal).toBeVisible();
+	await expect(modal.locator("#inspect-heading")).toContainText("語");
+	await expect(modal.locator(".inspect-back")).toHaveCount(0);
+	await modal.locator('.inspect-decomp button:has-text("吾")').first().click();
+	await expect(modal.locator("#inspect-heading")).toContainText("吾");
+	// One more level down, then Back twice lands home.
+	await modal.locator('.inspect-decomp button:has-text("口")').first().click();
+	await expect(modal.locator("#inspect-heading")).toContainText("口");
+	await expect(modal).toContainText("mouth");
+	await modal.locator(".inspect-back").click();
+	await expect(modal.locator("#inspect-heading")).toContainText("吾");
+	await modal.locator(".inspect-back").click();
+	await expect(modal.locator("#inspect-heading")).toContainText("語");
+	await expect(modal.locator(".inspect-back")).toHaveCount(0);
+	// The Components line opens parts the same way.
+	await modal.locator('.inspect-components button:has-text("言")').click();
+	await expect(modal.locator("#inspect-heading")).toContainText("言");
+	await expect(modal).toContainText("speech");
+	await expect(modal.locator(".inspect-back")).toBeVisible();
 });
