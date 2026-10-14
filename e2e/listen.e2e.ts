@@ -533,7 +533,6 @@ test("the clip in play shows the video, centered; others keep a still", async ({
 		const clip = document.querySelector(".clip.open")!;
 		const screen = clip.querySelector(".screen")!.getBoundingClientRect();
 		const bar = clip.querySelector(".controls")!.getBoundingClientRect();
-		const ask = clip.querySelector(".ask")!.getBoundingClientRect();
 		const box = clip.querySelector(".guess-box")!.getBoundingClientRect();
 		return {
 			joined: Math.abs(bar.top - screen.bottom) < 1,
