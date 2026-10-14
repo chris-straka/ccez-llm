@@ -17,6 +17,13 @@ the record). Screenshots the owner attached are in
   ろぐん (correct here). Single-kanji readings use the standalone reading,
   not the reading the kanji has in this sentence. Owner is not sure of the
   best handling.
+- Furigana splits compounds the best path cuts into single kanji (一歩
+  shows いち|ほ instead of いっぽ over the whole word; same in
+  ccez-lang's screenshot). ccez-lang fixed this 2026-10-14 by rejoining
+  runs of single-kanji tokens with the N-best lattice's whole-span token
+  (common words beat proper nouns: 一人 ひとり, not カズト), else the
+  joined readings over the whole compound (露軍 ろぐん): port that fix
+  here (`furigana.worker.ts` + `furiganaRuby.ts`), don't re-invent it.
 - In the Korean/Japanese plural answer (`들` vs `たち`): right-clicking
   接尾辞 showed Chinese pinyin but read 접미 (Korean). Since 2026-10-14 the
   voice follows the panel (a pinyin panel reads Mandarin, wave dashes are
