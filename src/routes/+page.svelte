@@ -15194,10 +15194,15 @@
 	/* (Hide-messages mode in `MessageArticle.svelte`.) */
 	/* (Phone plain-user row in `MessageArticle.svelte`.) */
 	/* (Phone article widths in `MessageArticle.svelte`.) */
-	/* dir=auto puts Arabic paragraphs at the right edge; the chat
-	reads left-aligned, so alignment follows the column while the
-	base direction (selection, drag) stays with the text. */
-	.app[data-android] :global(.rendered [dir="auto"]) {
+	/* RTL puts Arabic paragraphs at the right edge; the chat reads
+	left-aligned, so alignment follows the column while the base
+	direction (selection, drag) stays with the text. Lists and quotes
+	keep start alignment: their markers and bar sit on the RTL side. */
+	.app[data-android]
+		:global(
+			.rendered
+				:is([dir="auto"], [dir="rtl"]):not(li, ul, ol, blockquote, blockquote *)
+		) {
 		text-align: left;
 	}
 	/* Own-row packing, speaking slot, and phone button order render

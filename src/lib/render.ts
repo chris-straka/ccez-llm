@@ -348,6 +348,48 @@ function renderInto(
 	return withTags.replace(DIR_AUTO_BLOCKS, '<$1 dir="auto"');
 }
 
+/** Hebrew, Arabic, Syriac, Thaana, NKo, and their presentation forms. */
+const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+const RTL_CHARS = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/g;
+
+/**
+ * A block's base direction by majority of strong letters, not by the
+ * first one (what `dir="auto"` does): "مَا is what" is an English
+ * sentence about an Arabic word, and first-strong made it RTL, so it
+ * read "is what مَا". Marks (harakat) and digits don't count. Null
+ * when the text has no letters (the block keeps `dir="auto"`). Pure.
+ */
+export function bidiDirection(text: string): "ltr" | "rtl" | null {
+	const rtl =
+		text.match(RTL_CHARS)?.filter((c) => /\p{L}/u.test(c)).length ?? 0;
+	const letters = text.match(/\p{L}/gu)?.length ?? 0;
+	const ltr = letters - rtl;
+	if (rtl === 0 && ltr === 0) return null;
+	return rtl > ltr ? "rtl" : "ltr";
+}
+
+/**
+ * Settle every `dir="auto"` block (and the lists holding them) by
+ * `bidiDirection`. Lists get a direction too, so an Arabic list's
+ * indent and markers sit on the right instead of hanging off the
+ * column's right edge. Only runs on markup with RTL letters in it.
+ */
+function resolveBidi(html: string): string {
+	if (!RTL_CHAR.test(html)) return html;
+	const box = document.createElement("template");
+	box.innerHTML = html;
+	for (const el of box.content.querySelectorAll<HTMLElement>(
+		'[dir="auto"], ul, ol'
+	)) {
+		if (el.hasAttribute("dir") && el.getAttribute("dir") !== "auto") continue;
+		const dir = bidiDirection(el.textContent ?? "");
+		if (dir) el.setAttribute("dir", dir);
+		else if (el.localName === "ul" || el.localName === "ol")
+			el.setAttribute("dir", "auto");
+	}
+	return box.innerHTML;
+}
+
 let purifier: ReturnType<typeof DOMPurify> | null = null;
 
 export function sanitize(dirty: string): string {
@@ -356,26 +398,28 @@ export function sanitize(dirty: string): string {
 		return `<p dir="auto">${escapeHtml(dirty)}</p>`;
 	}
 	purifier ??= DOMPurify(window);
-	return purifier.sanitize(dirty, {
-		ADD_TAGS: ["details", "summary", "button", "ruby", "rt", "rp"],
-		ADD_ATTR: [
-			"open",
-			"class",
-			"style",
-			"aria-hidden",
-			"aria-label",
-			"aria-expanded",
-			"data-code-copy",
-			"data-code-run",
-			"data-code-lang",
-			"data-code-output",
-			"data-code-index",
-			"data-math-index",
-			"data-paste-fold",
-			"type",
-			"dir"
-		]
-	});
+	return resolveBidi(
+		purifier.sanitize(dirty, {
+			ADD_TAGS: ["details", "summary", "button", "ruby", "rt", "rp"],
+			ADD_ATTR: [
+				"open",
+				"class",
+				"style",
+				"aria-hidden",
+				"aria-label",
+				"aria-expanded",
+				"data-code-copy",
+				"data-code-run",
+				"data-code-lang",
+				"data-code-output",
+				"data-code-index",
+				"data-math-index",
+				"data-paste-fold",
+				"type",
+				"dir"
+			]
+		})
+	);
 }
 
 /** One visible run: body text, a closed-fold marker button, or an

@@ -945,10 +945,23 @@
 	Muting them washed out long passages on light theme. The 4px bar
 	plus airy margins sets the passage apart as a block — no wash, no
 	accent bar, no italics (they degrade CJK). */
+	/* Messages read left-aligned, but an RTL list's markers and an
+	RTL quote's bar sit on the right: these align to their start so
+	the marker or bar stays beside its text, not across the column. */
+	.rendered :global(:is(ul, ol, li, blockquote):dir(rtl)) {
+		text-align: start;
+	}
+	/* An item whose direction differs from its list's (one Arabic
+	line in an English list) keeps its marker inside the box: outside,
+	it would hang past the list's other edge, off the column. */
+	.rendered :global(:is(ul, ol):dir(ltr) > li:dir(rtl)),
+	.rendered :global(:is(ul, ol):dir(rtl) > li:dir(ltr)) {
+		list-style-position: inside;
+	}
 	.rendered :global(blockquote) {
 		margin: 0.6em 0;
-		padding-left: 0.9rem;
-		border-left: 4px solid #8e8e93;
+		padding-inline-start: 0.9rem;
+		border-inline-start: 4px solid #8e8e93;
 		border-color: var(--line-hover);
 		color: #1c1c1e;
 		color: var(--ink);

@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	attachTagHtml,
+	bidiDirection,
 	extractThoughts,
 	stripSourcesIfUnasked,
 	sourcesAsked,
@@ -184,6 +185,28 @@ describe("markdown rendering", () => {
 			expect(html).toContain(`<${tag} dir="auto"`);
 		}
 		expect(html).not.toContain("<pre dir=");
+	});
+
+	it("directs mixed Arabic and English blocks by their majority", () => {
+		const { html } = renderMarkdown(
+			"مَا is what\n\nهذا كتاب جميل جدا\n\n1. الأول\n2. الثاني"
+		);
+		// First-strong would make this RTL and show "is what مَا".
+		expect(html).toContain('<p dir="ltr">مَا is what</p>');
+		expect(html).toContain('<p dir="rtl">هذا كتاب جميل جدا</p>');
+		// The list takes a side too, so its markers and indent follow.
+		expect(html).toMatch(/<ol dir="rtl">\s*<li dir="rtl">الأول<\/li>/);
+	});
+
+	it("leaves non-RTL markup and letterless blocks alone", () => {
+		const { html } = renderMarkdown("- item\n\n123");
+		expect(html).toContain("<ul>");
+		expect(html).toContain('<p dir="auto">123</p>');
+		expect(bidiDirection("123 ...")).toBeNull();
+		expect(bidiDirection("كتاب means book")).toBe("ltr");
+		expect(bidiDirection("أقرأ كتاب book")).toBe("rtl");
+		// Harakat are marks, not letters: they never tip the count.
+		expect(bidiDirection("مَا هُوَ x")).toBe("rtl");
 	});
 
 	it("converts rendered html back to plain text", () => {

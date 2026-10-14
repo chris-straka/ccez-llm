@@ -40,13 +40,6 @@ the record). Screenshots the owner attached are in
   the Mac: double-click already picks the segmenter word, single-hanzi
   drags are not snapped.)
 
-## Layout and text size
-
-- Arabic bullets and lists may be formatted wrong; numbered lists trail off
-  screen on Android.
-- Typing "مَا is what" in the prompt shows up as "is what مَا" in replies
-  (bidi ordering).
-
 ## News, listen, video
 
 - No News or Listen button on the front page until a language is picked

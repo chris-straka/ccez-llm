@@ -3700,3 +3700,38 @@ test.describe("toasts", () => {
 		expect(style.width).toBeLessThanOrEqual(412);
 	});
 });
+
+test("Arabic lists keep markers in the column; mixed lines read in order", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content: "مَا is what\n\n1. **مَا** — ما هذا؟\n2. **مَاذَا** — ماذا تفعل؟"
+		}
+	]);
+	await page.goto("/");
+	const list = page.locator("article.assistant ol");
+	await expect(list).toBeVisible({ timeout: 60_000 });
+	// An English sentence about an Arabic word stays LTR.
+	await expect(page.locator("article.assistant p").first()).toHaveAttribute(
+		"dir",
+		"ltr"
+	);
+	await expect(list).toHaveAttribute("dir", "rtl");
+	const fit = await page.evaluate(() => {
+		const col = document
+			.querySelector("article.assistant .rendered")!
+			.getBoundingClientRect();
+		const ol = document.querySelector("article.assistant ol")!;
+		const li = ol.querySelector("li")!.getBoundingClientRect();
+		const pad = parseFloat(getComputedStyle(ol).paddingRight);
+		return {
+			inside: li.right + pad <= col.right + 1,
+			start: getComputedStyle(ol.querySelector("li")!).textAlign
+		};
+	});
+	// Markers live in the list's right padding, inside the column, and
+	// the items hug them.
+	expect(fit).toEqual({ inside: true, start: "start" });
+});
