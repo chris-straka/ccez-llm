@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { repeatInksByMessage, REPEAT_INK_COUNT } from "./ann-repeats";
+import { inkSpans, repeatInksByMessage, REPEAT_INK_COUNT } from "./ann-repeats";
 import type { Annotation, AnnotationId } from "./annotations";
 import type { ChatMsgId } from "./chat";
 
@@ -69,5 +69,59 @@ describe("repeatInksByMessage", () => {
 			ann("m1", "…!")
 		]);
 		expect(out.size).toBe(0);
+	});
+});
+
+describe("inkSpans", () => {
+	const text = (spans: ReturnType<typeof inkSpans>, nodes: string[]) =>
+		spans.map(
+			({ ink, again, loc }) =>
+				`${ink}${again ? "." : "_"}${(nodes[loc.startNode] ?? "").slice(loc.startOffset, loc.endOffset)}@${loc.startOffset}`
+		);
+
+	it("draws the annotated quote solid and its repeats dotted", () => {
+		const nodes = ["das Haus und das Haus und das Haus"];
+		const spans = inkSpans(
+			nodes,
+			[{ quote: "Haus", ink: 1, from: 1 }],
+			[{ quote: "Haus", at: 1 }]
+		);
+		expect(text(spans, nodes)).toEqual(["1_Haus@17", "1.Haus@30"]);
+	});
+
+	it("draws repeats dotted where nothing is annotated", () => {
+		const nodes = ["proche du mouvement MAGA"];
+		const spans = inkSpans(nodes, [{ quote: "MAGA", ink: 0, from: 0 }], []);
+		expect(text(spans, nodes)).toEqual(["0.MAGA@20"]);
+	});
+
+	it("drops a repeat nested in another annotated quote", () => {
+		const nodes = ["elle est proche du mouvement MAGA, oui"];
+		const spans = inkSpans(
+			nodes,
+			[
+				{ quote: "mouvement MAGA", ink: 0, from: 0 },
+				{ quote: "proche du mouvement MAGA", ink: 1, from: 0 }
+			],
+			[{ quote: "proche du mouvement MAGA" }]
+		);
+		// One unbroken solid line in the quote's own ink.
+		expect(text(spans, nodes)).toEqual(["1_proche du mouvement MAGA@9"]);
+	});
+
+	it("spans text nodes split by a badge anchor", () => {
+		const nodes = ["a connu des ", "débuts difficiles", ", selon"];
+		const spans = inkSpans(
+			nodes,
+			[{ quote: "a connu des débuts difficiles", ink: 2, from: 0 }],
+			[{ quote: "a connu des débuts difficiles" }]
+		);
+		expect(spans).toEqual([
+			{
+				ink: 2,
+				again: false,
+				loc: { startNode: 0, startOffset: 0, endNode: 1, endOffset: 17 }
+			}
+		]);
 	});
 });

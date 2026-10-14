@@ -97,6 +97,13 @@ function registry(): HighlightRegistry | null {
 }
 
 /**
+ * Priority of the washes and the jump flash: above the repeat-ink
+ * underlines (ann-repeat-paint.ts), so a hovered quote washes whole
+ * wherever an ink overlaps it.
+ */
+export const WASH_PRIORITY = 2;
+
+/**
  * Paint wash ranges via CSS.highlights under one graded name
  * (default live). No-op (returns false) where unsupported — the
  * caller keeps the mark-DOM path. Never throws.
@@ -110,7 +117,9 @@ export function paintAnnotationWash(
 		if (!reg || ranges.length === 0) return false;
 		const Ctor = Highlight;
 		if (typeof Ctor !== "function") return false;
-		reg.set(name, new Ctor(...ranges));
+		const highlight = new Ctor(...ranges);
+		highlight.priority = WASH_PRIORITY;
+		reg.set(name, highlight);
 		return true;
 	} catch {
 		return false;

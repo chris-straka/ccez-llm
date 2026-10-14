@@ -241,11 +241,14 @@
 	let aidTall = $state(false);
 
 	/* Ink changes alone repaint without re-rendering the body; the
-	stamp above repaints after every render. */
+	stamp below repaints after every render. Annotated quotes here
+	underline solid, their repeats dotted. */
 	$effect(() => {
-		const inks = streaming || folded ? [] : repeats;
+		const skip = streaming || folded;
+		const inks = skip ? [] : repeats;
+		const quotes = skip ? [] : marks;
 		void tick().then(() => {
-			if (bodyEl) paintRepeatInks(bodyEl, inks);
+			if (bodyEl) paintRepeatInks(bodyEl, inks, quotes);
 		});
 	});
 	$effect(() => {
@@ -342,7 +345,11 @@
 				if (!bodyEl) return;
 				applyMarks(bodyEl, items, skipMarks, wash);
 				// Fresh text nodes need fresh ink ranges.
-				paintRepeatInks(bodyEl, skipMarks ? [] : untrack(() => repeats));
+				paintRepeatInks(
+					bodyEl,
+					skipMarks ? [] : untrack(() => repeats),
+					skipMarks ? [] : items
+				);
 				stampRunOutputs();
 				for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
 					if (!(wrap instanceof HTMLElement)) continue;
