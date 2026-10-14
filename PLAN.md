@@ -40,32 +40,6 @@ the record). Screenshots the owner attached are in
   the Mac: double-click already picks the segmenter word, single-hanzi
   drags are not snapped.)
 
-## Chats and prompt
-
-- Scroll position is not kept per chat: A -> B -> A lands at the top of A.
-  Owner wonders if each chat needs to be its own page.
-- Text typed into the main prompt follows the owner into the next chat.
-  Each chat gets its own draft.
-- After sending, switching chats and back resets the thinking counter and
-  may resend. Never resend if the app was not left; show the true age
-  (24 s if the request is 24 s old).
-- The edit button on the owner's own messages does nothing while the model
-  is still thinking.
-- The usual delete shortcuts should delete a message that is still
-  "thinking..." and has not landed.
-- Cmd+Z brings back deleted messages.
-- The thinking seconds counter should fade in and out on hover.
-- Cmd+Shift+J (new chat) should focus the main prompt; a visible but
-  unfocused prompt is weird.
-- Chat counter (1 / 2): holding Shift while the main prompt is not focused
-  shows it at the top right (title bar was the other idea).
-- Click-and-hold on the submit button cancels the current request, even
-  when unsent text sits in the box.
-- Android: open the chats sidebar by tap-and-hold, then swipe while
-  holding.
-- Android: pinch-to-zoom currently zooms parts of the UI such as the
-  settings sidebar. Pinch should only change the font size.
-
 ## Layout and text size
 
 - At 290% the thumbnails get tiny; at 300% the layout goes single column;
