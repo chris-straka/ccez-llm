@@ -64,7 +64,7 @@ TTS/OCR/dictation, page fetch, Android background turns).
   no restart is needed.
 - Device-only paths (Android, Windows, Linux): unit tests plus an honest
   "unverified on device" note, never a pass claim. Android verifies on the
-  local Android emulator (headless: `-no-window`, SwiftShader graphics;
+  emulator on f through fleet (`fleet run --emulator`; headless: `-no-window`, SwiftShader graphics;
   the x86_64 image runs the arm64 release APK through its ARM
   translation), never the owner's phone unless they ask that turn.
   Emulator frame rates are emulator numbers, not phone numbers.
