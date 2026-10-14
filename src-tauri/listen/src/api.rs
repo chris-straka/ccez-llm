@@ -77,6 +77,21 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     std::fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
 
+/// Rewrite a fragmented picture track in place as a plain MP4 (see
+/// `fmp4`). Best effort: a file it can't read or convert stays as it
+/// was, and plays as before.
+fn plain_mp4(path: &Path) {
+    let Ok(bytes) = std::fs::read(path) else {
+        return;
+    };
+    if !crate::fmp4::is_fragmented(&bytes) {
+        return;
+    }
+    if let Some(plain) = crate::fmp4::defragment(&bytes) {
+        let _ = write_atomic(path, &plain);
+    }
+}
+
 fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     write_atomic(path, &serde_json::to_vec(value).map_err(|e| e.to_string())?)
 }
@@ -346,6 +361,8 @@ impl Listen {
         let lock = video_lock(&format!("{id}/video"));
         let _guard = lock.lock().await;
         if path.is_file() {
+            // Pictures cached before they were remuxed get it once here.
+            plain_mp4(&path);
             return Ok(path);
         }
         let player = self.player(id, URL_TTL).await?;
@@ -366,6 +383,7 @@ impl Listen {
             }
             done => done?,
         }
+        plain_mp4(&path);
         Ok(path)
     }
 

@@ -4,6 +4,7 @@
 
 mod api;
 mod client;
+pub mod fmp4;
 pub mod youtube;
 
 pub use api::{Fetched, Listen};

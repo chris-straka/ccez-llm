@@ -164,6 +164,28 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.locator(".empty-state")).toBeVisible({ timeout: 60_000 });
 });
 
+test("News and Listen stay hidden until a language is picked", async ({
+	page
+}) => {
+	// Same shell and channels, but a chat with no language yet.
+	await seedChat(page, [], null, {
+		listenChannels: [{ url: CHANNEL, name: "Learner Channel" }]
+	});
+	await page.reload();
+	await expect(page.locator(".empty-state h1")).toBeVisible({
+		timeout: 60_000
+	});
+	await expect(page.getByRole("tab", { name: "Listen" })).toHaveCount(0);
+	await expect(page.getByRole("tab", { name: "News" })).toHaveCount(0);
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await page
+		.locator(".lang-list")
+		.getByRole("menuitem", { name: "French" })
+		.click();
+	await expect(page.getByRole("tab", { name: "News" })).toBeVisible();
+	await expect(page.getByRole("tab", { name: "Listen" })).toBeVisible();
+});
+
 test("a drill runs: guess, next clip at once, reveal, tally", async ({
 	page
 }) => {
