@@ -8,55 +8,23 @@ the record). Screenshots the owner attached are in
 
 ## Annotations (A, the overlay, badges)
 
-- Typing `A` to annotate a Japanese sentence does not focus the new
-  textbox; the owner has to click into it.
-- Hitting `a` on something still fetching an annotation opens the textbox
-  ("A") version. It should do nothing while the fetch is in flight.
-- If an annotation is loading and the owner hits `A` on it by accident,
-  then Esc right away (without sending anything), the annotation that was
-  loading is removed. The one in flight must survive.
-- In the "A" annotation text bar the text sits too close to the left edge
-  when there is little text.
-- Highlight text, the annotate menu button appears, switch chat: the
-  button still shows on the other chat.
-- Open the annotation overlay menu, switch chat and come back: it is still
-  on the overlay menu. Owner leans to "close it", not sure.
-- Annotations stop loading when the owner goes to another chat; they
-  should keep loading in the background.
-- Add a keyboard or mouse shortcut that deletes all annotations on a
-  message.
-- Remove the feature where annotations attach to the main text prompt to
-  send with the next message. (An archived note asked the prompt to show
-  whether something is being annotated; moot once this goes.)
-- Right-click on a highlight reads "ichi" before the highlighted text: the
-  reader is picking up the annotation badge number as well
-  (`right-click-reads-annotation-ichi.jpg`).
-- Right-clicking a highlight with several kanji removes the kanji from the
-  highlight, and the furigana popups overlap each other; maybe spread them
-  to different parts of the screen
-  (`right-click-kanji-furigana-overlap.jpg`).
-- Right-click read "hachinasuriawase", which is not in the highlight
-  (`right-click-hachinasuriawase.jpg`: the highlight was すり合わせ).
+- Right-clicking a highlight with several kanji: the tinted kanji read as
+  dropped from the highlight (the tint colour replaces the selection
+  colour on them; `right-click-kanji-furigana-overlap.jpg`). The popups
+  no longer overlap (2026-10-14); only the tint look is open.
 - 露軍: right-clicking the first kanji gives つゆ the first time and ろ
   every time after; annotating both gives つゆぐん, right-click gives
   ろぐん (correct here). Single-kanji readings use the standalone reading,
   not the reading the kanji has in this sentence. Owner is not sure of the
   best handling.
 - In the Korean/Japanese plural answer (`들` vs `たち`): right-clicking
-  接尾辞 showed Chinese pinyin but read 접미 (Korean); 〜達 read as "tachi
-  subashtu tachi". Per-token language detection inside a mixed-script
-  answer is picking the wrong script.
-- Right-click on Japanese text mixed with English in one bullet reads the
-  entire bullet, not the selection: the Japanese voice reads the English
-  and then the whole Japanese sentence (`tts-mixed-jp-en-bullet.jpg`).
-  Only that bullet did it.
+  接尾辞 showed Chinese pinyin but read 접미 (Korean). Since 2026-10-14 the
+  voice follows the panel (a pinyin panel reads Mandarin, wave dashes are
+  never read); whether a Han-only word inside a Korean paragraph should
+  show pinyin at all is still open.
 
 ## Annotations, round 2 (owner, 2026-10-14)
 
-- `a` used to show pinyin for every hanzi everywhere. It must not do that
-  any more: `a` only annotates, and shows the pinyin or furigana of
-  whatever is being annotated. (The owner's note "the pinyin on 'a' needs
-  to move to another keypress" meant this.)
 - Colour-code repeats: text later in a message that was already annotated
   above gets the same colour as its first annotation. The owner wants
   colour, not dimming or underlines ("dimming would make it harder to
@@ -67,21 +35,10 @@ the record). Screenshots the owner attached are in
 
 - Mouse selection of Chinese feels strange; the browser's own behaviour is
   better: a single hanzi can be selected on its own, double-click selects
-  the word (什么, not 什 or 么). Same for Korean eumjeol (syllable blocks).
-- Inspect panel: clicking one of the decomposed kanji at the bottom should
-  open the inspect panel for that kanji, with history so Back works.
-- Inspect panel: audio for the kun and on readings; it could be bigger on
-  desktop.
-- Romaja on right-click for Korean.
-
-## Speech
-
-- Voice speed below 0.5x.
-- "Dis-moi ce que tu en penses." used an English voice, not French.
-- OCR button: first click showed the spinning rainbow wheel for a while
-  (looked frozen), then produced 闪烁碎片飘到了海边; the second run was
-  fast. Probably a first-time model install. Show what it is doing instead
-  of blocking: the owner's real complaint about OCR is visibility.
+  the word (什么, not 什 or 么). (Korean syllable blocks stopped snapping
+  out to the eojeol on 2026-10-14; the Chinese part needs a repro from
+  the Mac: double-click already picks the segmenter word, single-hanzi
+  drags are not snapped.)
 
 ## Chats and prompt
 
@@ -132,4 +89,3 @@ the record). Screenshots the owner attached are in
 - Video clips look corrupted: from the start of the second clip onward.
 - Video clips: the "type what you hear" box is too wide, and the video
   controls must stay reachable the whole time.
-
