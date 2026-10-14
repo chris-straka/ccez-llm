@@ -11374,6 +11374,8 @@
 				// opens. The decision already confirmed a word is
 				// under the pointer; a stale range selects nothing
 				// and files nothing (annotate guards the empty quote).
+				// A word whose note is still loading files nothing
+				// either, and its borrowed selection goes back.
 				if (hoverHit) {
 					event.preventDefault();
 					window
@@ -11385,7 +11387,7 @@
 							hoverHit.end
 						);
 					annotateMode.placeSelMenu();
-					annotateMode.annotate("", true);
+					if (!annotateMode.annotate("", true)) annotateMode.clearSelection();
 					annotateMode.selMenu = null;
 					return;
 				}

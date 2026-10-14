@@ -512,14 +512,15 @@ export class AnnotateMode {
 
 	/** Annotate at the cursor: the comment pill opens where the selection
 	was — never down in the composer. Enter saves, Escape cancels. The
-	annotation stays pending (no badge, no count) until submit. */
-	annotate(initialComment: string = "", instant = false): void {
+	annotation stays pending (no badge, no count) until submit. False
+	when nothing started (no quote, or bare A on a note in flight). */
+	annotate(initialComment: string = "", instant = false): boolean {
 		const menu = this.selMenu;
-		if (!menu) return;
+		if (!menu) return false;
 		if (!menu.quote.trim()) {
 			this.clearSelection();
 			this.selMenu = null;
-			return;
+			return false;
 		}
 		// Starting over submits whatever is being composed first: typed
 		// comments are never silently dropped.
@@ -544,10 +545,12 @@ export class AnnotateMode {
 				? ("tashkeel" as const)
 				: undefined;
 		// Same span twice would stack two badges on one anchor (and
-		// hovering them oscillates): delete the existing annotation
-		// and start the new one clean — no toast, no lockout, the
-		// create box opens for the fresh wording either way (even on
-		// the instant path: re-annotating means rewriting).
+		// hovering them oscillates): the new note replaces the filed
+		// one, but only once it files — cancelling leaves the old
+		// note as it was. The create box opens for the fresh wording
+		// either way (even on the instant path: re-annotating means
+		// rewriting), except that bare A on a note still waiting for
+		// its answer does nothing at all.
 		const dupe = duplicateAnnotationId(
 			this.deps.getAnnotations(),
 			{
@@ -559,9 +562,11 @@ export class AnnotateMode {
 			aidScope
 		);
 		if (dupe) {
-			this.deps.setAnnotations(
-				deleteAnnotation(this.deps.getAnnotations(), dupe)
-			);
+			const filed = this.deps.getAnnotations().find((a) => a.id === dupe);
+			if (instant && filed?.answer === undefined) {
+				this.selMenu = null;
+				return false;
+			}
 			if (this.answerPop?.id === dupe) {
 				if (this.answerTimer) {
 					clearTimeout(this.answerTimer);
@@ -581,7 +586,8 @@ export class AnnotateMode {
 			comment: "",
 			at,
 			...(aidScope ? { aidScope } : {}),
-			...(instant ? { brief: true } : {})
+			...(instant ? { brief: true } : {}),
+			...(dupe ? { replaces: dupe } : {})
 		};
 		this.deps.setPending(pending);
 		// Creating an annotation always reads the quote back out
@@ -611,7 +617,7 @@ export class AnnotateMode {
 		if (instant) {
 			this.deps.setAnnDraft(initialComment);
 			this.commitPending();
-			return;
+			return true;
 		}
 		// Phones file the comment in the composer, never the
 		// transplanted pill (its textbox can't reliably summon the
@@ -623,7 +629,7 @@ export class AnnotateMode {
 			this.deps.setHighlight(pending.id);
 			this.deps.editInPrompt(initialComment);
 			if (settings.hapticsEnabled) vibrateTick(6);
-			return;
+			return true;
 		}
 		const width = annComposerWidth({
 			fontPx: 16 * settings.fontScale * (settings.annPopScale ?? 1),
@@ -651,6 +657,7 @@ export class AnnotateMode {
 		this.selMenu = null;
 		this.deps.setHighlight(pending.id);
 		this.deps.openCreatePill(pending.id, x, y, initialComment);
+		return true;
 	}
 
 	/** Submit the annotation being composed (Enter or Save). The id is

@@ -66,6 +66,12 @@ export interface Annotation {
 	 * gloss instead of the full lesson Shift+A and typed questions get.
 	 */
 	brief?: boolean;
+	/**
+	 * Pending only: the filed note on the same span this one rewrites.
+	 * Filing drops it (one badge per span); cancelling leaves it as it
+	 * was, answer or request in flight included.
+	 */
+	replaces?: AnnotationId;
 }
 
 export function newAnnotationId(): AnnotationId {
@@ -449,7 +455,8 @@ export function annotationCopyText(quote: string, comment: string): string {
 
 /**
  * File a pending annotation with its draft comment:
- * the pill commit path. Null when nothing is pending.
+ * the pill commit path. A rewrite of a filed span drops the
+ * note it replaces in the same step. Null when nothing is pending.
  */
 export function filePendingAnnotation(
 	list: Annotation[],
@@ -457,7 +464,9 @@ export function filePendingAnnotation(
 	draft: string
 ): Annotation[] | null {
 	if (!pending) return null;
-	return [...list, { ...pending, comment: draft }];
+	const { replaces, ...filed } = pending;
+	const kept = replaces ? deleteAnnotation(list, replaces) : list;
+	return [...kept, { ...filed, comment: draft }];
 }
 
 /**

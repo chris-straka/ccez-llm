@@ -393,11 +393,53 @@ describe("annotate", () => {
 		mode.answerTimer = setTimeout(() => {}, 10_000);
 		mode.selMenu = menu();
 		mode.annotate();
-		expect(getAnnotations()).toEqual([]);
+		// The old note stays filed until the rewrite files.
+		expect(getAnnotations()).toEqual([dupe]);
 		expect(getPending()?.quote).toBe("Bonjour");
+		expect(getPending()?.replaces).toBe("dupe");
 		expect(mode.answerPop).toBeNull();
 		expect(mode.answerTimer).toBeNull();
 		expect(calls.promptEdits).toEqual([""]);
+		mode.commitPending();
+		expect(getAnnotations()).toHaveLength(1);
+		expect(getAnnotations()[0]?.id).not.toBe("dupe");
+	});
+
+	it("bare A on a note still loading does nothing", () => {
+		const { mode, calls, getAnnotations, getPending, setAnnotations } =
+			harness();
+		const loading = note({
+			id: "loading" as AnnotationId,
+			messageId: "m1" as ChatMsgId,
+			quote: "Bonjour",
+			at: 0
+		});
+		setAnnotations([loading]);
+		mode.selMenu = menu();
+		expect(mode.annotate("", true)).toBe(false);
+		expect(getAnnotations()).toEqual([loading]);
+		expect(getPending()).toBeNull();
+		expect(calls.pills).toEqual([]);
+		expect(calls.asks).toEqual([]);
+		expect(mode.selMenu).toBeNull();
+	});
+
+	it("Shift+A on a loading note leaves it filed until the rewrite files", () => {
+		const { mode, calls, getAnnotations, getPending, setAnnotations } =
+			harness();
+		const loading = note({
+			id: "loading" as AnnotationId,
+			messageId: "m1" as ChatMsgId,
+			quote: "Bonjour",
+			at: 0
+		});
+		setAnnotations([loading]);
+		mode.selMenu = menu();
+		expect(mode.annotate("")).toBe(true);
+		expect(calls.pills).toHaveLength(1);
+		expect(getPending()?.replaces).toBe("loading");
+		// Cancelling (Esc) drops only the pending draft.
+		expect(getAnnotations()).toEqual([loading]);
 	});
 
 	it("a blank quote just clears", () => {

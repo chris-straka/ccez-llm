@@ -437,6 +437,24 @@ describe("pending filing", () => {
 		expect(filePendingAnnotation([], null, "note")).toBeNull();
 	});
 
+	it("filing a rewrite drops the note it replaces, never others", () => {
+		const old: Annotation = {
+			id: "old" as AnnotationId,
+			messageId: m1,
+			quote: "q",
+			comment: ""
+		};
+		const other: Annotation = { ...old, id: "other" as AnnotationId };
+		const pending: Annotation = {
+			...old,
+			id: "p" as AnnotationId,
+			replaces: old.id
+		};
+		const filed = filePendingAnnotation([old, other], pending, "why?");
+		expect(filed?.map((a) => a.id)).toEqual(["other", "p"]);
+		expect(filed?.[1]).not.toHaveProperty("replaces");
+	});
+
 	it("washes the pending preview or the saved quote", () => {
 		expect(promptAnnWashIdFor(null, "p" as AnnotationId)).toBeNull();
 		expect(promptAnnWashIdFor({ pending: true }, "p" as AnnotationId)).toBe(

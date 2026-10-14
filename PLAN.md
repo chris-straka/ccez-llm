@@ -10,11 +10,6 @@ the record). Screenshots the owner attached are in
 
 - Typing `A` to annotate a Japanese sentence does not focus the new
   textbox; the owner has to click into it.
-- Hitting `a` on something still fetching an annotation opens the textbox
-  ("A") version. It should do nothing while the fetch is in flight.
-- If an annotation is loading and the owner hits `A` on it by accident,
-  then Esc right away (without sending anything), the annotation that was
-  loading is removed. The one in flight must survive.
 - In the "A" annotation text bar the text sits too close to the left edge
   when there is little text.
 - Highlight text, the annotate menu button appears, switch chat: the
