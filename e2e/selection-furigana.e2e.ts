@@ -261,7 +261,8 @@ test("right-clicking kanji shows its sentence reading and speaks kana", async ({
 test("back-to-back kanji share one panel with split colors", async ({
 	page
 }) => {
-	await seedChat(page, [{ role: "assistant", content: "一人で行く" }]);
+	// Two words, not one compound: 一人 reads ひとり over both kanji.
+	await seedChat(page, [{ role: "assistant", content: "駅前広場で" }]);
 	await page.goto("/");
 	await expect(
 		page.locator("article.assistant .rendered p").first()
@@ -272,22 +273,22 @@ test("back-to-back kanji share one panel with split colors", async ({
 		const p = document.querySelector("article.assistant .rendered p");
 		const text = p?.firstChild;
 		if (!text) return "";
-		window.getSelection()?.setBaseAndExtent(text, 0, text, 2);
+		window.getSelection()?.setBaseAndExtent(text, 0, text, 4);
 		return window.getSelection()?.toString() ?? "";
 	});
-	expect(selected).toBe("一人");
+	expect(selected).toBe("駅前広場");
 	await clickInsideHighlight(page);
 	const panels = page.locator(".sel-pinyin");
 	await expect(panels.locator(".spr").first()).toBeVisible({
 		timeout: 120_000
 	});
 	// One panel, both furigana, zero kanji — and the boundary splits
-	// by color (いち one color, にん another).
+	// by color (えきまえ one color, ひろば another).
 	await expect(panels).toHaveCount(1);
 	const readings = panels.locator(".srt");
 	expect(await readings.count()).toBe(2);
-	await expect(panels.filter({ hasText: "一" })).toHaveCount(0);
-	await expect(panels.filter({ hasText: "人" })).toHaveCount(0);
+	await expect(panels.filter({ hasText: "駅" })).toHaveCount(0);
+	await expect(panels.filter({ hasText: "広" })).toHaveCount(0);
 	const colors = await readings.evaluateAll((els) =>
 		els.map((el) => getComputedStyle(el).color)
 	);

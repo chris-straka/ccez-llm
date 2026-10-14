@@ -2,7 +2,7 @@ import init, { TokenizerBuilder, loadDictionaryFromBytes } from "lindera-wasm";
 import { unzipSync } from "fflate";
 import { toHiragana } from "wanakana";
 import { appRoot } from "./workerUrl";
-import { rubyHtmlForText, type RubyToken } from "./furiganaRuby";
+import { furiganaLineHtml } from "./furiganaRuby";
 
 /**
  * Furigana conversion off the main thread. Lindera's dictionary build
@@ -95,23 +95,8 @@ function ensureReady(): Promise<Tokenizer> {
 	return ready;
 }
 
-interface LinderaToken {
-	surface?: unknown;
-	details?: unknown;
-}
-
-function toRubyToken(token: LinderaToken): RubyToken {
-	const surface = typeof token.surface === "string" ? token.surface : "";
-	const details: unknown[] = Array.isArray(token.details) ? token.details : [];
-	const seventh = details[7];
-	const reading = typeof seventh === "string" ? seventh : null;
-	return { surface, reading };
-}
-
 async function convert(text: string): Promise<string> {
-	const tokenizer = await ensureReady();
-	const tokens = (tokenizer.tokenize(text) as LinderaToken[]).map(toRubyToken);
-	return rubyHtmlForText(text, tokens, toHiragana);
+	return furiganaLineHtml(await ensureReady(), text, toHiragana);
 }
 
 scope.addEventListener("message", (event: Event) => {

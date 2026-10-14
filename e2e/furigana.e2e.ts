@@ -69,6 +69,27 @@ test.describe("pinning", () => {
 		await expect(body).not.toContainText("**");
 	});
 
+	/** Compounds the best path splits into single kanji read as one word:
+	the worker's N-best lattice gives 一歩 いっぽ, never いち|ほ. */
+	test("furigana reads split compounds whole", async ({ page }) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "新しい一歩を踏み出そう。露軍の攻撃。" }
+		]);
+		await page.goto("/");
+		const body = page.locator("article.assistant .rendered");
+		const aidBtn = page.locator(
+			'article.assistant .actions button:has-text("読み仮名")'
+		);
+		await aidBtn.hover();
+		await aidBtn.click();
+		const ippo = body.locator(".frb", { hasText: "一歩" });
+		await expect(ippo).toHaveCount(1, { timeout: 60_000 });
+		await expect(ippo.locator(".frt")).toHaveText("いっぽ");
+		await expect(
+			body.locator(".frb", { hasText: "露軍" }).locator(".frt")
+		).toHaveText("ろぐん");
+	});
+
 	/** A message with its own Japanese and Chinese sections offers both
 	local aids, furigana first. Kanji alone must not summon pinyin: only a
 	Han-only line counts as Chinese. */
@@ -387,7 +408,8 @@ test.describe("ruby-geometry", () => {
 				css: getComputedStyle(arabic).direction
 			};
 		});
-		expect(dir.attr).toBe("auto");
+		// Blocks take their direction from the majority of letters.
+		expect(dir.attr).toBe("rtl");
 		expect(dir.css).toBe("rtl");
 	});
 
