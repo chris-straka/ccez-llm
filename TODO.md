@@ -13,6 +13,9 @@ they ship — the commit is the record.
 
 ## Open
 
+- Owner feedback batch of 2026-10-13: `PLAN.md` (annotations, selection,
+  speech, chats, layout, news/video). Work rows off there.
+
 - OpenCode Zen outside Android: its API sends no CORS headers, so the
   web build and the desktop webview can't send to it (the model list
   already loads from Rust via `list_models`). Desktop sends from Rust,
