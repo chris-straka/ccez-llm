@@ -110,21 +110,19 @@ export interface EditTargetMessage {
 }
 
 /** `editMessage` outcome for one pencil press. */
-export type EditMessageAction =
-	"ignore-sending" | "ignore-not-user" | "toggle-off" | "open";
+export type EditMessageAction = "ignore-not-user" | "toggle-off" | "open";
 
 /**
- * What opening an in-place edit does. Guard order is the contract: a
- * streaming reply wins over everything (no-op mid-send), then the
- * target must be a user's message, then pressing the already-open
- * message toggles it shut instead of reopening.
+ * What opening an in-place edit does. Guard order is the contract:
+ * the target must be a user's message, then pressing the already-open
+ * message toggles it shut instead of reopening. A reply in flight
+ * never blocks the edit (see editReasks for what saving does then).
  */
 export function editMessageAction(
 	messages: ReadonlyArray<EditTargetMessage>,
 	index: number,
-	facts: { sending: boolean; editingId: unknown }
+	facts: { editingId: unknown }
 ): EditMessageAction {
-	if (facts.sending) return "ignore-sending";
 	const msg = messages[index];
 	if (!msg || msg.role !== "user") return "ignore-not-user";
 	if (
@@ -134,6 +132,27 @@ export function editMessageAction(
 	)
 		return "toggle-off";
 	return "open";
+}
+
+/**
+ * Saving an edit to the question whose reply is still in flight asks
+ * again: the old request answers a question that no longer exists.
+ * Only a real change re-asks, and only for the message right above
+ * the pending reply; any other edit saves in place.
+ */
+export function editReasks(
+	messages: ReadonlyArray<EditTargetMessage>,
+	editedId: unknown,
+	facts: { sending: boolean; changed: boolean }
+): boolean {
+	if (!facts.sending || !facts.changed) return false;
+	const last = messages[messages.length - 1];
+	const asked = messages[messages.length - 2];
+	return (
+		last?.role === "assistant" &&
+		asked?.role === "user" &&
+		asked.id === editedId
+	);
 }
 
 /**

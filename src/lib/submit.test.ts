@@ -4,6 +4,7 @@ import {
 	sendAction,
 	composerLocked,
 	editMessageAction,
+	editReasks,
 	newestUserMessageIndex,
 	commitEditTarget,
 	shouldRumbleOnFirstToken
@@ -196,41 +197,50 @@ describe("sendAction", () => {
 	});
 });
 
+describe("editReasks", () => {
+	const q = { role: "user", id: "q" };
+	const older = { role: "user", id: "o" };
+	const a = { role: "assistant", id: "a" };
+	const pending = { role: "assistant", id: "p" };
+	const live = { sending: true, changed: true };
+
+	it("re-asks when the pending reply's question changes", () => {
+		expect(editReasks([older, a, q, pending], "q", live)).toBe(true);
+	});
+
+	it("saves in place otherwise", () => {
+		expect(editReasks([older, a, q, pending], "o", live)).toBe(false);
+		expect(
+			editReasks([older, a, q, pending], "q", { ...live, changed: false })
+		).toBe(false);
+		expect(
+			editReasks([older, a, q, pending], "q", { ...live, sending: false })
+		).toBe(false);
+	});
+});
+
 describe("editMessageAction", () => {
 	const user = { role: "user", id: "u1" };
 	const assistant = { role: "assistant", id: "a1" };
 
-	it("no-ops mid-send over everything", () => {
-		expect(
-			editMessageAction([user], 0, { sending: true, editingId: null })
-		).toBe("ignore-sending");
-		expect(
-			editMessageAction([user], 0, { sending: true, editingId: "u1" })
-		).toBe("ignore-sending");
-	});
-
 	it("rejects missing and non-user targets", () => {
-		expect(
-			editMessageAction([user], 3, { sending: false, editingId: null })
-		).toBe("ignore-not-user");
-		expect(
-			editMessageAction([assistant], 0, { sending: false, editingId: null })
-		).toBe("ignore-not-user");
+		expect(editMessageAction([user], 3, { editingId: null })).toBe(
+			"ignore-not-user"
+		);
+		expect(editMessageAction([assistant], 0, { editingId: null })).toBe(
+			"ignore-not-user"
+		);
 	});
 
 	it("toggles the already-open message shut", () => {
-		expect(
-			editMessageAction([user], 0, { sending: false, editingId: "u1" })
-		).toBe("toggle-off");
+		expect(editMessageAction([user], 0, { editingId: "u1" })).toBe(
+			"toggle-off"
+		);
 	});
 
 	it("opens any other user message", () => {
-		expect(
-			editMessageAction([user], 0, { sending: false, editingId: null })
-		).toBe("open");
-		expect(
-			editMessageAction([user], 0, { sending: false, editingId: "u9" })
-		).toBe("open");
+		expect(editMessageAction([user], 0, { editingId: null })).toBe("open");
+		expect(editMessageAction([user], 0, { editingId: "u9" })).toBe("open");
 	});
 });
 

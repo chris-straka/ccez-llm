@@ -15,6 +15,8 @@ import {
 	setChatVoice,
 	deleteChat,
 	deleteMessage,
+	restoreDeletedMessages,
+	cancelSend,
 	stageMessage,
 	branchFrom,
 	truncateToMessage,
@@ -812,6 +814,134 @@ describe("chat", () => {
 		expect(activeChat(state).messages.map((m) => m.role)).toEqual([
 			"assistant"
 		]);
+	});
+
+	/** A provider that streams the given tokens, then hangs until aborted. */
+	function hangingAfter(tokens: string[]): ChatProvider {
+		return {
+			id: "hang",
+			async chat(): Promise<ChatResult> {
+				throw new Error("unused");
+			},
+			stream(_m, cb, opts): Promise<ChatResult> {
+				for (const t of tokens) cb.onToken(t);
+				return new Promise<ChatResult>((_resolve, reject) => {
+					opts?.signal?.addEventListener("abort", () =>
+						reject(new DOMException("aborted", "AbortError"))
+					);
+				});
+			}
+		};
+	}
+
+	it("deleting a thinking reply cancels it and leaves nothing to undo", async () => {
+		const { state, store } = stateWith(freshStore());
+		const sending = sendMessage(
+			state,
+			hangingAfter([]),
+			"sys",
+			"hi",
+			{},
+			store
+		);
+		await new Promise((r) => setTimeout(r, 10));
+		expect(isSending(state)).toBe(true);
+		expect(deleteMessage(state, 1, store)).toEqual([]);
+		await sending;
+		expect(isSending(state)).toBe(false);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["hi"]);
+	});
+
+	it("deleting the question of a thinking reply takes the reply along", async () => {
+		const { state, store } = stateWith(freshStore());
+		const sending = sendMessage(
+			state,
+			hangingAfter([]),
+			"sys",
+			"hi",
+			{},
+			store
+		);
+		await new Promise((r) => setTimeout(r, 10));
+		const removed = deleteMessage(state, 0, store);
+		expect(removed.map((r) => r.message.content)).toEqual(["hi"]);
+		await sending;
+		expect(isSending(state)).toBe(false);
+		expect(activeChat(state).messages).toHaveLength(0);
+	});
+
+	it("restores deleted messages where they were", async () => {
+		const { state, store } = stateWith(freshStore());
+		await sendMessage(state, scriptedProvider(["r1"]), "sys", "one", {}, store);
+		await sendMessage(state, scriptedProvider(["r2"]), "sys", "two", {}, store);
+		const removed = deleteMessage(state, 1, store);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"one",
+			"two",
+			"r2"
+		]);
+		expect(restoreDeletedMessages(state, removed, store)).toBe(true);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"one",
+			"r1",
+			"two",
+			"r2"
+		]);
+		// Already back: a second undo of the same entry changes nothing.
+		expect(restoreDeletedMessages(state, removed, store)).toBe(false);
+		// A chat that shrank takes the message at its end.
+		const tail = deleteMessage(state, 3, store);
+		deleteMessage(state, 2, store);
+		restoreDeletedMessages(state, tail, store);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"one",
+			"r1",
+			"r2"
+		]);
+	});
+
+	it("restoring into a deleted chat does nothing", async () => {
+		const { state, store } = stateWith(freshStore());
+		await sendMessage(state, scriptedProvider(["r"]), "sys", "one", {}, store);
+		const removed = deleteMessage(state, 0, store);
+		deleteChat(state, state.activeChatId, store);
+		expect(restoreDeletedMessages(state, removed, store)).toBe(false);
+	});
+
+	it("a cancelled reply keeps its partial text without an error", async () => {
+		const { state, store } = stateWith(freshStore());
+		const sending = sendMessage(
+			state,
+			hangingAfter(["Partial ", "answer"]),
+			"sys",
+			"hi",
+			{},
+			store
+		);
+		await new Promise((r) => setTimeout(r, 10));
+		expect(cancelSend(state, state.activeChatId)).toBe(true);
+		await sending;
+		const reply = activeChat(state).messages[1];
+		expect(reply?.content).toBe("Partial answer");
+		expect(reply?.error).toBeNull();
+		expect(isSending(state)).toBe(false);
+	});
+
+	it("a cancelled reply that never started leaves no bubble", async () => {
+		const { state, store } = stateWith(freshStore());
+		const sending = sendMessage(
+			state,
+			hangingAfter([]),
+			"sys",
+			"hi",
+			{},
+			store
+		);
+		await new Promise((r) => setTimeout(r, 10));
+		cancelSend(state, state.activeChatId);
+		await sending;
+		expect(activeChat(state).messages.map((m) => m.role)).toEqual(["user"]);
+		expect(cancelSend(state, state.activeChatId)).toBe(false);
 	});
 
 	it("exposes user-turn waypoints", async () => {

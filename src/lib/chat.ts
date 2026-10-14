@@ -430,6 +430,8 @@ export function setChatVoice(
 
 /** Abort controllers for in-flight sends, keyed by owning chat (see abortSend). */
 const inflightByChat = new Map<ChatId, AbortController>();
+/** Sends the user stopped on purpose: they settle without an error. */
+const cancelledSends = new WeakSet<AbortController>();
 
 /**
  * Abort in-flight sends: one chat's when given an id, all of them
@@ -575,24 +577,100 @@ export function deleteChat(
 	persistChats(state, store);
 }
 
+/** A message taken out of a chat, kept so Cmd+Z can put it back. */
+export interface DeletedMessage {
+	chatId: ChatId;
+	index: number;
+	message: ChatMsg;
+}
+
+/**
+ * Delete one message from the active chat. Returns what left, oldest
+ * first, so the caller can offer an undo. A reply still thinking goes
+ * with its request: deleting the placeholder (or the question it
+ * answers, before any token landed) cancels the send and removes
+ * both. An empty placeholder is never returned (nothing to restore).
+ */
 export function deleteMessage(
 	state: ChatState,
 	index: number,
 	store?: KeyValueStore
-): void {
+): DeletedMessage[] {
 	const chat = activeChat(state);
-	// Removing the streaming placeholder mid-flight strands it the same
-	// way dropping the chat does — kill the send with it.
 	const target = chat.messages[index];
-	if (
-		isSending(state) &&
-		target?.role === "assistant" &&
-		index === chat.messages.length - 1
-	) {
+	if (!target) return [];
+	const lastIndex = chat.messages.length - 1;
+	const last = chat.messages[lastIndex];
+	const live = isSending(state, chat.id) && last?.role === "assistant";
+	const thinking = live && !state.replyStartedChatIds.includes(chat.id);
+	let doomed = new Set([index]);
+	if (live && index === lastIndex) {
+		// Removing the streaming placeholder mid-flight strands it the
+		// same way dropping the chat does: kill the send with it.
 		abortSend(chat.id);
+	} else if (thinking && index === lastIndex - 1 && target.role === "user") {
+		// The question whose answer has not started: its request is
+		// moot, so the placeholder and the send go too.
+		abortSend(chat.id);
+		doomed = new Set([index, lastIndex]);
 	}
-	chat.messages = chat.messages.filter((_, i) => i !== index);
+	const removed: DeletedMessage[] = [];
+	chat.messages.forEach((m, i) => {
+		if (!doomed.has(i)) return;
+		if (m.role === "assistant" && m.content === "" && !m.error) return;
+		removed.push({ chatId: chat.id, index: i, message: m });
+	});
+	chat.messages = chat.messages.filter((_, i) => !doomed.has(i));
 	persistChats(state, store);
+	return removed;
+}
+
+/**
+ * Put deleted messages back where they were (Cmd+Z). Indexes are the
+ * positions they held, oldest first; a chat that shrank since takes
+ * them at its end. A deleted chat restores nothing. Returns whether
+ * anything came back.
+ */
+export function restoreDeletedMessages(
+	state: ChatState,
+	entries: DeletedMessage[],
+	store?: KeyValueStore
+): boolean {
+	const first = entries[0];
+	if (!first) return false;
+	const target = state.chats.find((c) => c.id === first.chatId);
+	if (!target) return false;
+	const next = [...target.messages];
+	// A send in flight keeps its placeholder last: restored messages
+	// land above it.
+	const live =
+		state.sendingChatIds.includes(target.id) &&
+		next[next.length - 1]?.role === "assistant";
+	const ceiling = live ? next.length - 1 : next.length;
+	let offset = 0;
+	for (const entry of entries) {
+		if (next.some((m) => m.id === entry.message.id)) continue;
+		const at = Math.min(entry.index, ceiling + offset);
+		next.splice(at, 0, entry.message);
+		offset += 1;
+	}
+	if (offset === 0) return false;
+	target.messages = next;
+	persistChats(state, store);
+	return true;
+}
+
+/**
+ * Stop a chat's reply on request (hold the send button). The partial
+ * text stays as an ordinary message; a reply that never started
+ * leaves no empty bubble behind. No-op when the chat is not sending.
+ */
+export function cancelSend(state: ChatState, chatId: ChatId): boolean {
+	if (!state.sendingChatIds.includes(chatId)) return false;
+	const controller = inflightByChat.get(chatId);
+	if (controller) cancelledSends.add(controller);
+	abortSend(chatId);
+	return controller !== undefined;
 }
 
 /**
@@ -1407,10 +1485,18 @@ export async function streamAssistantReply(
 		);
 		replaceReply({ content: result.content, usage: result.usage });
 	} catch (error) {
-		replaceReply({
-			content: streamed,
-			error: error instanceof Error ? error.message : String(error)
-		});
+		if (cancelledSends.has(controller)) {
+			// Stopped by the user: keep what streamed as a plain reply,
+			// or drop the placeholder when nothing did.
+			const target = state.chats.find((c) => c.id === chatId);
+			if (target && streamed === "")
+				target.messages = target.messages.filter((m) => m.id !== replyId);
+			else replaceReply({ content: streamed });
+		} else
+			replaceReply({
+				content: streamed,
+				error: error instanceof Error ? error.message : String(error)
+			});
 	} finally {
 		if (inflightByChat.get(chatId) === controller)
 			inflightByChat.delete(chatId);

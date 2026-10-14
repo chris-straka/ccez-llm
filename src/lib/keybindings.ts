@@ -747,7 +747,8 @@ export type ChromeChord =
 	| "prompt-width"
 	| "quick-lang"
 	| "delete-badge"
-	| "delete-message";
+	| "delete-message"
+	| "undo-delete";
 
 /** Digit order for the Cmd+1..0 quick-language chords (see `quickLangIndexForKey`). */
 const QUICK_LANG_KEYS = "1234567890";
@@ -806,6 +807,10 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		return "toggle-settings";
 	}
 	if (cmd && !facts.altKey && !facts.shiftKey) {
+		// ⌘Z / Ctrl+Z outside any text field brings back deleted
+		// messages; fields and the prompt keep their own undo.
+		if (facts.code === "KeyZ" && !facts.inEditor && !facts.inField)
+			return "undo-delete";
 		// Physical key codes: shifted brackets report layout-dependent
 		// `key` values ("{" / "}" on US), so the shift group above
 		// matches the code instead.
@@ -1150,4 +1155,30 @@ export function deleteScope(facts: DeleteKeyFacts): DeleteScope | null {
 	if ((facts.hoverBadgeId ?? null) !== null) return "badge";
 	if (!facts.hovered) return null;
 	return "message";
+}
+
+/** Facts the Shift chat-counter peek reads (keydown and keyup alike). */
+export interface CounterPeekFacts extends KeyModifiers {
+	type: "keydown" | "keyup";
+	key: string;
+	repeat: boolean;
+	/** Typing target (the prompt, a field): Shift there is a capital. */
+	inEditable: boolean;
+}
+
+/**
+ * Shift held on its own outside any text field peeks the chat counter
+ * ("2 / 5", top right). "arm" starts the short hold before it shows;
+ * Shift's release, or any other key (a Shift chord), hides it. Null
+ * leaves it as it is (auto-repeat of the held Shift).
+ */
+export function counterPeekStep(
+	facts: CounterPeekFacts
+): "arm" | "hide" | null {
+	if (facts.key !== "Shift") return facts.type === "keydown" ? "hide" : null;
+	if (facts.type === "keyup") return "hide";
+	if (facts.repeat) return null;
+	if (facts.metaKey || facts.ctrlKey || facts.altKey || facts.inEditable)
+		return "hide";
+	return "arm";
 }

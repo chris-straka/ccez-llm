@@ -10,7 +10,7 @@ import {
 	idleSliderToSetting,
 	isPromptIdle,
 	pointInRect,
-	sendHoldArmed,
+	sendHoldAction,
 	gutterSide,
 	rowWorkRunning,
 	messageActionsTapAllowed,
@@ -134,11 +134,25 @@ describe("send-button hold geometry", () => {
 		expect(pointInRect(15, 35, undefined)).toBe(false);
 	});
 
-	it("arms only on a truly empty composer with no owner", () => {
-		expect(sendHoldArmed(false, false, true)).toBe(true);
-		expect(sendHoldArmed(true, false, true)).toBe(false);
-		expect(sendHoldArmed(false, true, true)).toBe(false);
-		expect(sendHoldArmed(false, false, false)).toBe(false);
+	it("stops a live reply, else swaps on a truly empty composer", () => {
+		const idle = {
+			timerRunning: false,
+			promptNoteEditing: false,
+			composerEmpty: true,
+			replyLive: false
+		};
+		expect(sendHoldAction(idle)).toBe("swap-lang");
+		expect(sendHoldAction({ ...idle, timerRunning: true })).toBeNull();
+		expect(sendHoldAction({ ...idle, promptNoteEditing: true })).toBeNull();
+		expect(sendHoldAction({ ...idle, composerEmpty: false })).toBeNull();
+		// A reply in flight: the hold stops it, unsent text or not.
+		expect(sendHoldAction({ ...idle, replyLive: true })).toBe("stop-reply");
+		expect(
+			sendHoldAction({ ...idle, replyLive: true, composerEmpty: false })
+		).toBe("stop-reply");
+		expect(
+			sendHoldAction({ ...idle, replyLive: true, timerRunning: true })
+		).toBeNull();
 	});
 });
 

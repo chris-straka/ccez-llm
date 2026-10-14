@@ -36,7 +36,8 @@ import {
 	type ShortcutsFilterFacts,
 	type SidebarListFacts,
 	type SpaceKeyFacts,
-	sidebarSpeakTarget
+	sidebarSpeakTarget,
+	counterPeekStep
 } from "./keybindings";
 
 const msgBase: MessageKeyFacts = {
@@ -1122,6 +1123,16 @@ const chromeBase: ChromeChordFacts = {
 };
 
 describe("chromeChord", () => {
+	it("⌘Z outside fields undoes a message delete", () => {
+		const z = { ...chromeBase, key: "z", code: "KeyZ" };
+		expect(chromeChord(z)).toBe("undo-delete");
+		expect(chromeChord({ ...z, inShell: false })).toBe("undo-delete");
+		expect(chromeChord({ ...z, inEditor: true })).toBeNull();
+		expect(chromeChord({ ...z, inField: true })).toBeNull();
+		// Redo spellings stay free.
+		expect(chromeChord({ ...z, shiftKey: true })).not.toBe("undo-delete");
+	});
+
 	it("reads the same token across spellings", () => {
 		// The browser keeps the panel spellings (the shell spends
 		// ⇧⌘[ / ⇧⌘] on the prompt width instead — see below).
@@ -1733,5 +1744,34 @@ describe("sidebarSpeakTarget", () => {
 		expect(sidebarSpeakTarget({ ...row, metaKey: true })).toBeNull();
 		expect(sidebarSpeakTarget({ ...row, listOpen: false })).toBeNull();
 		expect(sidebarSpeakTarget({ ...row, inField: true })).toBeNull();
+	});
+});
+
+describe("counterPeekStep", () => {
+	const shift = {
+		type: "keydown" as const,
+		key: "Shift",
+		repeat: false,
+		metaKey: false,
+		ctrlKey: false,
+		altKey: false,
+		shiftKey: true,
+		inEditable: false
+	};
+
+	it("arms on a lone Shift outside text fields", () => {
+		expect(counterPeekStep(shift)).toBe("arm");
+		expect(counterPeekStep({ ...shift, repeat: true })).toBeNull();
+	});
+
+	it("never arms while typing or inside a chord", () => {
+		expect(counterPeekStep({ ...shift, inEditable: true })).toBe("hide");
+		expect(counterPeekStep({ ...shift, metaKey: true })).toBe("hide");
+	});
+
+	it("hides on release and on any other key", () => {
+		expect(counterPeekStep({ ...shift, type: "keyup" })).toBe("hide");
+		expect(counterPeekStep({ ...shift, key: "D" })).toBe("hide");
+		expect(counterPeekStep({ ...shift, type: "keyup", key: "D" })).toBeNull();
 	});
 });

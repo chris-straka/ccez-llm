@@ -15,6 +15,8 @@ import {
 	shiftKeyLabel,
 	edgeSwipeTarget,
 	contentSwipeTarget,
+	holdSwipeOpensChats,
+	HOLD_SWIPE_MS,
 	messageFoldSwipe,
 	visibleProviderIds,
 	stepCyclicId,
@@ -271,6 +273,26 @@ describe("edgeSwipeTarget", () => {
 		expect(edgeSwipeTarget(W - 60, 600, W - 200, 596, W, 48, 64)).toBe(
 			"settings"
 		);
+	});
+});
+
+describe("holdSwipeOpensChats", () => {
+	const start = { x: 100, y: 500, at: 1_000 };
+	const rested = 1_000 + HOLD_SWIPE_MS;
+
+	it("opens after a rest, then a rightward drag", () => {
+		expect(holdSwipeOpensChats(start, rested, 160, 510)).toBe(true);
+	});
+
+	it("needs the rest, the distance, and a mostly-sideways drag", () => {
+		// A plain swipe (left its point at once) stays a swipe.
+		expect(holdSwipeOpensChats(start, 1_050, 200, 500)).toBe(false);
+		// Still resting.
+		expect(holdSwipeOpensChats(start, null, 200, 500)).toBe(false);
+		expect(holdSwipeOpensChats(start, rested, 130, 500)).toBe(false);
+		expect(holdSwipeOpensChats(start, rested, 160, 600)).toBe(false);
+		// Leftward never opens chats.
+		expect(holdSwipeOpensChats(start, rested, 30, 500)).toBe(false);
 	});
 });
 

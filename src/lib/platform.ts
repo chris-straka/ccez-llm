@@ -405,6 +405,30 @@ export function contentSwipeTarget(
 	return dx > 0 ? "chats" : "settings";
 }
 
+/** How long a finger rests before its drag counts as hold-then-swipe. */
+export const HOLD_SWIPE_MS = 350;
+
+/**
+ * Hold-then-swipe (phone only): a finger that rested in place, then
+ * drags right while still down, opens the chats list on the spot —
+ * no lift needed. `leftAt` is when the finger first travelled off
+ * its press point (null while it still rests). Callers gate this on
+ * the Android UA and a clean start (no field, action row, code, or
+ * chip rail).
+ */
+export function holdSwipeOpensChats(
+	start: { x: number; y: number; at: number },
+	leftAt: number | null,
+	x: number,
+	y: number,
+	minDistance = 48
+): boolean {
+	if (leftAt === null || leftAt - start.at < HOLD_SWIPE_MS) return false;
+	const dx = x - start.x;
+	const dy = y - start.y;
+	return dx >= minDistance && Math.abs(dy) < dx;
+}
+
 /**
  * Message fold stroke (phone only): a mostly-horizontal stroke starting
  * on a message folds it — either direction, so rightward message
