@@ -13,6 +13,8 @@ import {
 	applyMarks,
 	quoteFragmentText,
 	quoteTextNodes,
+	quoteText,
+	quoteTextOffset,
 	equationBodyOf,
 	equationBodyRange,
 	trimParagraphTerminator,
@@ -47,6 +49,22 @@ describe("quoteFragmentText", () => {
 			)
 		);
 		expect(text).toBe("Kyoto in two sentences");
+	});
+
+	it("block context and caret offsets skip badges and readings", () => {
+		// The context a highlight speaks from: a badge number before
+		// すり合わせ would otherwise convert and read aloud.
+		const block = document.createElement("p");
+		block.innerHTML =
+			'綿密な<button data-ann-badge="a1">1</button>すり' +
+			'<span class="frb">合<span class="frt">あ</span></span>わせを欠いた';
+		expect(quoteText(block)).toBe("綿密なすり合わせを欠いた");
+		const suri = block.childNodes[2];
+		if (!suri) throw new Error("no text after the badge");
+		expect(quoteTextOffset(block, suri, 0)).toBe(3);
+		const badgeText = block.querySelector("button")?.firstChild;
+		if (!badgeText) throw new Error("no badge text");
+		expect(quoteTextOffset(block, badgeText, 0)).toBeNull();
 	});
 
 	it("skips math chrome buttons when collecting quotable text", () => {

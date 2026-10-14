@@ -461,6 +461,33 @@ export function quoteTextNodes(root: Node): Text[] {
 	return nodes;
 }
 /**
+ * Message text of a rendered block, chrome out (same nodes as
+ * quoteTextNodes): the sentence context a highlight speaks and reads
+ * from. Plain textContent puts a badge's number in front of the next
+ * word ("な1すり合わせ"), and the reading converter voices it.
+ */
+export function quoteText(root: Node): string {
+	return quoteTextNodes(root)
+		.map((node) => node.textContent ?? "")
+		.join("");
+}
+/**
+ * Offset of a caret (text node, offset) in quoteText(root), or null
+ * when the node is chrome or outside the block.
+ */
+export function quoteTextOffset(
+	root: Node,
+	node: Node,
+	offset: number
+): number | null {
+	let at = 0;
+	for (const text of quoteTextNodes(root)) {
+		if (text === node) return at + Math.min(offset, text.length);
+		at += text.length;
+	}
+	return null;
+}
+/**
  * Numbered badge on the first occurrence of each quoted span, plus the
  * yellow wash on the one annotation whose comment box is open. Badges
  * float above-right of their quote on a positioned anchor (never inline,

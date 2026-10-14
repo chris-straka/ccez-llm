@@ -21,6 +21,7 @@ import {
 	equationBodyRange,
 	quoteFragmentText,
 	quoteRange,
+	quoteText,
 	quoteTextNodes
 } from "./annotations-stamp";
 import {
@@ -295,7 +296,7 @@ export class AnnotateMode {
 		if (!quote) return null;
 		const story = this.storyOfHeadline(headline);
 		if (!story) return null;
-		const context = (headline.textContent ?? "").slice(0, 2000);
+		const context = quoteText(headline).slice(0, 2000);
 		return { quote, context, messageId: null, story };
 	}
 
@@ -329,17 +330,15 @@ export class AnnotateMode {
 		if (!messageId) return null;
 		// The paragraph holding the highlight: a lone Han char can
 		// never carry kana itself, so Inspect guesses its locale from
-		// this text instead. Ruby readings ride along in textContent,
-		// but furigana only annotates Japanese lines, so the guess
-		// still points the right way.
+		// this text instead. Badge numbers and ruby readings stay out:
+		// speech converts its kana from this sentence, and a badge's
+		// "1" before the highlight would be read aloud with it.
 		const anchorEl =
 			selection.anchorNode instanceof Element
 				? selection.anchorNode
 				: selection.anchorNode?.parentElement;
-		const context = (anchorEl?.closest("p, li")?.textContent ?? "").slice(
-			0,
-			2000
-		);
+		const block = anchorEl?.closest("p, li");
+		const context = (block ? quoteText(block) : "").slice(0, 2000);
 		return { quote, context, messageId };
 	}
 

@@ -490,6 +490,43 @@ async function selectQuote(
 	return point;
 }
 
+const JA_NEWS =
+	"トランプ米大統領が11日に発表した「エネルギー停戦」合意は、紛争当事者との綿密なすり合わせを欠いた独断的な宣言であった疑いが深まっている。";
+
+test("right-click a highlight beside an annotation badge reads only the highlight", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: JA_NEWS }]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-ja",
+						messageId: "e2e-m0",
+						quote: "綿密な",
+						comment: ""
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 60_000
+	});
+	const at = await selectQuote(page, "すり合わせ");
+	await page.mouse.click(at.x, at.y, { button: "right" });
+	await expect
+		.poll(() => spoken(page), { timeout: 30_000 })
+		.not.toHaveLength(0);
+	// The badge's number never reaches the voice: the sentence-correct
+	// kana covers exactly the highlight.
+	expect(await spoken(page)).toEqual(["すりあわせ"]);
+	expect(await spokenLang(page)).toEqual(["ja-JP"]);
+});
+
 test("right-click the Japanese half of a mixed bullet reads only the highlight", async ({
 	page
 }) => {

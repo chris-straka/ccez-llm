@@ -280,7 +280,9 @@
 		unwrapMark,
 		invalidateWashPaint,
 		lockSelectionToMessage,
+		quoteText,
 		quoteTextNodes,
+		quoteTextOffset,
 		repaintLiveWash,
 		snapSelectionToWordEdges
 	} from "$lib/annotations-stamp";
@@ -1810,18 +1812,19 @@
 			const block = anchor?.closest("p, li");
 			if (block && liveSel && liveSel.rangeCount > 0) {
 				const range = liveSel.getRangeAt(0);
-				const at = caretOffsetInBlock(
-					document,
+				// Chrome-free text, like the converted sentence: a
+				// badge number in the left context never matches it.
+				const at = quoteTextOffset(
 					block,
 					range.startContainer,
 					range.startOffset
 				);
-				const blockText = block.textContent ?? "";
-				qStart = quoteStartForContext(
-					plain,
-					quoted.quote,
-					blockText.slice(Math.max(0, at - 24), at)
-				);
+				if (at !== null)
+					qStart = quoteStartForContext(
+						plain,
+						quoted.quote,
+						quoteText(block).slice(Math.max(0, at - 24), at)
+					);
 			}
 		} catch {
 			// Document moved under the highlight: first match below.
