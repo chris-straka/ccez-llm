@@ -232,6 +232,10 @@ export class AnnotationDrafts {
 		// (its reply still lands on the same id).
 		if (this.asking.has(ann.id)) return;
 		this.asking.add(ann.id);
+		// The chat the ask fired from: the reply may land after a
+		// switch, and it belongs to that chat's drafts, never the
+		// one on screen.
+		const chatId = this.deps.getActiveChatId();
 		try {
 			const provider = await this.deps.resolveProvider();
 			if (!provider) {
@@ -251,14 +255,15 @@ export class AnnotationDrafts {
 				context: this.deps.answerContextFor(ann),
 				...(ann.brief ? { brief: true } : {})
 			});
-			this.list = attachAnnotationAnswer(this.list, ann.id, answer);
+			this.attachAnswer(chatId, ann.id, answer);
 			// Story notes have no badge to turn orange or pin from:
 			// an answered one joins the review dock directly (and
 			// rides the launched session as context), and its card
 			// opens while the story is still on screen (resume
 			// scans for long-closed panels attach silently).
 			if (!ann.messageId && ann.story && answer.trim()) {
-				this.list = setPromptPinned(this.list, ann.id, true);
+				if (chatId === this.deps.getActiveChatId())
+					this.list = setPromptPinned(this.list, ann.id, true);
 				if (this.deps.isNewsStoryOpen(ann.story.link))
 					this.deps.openBadge(ann.id);
 			}
@@ -270,6 +275,31 @@ export class AnnotationDrafts {
 		} finally {
 			this.asking.delete(ann.id);
 		}
+	}
+
+	/**
+	 * Land an answer on its chat: the live list while that chat is
+	 * still open (and its stashed filed list mid-edit), else the
+	 * chat's stored drafts — browsing away never loses a reply, and
+	 * the next restore shows the badge orange. A chat dropped
+	 * meanwhile keeps nothing (the save prunes unknown ids).
+	 */
+	private attachAnswer(chatId: ChatId, id: AnnotationId, answer: string): void {
+		if (chatId === this.deps.getActiveChatId()) {
+			this.list = attachAnnotationAnswer(this.list, id, answer);
+			if (this.stash && this.stash.chatId === chatId)
+				this.stash.list = attachAnnotationAnswer(this.stash.list, id, answer);
+			return;
+		}
+		if (this.stash && this.stash.chatId === chatId)
+			this.stash.list = attachAnnotationAnswer(this.stash.list, id, answer);
+		const stored = loadDraftAnnotations(chatId);
+		if (!stored.some((a) => a.id === id)) return;
+		saveDraftAnnotations(
+			chatId,
+			attachAnnotationAnswer(stored, id, answer),
+			this.deps.getChatIds()
+		);
 	}
 
 	/**

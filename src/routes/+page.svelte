@@ -2908,9 +2908,10 @@
 			drafts.fileChat(from);
 			selectChat(chatState, id);
 			drafts.restoreChat(id);
-			// Answers lost crossing chats (or a restart) refire here:
-			// inflight asks stay single via the asking set, answered
-			// drafts never refire.
+			// Answers lost to a restart refire here (a chat switch
+			// loses none: inflight asks land in their own chat's
+			// drafts); the asking set keeps inflight asks single,
+			// answered drafts never refire.
 			drafts.resumeUnanswered();
 			restoreChatScroll(id);
 		};

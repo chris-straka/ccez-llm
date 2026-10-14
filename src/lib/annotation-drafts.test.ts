@@ -242,6 +242,62 @@ describe("ask flow", () => {
 		expect(drafts.list.find((a) => a.id === "b2")?.answer).toBe("réponse");
 	});
 
+	it("an answer landing after a chat switch files into its own chat", async () => {
+		let release: (() => void) | null = null;
+		const { drafts, setActive, setChats } = harness({
+			chats: ["c1", "c2"],
+			answer: () =>
+				new Promise<string>((resolve) => {
+					release = () => resolve("late");
+				})
+		});
+		setChats(["c1", "c2"]);
+		const q = note();
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(release).not.toBeNull());
+		// Leave for c2 the way the page does: file, switch, restore.
+		drafts.fileChat("c1" as ChatId);
+		setActive("c2");
+		drafts.restoreChat("c2");
+		expect(drafts.list).toEqual([]);
+		release!();
+		await asked;
+		// c2's live list stays clean; c1's stored draft carries the answer.
+		expect(drafts.list).toEqual([]);
+		expect(loadDraftAnnotations("c1")[0]?.answer).toBe("late");
+		setActive("c1");
+		drafts.restoreChat("c1");
+		expect(drafts.list[0]?.answer).toBe("late");
+		// Nothing left to resume: the answer landed.
+		drafts.resumeUnanswered();
+		await new Promise((r) => setTimeout(r, 10));
+		expect(drafts.list[0]?.answer).toBe("late");
+	});
+
+	it("a late answer for a dropped chat is discarded", async () => {
+		let release: (() => void) | null = null;
+		const { drafts, setActive, setChats } = harness({
+			chats: ["c1", "c2"],
+			answer: () =>
+				new Promise<string>((resolve) => {
+					release = () => resolve("late");
+				})
+		});
+		const q = note();
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(release).not.toBeNull());
+		setChats(["c2"]);
+		drafts.discardChat("c1" as ChatId, ["c2" as ChatId]);
+		setActive("c2");
+		drafts.restoreChat("c2");
+		release!();
+		await asked;
+		expect(loadDraftAnnotations("c1")).toEqual([]);
+		expect(drafts.list).toEqual([]);
+	});
+
 	it("keyless resumes stay silent but explicit asks banner", async () => {
 		const { drafts, calls } = harness({ provider: null });
 		const q = note();
