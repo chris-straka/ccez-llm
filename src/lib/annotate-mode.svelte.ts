@@ -15,6 +15,7 @@ import {
 } from "./quote-match";
 import { selMenuPlacement } from "./sel-geometry";
 import { selMenuWidthEstimate } from "./selSlices";
+import { scopePlainText } from "./selTint";
 import { messageIndexFromId, type ChatMsg, type ChatMsgId } from "./chat";
 import {
 	equationBodyOf,
@@ -329,17 +330,16 @@ export class AnnotateMode {
 		if (!messageId) return null;
 		// The paragraph holding the highlight: a lone Han char can
 		// never carry kana itself, so Inspect guesses its locale from
-		// this text instead. Ruby readings ride along in textContent,
-		// but furigana only annotates Japanese lines, so the guess
-		// still points the right way.
+		// this text instead. Chrome stays out (badge digits, ruby
+		// readings): the voice and the furigana resolve against this
+		// text, and a badge's number beside the quote would be read
+		// out and shift every offset.
 		const anchorEl =
 			selection.anchorNode instanceof Element
 				? selection.anchorNode
 				: selection.anchorNode?.parentElement;
-		const context = (anchorEl?.closest("p, li")?.textContent ?? "").slice(
-			0,
-			2000
-		);
+		const block = anchorEl?.closest("p, li") ?? null;
+		const context = (block ? scopePlainText(block) : "").slice(0, 2000);
 		return { quote, context, messageId };
 	}
 

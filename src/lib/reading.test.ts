@@ -795,6 +795,29 @@ describe("speechKanaForQuote", () => {
 		);
 	});
 
+	it("starts exactly at the highlight inside a reading-less run", () => {
+		// A gloss bullet: the English lead and その share one
+		// reading-less run with the quote's first characters, and
+		// speech must begin at the highlight, never at the run.
+		const glossRuns = annotatedRunsWithOffsets(
+			'This book - その<span class="frb">本<span class="frt">ほん</span></span>は<span class="frb">私<span class="frt">わたし</span></span>の'
+		)!;
+		const glossPlain = glossRuns.map((r) => r.text).join("");
+		expect(speechKanaForQuote(glossRuns, glossPlain, "その本は私の")).toBe(
+			"そのほんはわたしの"
+		);
+		expect(speechKanaForQuote(glossRuns, glossPlain, "本は")).toBe("ほんは");
+	});
+
+	it("sheds an all-kana head inside one run", () => {
+		const ochaRuns = annotatedRunsWithOffsets(
+			'<span class="frb">お茶<span class="frt">おちゃ</span></span>を'
+		)!;
+		const ochaPlain = ochaRuns.map((r) => r.text).join("");
+		expect(speechKanaForQuote(ochaRuns, ochaPlain, "茶")).toBe("ちゃ");
+		expect(speechKanaForQuote(ochaRuns, ochaPlain, "茶を")).toBe("ちゃを");
+	});
+
 	it("keeps the full reading past a non-kana remainder", () => {
 		const kyouRuns = annotatedRunsWithOffsets(
 			'<span class="frb">今日<span class="frt">きょう</span></span>は'

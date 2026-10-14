@@ -1297,14 +1297,17 @@ export function sliceRunsForQuote(
 
 /**
  * Spoken kana for a highlight, for speech assembly only. Speaks
- * exactly the selection: slice readings joined, with one trim — a
- * highlight ending strictly inside a run whose remainder is all
- * kana sheds that okurigana tail from the reading (心地 cut from
- * 心地よい speaks ここち, not ここちよい). Nothing crosses a run
- * boundary, so trailing particles never ride along (味覚が speaks
- * みかく). A highlight ending mid-run on non-kana keeps the full
- * token reading (best effort: mora alignment is unknowable). Popup
- * ruby and tints keep the untrimmed slice. Pure.
+ * exactly the selection: slice readings joined, trimmed at both
+ * ends — a highlight ending strictly inside a run whose remainder
+ * is all kana sheds that okurigana tail from the reading (心地 cut
+ * from 心地よい speaks ここち, not ここちよい), and one starting
+ * inside a run sheds the uncovered head the same way (a reading-less
+ * run contributes only its covered text, so "This book - その本"
+ * never rides in front of その). Nothing crosses a run boundary, so
+ * trailing particles never ride along (味覚が speaks みかく). A cut
+ * on non-kana keeps the full token reading (best effort: mora
+ * alignment is unknowable). Popup ruby and tints keep the untrimmed
+ * slice. Pure.
  */
 export function speechKanaForQuote(
 	sentenceRuns: AnnotatedRunWithOffsets[] | null,
@@ -1321,35 +1324,30 @@ export function speechKanaForQuote(
 			: sentencePlain.indexOf(quote);
 	if (qStart < 0) return null;
 	const qEnd = qStart + quote.length;
+	const allKana = (text: string): boolean =>
+		text !== "" && /^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(text);
 	let kana = "";
 	for (const run of sentenceRuns) {
 		if (run.end <= qStart) continue;
 		if (run.start >= qEnd) break;
-		const reading = run.reading ?? run.text;
-		if (run.end <= qEnd) {
-			kana += reading;
+		const from = Math.max(run.start, qStart) - run.start;
+		const to = Math.min(run.end, qEnd) - run.start;
+		if (run.reading === null) {
+			kana += run.text.slice(from, to);
 			continue;
 		}
-		// The quote ends strictly inside this run: a reading-less
-		// run contributes only its covered text; a reading-bearing
-		// one sheds an all-kana remainder (okurigana) from the
-		// reading.
-		const cut = qEnd - run.start;
-		if (run.reading === null) {
-			kana += run.text.slice(0, cut);
-			break;
-		}
-		const rest = run.text.slice(cut);
-		if (
-			rest !== "" &&
-			/^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(rest) &&
-			reading.length >= rest.length
-		) {
-			kana += reading.slice(0, reading.length - rest.length);
-		} else {
-			kana += reading;
-		}
-		break;
+		let reading = run.reading;
+		// The quote starts strictly inside this run: an all-kana
+		// uncovered head comes off the front of the reading.
+		const head = run.text.slice(0, from);
+		if (allKana(head) && reading.length >= head.length)
+			reading = reading.slice(head.length);
+		// The quote ends strictly inside this run: an all-kana
+		// remainder (okurigana) comes off the end.
+		const rest = run.text.slice(to);
+		if (allKana(rest) && reading.length >= rest.length)
+			reading = reading.slice(0, reading.length - rest.length);
+		kana += reading;
 	}
 	return kana === "" ? null : kana;
 }

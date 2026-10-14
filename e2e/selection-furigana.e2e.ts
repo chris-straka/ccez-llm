@@ -501,3 +501,89 @@ test("pinned panels re-anchor past highlight death on scroll", async ({
 	expect(await panels.count()).toBeGreaterThanOrEqual(3);
 	await expect(page.locator(".ann-answer")).toBeVisible();
 });
+
+/** A highlight that starts mid-run reads from the highlight, never
+from the run: the English lead of a gloss bullet shares one
+reading-less run with the first kana of the Japanese half, and a
+right-click inside the (wrapped) highlight used to read the whole
+bullet in the Japanese voice. */
+test("right-click inside a wrapped gloss highlight reads only the highlight", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content:
+				"Examples:\n\n- She's changed a lot - 彼女はすごく変わった\n- This book changed my life - その本は私の人生を変えた\n- change your mind - 考えを変える"
+		}
+	]);
+	await page.setViewportSize({ width: 380, height: 700 });
+	await page.goto("/");
+	await expect(page.locator("article.assistant li").nth(1)).toBeVisible({
+		timeout: 60_000
+	});
+	const selected = await page.evaluate(() => {
+		const li = document.querySelectorAll("article.assistant .rendered li")[1];
+		const text = li?.firstChild;
+		if (!(text instanceof Text)) return "";
+		const i = text.data.indexOf("その本");
+		window.getSelection()?.setBaseAndExtent(text, i, text, text.data.length);
+		return window.getSelection()?.toString() ?? "";
+	});
+	expect(selected).toBe("その本は私の人生を変えた");
+	// Inside the highlight, on its second line.
+	const rects = await page.evaluate(() =>
+		[...(window.getSelection()?.getRangeAt(0).getClientRects() ?? [])].map(
+			(r) => ({ x: r.left, y: r.top, w: r.width, h: r.height })
+		)
+	);
+	expect(rects.length).toBeGreaterThan(1);
+	const last = rects[rects.length - 1]!;
+	await page.mouse.click(last.x + last.w / 2, last.y + last.h / 2, {
+		button: "right"
+	});
+	await expect
+		.poll(() => spoken(page), { timeout: 120_000 })
+		.toEqual(["そのほんはわたしのじんせいをかえた"]);
+});
+
+/** A badge beside the highlight stays out of the reading: its
+number is chrome, never context (right-clicking すり合わせ next to
+badge 4 read "ichi" first). */
+test("a neighbouring badge number never reaches the reading", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "夜は日記を書きます。" }
+	]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "日記");
+	await page.keyboard.press("a");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 10_000
+	});
+	await page.evaluate(() =>
+		(window as unknown as { __spoken: string[] }).__spoken.splice(0)
+	);
+	// Highlight the word right after the badge and read it.
+	const selected = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const walker = document.createTreeWalker(p!, NodeFilter.SHOW_TEXT);
+		let node: Node | null;
+		while ((node = walker.nextNode())) {
+			const i = (node.textContent ?? "").indexOf("書き");
+			if (i >= 0 && !node.parentElement?.closest("button")) {
+				window.getSelection()?.setBaseAndExtent(node, i, node, i + 2);
+				return window.getSelection()?.toString() ?? "";
+			}
+		}
+		return "";
+	});
+	expect(selected).toBe("書き");
+	await clickInsideHighlight(page);
+	await expect.poll(() => spoken(page), { timeout: 120_000 }).toEqual(["かき"]);
+	await expect(page.locator(".sel-pinyin")).not.toContainText("1");
+});

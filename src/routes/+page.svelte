@@ -244,6 +244,7 @@
 		readingPanelPlacement,
 		menuYAbovePanel,
 		clampPanelCenterX,
+		spreadPanelCenters,
 		highlightSteady,
 		panelCenterMoved,
 		lineStartOffset,
@@ -318,6 +319,8 @@
 	import {
 		joinSlicesWithBlocks,
 		scopeSlices,
+		scopePlainOffset,
+		scopePlainText,
 		selectionSlices,
 		shrinkPanelToContent,
 		spanRect,
@@ -1668,15 +1671,26 @@
 		requestAnimationFrame(() => {
 			const nodes = [...document.querySelectorAll(".sel-pinyin")];
 			if (nodes.length !== current.length) return;
-			let moved = false;
-			const xs = current.map((panel, i) => {
+			const sized = current.map((panel, i) => {
 				const node = nodes[i];
-				if (!(node instanceof HTMLElement)) return panel.x;
+				if (!(node instanceof HTMLElement)) return { ...panel, w: 0 };
 				// Narrow scrunched glass to its longest line first:
 				// the clamp below then guards text, not empty slab.
 				const w = shrinkPanelToContent(node);
-				if (w === 0) return panel.x;
-				const x = clampPanelCenterX(panel.x, w, window.innerWidth);
+				if (w === 0) return { ...panel, w: 0 };
+				return {
+					x: clampPanelCenterX(panel.x, w, window.innerWidth),
+					y: panel.y,
+					w
+				};
+			});
+			// Neighbouring kanji groups on one line centre their
+			// panels a glyph apart: spread the row so the readings
+			// sit side by side instead of over each other.
+			const spread = spreadPanelCenters(sized, window.innerWidth);
+			let moved = false;
+			const xs = current.map((panel, i) => {
+				const x = sized[i]?.w ? (spread[i] ?? panel.x) : panel.x;
 				if (panelCenterMoved(x, panel.x)) moved = true;
 				return x;
 			});
@@ -1809,18 +1823,20 @@
 			const block = anchor?.closest("p, li");
 			if (block && liveSel && liveSel.rangeCount > 0) {
 				const range = liveSel.getRangeAt(0);
-				const at = caretOffsetInBlock(
-					document,
+				// Chrome-free text and offset (badge digits, ruby): the
+				// left context must match the converted sentence.
+				const at = scopePlainOffset(
 					block,
 					range.startContainer,
 					range.startOffset
 				);
-				const blockText = block.textContent ?? "";
-				qStart = quoteStartForContext(
-					plain,
-					quoted.quote,
-					blockText.slice(Math.max(0, at - 24), at)
-				);
+				const blockText = scopePlainText(block);
+				if (at >= 0)
+					qStart = quoteStartForContext(
+						plain,
+						quoted.quote,
+						blockText.slice(Math.max(0, at - 24), at)
+					);
 			}
 		} catch {
 			// Document moved under the highlight: first match below.
@@ -1988,6 +2004,22 @@
 		if (pin) panelsPinned = false;
 		return null;
 	}
+	/** Which readings a Han quote earns (the same call readingsForQuote
+	makes): ja furigana, zh pinyin, or none. The voice follows this
+	too, so the panel and the reading never disagree (a pinyin panel
+	over a Korean-script answer used to read Korean). */
+	function readingsLangFor(quoted: {
+		quote: string;
+		context: string;
+	}): "ja" | "zh" | null {
+		const probe =
+			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
+		if (![...quoted.quote].some((ch) => isHanChar(ch))) return null;
+		if (hanOverlayLangFor(probe) === "ja") return "ja";
+		if (offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin"))
+			return "zh";
+		return null;
+	}
 	/** Sync offer check behind readingsForQuote: creation keeps
 	the highlight (instead of clearing it) exactly when panels
 	are coming, so they have a live rect to place against. */
@@ -1996,14 +2028,7 @@
 		messageId: ChatMsgId;
 		context: string;
 	}): boolean {
-		const probe =
-			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
-		if (![...quoted.quote].some((ch) => isHanChar(ch))) return false;
-		return (
-			(hanOverlayLangFor(probe) !== "ja" &&
-				offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")) ||
-			hanOverlayLangFor(probe) === "ja"
-		);
+		return readingsLangFor(quoted) !== null;
 	}
 	/**
 	 * Readings for a highlight in the popup by the selection (see
@@ -6919,7 +6944,10 @@
 		quote: string,
 		messageId: string,
 		keepMenu = false,
-		context: string = quote
+		context: string = quote,
+		/** Voice already decided by the caller (the readings panel's
+		language): the panel and the voice must never disagree. */
+		langHint?: string
 	): Promise<void> {
 		// The highlight stays: hearing the quote shouldn't clear the
 		// selection it came from. Touch auto-read keeps the menu too,
@@ -6929,6 +6957,10 @@
 		// default), so a kanji-only highlight inside Japanese text
 		// reads Japanese — the quote alone would read Chinese.
 		const voices = webVoices();
+		// Wave dashes and tildes hugging a quote are glyphs, not words
+		// (〜達 read its dash out loud): they never reach the voice.
+		quote = quote.replace(/^[〜～~\s]+|[〜～~\s]+$/gu, "");
+		if (!quote) return;
 		// No Punjabi voice on the device: the Hindi voice reads the
 		// transliteration instead of the default voice going silent.
 		quote = punjabiSpeechText(quote, voices);
@@ -6936,11 +6968,12 @@
 		const sentence = sentenceForQuote(context, quote);
 		const probe = sentence ?? context;
 		const lang = effectiveSpeechLang(
-			await quoteLangForContext(
-				probe,
-				context,
-				latinFallback(settings.voiceLang)
-			),
+			langHint ??
+				(await quoteLangForContext(
+					probe,
+					context,
+					latinFallback(settings.voiceLang)
+				)),
 			voices
 		);
 		if (!speechAttemptable(settings.voiceEngine, lang, voices)) {
@@ -13187,11 +13220,15 @@
 					const kana = quoted.messageId
 						? await readingsForQuote({ ...quoted, messageId: quoted.messageId })
 						: null;
+					// A pinyin panel reads Mandarin, whatever script the
+					// rest of the paragraph is in.
+					const panel = quoted.messageId ? readingsLangFor(quoted) : null;
 					void speakQuote(
 						kana ?? quoted.quote,
 						selSpeakKey(quoted),
 						false,
-						quoted.context
+						quoted.context,
+						panel === "zh" ? "zh-CN" : undefined
 					);
 				})();
 				return;

@@ -336,6 +336,54 @@ export function menuYAbovePanel(
 }
 
 /**
+ * Spread readings panels that share a row so none overlaps: sorted
+ * by center, each panel keeps its center unless the panel before it
+ * would collide, in which case it slides right by the overlap plus
+ * a gap; a row that then runs past the right margin slides back
+ * left as a block, never past the left margin. Rows are panels at
+ * the same y (groups on one text line share their anchor top).
+ * Returns the centers in input order. Pure.
+ */
+export function spreadPanelCenters(
+	panels: ReadonlyArray<{ x: number; w: number; y: number }>,
+	viewportWidth: number,
+	gap = 6,
+	margin = 8
+): number[] {
+	const xs = panels.map((p) => p.x);
+	const rows = new Map<number, number[]>();
+	panels.forEach((p, i) => {
+		const row = rows.get(p.y);
+		if (row) row.push(i);
+		else rows.set(p.y, [i]);
+	});
+	for (const row of rows.values()) {
+		row.sort((a, b) => (panels[a]?.x ?? 0) - (panels[b]?.x ?? 0));
+		let right = -Infinity;
+		for (const i of row) {
+			const p = panels[i];
+			if (!p) continue;
+			let x = p.x;
+			if (x - p.w / 2 < right + gap) x = right + gap + p.w / 2;
+			xs[i] = x;
+			right = x + p.w / 2;
+		}
+		const overflow = right - (viewportWidth - margin);
+		if (overflow > 0) {
+			const first = row[0];
+			const firstPanel = first === undefined ? undefined : panels[first];
+			const room =
+				first === undefined || !firstPanel
+					? 0
+					: (xs[first] ?? 0) - firstPanel.w / 2 - margin;
+			const shift = Math.min(overflow, Math.max(0, room));
+			for (const i of row) xs[i] = (xs[i] ?? 0) - shift;
+		}
+	}
+	return xs;
+}
+
+/**
  * Width-pass center clamp for readings panels: the panel centers on
  * its highlight (CSS translateX), so the center keeps an 8px margin
  * on both sides. The upper bound never drops below the lower one —

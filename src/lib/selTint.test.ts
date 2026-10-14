@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
 	joinSlicesWithBlocks,
 	longestLineWidth,
+	scopePlainOffset,
+	scopePlainText,
 	scopeSlices,
 	selectionSlices,
 	shrinkPanelToContent,
@@ -79,6 +81,24 @@ describe("scopeSlices", () => {
 				.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
 				.join("")
 		).toBe("abcdef");
+	});
+});
+
+describe("scopePlainText and scopePlainOffset", () => {
+	it("skip badge digits and ruby readings, keeping offsets aligned", () => {
+		const div = rendered("");
+		div.innerHTML =
+			'夜は<span>日記<button data-ann-badge="x">1</button></span>を' +
+			"<ruby>書<rt>か</rt></ruby>きます。";
+		expect(scopePlainText(div)).toBe("夜は日記を書きます。");
+		const wo = div.childNodes[2];
+		expect(wo instanceof Text).toBe(true);
+		expect(scopePlainOffset(div, wo as Node, 0)).toBe(4);
+		const badgeText = div.querySelector("button")?.firstChild;
+		expect(scopePlainOffset(div, badgeText as Node, 0)).toBe(-1);
+		// An element container resolves to its first text inside.
+		expect(scopePlainOffset(div, div, 1)).toBe(2);
+		expect(scopePlainOffset(div, div, div.childNodes.length)).toBe(10);
 	});
 });
 

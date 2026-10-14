@@ -7,6 +7,7 @@ import {
 	readingPanelPlacement,
 	menuYAbovePanel,
 	clampPanelCenterX,
+	spreadPanelCenters,
 	highlightSteady,
 	panelCenterMoved,
 	lineStartOffset,
@@ -483,5 +484,67 @@ describe("pressExpandedSelection", () => {
 		expect(pressExpandedSelection("声调", "很难")).toBe(false);
 		expect(pressExpandedSelection("", "很难")).toBe(false);
 		expect(pressExpandedSelection("", "")).toBe(false);
+	});
+});
+
+describe("spreadPanelCenters", () => {
+	it("leaves spaced panels alone and slides colliding ones right", () => {
+		expect(
+			spreadPanelCenters(
+				[
+					{ x: 100, w: 40, y: 10 },
+					{ x: 200, w: 40, y: 10 }
+				],
+				800
+			)
+		).toEqual([100, 200]);
+		// Three neighbours a glyph apart: the second and third slide
+		// right of the one before them, gap included.
+		expect(
+			spreadPanelCenters(
+				[
+					{ x: 100, w: 60, y: 10 },
+					{ x: 120, w: 60, y: 10 },
+					{ x: 140, w: 60, y: 10 }
+				],
+				800
+			)
+		).toEqual([100, 166, 232]);
+	});
+
+	it("spreads per row and keeps input order", () => {
+		expect(
+			spreadPanelCenters(
+				[
+					{ x: 120, w: 60, y: 40 },
+					{ x: 100, w: 60, y: 10 },
+					{ x: 100, w: 60, y: 40 }
+				],
+				800
+			)
+		).toEqual([166, 100, 100]);
+	});
+
+	it("slides an overflowing row back left, never past the margin", () => {
+		expect(
+			spreadPanelCenters(
+				[
+					{ x: 360, w: 60, y: 10 },
+					{ x: 370, w: 60, y: 10 }
+				],
+				400
+			)
+		).toEqual([296, 362]);
+		// No room on the left: the row parks at the left margin.
+		expect(
+			spreadPanelCenters(
+				[
+					{ x: 38, w: 60, y: 10 },
+					{ x: 40, w: 60, y: 10 },
+					{ x: 42, w: 60, y: 10 }
+				],
+				150
+			)
+		).toEqual([38, 104, 170]);
 	});
 });

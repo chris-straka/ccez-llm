@@ -18,6 +18,38 @@ export const SEL_TEXT_SKIP =
 	"rt, rp, .frt, [data-ann-badge], .ccez-math-head, .ccez-code-head," +
 	" .ccez-math-tex, .ccez-math-copy, .ccez-math-foldedlabel, .ccez-code-foldedlabel";
 
+/** Plain text of a block minus chrome (badge digits, ruby readings,
+math/code UI): the context a quote's sentence, voice, and furigana
+resolve against — a badge's "1" beside the highlight must never
+reach the reader ("ichi すり合わせ"). */
+export function scopePlainText(scope: ParentNode): string {
+	return scopeSlices(scope)
+		.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
+		.join("");
+}
+
+/** Offset of a caret (node, offset) in scopePlainText's text, or -1
+when it sits in chrome or outside the scope. An element container
+(whole-node starts) resolves to its first text inside. */
+export function scopePlainOffset(
+	scope: ParentNode,
+	node: Node,
+	offset: number
+): number {
+	const slices = scopeSlices(scope);
+	if (node instanceof Text) {
+		const hit = slices.find((s) => s.node === node);
+		return hit ? hit.base + Math.min(offset, hit.end) - hit.start : -1;
+	}
+	const child = node.childNodes[offset] ?? null;
+	if (!child) {
+		const last = slices.at(-1);
+		return last ? last.base + (last.end - last.start) : -1;
+	}
+	const first = slices.find((s) => child === s.node || child.contains(s.node));
+	return first ? first.base : -1;
+}
+
 /** Text slices of a range with highlight offsets: one entry per text
 node, clamped to the range, chrome skipped. The concatenated slice
 texts equal the quote when the range is the highlight. */
