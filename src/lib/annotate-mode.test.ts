@@ -378,7 +378,8 @@ describe("annotate", () => {
 			id: "dupe" as AnnotationId,
 			messageId: "m1" as ChatMsgId,
 			quote: "Bonjour",
-			at: 0
+			at: 0,
+			answer: "hello"
 		});
 		setAnnotations([dupe]);
 		setHighlight("dupe" as AnnotationId);
@@ -393,11 +394,33 @@ describe("annotate", () => {
 		mode.answerTimer = setTimeout(() => {}, 10_000);
 		mode.selMenu = menu();
 		mode.annotate();
-		expect(getAnnotations()).toEqual([]);
+		// The answered note stands until the new wording files (an
+		// Esc leaves it as it was); its card and highlight close.
+		expect(getAnnotations()).toEqual([dupe]);
 		expect(getPending()?.quote).toBe("Bonjour");
 		expect(mode.answerPop).toBeNull();
 		expect(mode.answerTimer).toBeNull();
 		expect(calls.promptEdits).toEqual([""]);
+	});
+
+	it("A over a note still on the wire does nothing", () => {
+		const { mode, calls, getAnnotations, getPending, setAnnotations } = harness(
+			{ phone: true }
+		);
+		const waiting = note({
+			id: "blue" as AnnotationId,
+			messageId: "m1" as ChatMsgId,
+			quote: "Bonjour",
+			at: 0
+		});
+		setAnnotations([waiting]);
+		mode.selMenu = menu();
+		mode.annotate("", true);
+		expect(getAnnotations()).toEqual([waiting]);
+		expect(getPending()).toBeNull();
+		expect(mode.selMenu).toBeNull();
+		expect(calls.filed).toEqual([]);
+		expect(calls.promptEdits).toEqual([]);
 	});
 
 	it("a blank quote just clears", () => {

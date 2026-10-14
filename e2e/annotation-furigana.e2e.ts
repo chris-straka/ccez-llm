@@ -72,3 +72,30 @@ test("answer card leaves the furigana panel on top", async ({ page }) => {
 	expect(overlaps).toBe(true);
 	expect(Number(panelZ)).toBeGreaterThan(Number(cardZ));
 });
+
+/** Shift+A over Japanese lands typing focus in the create box and
+keeps it there once the furigana panel resolves (the readings
+pass restores the document selection, which must not pull focus
+off the box). */
+test("Shift+A over Japanese focuses the create box and keeps it", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "夜は日記を書きます。" }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 0, "日記");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("A");
+	const box = page.locator(".ann-pop.fresh textarea");
+	await expect(box).toBeVisible({ timeout: 10_000 });
+	await expect(box).toBeFocused();
+	const panel = page.locator(".sel-pinyin", { hasText: "にっき" }).first();
+	await expect(panel).toBeVisible({ timeout: 15_000 });
+	await expect(box).toBeFocused();
+	await page.keyboard.type("what?");
+	await expect(box).toHaveValue("what?");
+});

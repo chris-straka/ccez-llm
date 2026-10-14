@@ -24,6 +24,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Read aloud",
 			"Read word / sentence / paragraph",
 			"Annotate word",
+			"Clear its annotations",
 			"Edit your message",
 			"Rerun / regenerate",
 			"Cut",

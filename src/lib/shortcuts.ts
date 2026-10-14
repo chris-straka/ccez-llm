@@ -164,6 +164,7 @@ export function desktopShortcuts(
 			keys: "Shift+W / Shift+S / Shift+P"
 		},
 		{ group: hover, name: "Annotate word", keys: "A" },
+		{ group: hover, name: "Clear its annotations", keys: "Shift+Delete" },
 		{ group: hover, name: "Edit your message", keys: "E" },
 		{ group: hover, name: "Rerun / regenerate", keys: "R" },
 		{ group: hover, name: "Cut", keys: "X" },

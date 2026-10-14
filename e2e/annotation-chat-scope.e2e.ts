@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat, toggleSidebar } from "./helpers";
+import { dragQuote, seedChat, toggleSidebar } from "./helpers";
 
 /** Draft annotations belong to one chat: leaving files them away,
 restoring them on return, and the other chat stays clean. Drafts
@@ -44,4 +44,65 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 	await expect(
 		page.locator("article.assistant button.ccez-ann-badge")
 	).toHaveCount(1);
+});
+
+/** Switching chats closes the annotation surfaces the leaving chat
+owned (the Annotate button over a highlight, the open answer card),
+and a reply that lands while another chat is open files into its
+own chat: coming back shows the badge orange at once, never a
+refired question. */
+test("a chat switch closes annotation surfaces and keeps answers loading", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [
+		{ role: "assistant", content: "Kyoto is an old capital with many temples" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "2500");
+	});
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	// Highlight: the Annotate button shows.
+	await dragQuote(page, 0, "temples");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	// File a question and leave while it is on the wire.
+	await page.keyboard.press("A");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await pop.locator("textarea").fill("why so many?");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge.ans-waiting")).toHaveCount(
+		1,
+		{ timeout: 10_000 }
+	);
+	await dragQuote(page, 0, "capital");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.locator(".ta-input").click();
+	await toggleSidebar(page);
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	await page.locator('button[aria-label="New chat"]').click();
+	await expect(page.locator(".hero")).toBeVisible();
+	// The button went with the chat.
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
+	// Let the reply land while away.
+	await page.waitForTimeout(3500);
+	await toggleSidebar(page);
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	await page.locator("aside ul li button.side-chat").nth(0).click();
+	// Orange at once: the answer was filed into this chat while
+	// another was open (a refired ask would need the mock's 2.5s).
+	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(1, {
+		timeout: 1500
+	});
+	// An open answer card goes with the next switch too.
+	await page.locator("button.ccez-ann-badge.ans-ready").focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	await toggleSidebar(page);
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	await page.locator("aside ul li button.side-chat").nth(1).click();
+	await expect(page.locator(".hero")).toBeVisible();
+	await expect(page.locator(".ann-answer")).toHaveCount(0);
 });

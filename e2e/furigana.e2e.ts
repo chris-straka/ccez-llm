@@ -466,9 +466,10 @@ test.describe("keyboard", () => {
 		});
 	});
 
-	/** Bare A over no word (below the text, above the actions)
-	still toggles aids: UI chrome never files. */
-	test("hovering message chrome and pressing a pins pinyin", async ({
+	/** Bare A over no word (below the text, above the actions) does
+	nothing: A only annotates (M and N pin the message-wide aids),
+	and UI chrome never files. */
+	test("hovering message chrome and pressing a pins nothing", async ({
 		page
 	}) => {
 		await seedChat(page, [{ role: "assistant", content: "你好世界" }]);
@@ -500,16 +501,15 @@ test.describe("keyboard", () => {
 			(document.activeElement as HTMLElement | null)?.blur?.()
 		);
 		await page.keyboard.press("a");
+		// No ruby, no badge, no box: the key is dead over a gap. M
+		// still pins pinyin on the same message.
+		await page.waitForTimeout(400);
+		await expect(body.locator("ruby")).toHaveCount(0);
+		await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+		await expect(page.locator(".ann-pop")).toHaveCount(0);
+		await page.keyboard.press("m");
 		await expect(body.locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
 		await expect(body).toContainText("nǐ");
-		// Second press lifts it again (re-aim first: pinned ruby
-		// reflows the line, so the old point may sit on a glyph now
-		// — and glyphs file annotations instead of toggling).
-		const pt2 = await gapPoint();
-		if (!pt2) throw new Error("message has no chrome gap");
-		await page.mouse.move(pt2.x, pt2.y);
-		await page.keyboard.press("a");
-		await expect(body.locator("ruby")).toHaveCount(0, { timeout: 10_000 });
 	});
 
 	/** M pins pinyin on the message in the middle of the screen. */

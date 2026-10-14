@@ -448,8 +448,11 @@ export function annotationCopyText(quote: string, comment: string): string {
 }
 
 /**
- * File a pending annotation with its draft comment:
- * the pill commit path. Null when nothing is pending.
+ * File a pending annotation with its draft comment: the pill commit
+ * path. A filed note on the same span goes with the filing (two
+ * badges on one anchor oscillate under the pointer): re-annotating
+ * rewrites it, and nothing is lost until the new wording lands.
+ * Null when nothing is pending.
  */
 export function filePendingAnnotation(
 	list: Annotation[],
@@ -457,7 +460,16 @@ export function filePendingAnnotation(
 	draft: string
 ): Annotation[] | null {
 	if (!pending) return null;
-	return [...list, { ...pending, comment: draft }];
+	const dupe = duplicateAnnotationId(
+		list,
+		pending,
+		pending.quote,
+		pending.at ?? 0,
+		pending.aidScope
+	);
+	const kept =
+		dupe && dupe !== pending.id ? deleteAnnotation(list, dupe) : list;
+	return [...kept, { ...pending, comment: draft }];
 }
 
 /**

@@ -158,7 +158,6 @@
 	import {
 		canEditMessage,
 		rerunIndexFor,
-		toggleAidKinds,
 		toggleSingleAid
 	} from "$lib/message-actions";
 	import Toasts from "$lib/components/Toasts.svelte";
@@ -1923,6 +1922,10 @@
 		}
 		selPinyin = null;
 		selFurigana = panels;
+		// The create box must never need a click: the tint surgery
+		// and WebKit's selection restore above can pull focus off a
+		// Shift+A box opened over Japanese, so it takes focus back.
+		refocusAnnPop();
 		// True-width pass: placement only knows highlight centers,
 		// so a wide panel near the right edge hangs off-screen —
 		// nudge each back inside without collapsing them onto one x.
@@ -2891,6 +2894,7 @@
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
+		if (id !== from) closeAnnotationSurfaces();
 		newsMode.clear();
 		const mutate = (): void => {
 			// File the leaving chat's scroll first (a no-op mid-peek,
@@ -4241,6 +4245,7 @@
 		previewChatId = null;
 		stopVoice();
 		dismissSelPanels();
+		closeAnnotationSurfaces();
 		// File the leaving chat's drafts away before resetDraftExtras
 		// empties them — otherwise the autosave effect files the empty
 		// list under the old chat's id and return-restore comes back
@@ -5442,6 +5447,15 @@
 		}, 160);
 	}
 
+	/** Focus back on an open create/edit box after async panel work
+	moved it (a resolved readings panel, a selection restore): the
+	box is typed into the moment it opens, never after a click. */
+	function refocusAnnPop(): void {
+		if (!annPop || annPopClosing || !annPopBox) return;
+		if (document.activeElement === annPopBox) return;
+		annPopBox.focus({ preventScroll: true });
+	}
+
 	/** Opening (or teardown) cancels a fade-out in flight. */
 	function settleAnnPop(): void {
 		if (annPopTimer) clearTimeout(annPopTimer);
@@ -6193,6 +6207,59 @@
 			deleteMessage(chatState, index);
 		} else editMessageContent(chatState, messageId, plan.bare);
 		flashToast("Sent annotations cleared");
+	}
+
+	/** Leaving a chat closes every annotation surface it owned: the
+	Annotate button over a highlight, the create box (typed text
+	files first, an empty one cancels — nothing typed is dropped),
+	the answer card, the review dock, and the sent-refs card. None
+	of them means anything over the next chat's messages. */
+	function closeAnnotationSurfaces(): void {
+		annotateMode.selMenu = null;
+		if (annPop && !annPopClosing) {
+			if (annPopBlurAction(annDraft) === "cancel") cancelAnnPop();
+			else saveAnnPop();
+		}
+		if (promptAnnEdit) commitPromptAnnEdit();
+		if (annotateMode.answerPop) {
+			if (annotateMode.answerTimer) clearTimeout(annotateMode.answerTimer);
+			annotateMode.answerTimer = null;
+			annotateMode.answerClosing = false;
+			annotateMode.answerPop = null;
+		}
+		pendingAnn = null;
+		reviewOpen = false;
+		highlightAnnId = null;
+		refsPopOpen = null;
+		annotateMode.clearSelection();
+	}
+
+	/** Drop every annotation on one message (Shift+Delete over it):
+	the create box, answer card, and dock close with them when they
+	addressed one; the thump is a single delete beat. False when the
+	message had none. */
+	function clearMessageAnnotations(messageId: ChatMsgId): boolean {
+		const doomed = drafts.list.filter((a) => a.messageId === messageId);
+		if (doomed.length === 0) return false;
+		const ids = new Set<string>(doomed.map((a) => a.id));
+		if (annPop && ids.has(annPop.id)) cancelAnnPop();
+		if (pendingAnn && pendingAnn.messageId === messageId) {
+			pendingAnn = null;
+			if (promptAnnEdit) exitPromptAnnEdit();
+		}
+		if (annotateMode.answerPop && ids.has(annotateMode.answerPop.id))
+			annotateMode.closeAnswerPop();
+		if (highlightAnnId && ids.has(highlightAnnId)) highlightAnnId = null;
+		drafts.setList(drafts.list.filter((a) => a.messageId !== messageId));
+		reviewOpen = false;
+		dismissSelPanels();
+		buzzBeat("done", androidUI);
+		flashToast(
+			doomed.length === 1
+				? "Annotation deleted"
+				: `${doomed.length} annotations deleted`
+		);
+		return true;
 	}
 
 	function clearAllAnnotations(): void {
@@ -11444,31 +11511,11 @@
 					return;
 				}
 			}
-			if (msgAction === "toggle-aids") {
-				// A toggles every aid the hovered message offers — pinyin
-				// over Chinese lines, furigana over Japanese ones (dual
-				// rendering applies each to its own lines, so a mixed
-				// message reads end to end instead of favoring Japanese).
-				// Same offers the buttons show: refs-stripped display
-				// text over the rendered list, never raw stored content.
-				const target = viewChat.messages[hoveredIdx];
-				const kinds = target
-					? offeredLocalAids(aidDisplayText(target.content), activeReplyCode)
-					: [];
-				if (target && kinds.length > 0) {
-					consumeEvent(event);
-					const { pin, unpin } = toggleAidKinds(kinds, pinnedKinds(target.id));
-					for (const kind of unpin) unpinLocalAid(target, kind);
-					for (const kind of pin) pinLocalAid(target, kind);
-					return;
-				}
-			}
 			if (msgAction === "pin-pinyin" || msgAction === "pin-furigana") {
 				// M pins pinyin, N pins furigana on the message in the
 				// middle of the screen (toggle — a second press lifts it).
-				// Kinds the center message doesn't offer stay off, exactly
-				// like A on an unoffered hover. The token names the kind,
-				// so the body never re-reads the key.
+				// Kinds the center message doesn't offer stay off. The
+				// token names the kind, so the body never re-reads the key.
 				const idx = centerMessageIndex();
 				const target = idx >= 0 ? viewChat.messages[idx] : undefined;
 				const want: LocalAid =
@@ -11569,6 +11616,16 @@
 				event.preventDefault();
 				annotateMode.removeAnnotation(annotateMode.hoverBadgeId);
 				return;
+			}
+			if (msgAction === "delete-annotations-hovered") {
+				// Shift+Delete/Backspace clears every annotation on the
+				// hovered message in one go (answered or still on the
+				// wire); a message with none keeps the key dead.
+				const target = viewChat.messages[hoveredIdx];
+				if (target && clearMessageAnnotations(target.id)) {
+					event.preventDefault();
+					return;
+				}
 			}
 			if (msgAction === "copy-hovered") {
 				// C copies the hovered message as plain text (the row

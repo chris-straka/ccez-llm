@@ -435,6 +435,20 @@ describe("pending filing", () => {
 			{ ...pending, comment: "note" }
 		]);
 		expect(filePendingAnnotation([], null, "note")).toBeNull();
+		// A filed note on the same span goes with the filing
+		// (re-annotating rewrites it); other spans stay.
+		const old: Annotation = {
+			id: "old" as AnnotationId,
+			messageId: m1,
+			quote: "q",
+			comment: "why?",
+			answer: "because"
+		};
+		const other: Annotation = { ...old, id: "other" as AnnotationId, at: 1 };
+		expect(filePendingAnnotation([old, other], pending, "again")).toEqual([
+			other,
+			{ ...pending, comment: "again" }
+		]);
 	});
 
 	it("washes the pending preview or the saved quote", () => {

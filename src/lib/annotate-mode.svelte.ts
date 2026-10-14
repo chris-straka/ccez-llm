@@ -544,10 +544,14 @@ export class AnnotateMode {
 				? ("tashkeel" as const)
 				: undefined;
 		// Same span twice would stack two badges on one anchor (and
-		// hovering them oscillates): delete the existing annotation
-		// and start the new one clean — no toast, no lockout, the
-		// create box opens for the fresh wording either way (even on
-		// the instant path: re-annotating means rewriting).
+		// hovering them oscillates). A note still on the wire stands:
+		// A over a blue badge (a slip, or impatience) neither forks a
+		// second ask nor lets the Esc after it take the in-flight one
+		// away. An answered note is replaced when the new wording
+		// files (filePendingAnnotation), never here — cancelling the
+		// box leaves it exactly as it was. The create box opens for
+		// the fresh wording even on the instant path: re-annotating
+		// means rewriting.
 		const dupe = duplicateAnnotationId(
 			this.deps.getAnnotations(),
 			{
@@ -559,9 +563,11 @@ export class AnnotateMode {
 			aidScope
 		);
 		if (dupe) {
-			this.deps.setAnnotations(
-				deleteAnnotation(this.deps.getAnnotations(), dupe)
-			);
+			const existing = this.deps.getAnnotations().find((a) => a.id === dupe);
+			if (existing && existing.answer === undefined) {
+				this.selMenu = null;
+				return;
+			}
 			if (this.answerPop?.id === dupe) {
 				if (this.answerTimer) {
 					clearTimeout(this.answerTimer);

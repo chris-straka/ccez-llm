@@ -2,32 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
 	canEditMessage,
 	rerunIndexFor,
-	toggleAidKinds,
 	toggleSingleAid
 } from "./message-actions";
-
-describe("toggleAidKinds", () => {
-	it("lifts every kind when all are pinned, else pins the missing ones", () => {
-		expect(
-			toggleAidKinds(["pinyin", "furigana"], ["pinyin", "furigana"])
-		).toEqual({
-			pin: [],
-			unpin: ["pinyin", "furigana"]
-		});
-		expect(toggleAidKinds(["pinyin", "furigana"], [])).toEqual({
-			pin: ["pinyin", "furigana"],
-			unpin: []
-		});
-		expect(toggleAidKinds(["pinyin", "furigana"], ["pinyin"])).toEqual({
-			pin: ["furigana"],
-			unpin: []
-		});
-	});
-
-	it("toggles nothing for empty offers", () => {
-		expect(toggleAidKinds([], [])).toEqual({ pin: [], unpin: [] });
-	});
-});
 
 describe("toggleSingleAid", () => {
 	it("pins, unpins, or stays off unoffered kinds", () => {

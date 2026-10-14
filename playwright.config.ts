@@ -63,6 +63,7 @@ export default defineConfig({
 				"**/scroll-field.e2e.ts",
 				"**/lang-pills.e2e.ts",
 				"**/annotations-ux.e2e.ts",
+				"**/annotation-furigana.e2e.ts",
 				"**/composer-tools.e2e.ts",
 				"**/paste-preview.e2e.ts"
 			]

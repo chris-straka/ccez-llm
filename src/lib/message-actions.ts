@@ -10,25 +10,9 @@
 import type { LocalAid } from "./reading";
 
 /**
- * Toggle-all math for the A hotkey: when every offered kind is already
- * pinned, lift them all; otherwise pin every kind that isn't. Empty
- * offers toggle nothing (the body owns the non-empty check that keeps
- * unoffered hovers falling through).
- */
-export function toggleAidKinds(
-	offered: LocalAid[],
-	pinned: LocalAid[]
-): { pin: LocalAid[]; unpin: LocalAid[] } {
-	if (offered.length > 0 && offered.every((kind) => pinned.includes(kind))) {
-		return { pin: [], unpin: [...offered] };
-	}
-	return { pin: offered.filter((kind) => !pinned.includes(kind)), unpin: [] };
-}
-
-/**
  * Single-aid toggle for the M/N hotkeys: null when the center message
- * doesn't offer the wanted kind (stays off, exactly like A on an
- * unoffered hover), otherwise the direction of the toggle.
+ * doesn't offer the wanted kind (stays off), otherwise the direction
+ * of the toggle.
  */
 export function toggleSingleAid(
 	offered: LocalAid[],

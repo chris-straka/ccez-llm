@@ -86,7 +86,6 @@ export interface MessageKeyFacts extends KeyModifiers {
 }
 
 export type MessageKeyAction =
-	| "toggle-aids"
 	| "annotate-selection"
 	| "annotate-hovered-instant"
 	| "annotate-empty"
@@ -101,6 +100,7 @@ export type MessageKeyAction =
 	| "cut-hovered"
 	| "delete-hovered"
 	| "delete-badge"
+	| "delete-annotations-hovered"
 	| "branch-hovered"
 	| "rerun-hovered"
 	| "speak-hovered"
@@ -119,8 +119,8 @@ export function messageKeyAction(
 	// and send it at once, no pill — hovering is not required (see
 	// selInMessage). Hovering a word with no selection sends it the
 	// same way; Shift+A opens the create box empty instead
-	// (selection or hover). Bare message A over anything else still
-	// toggles aids below.
+	// (selection or hover). A only ever annotates: over no word it
+	// does nothing (M and N pin the message-wide aids).
 	if (
 		facts.key === "a" &&
 		(hovered || facts.selInMessage) &&
@@ -152,8 +152,6 @@ export function messageKeyAction(
 		(facts.hasSelection || facts.hoverWord)
 	)
 		return "annotate-empty";
-	if (facts.key === "a" && hovered && bare(facts) && !facts.inField)
-		return "toggle-aids";
 	// M/N pin on the center message, not the hovered one, so they
 	// need no hover — only hands off the editor and fields.
 	if (
@@ -263,6 +261,21 @@ export function messageKeyAction(
 		(facts.hoverBadgeId ?? null) !== null
 	)
 		return "delete-badge";
+	// Shift+Delete/Backspace over a message clears every annotation
+	// on it (badge hovered or not): the badge-by-badge Delete above
+	// stays for one, and messages themselves still need Shift+D.
+	if (
+		(facts.key === "Delete" || facts.key === "Backspace") &&
+		facts.shiftKey &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		!facts.inField &&
+		!facts.inEditor &&
+		!facts.inEditable &&
+		hovered
+	)
+		return "delete-annotations-hovered";
 	// Shift+C branches from the hovered message, Shift+R reads it
 	// aloud. Physical codes like Shift+D, so any layout's keys work
 	// (Shift+CapsLock spellings included); fields and rich editors

@@ -828,9 +828,10 @@ test("bottom answer flips above without moving the thread", async ({
 	expect(cardBox!.y).toBeGreaterThanOrEqual(0);
 	expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(badgeBox!.y);
 	expect(await threadTop(page)).toBe(top);
-	// The note's first line reads as its headline.
+	// The note's first line reads as its headline (minus the quote
+	// lead the card never repeats).
 	await expect(card.locator(".ann-answer-head")).toHaveText(
-		"riverbank: the land along a river"
+		"the land along a river"
 	);
 });
 
@@ -1086,4 +1087,89 @@ test("text outside an open answer can't be selected", async ({ page }) => {
 	expect(
 		await page.evaluate(() => window.getSelection()?.toString() ?? "")
 	).toBe("");
+});
+
+/** A over a note still on the wire does nothing: no second ask,
+no create box, and an Esc after a slipped Shift+A takes nothing
+with it. Once answered, A reopens the box for a rewording and
+Esc still leaves the answered note as it was. */
+test("A over a waiting note does nothing, and Esc never drops it", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "2500");
+	});
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("a");
+	const waiting = page.locator("button.ccez-ann-badge.ans-waiting");
+	await expect(waiting).toHaveCount(1, { timeout: 10_000 });
+	// Bare A again over the same span: nothing opens, nothing forks.
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("a");
+	await page.waitForTimeout(300);
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// Shift+A then Esc: the in-flight note survives untouched.
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("A");
+	await page.waitForTimeout(300);
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await page.keyboard.press("Escape");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// The reply lands on the one note that was asked.
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toHaveCount(1, { timeout: 30_000 });
+	// Answered: Shift+A opens the box for a rewording, and Esc
+	// leaves the answered note exactly as it was.
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("A");
+	await expect(page.locator(".ann-pop.fresh")).toBeVisible({
+		timeout: 10_000
+	});
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(ready).toHaveCount(1);
+	// Filing a rewording replaces it: still one badge, blue again.
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("A");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await pop.locator("textarea").fill("again?");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	await expect(waiting).toHaveCount(1, { timeout: 10_000 });
+});
+
+/** Shift+Delete over a message clears every annotation on it. */
+test("Shift+Delete clears a message's annotations", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("a");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 10_000
+	});
+	await dragQuote(page, 0, "fog");
+	await page.keyboard.press("a");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(2, {
+		timeout: 10_000
+	});
+	await article.hover();
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
+	await page.keyboard.press("Shift+Delete");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+	await expect(page.locator(".toast")).toContainText("2 annotations deleted");
 });

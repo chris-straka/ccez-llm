@@ -6,7 +6,7 @@ import { dragQuote, seedChat } from "./helpers";
  * note. (Phones double-tap the word; desktop drags it: both leave a
  * live selection, which is what owns A.) Hovering a word with no
  * selection sends it the same way; Shift+A opens the create box
- * empty instead. Bare-message A still toggles aids.
+ * empty instead. Bare-message A over no word does nothing.
  */
 test("selected word plus A sends at once", async ({ page }) => {
 	await seedChat(page, [
@@ -63,8 +63,7 @@ test("hovered word plus A sends at once", async ({ page }) => {
 	await page.keyboard.press("Escape");
 	// Mid-word hover with no selection anywhere: resolve the
 	// word's own caret rect so the pointer lands on a glyph, not a
-	// gap (gaps keep the old aids behavior, which files nothing
-	// here).
+	// gap (gaps file nothing).
 	const pt = await page.evaluate(() => {
 		const el = document.querySelector("article.assistant .rendered");
 		if (!el) return null;

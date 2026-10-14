@@ -94,8 +94,8 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...r, inEditor: true })).toBeNull();
 	});
 
-	it("files a live selection on A, toggles aids on bare message A", () => {
-		expect(messageKeyAction(msgBase)).toBe("toggle-aids");
+	it("files a live selection on A, and bare message A over no word does nothing", () => {
+		expect(messageKeyAction(msgBase)).toBeNull();
 		expect(messageKeyAction({ ...msgBase, hasSelection: true })).toBe(
 			"annotate-selection"
 		);
@@ -135,10 +135,9 @@ describe("messageKeyAction", () => {
 				hoverWord: "riverbank"
 			})
 		).toBe("annotate-selection");
-		// No word under the pointer: aids toggle as before.
-		expect(messageKeyAction({ ...msgBase, hoverWord: null })).toBe(
-			"toggle-aids"
-		);
+		// No word under the pointer: A annotates nothing and pins
+		// nothing (M and N own the message-wide aids).
+		expect(messageKeyAction({ ...msgBase, hoverWord: null })).toBeNull();
 	});
 	it("files a message selection on A with no hover (menu stole it)", () => {
 		// The summoned menu opens under a stationary cursor and
@@ -204,7 +203,7 @@ describe("messageKeyAction", () => {
 		).toBe("annotate-empty");
 	});
 	it("fires the hovered-message hotkeys bare and hovered", () => {
-		expect(messageKeyAction(msgBase)).toBe("toggle-aids");
+		expect(messageKeyAction(msgBase)).toBeNull();
 		expect(messageKeyAction({ ...msgBase, key: "m", code: "KeyM" })).toBe(
 			"pin-pinyin"
 		);
@@ -421,9 +420,9 @@ describe("messageKeyAction", () => {
 		// contenteditable: not a plain field, but editable.
 		const rich = { ...msgBase, inField: false, inEditable: true };
 		expect(messageKeyAction({ ...rich, key: "x", code: "KeyX" })).toBe(null);
-		expect(messageKeyAction({ ...rich, key: "a", code: "KeyA" })).toBe(
-			"toggle-aids"
-		);
+		expect(
+			messageKeyAction({ ...rich, key: "a", code: "KeyA", hoverWord: "x" })
+		).toBe("annotate-hovered-instant");
 	});
 
 	it("takes Shift+D by physical code with its wider guard", () => {
@@ -444,13 +443,24 @@ describe("messageKeyAction", () => {
 		// No badge hovered: bare Delete stays dead (messages still
 		// need Shift+D, chats need Cmd).
 		expect(messageKeyAction({ ...msgBase, key: "Delete" })).toBe(null);
+		// Shift+Delete over the message clears every annotation on
+		// it, badge hovered or not; fields keep their keys.
+		const shiftDel = { ...msgBase, key: "Delete", shiftKey: true };
+		expect(messageKeyAction(shiftDel)).toBe("delete-annotations-hovered");
+		expect(messageKeyAction({ ...shiftDel, key: "Backspace" })).toBe(
+			"delete-annotations-hovered"
+		);
+		expect(messageKeyAction({ ...shiftDel, hoverBadgeId: "ann-1" })).toBe(
+			"delete-annotations-hovered"
+		);
+		expect(messageKeyAction({ ...shiftDel, hoveredIdx: -1 })).toBeNull();
+		expect(messageKeyAction({ ...shiftDel, inField: true })).toBeNull();
+		expect(messageKeyAction({ ...shiftDel, metaKey: true })).toBeNull();
 		expect(
 			messageKeyAction({ ...badge, hoverBadgeId: null, key: "Delete" })
 		).toBe(null);
-		// Modifiers and typing targets keep their keys.
-		expect(messageKeyAction({ ...badge, key: "Delete", shiftKey: true })).toBe(
-			null
-		);
+		// Modifiers and typing targets keep their keys (Shift+Delete
+		// is the message-wide clear above).
 		expect(messageKeyAction({ ...badge, key: "Delete", metaKey: true })).toBe(
 			null
 		);
