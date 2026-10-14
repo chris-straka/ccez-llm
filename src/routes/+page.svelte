@@ -7106,15 +7106,15 @@
 		context = punjabiSpeechText(context, voices);
 		const sentence = sentenceForQuote(context, quote);
 		const probe = sentence ?? context;
-		const lang = effectiveSpeechLang(
-			langHint ??
-				(await quoteLangForContext(
-					probe,
-					context,
-					latinFallback(settings.voiceLang)
-				)),
+		const resolved = effectiveSpeechLang(
+			await quoteLangForContext(
+				probe,
+				context,
+				latinFallback(settings.voiceLang)
+			),
 			voices
 		);
+		const lang = langHint ? effectiveSpeechLang(langHint, voices) : resolved;
 		if (!speechAttemptable(settings.voiceEngine, lang, voices)) {
 			annotateMode.selMenu = null;
 			setVoiceError("No voice for this language.");
@@ -7126,19 +7126,26 @@
 		// highlight still resolves its own language (see
 		// sentenceLangsFor), so a mixed highlight reads each part
 		// correctly and a kanji-only one keeps its context voice.
+		const langs = await sentenceLangsFor(
+			quote,
+			resolved,
+			voices,
+			latinFallback(settings.voiceLang),
+			// Seed Latin identification from the whole message: the
+			// highlight alone can start mid-sentence, too short to
+			// identify, while its message holds whole sentences.
+			context
+		);
+		// The caller's hint (a pinyin panel's Mandarin) voices the Han
+		// runs only: an English line in the same highlight keeps its
+		// own voice instead of being read in Chinese.
 		startSpeech(
 			"selection",
 			quote,
-			await sentenceLangsFor(
-				quote,
-				lang,
-				voices,
-				latinFallback(settings.voiceLang),
-				// Seed Latin identification from the whole message: the
-				// highlight alone can start mid-sentence, too short to
-				// identify, while its message holds whole sentences.
-				context
-			)
+			langHint
+				? (part: string) =>
+						[...part].some((ch) => isHanChar(ch)) ? lang : langs(part)
+				: langs
 		);
 	}
 

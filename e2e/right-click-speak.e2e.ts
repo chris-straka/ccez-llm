@@ -202,6 +202,23 @@ test("right-click on message open space does nothing", async ({ page }) => {
 test("right-click mixed message reads each line in its own voice", async ({
 	page
 }) => {
+	// Lines split by voice, so the page needs an English and a Chinese
+	// one: headless Linux browsers report none.
+	await page.addInitScript(() => {
+		const voices = [
+			{ name: "Samantha", lang: "en-US" },
+			{ name: "Tingting", lang: "zh-CN" }
+		].map((v) => ({
+			...v,
+			voiceURI: v.name,
+			localService: true,
+			default: v.lang === "en-US"
+		}));
+		Object.defineProperty(window.speechSynthesis, "getVoices", {
+			value: () => voices,
+			configurable: true
+		});
+	});
 	await seedChat(page, [
 		{ role: "assistant", content: "paragraph for you:\n汉语是" }
 	]);
