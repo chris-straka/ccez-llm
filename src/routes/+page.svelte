@@ -6585,7 +6585,10 @@
 	 * Mouse users: leaving drops focus from the message's buttons, so a
 	 * hover-only row hides instead of sticking on focus-within after a
 	 * click. Keyboard focus never fires mouseleave, so tabbing through
-	 * the row is unaffected.
+	 * the row is unaffected. Text fields (the in-place editor, the refs
+	 * box) keep focus: pointer travel must never move a caret or drop
+	 * a selection, and a field shrinking under a still pointer fires
+	 * this leave too.
 	 */
 	function releaseRowFocus(event: MouseEvent): void {
 		const row = event.currentTarget;
@@ -6593,7 +6596,8 @@
 		if (
 			row instanceof HTMLElement &&
 			active instanceof HTMLElement &&
-			row.contains(active)
+			row.contains(active) &&
+			!active.matches("textarea, input, [contenteditable]")
 		) {
 			active.blur();
 		}

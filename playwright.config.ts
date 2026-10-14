@@ -65,7 +65,8 @@ export default defineConfig({
 				"**/annotations-ux.e2e.ts",
 				"**/annotation-furigana.e2e.ts",
 				"**/composer-tools.e2e.ts",
-				"**/paste-preview.e2e.ts"
+				"**/paste-preview.e2e.ts",
+				"**/message-edit.e2e.ts"
 			]
 		}
 	],

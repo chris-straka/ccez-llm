@@ -58,11 +58,15 @@ test("hovering another message's buttons keeps the edit open", async ({
 	await page.goto("/");
 	await startEdit(page, 0);
 	// Draft a change, then wander to the other message's buttons: the
-	// hover blur must not kill the edit (the draft stays mounted for a
-	// click back in).
+	// edit stays open with its draft.
 	const inline = page.locator(".msg-edit .ta-input");
 	await inline.click();
-	await page.keyboard.press("End");
+	// Caret to the end by hand: WebKit on a Mac host reads End as
+	// scroll-to-end and leaves the caret where it was.
+	await inline.evaluate((el) => {
+		const ta = el as HTMLTextAreaElement;
+		ta.setSelectionRange(ta.value.length, ta.value.length);
+	});
 	await page.keyboard.type(" plus more");
 	const other = page.locator("article.user").nth(1);
 	await other.hover();
@@ -207,4 +211,105 @@ test("editing a message keeps baked refs and filed annotations", async ({
 	expect(stored.drafts["e2e-chat"]).toEqual([
 		expect.objectContaining({ id: "filed", answer: "vicinity" })
 	]);
+});
+
+/** Select-all then delete in the editor: the field shrinks to one
+line (the action row rides up from under the still pointer, which
+used to fire the row's leave blur), and the emptied field keeps that
+line, focus, and a painted caret with the composer's empty look (no
+placeholder); typing goes on landing in it. */
+test("an emptied edit field keeps its line and caret", async ({
+	page
+}, info) => {
+	await seedChat(page, [
+		{
+			role: "user",
+			content: "wipe me out\nsecond line\nthird line\nfourth line\nfifth line"
+		},
+		{ role: "assistant", content: "a reply" }
+	]);
+	await page.goto("/");
+	await startEdit(page, 0);
+	const inline = page.locator(".msg-edit .ta-input");
+	await expect(inline).toBeFocused();
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("Backspace");
+	await expect(inline).toHaveValue("");
+	// Two frames for the shrink and the engine's boundary events.
+	await page.evaluate(
+		() =>
+			new Promise((done) =>
+				requestAnimationFrame(() => requestAnimationFrame(done))
+			)
+	);
+	await page.screenshot({
+		path: info.outputPath("emptied.png"),
+		caret: "initial"
+	});
+	const empty = await inline.evaluate((el) => {
+		const style = getComputedStyle(el);
+		return {
+			height: el.getBoundingClientRect().height,
+			width: el.getBoundingClientRect().width,
+			lineHeight: parseFloat(style.lineHeight),
+			caret: style.caretColor,
+			placeholder: (el as HTMLTextAreaElement).placeholder,
+			focused: document.activeElement === el
+		};
+	});
+	expect(empty.focused).toBe(true);
+	expect(empty.height).toBeGreaterThanOrEqual(empty.lineHeight - 1);
+	expect(empty.caret).not.toBe("transparent");
+	expect(empty.caret).not.toBe("rgba(0, 0, 0, 0)");
+	expect(empty.placeholder).toBe("");
+	await page.keyboard.type("fresh");
+	await expect(inline).toHaveValue("fresh");
+	await expect(page.locator(".msg-edit")).toHaveCount(1);
+});
+
+/** Pointer travel never touches the edit field: a selection made in
+it (select-all or a drag) and its focus survive the pointer leaving
+the message, wherever it goes. */
+test("leaving the message keeps the edit selection", async ({ page }, info) => {
+	await seedChat(page, [
+		{ role: "user", content: "keep this selected please" },
+		{ role: "assistant", content: "a reply under it" },
+		{ role: "user", content: "another message here" }
+	]);
+	await page.goto("/");
+	await startEdit(page, 0);
+	const inline = page.locator(".msg-edit .ta-input");
+	const sel = (): Promise<[number, number, boolean]> =>
+		inline.evaluate((el) => {
+			const ta = el as HTMLTextAreaElement;
+			return [
+				ta.selectionStart,
+				ta.selectionEnd,
+				document.activeElement === ta
+			];
+		});
+	await page.keyboard.press("ControlOrMeta+a");
+	expect(await sel()).toEqual([0, 25, true]);
+	// Off the message into the reply, onto another message's row,
+	// then out to the empty margin.
+	await page.locator("article.assistant .rendered").hover();
+	await page.locator("article.user").nth(1).hover();
+	await page.mouse.move(2, 300);
+	await page.screenshot({ path: info.outputPath("left.png") });
+	expect(await sel()).toEqual([0, 25, true]);
+	// A drag selection holds too (click first: a press inside the
+	// select-all would start a text drag instead).
+	const box = await inline.boundingBox();
+	if (!box) throw new Error("edit box missing");
+	await page.mouse.click(box.x + 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2, {
+		steps: 5
+	});
+	await page.mouse.up();
+	const dragged = await sel();
+	expect(dragged[1]).toBeGreaterThan(dragged[0]);
+	await page.locator("article.assistant .rendered").hover();
+	await page.mouse.move(2, 300);
+	expect(await sel()).toEqual(dragged);
 });

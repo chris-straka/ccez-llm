@@ -750,6 +750,10 @@ where the text sat, like the composer's promptEl pattern). -->
 		row tall and only the first line shows. */
 		field-sizing: content;
 		overflow-y: auto;
+		/* An emptied draft keeps one line (the composer's empty look:
+		no placeholder, just the caret); content sizing must never fold
+		it to nothing. */
+		min-height: 1lh;
 	}
 	/* In-place edit on phones: the textarea editor misses the
 	prompt-scoped textarea styles, so it falls back to native chrome;
