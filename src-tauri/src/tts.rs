@@ -974,11 +974,11 @@ pub fn tts_speak(
     }
 }
 
-/// Speed multiplier from the frontend, clamped to 0.5x-1.5x (missing or
+/// Speed multiplier from the frontend, clamped to 0.25x-1.5x (missing or
 /// non-finite reads as 1.0). Pure.
 pub fn clamp_rate(rate: Option<f32>) -> f32 {
     match rate {
-        Some(r) if r.is_finite() => r.clamp(0.5, 1.5),
+        Some(r) if r.is_finite() => r.clamp(0.25, 1.5),
         _ => 1.0,
     }
 }
@@ -1022,7 +1022,7 @@ mod rate_tests {
     fn clamps_the_speed_multiplier() {
         assert_eq!(clamp_rate(None), 1.0);
         assert_eq!(clamp_rate(Some(f32::NAN)), 1.0);
-        assert_eq!(clamp_rate(Some(0.1)), 0.5);
+        assert_eq!(clamp_rate(Some(0.1)), 0.25);
         assert_eq!(clamp_rate(Some(3.0)), 1.5);
         assert_eq!(clamp_rate(Some(0.8)), 0.8);
     }

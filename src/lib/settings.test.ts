@@ -285,6 +285,14 @@ describe("settings", () => {
 		fast.voiceSpeed = 4;
 		saveSettings(fast, memoryStore);
 		expect(loadSettings(memoryStore).voiceSpeed).toBe(1.5);
+		const quarter = blankSettings();
+		quarter.voiceSpeed = 0.3;
+		saveSettings(quarter, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(0.3);
+		const crawl = blankSettings();
+		crawl.voiceSpeed = 0.05;
+		saveSettings(crawl, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(0.25);
 		const junk = blankSettings();
 		(junk as unknown as Record<string, unknown>).voiceSpeed = "slow";
 		saveSettings(junk, memoryStore);

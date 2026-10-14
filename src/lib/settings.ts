@@ -246,7 +246,7 @@ export interface AppSettings {
 	readerMode: "off" | "follow" | "tap";
 	/** Reader words per screen: 1-3, or 0 for Auto (fit ~18 characters). */
 	readerWords: number;
-	/** Voice speed multiplier for every read-aloud (0.5-1.5, 1 = normal). */
+	/** Voice speed multiplier for every read-aloud (0.25-1.5, 1 = normal). */
 	voiceSpeed: number;
 	/** Read-aloud volume, 0-1 (1 = the voice's full level). */
 	voiceVolume: number;
@@ -366,9 +366,12 @@ export const LINE_HEIGHT_MIN = 1;
 export const LINE_HEIGHT_MAX = 2.2;
 /** Listening drill volume ceiling: 200%, for a track quieter than the voice. */
 export const LISTEN_VOLUME_MAX = 2;
-/** Voice speed multiplier (1 = the engine's normal pace). */
+/** Voice speed multiplier (1 = the engine's normal pace). The floor
+sits at a quarter pace: slow enough to shadow a sentence syllable by
+syllable, and every engine still voices it (AVSpeech at 0.125, espeak
+at 44 wpm, Android at 0.25). */
 export const VOICE_SPEED_DEFAULT = 1;
-export const VOICE_SPEED_MIN = 0.5;
+export const VOICE_SPEED_MIN = 0.25;
 export const VOICE_SPEED_MAX = 1.5;
 /** Phone font scale at/above which the chat goes full-bleed (330%). */
 export const FULLBLEED_FONT_SCALE = 3.3;

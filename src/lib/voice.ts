@@ -444,7 +444,7 @@ function synthesis(): SpeechSynthesis | null {
  */
 let speechRate = 1;
 export function setSpeechRate(rate: number): void {
-	speechRate = Number.isFinite(rate) ? Math.min(1.5, Math.max(0.5, rate)) : 1;
+	speechRate = Number.isFinite(rate) ? Math.min(1.5, Math.max(0.25, rate)) : 1;
 }
 export function currentSpeechRate(): number {
 	return speechRate;
