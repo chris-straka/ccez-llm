@@ -483,7 +483,7 @@ describe("chat", () => {
 		const sending = sendMessage(state, gated, "sys", "hi", {}, store);
 		await new Promise((r) => setTimeout(r, 20));
 		expect(state.sending).toBe(true);
-		expect(state.sendingChatId).toBe(originId);
+		expect(isSending(state, originId)).toBe(true);
 		// Away mid-stream: tokens must not land in the new chat, and
 		// the indicator's owner stays the origin.
 		newChat(state, store);
@@ -495,14 +495,15 @@ describe("chat", () => {
 		expect(
 			state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)
 		).toEqual(["hi", "hel"]);
-		expect(state.sendingChatId).toBe(originId);
+		expect(isSending(state, originId)).toBe(true);
+		expect(isSending(state, awayId)).toBe(false);
 		resolveStream({
 			content: "hello",
 			usage: { prompt: 1, completion: 1, total: 2 }
 		});
 		await sending;
 		expect(state.sending).toBe(false);
-		expect(state.sendingChatId).toBeNull();
+		expect(state.sendingChatIds).toEqual([]);
 		expect(
 			state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)
 		).toEqual(["hi", "hello"]);
@@ -589,11 +590,11 @@ describe("chat", () => {
 		).toEqual(["one", "r1"]);
 		expect(isSending(state, originId)).toBe(false);
 		expect(state.sending).toBe(true);
-		expect(state.sendingChatId).toBe(awayId);
+		expect(state.sendingChatIds).toEqual([awayId]);
 		resolvers[1]?.({ content: "r2", usage });
 		await second;
 		expect(state.sending).toBe(false);
-		expect(state.sendingChatId).toBeNull();
+		expect(state.sendingChatIds).toEqual([]);
 		expect(
 			state.chats.find((c) => c.id === awayId)?.messages.map((m) => m.content)
 		).toEqual(["two", "r2"]);

@@ -7521,6 +7521,15 @@
 		}
 	});
 	const sendElapsed = $derived(sendAgeSec(sendStarts, viewChat.id, sendNow));
+	/** Chats with a reply in flight, for the chat list's working mark:
+	every TS send and native turn, detached ones included. */
+	const workingChats = $derived(
+		new Set<ChatId>([
+			...chatState.sendingChatIds,
+			...nativeTurns.fetching,
+			...nativeTurns.live
+		])
+	);
 
 	/** Inline chat rename (sidebar row): the page owns it so the Esc
 	ladder can cancel it like every other inline edit. */
@@ -8408,7 +8417,7 @@
 	pinned to the newest token — but only while stuck. Instant, never
 	queued behind the submit smooth-scroll. */
 	$effect(() => {
-		const sending = chatState.sending;
+		const sending = isSending(chatState, viewChat.id);
 		const msgs = viewChat.messages;
 		const last = msgs[msgs.length - 1];
 		const len = sending && last?.role === "assistant" ? last.content.length : 0;
@@ -8904,7 +8913,7 @@
 	new level (everything below is replaced by a fresh opener); the
 	toast's Undo puts the old replies back. */
 	function newsSetLevel(level: CefrLevel, msg: ChatMsg): void {
-		if (previewing || chatState.sending) return;
+		if (previewing || isSending(chatState)) return;
 		const live = activeChat(chatState);
 		const index = live.messages.findIndex((m) => m.id === msg.id);
 		const target = live.messages[index];
@@ -11908,7 +11917,11 @@
 			if (msgAction === "rerun-hovered") {
 				// R reruns the hovered turn: your message resends, a reply
 				// regenerates from the message it answered.
-				const at = rerunIndexFor(chat.messages, hoveredIdx, chatState.sending);
+				const at = rerunIndexFor(
+					chat.messages,
+					hoveredIdx,
+					isSending(chatState, chat.id)
+				);
 				if (at !== null) {
 					event.preventDefault();
 					rerunFrom(at);
@@ -14200,6 +14213,7 @@
 	<Sidebar
 		chats={sideVisibleChats()}
 		activeId={chatState.activeChatId}
+		working={workingChats}
 		collapsed={settings.sidebarCollapsed}
 		android={androidUI}
 		shell={tauriBackendAvailable()}
@@ -14357,7 +14371,6 @@
 		and the actions object. -->
 		<ThreadView
 			messages={viewChat.messages}
-			chatId={viewChat.id}
 			trimIdx={trimPointIndex(viewChat)}
 			onUndoTrim={() => undoTrim(viewChat)}
 			{focusMode}
@@ -14401,7 +14414,6 @@
 				promptAnnWashId() ??
 				annotateMode.hoverBadgeId}
 			sending={isSending(chatState, viewChat.id)}
-			sendingChatId={chatState.sendingChatId}
 			sendingPhase={replyPhase({
 				sending:
 					isSending(chatState, viewChat.id) ||

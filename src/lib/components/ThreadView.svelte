@@ -5,7 +5,7 @@ wiring, the empty hero, and the sending indicator (Svelte scoping binds
 the CSS to this markup). Row actions arrive as page callbacks and are
 bound to (msg, i) here, exactly like the paged actions object was. -->
 <script lang="ts">
-	import type { ChatMsg, ChatMsgId, ChatId } from "$lib/chat";
+	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import type {
 		Attachment,
 		AttachTagModel,
@@ -105,7 +105,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 
 	interface Props {
 		messages: ChatMsg[];
-		chatId: string;
 		focusMode: "edit" | "scroll";
 		selectedIdx: number;
 		speakingId: string | null;
@@ -131,8 +130,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		deleteTitle: string;
 		aidPreferred: LocalAid | null;
 		washId: string | null | undefined;
+		/** This chat has a reply in flight (its own, never another
+		chat's: several chats can be waiting at once). */
 		sending: boolean;
-		sendingChatId: ChatId | null;
 		sendingPhase: "fetch" | "waiting" | null;
 		sendElapsed: number;
 		waitingLabel: string;
@@ -201,7 +201,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 
 	let {
 		messages,
-		chatId,
 		focusMode,
 		selectedIdx,
 		speakingId,
@@ -228,7 +227,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		aidPreferred,
 		washId,
 		sending,
-		sendingChatId,
 		sendingPhase,
 		sendElapsed,
 		waitingLabel,
@@ -362,10 +360,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			activeReplyCode
 		)}
 		{@const streamingThis =
-			sending &&
-			chatId === sendingChatId &&
-			msg.role === "assistant" &&
-			i === messages.length - 1}
+			sending && msg.role === "assistant" && i === messages.length - 1}
 		{@const tagBase =
 			(sentRefs
 				? refsOnly && !isFolded
@@ -478,7 +473,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				{previewing}
 				news={newsTag && !previewing
 					? {
-							busy: sending && chatId === sendingChatId,
+							busy: sending,
 							setLevel: (level: CefrLevel) => actions.newsSetLevel(level, msg)
 						}
 					: null}

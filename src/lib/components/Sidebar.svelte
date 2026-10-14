@@ -47,6 +47,9 @@ only this drawer through scoping. -->
 		/** Page-filtered chats (keyboard nav reads the same filter). */
 		chats: Chat[];
 		activeId: ChatId;
+		/** Chats with a reply in flight (any number at once): their
+		rows pulse the thinking dots until the reply settles. */
+		working: ReadonlySet<ChatId>;
 		collapsed: boolean;
 		android: boolean;
 		/** Shell build (export hides where pickers fail). */
@@ -67,6 +70,7 @@ only this drawer through scoping. -->
 	let {
 		chats,
 		activeId,
+		working,
 		collapsed,
 		android,
 		shell,
@@ -181,6 +185,8 @@ only this drawer through scoping. -->
 						class="side-chat"
 						data-chat-id={item.id}
 						class:active={item.id === activeId}
+						class:working={working.has(item.id)}
+						aria-busy={working.has(item.id)}
 						onclick={() => {
 							if (heldOpen) {
 								heldOpen = false;
@@ -199,7 +205,13 @@ only this drawer through scoping. -->
 						}}
 					>
 						<span class="side-title">{chatTitle(item)}</span>
-						<span class="side-time">{labelFor(item.createdAt)}</span>
+						<span class="side-time"
+							>{labelFor(item.createdAt)}{#if working.has(item.id)}<span
+									class="side-working tdots"
+									aria-hidden="true"
+									><span>.</span><span>.</span><span>.</span></span
+								>{/if}</span
+						>
 					</button>
 				{/if}
 				{#if !android}
@@ -565,6 +577,32 @@ only this drawer through scoping. -->
 		font-weight: 400;
 		color: #6e6e73;
 		color: var(--dim);
+	}
+	/* Reply in flight: the thinking dots (same three colors as the
+	thread's chip) trail the timestamp, which is always short, so
+	a long title never clips them. */
+	.side-working {
+		margin-left: 0.3em;
+		font-family: system-ui, sans-serif;
+		font-size: 0.9rem;
+		font-weight: 700;
+		line-height: 0;
+	}
+	.side-working span:nth-child(1) {
+		color: var(--accent);
+	}
+	.side-working span:nth-child(2) {
+		color: #5ac8fa;
+		color: var(--thinking-2);
+	}
+	.side-working span:nth-child(3) {
+		color: #34c759;
+		color: var(--thinking-3);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.side-working span {
+			animation: none;
+		}
 	}
 	aside button.active {
 		background: transparent;

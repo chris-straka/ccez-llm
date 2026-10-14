@@ -122,18 +122,11 @@ export interface ChatState {
 	/** Any reply streaming anywhere (kept for global readers: ticker, edit gates). */
 	sending: boolean;
 	/**
-	 * Chat that owns the in-flight reply (null when idle). A send keeps
-	 * streaming into its own chat when the user looks elsewhere, so the
-	 * Thinking indicator — and the tokens — never leak onto whatever
-	 * chat replaces it. Never persisted: reloads always boot idle.
-	 * With concurrent sends this tracks the most recent one; the full
-	 * set lives in `sendingChatIds`.
-	 */
-	sendingChatId: ChatId | null;
-	/**
 	 * Every chat with a reply currently streaming. Sends lock per chat,
-	 * not globally: chat B sends while chat A still streams. Never
-	 * persisted: reloads always boot idle.
+	 * not globally: chat B sends while chat A still streams, and each
+	 * keeps its own Thinking indicator and tokens however the user
+	 * moves between them (read through `isSending`, never a single
+	 * "current sender"). Never persisted: reloads always boot idle.
 	 */
 	sendingChatIds: ChatId[];
 	/**
@@ -225,7 +218,6 @@ export function createChatState(store?: KeyValueStore): ChatState {
 		chats: [],
 		activeChatId: "" as ChatId,
 		sending: false,
-		sendingChatId: null,
 		sendingChatIds: [],
 		replyStartedChatIds: [],
 		fetchActiveChatIds: []
@@ -438,7 +430,7 @@ const cancelledSends = new WeakSet<AbortController>();
  * without one. Dropping a chat mid-stream must kill its network
  * request too — otherwise it pointlessly finishes into a chat that no
  * longer exists. (Merely looking at another chat never aborts: each
- * stream stays pinned to its origin via sendingChatId.)
+ * stream stays pinned to its origin chat id.)
  */
 export function abortSend(chatId?: ChatId): void {
 	if (chatId === undefined) {
@@ -1410,7 +1402,6 @@ export async function streamAssistantReply(
 	];
 	state.sendingChatIds = [...state.sendingChatIds, chatId];
 	state.sending = true;
-	state.sendingChatId = chatId;
 	// Own controller per chat (chained off a caller-provided signal, if
 	// any) so dropping one chat aborts only its network request — a
 	// concurrent reply elsewhere streams on untouched.
@@ -1508,12 +1499,6 @@ export async function streamAssistantReply(
 			(id) => id !== chatId
 		);
 		state.sending = state.sendingChatIds.length > 0;
-		// sendingChatId tracks the most recent in-flight chat for the
-		// legacy global readers: fall back to a still-streaming one.
-		if (state.sendingChatId === chatId) {
-			state.sendingChatId =
-				state.sendingChatIds[state.sendingChatIds.length - 1] ?? null;
-		}
 		persistChats(state, store);
 	}
 }
@@ -1561,7 +1546,6 @@ export function beginNativeSend(
 	];
 	state.sendingChatIds = [...state.sendingChatIds, chat.id];
 	state.sending = true;
-	state.sendingChatId = chat.id;
 	persistChats(state, store);
 	return { chatId: chat.id, userId, replyId };
 }
@@ -1587,7 +1571,6 @@ export function beginNativeResend(
 	];
 	state.sendingChatIds = [...state.sendingChatIds, chat.id];
 	state.sending = true;
-	state.sendingChatId = chat.id;
 	persistChats(state, store);
 	return { chatId: chat.id, replyId };
 }
@@ -1610,10 +1593,6 @@ export function settleNativeSend(
 		(id) => id !== chatId
 	);
 	state.sending = state.sendingChatIds.length > 0;
-	if (state.sendingChatId === chatId) {
-		state.sendingChatId =
-			state.sendingChatIds[state.sendingChatIds.length - 1] ?? null;
-	}
 	persistChats(state, store);
 }
 

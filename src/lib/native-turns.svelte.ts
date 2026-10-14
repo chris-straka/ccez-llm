@@ -421,7 +421,6 @@ export class NativeTurns {
 		const state = this.state;
 		state.sendingChatIds = [...state.sendingChatIds, target.id];
 		state.sending = true;
-		state.sendingChatId = target.id;
 		if (this.deps.stuckToBottom()) this.deps.scrollAfterRender();
 		await this.start(
 			target.id,
