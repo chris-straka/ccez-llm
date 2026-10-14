@@ -53,7 +53,9 @@ import {
 	isCjkChar,
 	groupRuns,
 	wordAtNodeOffset,
-	paragraphBounds
+	paragraphBounds,
+	isClearlyChineseSentence,
+	isHanOnly
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -852,6 +854,46 @@ describe("speechKanaForQuote", () => {
 		expect(speechKanaForQuote(oshirase, oshirasePlain, "知らせ")).toBe(
 			"しらせ"
 		);
+	});
+});
+
+describe("isClearlyChineseSentence", () => {
+	it("claims Chinese grammar, particles, and Chinese-only forms", () => {
+		expect(
+			isClearlyChineseSentence("熊猫慢悠悠地吃着竹子，看起来很幸福。")
+		).toBe(true);
+		expect(isClearlyChineseSentence("我们")).toBe(true);
+		expect(isClearlyChineseSentence("你好吗")).toBe(true);
+		expect(isClearlyChineseSentence("北京旅行很好。")).toBe(true);
+		expect(isClearlyChineseSentence("目的地に到着")).toBe(false);
+		expect(isClearlyChineseSentence("在日本的朋友")).toBe(true);
+		expect(isClearlyChineseSentence("汉语")).toBe(true);
+	});
+
+	it("leaves kana sentences and kana-less Japanese alone", () => {
+		expect(isClearlyChineseSentence("中国語では们と言います。")).toBe(false);
+		expect(isClearlyChineseSentence("例: 子供達、私達")).toBe(false);
+		expect(isClearlyChineseSentence("目的")).toBe(false);
+		expect(
+			isClearlyChineseSentence(
+				"한국어에서 들은 접미사이고, 일본어로는 接尾辞라고 합니다."
+			)
+		).toBe(false);
+	});
+});
+
+describe("isHanOnly", () => {
+	it("is true when every letter is Han, marks aside", () => {
+		expect(isHanOnly("接尾辞")).toBe(true);
+		expect(isHanOnly("〜達")).toBe(true);
+		expect(isHanOnly("私達、")).toBe(true);
+	});
+
+	it("is false with kana, hangul, Latin, or no Han", () => {
+		expect(isHanOnly("達は")).toBe(false);
+		expect(isHanOnly("接尾사")).toBe(false);
+		expect(isHanOnly("達 suffix")).toBe(false);
+		expect(isHanOnly("〜")).toBe(false);
 	});
 });
 

@@ -16,7 +16,7 @@ import {
 	stopNative,
 	saveNativeSpeech
 } from "./nativeTts";
-import { ttsLangFor } from "./reading";
+import { hanOverlayLangFor, ttsLangFor } from "./reading";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
@@ -533,5 +533,62 @@ describe("quoteProbeFor", () => {
 			"眺めて here."
 		);
 		expect(quoteProbeFor("ctx", "missing")).toBe("ctx");
+	});
+
+	// A Korean/Japanese answer about plurals (들 vs たち).
+	const plurals = [
+		"한국어의 들과 일본어의 たち는 둘 다 복수를 나타냅니다.",
+		"한국어에서 들은 접미사이고, 일본어로는 接尾辞라고 합니다.",
+		"日本語: 〜達は人に付く接尾辞です。",
+		"例: 子供達、私達"
+	].join("\n");
+
+	it("keeps a kana sentence for a kanji highlight inside it", () => {
+		const line = "日本語: 〜達は人に付く接尾辞です。";
+		const probe = quoteProbeFor(line, "接尾辞", plurals);
+		expect(hanOverlayLangFor(probe)).toBe("ja");
+		expect(ttsLangFor(probe, "")).toBe("ja-JP");
+		expect(hanOverlayLangFor(quoteProbeFor(line, "〜達", plurals))).toBe("ja");
+	});
+
+	it("reads a kanji highlight in a Korean line of a Japanese-bearing answer as Japanese", () => {
+		const line = "한국어에서 들은 접미사이고, 일본어로는 接尾辞라고 합니다.";
+		// Alone the line is Korean: hangul would pick the Korean voice
+		// and no kana would pick pinyin.
+		expect(ttsLangFor(quoteProbeFor(line, "接尾辞"), "")).toBe("ko-KR");
+		const probe = quoteProbeFor(line, "接尾辞", plurals);
+		expect(hanOverlayLangFor(probe)).toBe("ja");
+		expect(ttsLangFor(probe, "")).toBe("ja-JP");
+	});
+
+	it("takes the nearest kana sentence, not a distant one", () => {
+		const message = [
+			"日本語の話です。",
+			"Korean has 들.",
+			"English line with 接尾辞.",
+			"接尾辞は語の後ろに付きます。"
+		].join("\n");
+		expect(quoteProbeFor("English line with 接尾辞.", "接尾辞", message)).toBe(
+			"接尾辞は語の後ろに付きます。"
+		);
+	});
+
+	it("keeps a kana-less example line beside Japanese Japanese", () => {
+		const probe = quoteProbeFor("例: 子供達、私達", "子供達", plurals);
+		expect(hanOverlayLangFor(probe)).toBe("ja");
+	});
+
+	it("keeps a clearly Chinese sentence Chinese", () => {
+		const message = "中文用我们表示复数。\n日本語では私たちと言います。";
+		const probe = quoteProbeFor("中文用我们表示复数。", "复数", message);
+		expect(probe).toBe("中文用我们表示复数。");
+		expect(hanOverlayLangFor(probe)).toBe("zh");
+	});
+
+	it("leaves messages without kana and non-Han quotes alone", () => {
+		const korean = "한자로는 接尾辞라고 씁니다.";
+		expect(quoteProbeFor(korean, "接尾辞", korean)).toBe(korean);
+		const line = "한국어에서 들은 접미사입니다.";
+		expect(quoteProbeFor(line, "접미사", `${line}\nたちです。`)).toBe(line);
 	});
 });

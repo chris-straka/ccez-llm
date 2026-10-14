@@ -551,3 +551,52 @@ test("right-click the Japanese half of a mixed bullet reads only the highlight",
 	expect(texts.join("")).toBe("そのほんはわたしのじんせいをかえた");
 	expect(await spokenLang(page)).toEqual(["ja-JP"]);
 });
+
+const KO_JA_PLURALS = [
+	"한국어의 들과 일본어의 たち는 둘 다 복수를 나타냅니다.",
+	"",
+	"- 한국어에서 들은 접미사이고, 일본어로는 接尾辞라고 합니다.",
+	"- 日本語: 〜達は人に付く接尾辞です。",
+	"- 例: 子供達、私達"
+].join("\n");
+
+test("right-click kanji in the Korean line of a Korean/Japanese answer reads Japanese", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: KO_JA_PLURALS }]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered li").nth(1)).toBeVisible({
+		timeout: 60_000
+	});
+	// The first 接尾辞 sits in the Korean bullet: hangul around it
+	// once picked the Korean voice and pinyin.
+	const at = await selectQuote(page, "接尾辞");
+	await page.mouse.click(at.x, at.y, { button: "right" });
+	await expect
+		.poll(() => spoken(page), { timeout: 30_000 })
+		.not.toHaveLength(0);
+	expect(await spoken(page)).toEqual(["せつびじ"]);
+	expect(await spokenLang(page)).toEqual(["ja-JP"]);
+	// Furigana panels, never pinyin.
+	await expect(page.locator(".sel-pinyin").first()).toContainText("せつびじ");
+});
+
+test("right-click a bare kanji word in the Korean line speaks Japanese", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: KO_JA_PLURALS }]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered li").nth(1)).toBeVisible({
+		timeout: 60_000
+	});
+	// No highlight: the word under the cursor reads instantly, in the
+	// voice its message's Japanese decides, never the Korean one.
+	const at = await selectQuote(page, "尾");
+	await page.evaluate(() => window.getSelection()?.removeAllRanges());
+	await page.mouse.click(at.x, at.y, { button: "right" });
+	await expect
+		.poll(() => spoken(page), { timeout: 30_000 })
+		.not.toHaveLength(0);
+	expect((await spoken(page)).join("")).toContain("尾");
+	expect(await spokenLang(page)).toEqual(["ja-JP"]);
+});

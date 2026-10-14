@@ -469,6 +469,55 @@ export function hasDistinctiveChinese(text: string): boolean {
 	return false;
 }
 
+/** Chinese particles, pronouns and adverbs with no modern Japanese
+use (很好, 您, 她). */
+const CHINESE_PARTICLES = "们吗呢吧啊呀嘛哪很您她";
+/** Chinese grammar characters Japanese only uses inside compounds
+(目的, 終了, 到着): one proves nothing, two in a kana-less sentence
+read as Chinese grammar. */
+const CHINESE_GRAMMAR = "的了着地是在";
+
+/**
+ * Whether a sentence reads as Chinese on sight: no kana, and a
+ * simplified-only or traditional-only form, a Chinese-only particle,
+ * or two Chinese grammar characters in it. No length gate, unlike
+ * hasDistinctiveChinese: this judges the sentence around a
+ * highlight, never the highlight. Pure.
+ */
+export function isClearlyChineseSentence(text: string): boolean {
+	if (KANA_RE.test(text)) return false;
+	let grammar = 0;
+	for (const ch of text) {
+		if (
+			SIMPLIFIED_ONLY.includes(ch) ||
+			TRADITIONAL_ONLY.includes(ch) ||
+			CHINESE_PARTICLES.includes(ch)
+		)
+			return true;
+		if (CHINESE_GRAMMAR.includes(ch)) grammar++;
+	}
+	return grammar >= 2;
+}
+
+/**
+ * True when every letter in the text is Han (接尾辞, 〜達): the
+ * highlights whose reading and voice their surroundings decide.
+ * Punctuation and affix marks don't count as letters. Pure.
+ */
+export function isHanOnly(text: string): boolean {
+	let han = false;
+	for (const ch of text) {
+		if (/\p{Script=Han}/u.test(ch)) han = true;
+		else if (/\p{L}/u.test(ch)) return false;
+	}
+	return han;
+}
+
+/** True when the text holds hiragana or katakana. Pure. */
+export function hasKana(text: string): boolean {
+	return KANA_RE.test(text);
+}
+
 /**
  * Script-run key for one character: Latin letters report `"latin"`;
  * kana and Han share `"han"` (a kanji mid-Japanese must not split the

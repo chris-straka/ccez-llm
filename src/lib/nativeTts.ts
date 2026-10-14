@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { identifyLangOffline, identifyLangShort } from "./langId";
-import { hasDistinctiveChinese, hasPinyinTones, ttsLangFor } from "./reading";
+import {
+	hasDistinctiveChinese,
+	hasKana,
+	hasPinyinTones,
+	isClearlyChineseSentence,
+	isHanOnly,
+	ttsLangFor
+} from "./reading";
 import {
 	currentSpeechRate,
 	currentSpeechVolume,
@@ -610,10 +617,50 @@ export function stopNative(): void {
 }
 
 /**
- * Sentence probe for a quote: the sentence holding
- * the quote when found, else the context. Readings and language
- * resolve against the probe, never the bare fragment.
+ * Sentence probe for a quote: the sentence holding the quote when
+ * found, else the context. Readings and language resolve against
+ * the probe, never the bare fragment.
+ *
+ * A Han-only quote whose sentence has no kana is ambiguous: when the
+ * message holds Japanese, the nearest kana sentence stands in, so
+ * 接尾辞 in a Korean or English line of a Korean/Japanese answer
+ * reads Japanese (furigana, Japanese voice) instead of pinyin over a
+ * Korean voice. A sentence that is clearly Chinese keeps its own
+ * locale, and messages without kana keep the old probe.
  */
-export function quoteProbeFor(context: string, quote: string): string {
-	return sentenceForQuote(context, quote) ?? context;
+export function quoteProbeFor(
+	context: string,
+	quote: string,
+	message: string = context
+): string {
+	const sentence = sentenceForQuote(context, quote) ?? context;
+	if (
+		!isHanOnly(quote) ||
+		hasKana(sentence) ||
+		isClearlyChineseSentence(sentence)
+	)
+		return sentence;
+	return nearestKanaSentence(message, sentence) ?? sentence;
+}
+
+/** The kana sentence of `message` nearest the one matching `sentence`
+(searching outward, earlier first), or the first kana sentence when
+the sentence isn't found. Null when the message holds no kana. */
+function nearestKanaSentence(message: string, sentence: string): string | null {
+	const sentences = splitSentences(message);
+	const key = contextQuoteKey(sentence);
+	const at = key
+		? sentences.findIndex((s) => {
+				const k = contextQuoteKey(s);
+				return k.includes(key) || key.includes(k);
+			})
+		: -1;
+	if (at < 0) return sentences.find((s) => hasKana(s)) ?? null;
+	for (let d = 1; d < sentences.length; d++) {
+		for (const i of [at - d, at + d]) {
+			const s = sentences[i];
+			if (s !== undefined && hasKana(s)) return s;
+		}
+	}
+	return null;
 }

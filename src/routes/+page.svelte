@@ -576,6 +576,7 @@
 		nativeTtsSupported,
 		quoteLangFor,
 		quoteLangForContext,
+		quoteProbeFor,
 		sentenceForQuote,
 		sentenceLangsFor,
 		currentKeyboardInputSource
@@ -1508,7 +1509,7 @@
 		// になるうつくしい — the bare quote would read 美 as ビ with
 		// no sentence to correct it. showSelectionFurigana also shows
 		// the popup, so this path skips popupSelectionReadings.
-		const probe = sentenceForQuote(menu.context, menu.quote) ?? menu.context;
+		const probe = localeProbe(menu.context, menu.quote, menu.messageId);
 		// Headline picks read aloud with no readings panels
 		// (message-DOM placement has nothing to place on).
 		if (
@@ -1962,8 +1963,7 @@
 	): Promise<string | null> {
 		if (!pin) panelsPinned = false;
 		else panelsPinned = true;
-		const probe =
-			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
+		const probe = localeProbe(quoted.context, quoted.quote, quoted.messageId);
 		if (![...quoted.quote].some((ch) => isHanChar(ch))) {
 			if (pin) panelsPinned = false;
 			return null;
@@ -1988,6 +1988,29 @@
 		if (pin) panelsPinned = false;
 		return null;
 	}
+	/** Plain speech text of a message by id (null for story keys
+	and gone messages): the wider context quoteProbeFor searches. */
+	function messageSpeechText(id: string | null): string | null {
+		if (!id) return null;
+		const content = chatState.chats
+			.flatMap((c) => c.messages)
+			.find((m) => m.id === id)?.content;
+		return content === undefined ? null : speechText(content);
+	}
+	/** Text whose script decides a quote's readings and voice: its
+	sentence, or for a Han-only quote in a kana-less sentence the
+	nearest Japanese sentence of its message (see quoteProbeFor). */
+	function localeProbe(
+		context: string,
+		quote: string,
+		messageId: string | null
+	): string {
+		return quoteProbeFor(
+			context,
+			quote,
+			messageSpeechText(messageId) ?? context
+		);
+	}
 	/** Sync offer check behind readingsForQuote: creation keeps
 	the highlight (instead of clearing it) exactly when panels
 	are coming, so they have a live rect to place against. */
@@ -1996,8 +2019,7 @@
 		messageId: ChatMsgId;
 		context: string;
 	}): boolean {
-		const probe =
-			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
+		const probe = localeProbe(quoted.context, quoted.quote, quoted.messageId);
 		if (![...quoted.quote].some((ch) => isHanChar(ch))) return false;
 		return (
 			(hanOverlayLangFor(probe) !== "ja" &&
@@ -2016,7 +2038,7 @@
 		messageId: ChatMsgId,
 		context: string
 	): Promise<void> {
-		const probe = sentenceForQuote(context, quote) ?? context;
+		const probe = localeProbe(context, quote, messageId);
 		if (hanOverlayLangFor(probe) !== "ja") {
 			if (!offeredLocalAids(quote, activeReplyCode).includes("pinyin")) return;
 			const readings = readingsOnly(pinyinRuby(quote), " ", "rt");
@@ -6840,8 +6862,7 @@
 		// transliteration instead of the default voice going silent.
 		quote = punjabiSpeechText(quote, voices);
 		context = punjabiSpeechText(context, voices);
-		const sentence = sentenceForQuote(context, quote);
-		const probe = sentence ?? context;
+		const probe = localeProbe(context, quote, messageId);
 		const lang = effectiveSpeechLang(
 			await quoteLangForContext(
 				probe,
@@ -13080,13 +13101,23 @@
 						// A disturbed selection keeps its wash; speech
 						// still follows the point.
 					}
-					void speakQuote(word, msg.id, false, speechText(msg.content));
+					// The repointed word's own block is its context: the
+					// whole message would route the voice off the first
+					// sentence holding the word, wherever that sits.
+					const fresh = annotateMode.currentQuote();
+					void speakQuote(
+						word,
+						msg.id,
+						false,
+						fresh?.messageId && fresh.quote === word
+							? fresh.context
+							: speechText(msg.content)
+					);
 					// The repoint leaves a live highlight on the clicked
 					// word: show its readings like the quoted branch
 					// would below — a second right-click reads like the
 					// first, panel included. Speech already ran above;
 					// readingsForQuote only places the panel.
-					const fresh = annotateMode.currentQuote();
 					if (fresh?.messageId)
 						void readingsForQuote({ ...fresh, messageId: fresh.messageId });
 					return;
