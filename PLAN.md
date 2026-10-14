@@ -28,9 +28,6 @@ the record). Screenshots the owner attached are in
 - Remove the feature where annotations attach to the main text prompt to
   send with the next message. (An archived note asked the prompt to show
   whether something is being annotated; moot once this goes.)
-- Opinion wanted, do not build yet: colour-code things repeated in the
-  same message that were already annotated above, or some feature like
-  that.
 - Right-click on a highlight reads "ichi" before the highlighted text: the
   reader is picking up the annotation badge number as well
   (`right-click-reads-annotation-ichi.jpg`).
@@ -53,6 +50,18 @@ the record). Screenshots the owner attached are in
   entire bullet, not the selection: the Japanese voice reads the English
   and then the whole Japanese sentence (`tts-mixed-jp-en-bullet.jpg`).
   Only that bullet did it.
+
+## Annotations, round 2 (owner, 2026-10-14)
+
+- `a` used to show pinyin for every hanzi everywhere. It must not do that
+  any more: `a` only annotates, and shows the pinyin or furigana of
+  whatever is being annotated. (The owner's note "the pinyin on 'a' needs
+  to move to another keypress" meant this.)
+- Colour-code repeats: text later in a message that was already annotated
+  above gets the same colour as its first annotation. The owner wants
+  colour, not dimming or underlines ("dimming would make it harder to
+  read"). Colours must stay readable in light and dark themes and must not
+  clash with the reading colours (`docs/design/colors.md`).
 
 ## Selection and inspect
 
@@ -124,13 +133,3 @@ the record). Screenshots the owner attached are in
 - Video clips: the "type what you hear" box is too wide, and the video
   controls must stay reachable the whole time.
 
-## Unclear, ask the owner
-
-- "The pinyin on 'a' needs to move to another keypress." (Which `a`: the
-  hover+A aid toggle, or the annotate key? Both exist.)
-
-## Related idea (not this app)
-
-- ccez-lang: "How hard would it be to recreate something like Language
-  Reactor (the Chrome extension) with my own AI translate and dictionary?"
-  Answered in chat 2026-10-14; not scheduled.
