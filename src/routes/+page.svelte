@@ -4639,6 +4639,29 @@
 	 * lands in the notice queue's inline slot — never a throw into UI teardown.
 	 */
 	let ocrBusyId: string | null = $state(null);
+	/** Sticky toast while text recognition runs: the first run on a
+	machine installs the recognizer (seconds, once), and a silent wait
+	read as a frozen app. The outcome toast supersedes it; a miss or
+	failure clears it. Past a few seconds the copy says why. */
+	let ocrToastSeq: number | null = null;
+	function showOcrProgress(): void {
+		const seq = showNotice(notices, "toast", "Recognizing text…");
+		toastAction = null;
+		ocrToastSeq = seq;
+		setTimeout(() => {
+			if (ocrToastSeq !== seq || notices.toast.seq !== seq) return;
+			ocrToastSeq = showNotice(
+				notices,
+				"toast",
+				"Still recognizing — the first run sets up the recognizer"
+			);
+		}, 4000);
+	}
+	function clearOcrProgress(): void {
+		if (ocrToastSeq !== null && notices.toast.seq === ocrToastSeq)
+			clearNotice(notices, "toast");
+		ocrToastSeq = null;
+	}
 
 	async function recognizeAttachment(att: Attachment): Promise<void> {
 		if (ocrBusyId !== null || att.kind !== "image" || !att.dataUrl) return;
@@ -4656,6 +4679,7 @@
 				: null;
 		ocrBusyId = att.id;
 		clearNotice(notices, "inline");
+		showOcrProgress();
 		try {
 			// No language hint: the backend's learner default covers
 			// English + CJK scripts. Passing the Latin TTS fallback
@@ -4722,6 +4746,7 @@
 					: friendlyOcrError(message)
 			);
 		} finally {
+			clearOcrProgress();
 			ocrBusyId = null;
 		}
 	}
@@ -4963,6 +4988,7 @@
 				!native || !visionSupports(activeReplyCode)
 					? ocrFallbackLangs(activeReplyCode)
 					: null;
+			showOcrProgress();
 			try {
 				let result = fallbackLangs
 					? await recognizeFallbackText(dataUrl, fallbackLangs)
@@ -4997,6 +5023,8 @@
 						? friendlyFallbackError(message)
 						: friendlyOcrError(message)
 				);
+			} finally {
+				clearOcrProgress();
 			}
 		} finally {
 			captureBusy = false;

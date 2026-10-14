@@ -15,8 +15,10 @@
 //! Design: `ocr_recognize` takes a base64 image (data URL or raw) plus an
 //! optional BCP-47 language hint, runs one synchronous
 //! `VNRecognizeTextRequest` (accurate level, language correction on) on
-//! the invoke thread, and returns the top candidate per observation,
-//! shaped by [`shape_result`]. No completion-handler block is needed:
+//! a blocking worker thread (the first run installs the recognizer and
+//! can take seconds; on the main thread that beachballed the window),
+//! and returns the top candidate per observation, shaped by
+//! [`shape_result`]. No completion-handler block is needed:
 //! `performRequests` is synchronous and the request's `results` are read
 //! right after it returns.
 //!
@@ -211,9 +213,16 @@ pub fn ocr_supported() -> bool {
 /// when the image is bad, nothing was found, or the platform has no
 /// on-device OCR.
 #[tauri::command]
-pub fn ocr_recognize(image: String, lang: Option<String>) -> Result<OcrOutput, String> {
-    let bytes = decode_image(&image)?;
-    let languages = recognition_languages(lang.as_deref());
+pub async fn ocr_recognize(image: String, lang: Option<String>) -> Result<OcrOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || recognize_blocking(&image, lang.as_deref()))
+        .await
+        .map_err(|_| "text recognition stopped unexpectedly".to_string())?
+}
+
+/// The recognition itself, off the main thread (see [`ocr_recognize`]).
+fn recognize_blocking(image: &str, lang: Option<&str>) -> Result<OcrOutput, String> {
+    let bytes = decode_image(image)?;
+    let languages = recognition_languages(lang);
     #[cfg(target_os = "macos")]
     let candidates = imp::recognize(&bytes, &languages)?;
     #[cfg(target_os = "windows")]
