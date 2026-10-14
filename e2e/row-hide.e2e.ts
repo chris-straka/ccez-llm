@@ -31,22 +31,26 @@ for (const role of ["user", "assistant"] as const) {
 		await expect(row).toHaveCSS("opacity", "0");
 	});
 
-	test(`${role} row stays while its button holds focus`, async ({ page }) => {
+	test(`${role} row stays for keyboard focus, not a clicked button`, async ({
+		page
+	}) => {
 		const row = page.locator(`article.${role} .actions`);
+		const copy = page.locator(
+			`article.${role} .actions button[data-tip="Copy as plain text"]`
+		);
 		await row.hover();
 		await expect(row).toHaveCSS("opacity", "1");
-		// Clicking focuses the button: focus-within keeps the row up
-		// after the pointer leaves...
-		await page
-			.locator(`article.${role} .actions button[data-tip="Copy as plain text"]`)
-			.click();
+		// A mouse click focuses the button, but leaving the message
+		// releases that focus, so the hover-only row hides...
+		await copy.click();
 		await page.mouse.move(2, 2);
+		await expect(copy).not.toBeFocused();
+		await expect(row).toHaveCSS("opacity", "0");
+		// ...while keyboard focus (no mouseleave) keeps it up...
+		await copy.focus();
 		await expect(row).toHaveCSS("opacity", "1");
-		// ...releasing focus hides it again.
-		await page.evaluate(() => {
-			if (document.activeElement instanceof HTMLElement)
-				document.activeElement.blur();
-		});
+		// ...until that focus goes.
+		await copy.blur();
 		await expect(row).toHaveCSS("opacity", "0");
 	});
 }

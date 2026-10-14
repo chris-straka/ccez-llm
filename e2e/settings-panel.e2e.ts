@@ -186,16 +186,20 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
-	// Open settings and wait for it: under load the chord can land
-	// while the gutter double-click's word pick is still settling, so
-	// press again until the panel is really open (never toggles it
-	// shut: the press only fires while it is closed).
+	// Open settings and wait until it stays open: on a loaded runner
+	// the gutter double-click's trailing outside-press can shut the
+	// panel a frame after the chord opens it, so re-press until it
+	// holds (the press only fires while the panel is closed).
 	const panel = page.locator(".settings-panel");
 	const openSettings = () =>
 		expect(async () => {
 			if (await panel.evaluate((el) => el.classList.contains("closed")))
 				await page.keyboard.press("Meta+,");
 			await expect(panel).not.toHaveClass(/closed/, { timeout: 2_000 });
+			await page.waitForTimeout(300);
+			expect(
+				await panel.evaluate((el) => el.classList.contains("closed"))
+			).toBe(false);
 		}).toPass({ timeout: 20_000 });
 	await openSettings();
 	const slider = page.locator(

@@ -157,6 +157,9 @@ test("an image pasted after typed text stays on the same line", async ({
 });
 
 test("removing the pill collapses the strip", async ({ page }) => {
+	// The in-client OCR engine loads on first use: the 120s wait
+	// below needs a test budget past the 60s default.
+	test.slow();
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });

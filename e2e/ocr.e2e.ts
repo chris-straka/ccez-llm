@@ -75,6 +75,9 @@ test("image attachments offer text recognition", async ({ page }) => {
 test("history card OCR reports a textless image without the Mac shell", async ({
 	page
 }) => {
+	// The in-client OCR engine loads on first use: the 120s wait
+	// below needs a test budget past the 60s default.
+	test.slow();
 	// A sent message's expanded card carries a working OCR button:
 	// the pixel carries no text, so the fallback reports the miss
 	// (this also pins the delegated click reaching the stored
@@ -143,6 +146,9 @@ test("history card OCR reports a textless image without the Mac shell", async ({
 });
 
 test("recognition falls back live without the Mac shell", async ({ page }) => {
+	// The in-client OCR engine loads on first use: the 120s wait
+	// below needs a test budget past the 60s default.
+	test.slow();
 	await dropTextImage(page, "hello 123");
 	const item = page.locator(".attachments li").first();
 	await expect(item).toBeVisible({ timeout: 10_000 });
