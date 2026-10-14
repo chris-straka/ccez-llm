@@ -404,8 +404,8 @@ describe("placeNoteEditor", () => {
 		const p = placeNoteEditor(base);
 		expect(p.side).toBe("below");
 		expect(p.y).toBe(331);
-		// Short quote: the tail aims at its middle, capped 24px in.
-		expect(p.x).toBe(424 - 18);
+		// Under the quote's left edge, the tail 24px into it.
+		expect(p.x).toBe(400);
 		expect(p.x + p.tailX).toBe(424);
 		expect(p.maxHeight).toBe(800 - 8 - 331);
 	});
@@ -417,6 +417,14 @@ describe("placeNoteEditor", () => {
 		expect(p.x + 300).toBe(900);
 		// The tail still points at the quote.
 		expect(p.x + p.tailX).toBe(844);
+	});
+	it("shifts a little left so the tail lands on a short word", () => {
+		const p = placeNoteEditor({
+			...base,
+			anchor: { left: 400, top: 300, right: 410, bottom: 320 }
+		});
+		expect(p.x + p.tailX).toBe(405);
+		expect(p.x).toBe(405 - 18);
 	});
 	it("never starts left of the column", () => {
 		const p = placeNoteEditor({

@@ -307,9 +307,9 @@ export interface NoteAnchor {
 
 /**
  * Note editor placement, the answer card's sibling: just below the
- * quote's last line with the tail pointing back at it, inside the
- * article column (shifted left when the box would cross the column's
- * right edge), above the quote only when the room below is too short
+ * quote's last line, starting under its left edge with the tail
+ * pointing back at it, inside the article column (shifted left when
+ * the box would cross the column's right edge), above the quote only when the room below is too short
  * and the top has more. Never covers the quote or its badge
  * (`clearTop`). `side` pins the side chosen at open, so a growing
  * note never flips mid-typing; the height cap is the room on that
@@ -332,13 +332,12 @@ export function placeNoteEditor(facts: {
 	const { anchor, column, cardWidth: w } = facts;
 	const tailInset = Math.min(18, w / 2);
 	const lineWidth = Math.max(0, anchor.right - anchor.left);
-	// Short quotes take the tail at their middle, long last lines
-	// near their start (where reading resumes).
+	// The box starts under the quote's left edge with the tail near
+	// the quote's start (its middle for short words); a word too short
+	// to reach the tail's inset pulls the box that little bit left.
 	const target = anchor.left + Math.min(lineWidth / 2, 24);
-	const x = Math.max(
-		column.left,
-		Math.min(target - tailInset, column.right - w)
-	);
+	const start = lineWidth / 2 >= tailInset ? anchor.left : target - tailInset;
+	const x = Math.max(column.left, Math.min(start, column.right - w));
 	const tailX = Math.min(Math.max(target - x, tailInset), w - tailInset);
 	const reach = facts.gap + facts.tail;
 	const below = facts.floor - m - (anchor.bottom + reach);
