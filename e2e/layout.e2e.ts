@@ -129,9 +129,9 @@ test("text size scales messages and badges, prompt slider scales the composer", 
 	expect(await px("article .rendered")).toBeCloseTo(msgBefore * 1.1, 1);
 });
 
-/** The attachment strip sits on top of the prompt: past a 36rem chat
+/** The attachment strip rides inside the prompt: past a 36rem chat
 width the composer stops growing, and the paste-tag row (with its
-remove ×) must stop with it instead of spilling left. */
+remove ×) stays inside it, lined up with the text. */
 test("attachment strip shares the prompt box at wide chat widths", async ({
 	page
 }) => {
@@ -165,14 +165,14 @@ test("attachment strip shares the prompt box at wide chat widths", async ({
 			return el.getBoundingClientRect();
 		};
 		const strip = rect(".attachments");
-		const prompt = rect(".prompt");
+		const field = rect(".prompt .ta-input");
 		return {
 			stripLeft: strip.left,
-			promptLeft: prompt.left,
+			fieldLeft: field.left,
 			stripRight: strip.right,
-			promptRight: prompt.right
+			fieldRight: field.right
 		};
 	});
-	expect(Math.abs(edges.stripLeft - edges.promptLeft)).toBeLessThanOrEqual(2);
-	expect(Math.abs(edges.stripRight - edges.promptRight)).toBeLessThanOrEqual(2);
+	expect(Math.abs(edges.stripLeft - edges.fieldLeft)).toBeLessThanOrEqual(2);
+	expect(Math.abs(edges.stripRight - edges.fieldRight)).toBeLessThanOrEqual(2);
 });
