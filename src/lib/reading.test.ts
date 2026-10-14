@@ -685,6 +685,23 @@ describe("sliceRunsForQuote", () => {
 		]);
 	});
 
+	it("gives a kanji cut out of a compound its share of the word", () => {
+		const sentenceRuns = annotatedRunsWithOffsets(
+			'<span class="frb">露軍<span class="frt">ろぐん</span></span>の<span class="frb">露<span class="frt">つゆ</span></span>'
+		)!;
+		const sentencePlain = sentenceRuns.map((r) => r.text).join("");
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "露")).toEqual([
+			{ text: "露", reading: "ろ" }
+		]);
+		// A standalone 露 outside the compound keeps its own reading.
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "露", 3)).toEqual([
+			{ text: "露", reading: "つゆ" }
+		]);
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "露軍")).toEqual([
+			{ text: "露軍", reading: "ろぐん" }
+		]);
+	});
+
 	it("clips partial runs at the quote edges", () => {
 		const sentenceRuns = annotatedRunsWithOffsets(
 			'<span class="frb">桜<span class="frt">さくら</span></span>が咲く'
@@ -745,14 +762,14 @@ describe("quoteStartForContext", () => {
 		expect(sliceRunsForQuote(runs, p, "夜", 3)).toEqual([
 			{ text: "夜", reading: "よる" }
 		]);
-		// A genuinely partial pick clips to the quote (popup shows
-		// exactly the highlight); only the occurrence moves.
+		// A genuinely partial pick clips to the quote and reads its
+		// share of the word; only the occurrence moves.
 		expect(sliceRunsForQuote(runs, p, "夜", 0)).toEqual([
-			{ text: "夜", reading: "やかん" }
+			{ text: "夜", reading: "や" }
 		]);
 		// Default stays first-match (quote-bounded like the rest).
 		expect(sliceRunsForQuote(runs, p, "夜")).toEqual([
-			{ text: "夜", reading: "やかん" }
+			{ text: "夜", reading: "や" }
 		]);
 	});
 });
@@ -824,6 +841,16 @@ describe("speechKanaForQuote", () => {
 		)!;
 		const kyouPlain = kyouRuns.map((r) => r.text).join("");
 		expect(speechKanaForQuote(kyouRuns, kyouPlain, "今")).toBe("きょう");
+	});
+
+	it("speaks a kanji picked out of a compound by its share", () => {
+		const roRuns = annotatedRunsWithOffsets(
+			'<span class="frb">露軍<span class="frt">ろぐん</span></span>の<span class="frb">攻撃<span class="frt">こうげき</span></span>'
+		)!;
+		const roPlain = roRuns.map((r) => r.text).join("");
+		expect(speechKanaForQuote(roRuns, roPlain, "露")).toBe("ろ");
+		expect(speechKanaForQuote(roRuns, roPlain, "軍の攻")).toBe("ぐんのこう");
+		expect(speechKanaForQuote(roRuns, roPlain, "露軍")).toBe("ろぐん");
 	});
 
 	it("returns null at the sentence end or off the map", () => {

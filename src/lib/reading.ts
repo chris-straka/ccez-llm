@@ -1,6 +1,7 @@
 import type { ChatProvider } from "./providers/types";
 import { annRefsFor } from "./annotation-block";
 import { escapeHtml } from "./render-math";
+import { partialReading } from "./kanjiSplit";
 
 /**
  * Reading aids + speech, generalized across languages (A6).
@@ -1286,9 +1287,16 @@ export function sliceRunsForQuote(
 		const lo = Math.max(run.start, qStart);
 		const hi = Math.min(run.end, qEnd);
 		if (lo < hi) {
+			const from = lo - run.start;
+			const to = hi - run.start;
 			out.push({
-				text: run.text.slice(lo - run.start, hi - run.start),
-				reading: run.reading
+				text: run.text.slice(from, to),
+				// Part of a compound reads its share of the word
+				// (露 out of 露軍 ろぐん is ろ).
+				reading:
+					run.reading === null
+						? null
+						: partialReading(run.text, run.reading, from, to)
 			});
 		}
 	}
@@ -1336,7 +1344,13 @@ export function speechKanaForQuote(
 			kana += run.text.slice(from, to);
 			continue;
 		}
-		let reading = run.reading;
+		// Kanji picked out of a compound speak their share of the
+		// word reading (露 out of 露軍 ろぐん speaks ろ).
+		let reading = partialReading(run.text, run.reading, from, to);
+		if (reading !== run.reading) {
+			kana += reading;
+			continue;
+		}
 		// The quote starts strictly inside this run: an all-kana
 		// uncovered head comes off the front of the reading.
 		const head = run.text.slice(0, from);
