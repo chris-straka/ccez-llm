@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	fillHangulFromVariants,
 	formatGeneratedModule,
 	inBundledRange,
+	normalizeHangul,
 	parseUnihanReadings
 } from "./unihan-extract";
 
@@ -117,5 +119,31 @@ describe("formatGeneratedModule", () => {
 			includeExtA: false
 		});
 		expect(module.indexOf('"好"')).toBeLessThan(module.indexOf('"語"'));
+	});
+});
+
+describe("kHangul", () => {
+	it("drops source tags and puts educational readings first", () => {
+		expect(normalizeHangul("노:0 로:0E")).toBe("로 노");
+		expect(normalizeHangul("접:0E")).toBe("접");
+		expect(normalizeHangul("가:0 가:1E")).toBe("가");
+	});
+
+	it("parses into h and fills new forms from their old forms", () => {
+		const readings = [
+			"U+8FAD\tkHangul\t사:0E",
+			"U+8F9E\tkMandarin\tcí",
+			"U+63A5\tkHangul\t접:0E"
+		].join("\n");
+		const variants = [
+			"U+8F9E\tkJapaneseOldVariant\tU+8FAD",
+			"U+63A5\tkJapaneseOldVariant\tU+8FAD"
+		].join("\n");
+		const entries = parseUnihanReadings(readings);
+		expect(entries.get("接")?.h).toBe("접");
+		fillHangulFromVariants(entries, readings, variants);
+		expect(entries.get("辞")?.h).toBe("사");
+		// An own reading always wins over a variant's.
+		expect(entries.get("接")?.h).toBe("접");
 	});
 });

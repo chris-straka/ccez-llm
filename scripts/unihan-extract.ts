@@ -14,7 +14,7 @@
  * Ideographs only (U+4E00–U+9FFF).
  *
  * Extracted fields per character: kDefinition, kMandarin, kJapaneseOn,
- * kJapaneseKun (from Unihan_Readings.txt) plus kTotalStrokes and
+ * kJapaneseKun, kHangul (from Unihan_Readings.txt) plus kTotalStrokes and
  * kRSUnicode (from Unihan_IRGSources.txt — both live there, not in
  * Unihan_RadicalStrokeCounts.txt, which only holds kRSAdobe_Japan1_6).
  * Everything else is dropped.
@@ -45,6 +45,7 @@ export const UNIHAN_FIELD_MAP = {
 	kMandarin: "m",
 	kJapaneseOn: "on",
 	kJapaneseKun: "kun",
+	kHangul: "h",
 	kTotalStrokes: "t",
 	kRSUnicode: "rs"
 } as const;
@@ -63,6 +64,8 @@ export interface ExtractedEntry {
 	m?: string;
 	on?: string;
 	kun?: string;
+	/** Hanja readings, educational first (e.g. "로 노"). */
+	h?: string;
 	/** Total stroke count, as written (e.g. "14"). */
 	t?: string;
 	/** Kangxi radical + residual strokes (e.g. "149.7"). */
@@ -105,6 +108,23 @@ function entryFor(
 }
 
 /**
+ * kHangul as plain syllables: "노:0 로:0E" becomes "로 노". The
+ * source tags drop; readings tagged E (the educational hanja list)
+ * come first, so the first syllable is the everyday reading.
+ */
+export function normalizeHangul(value: string): string {
+	const all: string[] = [];
+	const edu: string[] = [];
+	for (const item of value.split(/\s+/)) {
+		const [syllable, tags = ""] = item.split(":");
+		if (!syllable || all.includes(syllable)) continue;
+		all.push(syllable);
+		if (tags.includes("E")) edu.push(syllable);
+	}
+	return [...edu, ...all.filter((s) => !edu.includes(s))].join(" ");
+}
+
+/**
  * Parse Unihan_Readings.txt content (tab-separated
  * `U+XXXX\tkField\tvalue` lines; `#` comments) into per-character
  * entries. Unknown fields, out-of-range code points, and malformed
@@ -130,12 +150,69 @@ export function parseUnihanReadings(
 		if (short === undefined) continue;
 		if (!inBundledRange(codePoint, options)) continue;
 		try {
-			entryFor(entries, codePoint)[short] = value;
+			entryFor(entries, codePoint)[short] =
+				short === "h" ? normalizeHangul(value) : value;
 		} catch {
 			continue;
 		}
 	}
 	return entries;
+}
+
+/** Variant fields whose targets can lend a hanja reading, in trust order. */
+const HANGUL_VARIANT_FIELDS = [
+	"kJapaneseOldVariant",
+	"kTraditionalVariant",
+	"kSemanticVariant",
+	"kZVariant"
+] as const;
+
+/**
+ * Hanja readings for characters Unihan gives none: Japanese new forms
+ * and simplified forms (辞, 学, 汉) borrow the reading of their old or
+ * traditional form (辭 사, 學 학, 漢 한), which Korean writes. Reads
+ * kHangul over every code point (variants can sit outside the bundled
+ * range) and the Unihan_Variants.txt text; only entries still missing
+ * `h` are filled.
+ */
+export function fillHangulFromVariants(
+	entries: Map<string, ExtractedEntry>,
+	readingsText: string,
+	variantsText: string
+): void {
+	const hangul = new Map<number, string>();
+	const variants = new Map<number, Map<string, number[]>>();
+	for (const line of readingsText.split("\n")) {
+		const [cp, field, value] = line.split("\t");
+		if (field !== "kHangul" || !cp?.startsWith("U+") || !value) continue;
+		hangul.set(Number.parseInt(cp.slice(2), 16), normalizeHangul(value));
+	}
+	for (const line of variantsText.split("\n")) {
+		const [cp, field, value] = line.split("\t");
+		if (!cp?.startsWith("U+") || !field || !value) continue;
+		const from = Number.parseInt(cp.slice(2), 16);
+		const targets = [...value.matchAll(/U\+([0-9A-F]+)/g)].map((m) =>
+			Number.parseInt(m[1] ?? "", 16)
+		);
+		let byField = variants.get(from);
+		if (!byField) variants.set(from, (byField = new Map()));
+		byField.set(field, targets);
+	}
+	for (const entry of entries.values()) {
+		if (entry.h !== undefined) continue;
+		const from = entry.char.codePointAt(0) ?? 0;
+		const byField = variants.get(from);
+		if (!byField) continue;
+		for (const field of HANGUL_VARIANT_FIELDS) {
+			const hit = (byField.get(field) ?? [])
+				.map((cp) => hangul.get(cp))
+				.find((h) => h !== undefined);
+			if (hit) {
+				entry.h = hit;
+				break;
+			}
+		}
+	}
 }
 
 export interface GeneratedMeta {
@@ -163,6 +240,7 @@ export function formatGeneratedModule(
 		if (entry.m !== undefined) parts.push(`m:${JSON.stringify(entry.m)}`);
 		if (entry.on !== undefined) parts.push(`on:${JSON.stringify(entry.on)}`);
 		if (entry.kun !== undefined) parts.push(`kun:${JSON.stringify(entry.kun)}`);
+		if (entry.h !== undefined) parts.push(`h:${JSON.stringify(entry.h)}`);
 		if (entry.t !== undefined) parts.push(`t:${JSON.stringify(entry.t)}`);
 		if (entry.rs !== undefined) parts.push(`rs:${JSON.stringify(entry.rs)}`);
 		return `\t${JSON.stringify(entry.char)}:{${parts.join(",")}},`;
@@ -175,7 +253,7 @@ export function formatGeneratedModule(
  *
  * Source: ${meta.sourceUrl} (Unicode ${meta.unicodeVersion},
  * Unihan_Readings.txt: kDefinition + kMandarin + kJapaneseOn +
- * kJapaneseKun; Unihan_IRGSources.txt: kTotalStrokes + kRSUnicode; for ${
+ * kJapaneseKun + kHangul, variants' kHangul where missing; Unihan_IRGSources.txt: kTotalStrokes + kRSUnicode; for ${
 		meta.includeExtA
 			? "CJK Unified Ideographs (U+4E00-U+9FFF) + Extension A (U+3400-U+4DBF)"
 			: "CJK Unified Ideographs (U+4E00-U+9FFF)"
@@ -193,6 +271,7 @@ export interface UnihanEntry {
 	m?: string;
 	on?: string;
 	kun?: string;
+	h?: string;
 	t?: string;
 	rs?: string;
 }
@@ -236,9 +315,12 @@ if (import.meta.main) {
 		const src = argValue(args, "src") ?? "Unihan_Readings.txt";
 		const out = argValue(args, "out") ?? "src/lib/unihan.generated.ts";
 		const includeExtA = args.includes("--include-ext-a");
-		const entries = parseUnihanReadings(
-			readMember(src, "Unihan_Readings.txt"),
-			{ includeExtA }
+		const readings = readMember(src, "Unihan_Readings.txt");
+		const entries = parseUnihanReadings(readings, { includeExtA });
+		fillHangulFromVariants(
+			entries,
+			readings,
+			readMember(src, "Unihan_Variants.txt")
 		);
 		for (const [char, extra] of parseUnihanReadings(
 			readMember(src, "Unihan_IRGSources.txt"),
