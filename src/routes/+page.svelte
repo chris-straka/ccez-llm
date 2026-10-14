@@ -3714,12 +3714,10 @@
 	let lastBoxPad = "";
 	let lastMainPad = "";
 	let lastSbw = "";
-	let lastTrayBottom = "";
 	$effect(() => {
-		// Tracked so attaching/removing re-runs the reserve past the
-		// ResizeObserver (the tray is absolute now: it resizes nothing,
-		// so no notification would ever fire for it).
-		void attachments.length;
+		// Tracked so an inline error re-runs the reserve (it renders
+		// outside the observed card). The attachment strip rides inside
+		// the card, so the ResizeObserver already sees it.
 		void notices.inline.message;
 		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
@@ -3727,17 +3725,7 @@
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
 			const cardH = Math.ceil(card.getBoundingClientRect().height);
-			const cardBottom =
-				Number.parseFloat(window.getComputedStyle(card).bottom) || 0;
 			const clearPx = cardH + 54;
-			// The tray floats over the thread (absolute, transparent),
-			// so the thread runs full-height behind and beside it: the
-			// tail clearance covers the tray too, and the tray docks a
-			// fixed margin above the card (tracking draft growth via
-			// the measured height) instead of riding the reserve high.
-			const tray = mainEl.querySelector<HTMLElement>(":scope > .attachments");
-			const trayH = tray ? Math.ceil(tray.getBoundingClientRect().height) : 0;
-			const trayGap = trayH > 0 ? 8 : 0;
 			// Thread clearance lives INSIDE the scroller: the thread
 			// runs full-height behind the solid card, and the tail
 			// still lands above it at the bottom. Empty chats keep
@@ -3745,28 +3733,14 @@
 			// news mode, whose card list is a tail like any thread.
 			const emptyChat =
 				viewChat.messages.length === 0 && newsMode.news === null;
-			const boxPad = emptyChat ? "0px" : `${clearPx + trayH + trayGap}px`;
+			const boxPad = emptyChat ? "0px" : `${clearPx}px`;
 			if (boxPad !== lastBoxPad) {
 				box.style.paddingBottom = boxPad;
 				lastBoxPad = boxPad;
 			}
-			if (tray && trayH > 0) {
-				const trayBottom = `${cardBottom + cardH + trayGap}px`;
-				if (trayBottom !== lastTrayBottom) {
-					tray.style.bottom = trayBottom;
-					lastTrayBottom = trayBottom;
-				}
-			} else {
-				// The tray remounts fresh on every attach cycle with no
-				// inline bottom (the CSS carries none): forget the last
-				// write while it is gone, or a remount at the same
-				// composer height reads as "unchanged" and the tray
-				// parks at the top.
-				lastTrayBottom = "";
-			}
 			// The error stays in main flow after the scroller:
 			// main-level padding lifts it above the card while
-			// rendered (the absolute tray needs no lift).
+			// rendered.
 			// Binary, so park/summon (transform-only, layout kept)
 			// never move anything. Empty chats keep today's floor.
 			const chromeOpen =
@@ -3783,8 +3757,7 @@
 			// zero with overlay scrollbars): the floating card centers in
 			// the full column, so it rides this much right of the
 			// articles without compensation (see --sbw on .prompt). Set
-			// on main, not the card: the attachment tray is the card's
-			// sibling and shares the same centering math.
+			// on main, not the card.
 			const sbw = `${Math.max(0, box.offsetWidth - box.clientWidth)}px`;
 			if (sbw !== lastSbw) {
 				mainEl.style.setProperty("--sbw", sbw);
@@ -14548,28 +14521,6 @@
 			</p>
 		{/if}
 
-		<!-- Attachment strip: pills and image/pasted-text cards over the
-		thread. Attachments.svelte owns the strip markup, card buttons,
-		and surfaces; the page keeps the array, drag/busy flags,
-		and the editor/toast side effects. The inline error stays paged
-		in the shared `.error` look (Svelte scoping binds page CSS to
-		page markup, so moving it would drop the red pairing). -->
-		<Attachments
-			{attachments}
-			dragging={stripDragging}
-			busyId={ocrBusyId}
-			idle={promptIdle}
-			inlineError={notices.inline.message}
-			actions={{
-				dragStart: stripDragStart,
-				dragMove: stripDragMove,
-				dragEnd: stripDragEnd,
-				clickGate: stripClickGate,
-				copy: copyAttachment,
-				recognize: (att: Attachment) => void recognizeAttachment(att),
-				remove: removeAttachment
-			}}
-		/>
 		{#if notices.inline.message && !androidUI}
 			<p
 				class="error attach-error"
@@ -14658,7 +14609,33 @@
 					editOrange: editOrangeAnnotation
 				}
 			}}
-		/>
+		>
+			{#snippet tray()}
+				<!-- Attachment strip: pills and image/pasted-text cards
+				inside the composer card, above the text.
+				Attachments.svelte owns the strip markup, card buttons,
+				and surfaces; the page keeps the array, drag/busy flags,
+				and the editor/toast side effects. The inline error
+				stays paged in the shared `.error` look (Svelte scoping
+				binds page CSS to page markup, so moving it would drop
+				the red pairing). -->
+				<Attachments
+					{attachments}
+					dragging={stripDragging}
+					busyId={ocrBusyId}
+					inlineError={notices.inline.message}
+					actions={{
+						dragStart: stripDragStart,
+						dragMove: stripDragMove,
+						dragEnd: stripDragEnd,
+						clickGate: stripClickGate,
+						copy: copyAttachment,
+						recognize: (att: Attachment) => void recognizeAttachment(att),
+						remove: removeAttachment
+					}}
+				/>
+			{/snippet}
+		</Composer>
 
 		{#if captureStaged}
 			<!-- Weak-capture overlay: the staged read waits for a

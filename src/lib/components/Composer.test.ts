@@ -3,9 +3,9 @@ import { describe, it, expect } from "vitest";
 
 /**
  * Composer card surfaces live in Composer.svelte; no composer
- * selector stays paged. Field rhythm, text reservation tiers, and
- * the capture menu's upward anchor are CSS contracts jsdom can't
- * see.
+ * selector stays paged. Field rhythm and the capture menu's upward
+ * anchor are CSS contracts jsdom can't see; the bottom-row layout is
+ * pinned in `e2e/composer-bottom-row.e2e.ts`.
  */
 function componentSource(): string {
 	return readFileSync(new URL("./Composer.svelte", import.meta.url), "utf8");
@@ -23,16 +23,6 @@ function pageSource(): string {
 		new URL("../../routes/+page.svelte", import.meta.url),
 		"utf8"
 	);
-}
-
-function reviewDockStyle(): string {
-	const source = readFileSync(
-		new URL("./ReviewDock.svelte", import.meta.url),
-		"utf8"
-	);
-	const match = source.match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("ReviewDock.svelte has no <style> block");
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 function pageStyle(): string {
@@ -102,57 +92,7 @@ describe("composer surfaces", () => {
 	});
 });
 
-describe("composer text reservation", () => {
-	it("sizes the mic tier to the measured icon cluster", () => {
-		const css = componentStyle();
-		// attach + mic + converse + voice measure ~6.5rem in-page
-		// (capture adds a fifth icon): each tier keeps ~1rem of
-		// breathing room, never ~2rem of dead space that wraps text
-		// a word early.
-		expect(css).toMatch(
-			/\.prompt:has\(\.mic-btn\):has\(\.capture-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*9\.1rem/
-		);
-		expect(css).toMatch(
-			/\.prompt:has\(\.mic-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*7\.6rem/
-		);
-	});
-
-	it("keeps the mic-less base tier at its measured size", () => {
-		const css = componentStyle();
-		expect(css).toMatch(/--tools-pad:\s*4\.2rem/);
-	});
-
-	it("reserves room only for buttons that are actually present", () => {
-		const css = componentStyle();
-		const dock = reviewDockStyle();
-		// The mic tier rides the mic button's DOM presence: no mic,
-		// no reservation. The dock tiers ride the wrap's presence.
-		expect(css).toContain(".prompt:has(.mic-btn)");
-		// The five-icon tier needs the capture button too — the
-		// preview (no backend, no button) keeps the four-icon tier.
-		expect(css).toContain(".prompt:has(.mic-btn):has(.capture-btn)");
-		expect(dock).toContain(":global(.prompt:has(.ann-wrap))");
-		expect(dock).toContain(":global(.prompt:has(.mic-btn):has(.ann-wrap))");
-	});
-
-	it("composes the jump trigger on top instead of restating tiers", () => {
-		const css = componentStyle();
-		expect(css).toMatch(
-			/\.prompt:has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*1\.8rem/
-		);
-		expect(css).toContain("calc(var(--tools-pad) + var(--tools-extra))");
-	});
-
-	it("reserves the correction toggle's seat, stacking with the jump trigger", () => {
-		const css = componentStyle();
-		expect(css).toMatch(
-			/\.prompt:has\(\.correct-btn\)\s*\{[^}]*--tools-extra:\s*1\.8rem/
-		);
-		expect(css).toMatch(
-			/\.prompt:has\(\.correct-btn\):has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*3\.6rem/
-		);
-	});
-
+describe("composer capture menu", () => {
 	it("opens the capture menu upward from the tools row", () => {
 		const css = componentStyle();
 		// The composer sits at the viewport bottom: a downward menu

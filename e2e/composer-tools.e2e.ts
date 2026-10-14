@@ -139,34 +139,20 @@ test("idle-hide takes the attachment strip with the prompt", async ({
 	// No input for 2s (+ticker): the prompt slides away and the image
 	// bubble goes with it — no pill lingers over the chat.
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
-	await expect(strip).toHaveClass(/composer-idle/);
-	await expect(strip).toHaveCSS("opacity", "0");
-	// Strip and card park as one unit: same settled translate and same
-	// ramp (a taller tray on its own slide outran the prompt).
-	await expect
-		.poll(
-			async () =>
-				page.evaluate(() => {
-					const motion = (sel: string): string => {
-						const el = document.querySelector(sel);
-						if (!el) return "missing";
-						const css = getComputedStyle(el);
-						return `${css.transform} ## ${css.transitionDuration}`;
-					};
-					return `${motion("ul.attachments")} @@ ${motion("main .prompt")}`;
-				}),
-			{ timeout: 5_000 }
-		)
-		.toMatch(
-			/^matrix\(1, 0, 0, 1, 0, 12\) ## 0\.25s, 0\.25s, 0s @@ matrix\(1, 0, 0, 1, 0, 12\)/
-		);
+	// The strip rides inside the card: one fade, one slide, no
+	// separate ramp to drift out of step.
+	expect(await strip.evaluate((el) => el.closest(".prompt") !== null)).toBe(
+		true
+	);
+	await expect(prompt).toHaveCSS("opacity", "0");
+	await expect(strip).not.toBeVisible();
 	// A summon key restores both together (pointer travel alone only
 	// re-arms the timer, never restores).
 	await page.mouse.move(400, 200);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await expect(strip).not.toHaveClass(/composer-idle/, { timeout: 5_000 });
+	await expect(strip).toBeVisible({ timeout: 5_000 });
 });
 
 test("empty chat never idle-hides the composer", async ({ page }) => {
@@ -239,60 +225,44 @@ test("ESC in the composer drops focus", async ({ page }) => {
 	await expect(editor).not.toBeFocused();
 });
 
-test("composer text clears the tools cluster", async ({ page }) => {
-	// First-line reservation holds the icon cluster clear: padding
-	// meets the row's live width (the old >100px constant dated to
-	// the Shot text-button era; the icon cluster is narrower, so the
-	// invariant — never the number — is what pins the regression).
-	const pad = await page
-		.locator(".ta-input")
-		.first()
-		.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
-	const toolsBox = await page.locator(".prompt-tools").boundingBox();
-	if (!toolsBox) throw new Error("missing tools box");
-	expect(pad).toBeGreaterThanOrEqual(toolsBox.width);
-});
-
-test("composer text clears a growing toolbar at large prompt sizes", async ({
+test("composer text runs the full card width above a growing toolbar", async ({
 	page
 }) => {
 	await page.setViewportSize({ width: 1600, height: 1000 });
 	await addAnnotation(page);
 	const field = page.locator(".ta-input").first();
-	const tools = page.locator(".prompt-tools");
 	await field.fill(
 		'For this "[Pasted 246 chars]", I am a little confused about the meaning of this expression.'
 	);
 	await page.evaluate(() => {
-		const pill = document.querySelector(".prompt-tools .ann-pill");
+		const pill = document.querySelector<HTMLElement>(".prompt-tools .ann-pill");
 		if (!pill) throw new Error("missing annotation counter");
 		pill.textContent = "600";
-		pill.setAttribute("style", "font-size: 2rem");
+		pill.style.fontSize = "4rem";
 		document
 			.querySelector<HTMLElement>(".app")
 			?.style.setProperty("--prompt-font", "2");
 	});
-	const clearsTools = () =>
+	// No side reservation at any toolbar width: the text spans the
+	// card, and the tools row sits wholly below it.
+	const layout = () =>
 		field.evaluate((el) => {
-			const tools = document.querySelector(".prompt-tools");
-			if (!tools) throw new Error("missing prompt toolbar");
-			const fieldRight = el.getBoundingClientRect().right;
-			const pad = parseFloat(getComputedStyle(el).paddingRight);
-			return tools.getBoundingClientRect().left - (fieldRight - pad);
+			const card = el.closest(".prompt")!.getBoundingClientRect();
+			const tools = document
+				.querySelector(".prompt-tools")!
+				.getBoundingClientRect();
+			const box = el.getBoundingClientRect();
+			return {
+				pad: parseFloat(getComputedStyle(el).paddingRight),
+				slack: card.width - box.width,
+				below: tools.top - box.bottom
+			};
 		});
-	await expect.poll(clearsTools).toBeGreaterThanOrEqual(4);
-	await page.evaluate(() => {
-		const pill = document.querySelector<HTMLElement>(".prompt-tools .ann-pill");
-		if (!pill) throw new Error("missing annotation counter");
-		pill.style.fontSize = "4rem";
-	});
-	await expect.poll(clearsTools).toBeGreaterThanOrEqual(4);
+	await expect.poll(async () => (await layout()).pad).toBe(0);
+	const { slack, below } = await layout();
+	expect(slack).toBeLessThan(40);
+	expect(below).toBeGreaterThanOrEqual(0);
 	await expect(field).toHaveValue(/confused about the meaning/);
-	await tools.evaluate((el) => {
-		const pill = el.querySelector<HTMLElement>(".ann-pill");
-		if (pill) pill.style.removeProperty("font-size");
-	});
-	await expect.poll(clearsTools).toBeGreaterThanOrEqual(4);
 	await page
 		.locator(".prompt")
 		.screenshot({ path: ".screenshots/composer-text-spacing.png" });

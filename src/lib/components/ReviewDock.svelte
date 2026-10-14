@@ -413,9 +413,9 @@ answer. -->
 	focus, or pinned click. Beats the centered-column group rule.
 	Flush against the pill (no gap): the pointer travels straight
 	from badge to popup without crossing dead hover space. */
-	/* The pill sits at the prompt's right edge, so the card anchors
-	right and grows up-and-left — growing right would run it off the
-	column (and over the send button's airspace). The pill toggles
+	/* The pill leads the tools row at the prompt's left edge, so the
+	card anchors left and grows up-and-right — growing left would run
+	it off the column. The pill toggles
 	it (pinned): no hover-open anywhere, so reaching for its buttons
 	never flaps it shut. */
 	.ann-wrap .review {
@@ -424,7 +424,7 @@ answer. -->
 		card must never cover its own toggle (click-to-close would
 		have no target). */
 		bottom: calc(100% + 0.5rem);
-		right: 0;
+		left: 0;
 		z-index: 60;
 		width: max-content;
 		min-width: 16rem;
@@ -475,15 +475,6 @@ answer. -->
 	:global(.app[data-android]) :global(.prompt:has(.ann-dock)) .ann-wrap {
 		visibility: hidden;
 		pointer-events: none;
-	}
-	/* Tool seating rides the dock's presence: the prompt reserves
-	room for the wrap (and the mic+wrap pair) via :has(), matched at
-	runtime in the DOM. Fully global — the prompt renders paged. */
-	:global(.prompt:has(.ann-wrap)) :global(.ta-input) {
-		--tools-pad: 9.5rem;
-	}
-	:global(.prompt:has(.mic-btn):has(.ann-wrap)) :global(.ta-input) {
-		--tools-pad: 13.1rem;
 	}
 	:global(.app[data-android]) :global(.prompt-tools) .ann-wrap .review {
 		position: absolute;

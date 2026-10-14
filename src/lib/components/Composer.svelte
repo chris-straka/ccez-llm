@@ -1,4 +1,4 @@
-<!-- Composer: prompt card, tools cluster, send button, banners. The
+<!-- Composer: prompt card, tools row, send button, banners. The
 page owns the editor instance, all composer state (text, idle, mic,
 voice, review drafts, waypoints), and every behavior; this component
 owns the card markup, the tool buttons, and their surfaces (Svelte
@@ -6,8 +6,10 @@ scoping binds the CSS to this markup). Element refs the page drives
 (prompt mount node, send-button geometry) cross as $bindable, exactly
 like Sidebar's search/searchEl. The file input lives here too (the
 page never touches it); the inline attach error stays paged in the
-shared `.error` look. -->
+shared `.error` look. The page's attachment strip renders inside the
+card through the `tray` snippet. -->
 <script lang="ts">
+	import type { Snippet } from "svelte";
 	import { fade } from "svelte/transition";
 	import { dropFilesFromDataTransfer } from "$lib/intake";
 	import { shouldShowInspect } from "$lib/inspect";
@@ -92,6 +94,9 @@ shared `.error` look. -->
 		promptEl?: HTMLElement | undefined;
 		/** Send-button node (the page reads its rect for the hold zone). */
 		sendBtnEl?: HTMLElement | null;
+		/** Attachment strip (pills, image and pasted-text cards): rides
+		inside the card, above the text. */
+		tray?: Snippet;
 		actions: ComposerActions;
 	}
 
@@ -131,34 +136,12 @@ shared `.error` look. -->
 		wpOpen,
 		promptEl = $bindable(),
 		sendBtnEl = $bindable(null),
+		tray,
 		actions
 	}: Props = $props();
 
 	let attachInput: HTMLInputElement | undefined = $state();
 
-	/** Reserve the toolbar's actual width, including variable-width badges. */
-	function measureToolbar(node: HTMLElement): { destroy(): void } {
-		const prompt = node.closest<HTMLElement>(".prompt");
-		const fit = () => {
-			if (!prompt) return;
-			prompt.style.setProperty(
-				"--tools-space",
-				`${Math.ceil(node.getBoundingClientRect().width) + 8}px`
-			);
-		};
-		fit();
-		const observer =
-			typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
-		observer?.observe(node);
-		window.addEventListener("resize", fit);
-		return {
-			destroy: () => {
-				observer?.disconnect();
-				window.removeEventListener("resize", fit);
-				prompt?.style.removeProperty("--tools-space");
-			}
-		};
-	}
 	/** The dock shows the one row a badge tap opened (a waiting
 	note: its quote, question, copy and delete). Annotations live at
 	their badges otherwise — the answer card reads, the pencil
@@ -237,7 +220,7 @@ stop, so both rules below stay suppressed. -->
 		}
 	}}
 >
-	<div class="prompt-tools" use:measureToolbar>
+	<div class="prompt-tools">
 		{#if android && hasSelMenu && !preview}
 			<!-- Phone action dock: Speak and Inspect (Annotate
 			and Copy live in the floating selection menu).
@@ -489,6 +472,9 @@ stop, so both rules below stay suppressed. -->
 			{altHeld ? "Add +" : replyLang ? replyLang.badge : "↑"}
 		</button></span
 	>
+	{#if tray}
+		<div class="tray">{@render tray()}</div>
+	{/if}
 </div>
 {#if banner && !android}
 	<p class="error-banner" role="alert">{banner}</p>
@@ -513,14 +499,9 @@ stop, so both rules below stay suppressed. -->
 		bottom: 0.6rem;
 		min-height: 0;
 	}
-	/* Phone composer: text on top, buttons below (other chat apps'
-	rhythm). The card becomes a plain column: the field grows to its
-	cap then scrolls, the tools row sits static underneath with the
-	send button pinned at its right end. Desktop keeps the overlaid
-	tools cluster and its measured reservations. */
+	/* Phone composer: the base column (text on top, tools row below)
+	with thumb-sized spacing. */
 	:global(.app[data-android]) .prompt {
-		display: flex;
-		flex-direction: column;
 		/* One geometry, every state: no gap, no min-height floor, so
 		focus, first character, and send all hold the fresh-chat size
 		and only text lines grow the card. (The old focus/empty-scoped
@@ -532,11 +513,6 @@ stop, so both rules below stay suppressed. -->
 		padding: 0.85rem 0.8rem 0.75rem;
 	}
 	:global(.app[data-android]) .prompt :global(.ta-input) {
-		/* Top bar is text-only: the tools live in the row below, so no
-		right-side reservation (desktop keeps its overlaid cluster). */
-		--tools-pad: 0rem;
-		--tools-extra: 0rem;
-		--tools-space: 0px;
 		padding: 0 0 0.1rem;
 		/* Small single line (~26px): the old 2rem floor read 60/40
 		against the button bar. The field owns its height where
@@ -547,23 +523,13 @@ stop, so both rules below stay suppressed. -->
 		max-height: 7.5rem;
 	}
 	:global(.app[data-android]) .prompt-tools {
-		position: static;
-		order: 5;
-		width: auto;
-		margin-top: auto;
-		padding-right: 2.6rem;
-		/* Bottom bar: one even row under the text, no divider. */
-		align-items: center;
+		min-height: 0;
+		margin-left: 0;
 		padding-top: 0.35rem;
 	}
 	:global(.app[data-android]) .send-btn {
 		bottom: 0.6rem;
 		right: 0.7rem;
-		/* Outranks the tools row: as a flex item it keeps the base
-		z-index 5, which creates a stacking context even with
-		position static — without this the row eats the send button's
-		taps where they overlap at the card's right end. */
-		z-index: 6;
 		transition:
 			opacity 0.18s ease,
 			visibility 0s;
@@ -754,24 +720,24 @@ stop, so both rules below stay suppressed. -->
 		bottom: 1.1rem;
 		z-index: 30;
 		margin: 0;
-		/* First-line reservation for the absolute tools cluster:
-		measured in-page (attach+voice ≈ 3.3rem, +mic ≈ 5.1rem), so
-		the base covers the mic-less row and the mic tier below covers
-		the rest, each with margin. Combos below only widen it;
-		.wp-jump adds via --tools-extra so every combo composes. */
-		--tools-pad: 4.2rem;
-		--tools-extra: 0rem;
+		/* Text on top at the card's full width, one tools row below
+		with send pinned at its right end (other chat apps' rhythm):
+		the field grows to its cap then scrolls, and nothing ever
+		reserves a column beside the text. The attachment strip rides
+		above the text (.tray). */
+		display: flex;
+		flex-direction: column;
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
 		border-radius: 12px;
-		padding: 0 0.8rem 2.3rem;
+		padding: 0.6rem 0.8rem 0.65rem;
 		background: #fff;
 		/* Raised, not flat: on dark the card sits a step above the page
 		and floats on a soft shadow (none on light). */
 		background: var(--bg-raised);
 		box-shadow: var(--shadow-raised);
 		/* Fixed floor so mounting the editor never shifts layout:
-		about three text lines plus the tools row. */
+		about two text lines plus the tools row. */
 		min-height: 6.4rem;
 		box-sizing: border-box;
 		/* Ease the outline both in and out of hover, plus the
@@ -837,6 +803,10 @@ stop, so both rules below stay suppressed. -->
 	}
 	.send-btn {
 		position: absolute;
+		/* Outranks the tools row: as a flex item with a z-index the
+		row is a stacking context spanning the card, so without this
+		it eats the send button's hits where they overlap. */
+		z-index: 6;
 		/* The glyph (arrow, flag, "Add +") is chrome, never content:
 		long-pressing it must not start a text pick. */
 		user-select: none;
@@ -891,23 +861,32 @@ stop, so both rules below stay suppressed. -->
 		font-size: 0.78rem;
 		padding: 0.3rem 0.9rem;
 	}
-	/* Voice readback toggle: the same borderless icon treatment as the
-	attach button. On state reads green like a playing message row. */
-	/* Attach + Voice ride top-right of the prompt as one cluster, so the
-	icon never drifts from the pill at any text size. */
+	/* Tools row under the text: left-aligned, the send button's seat
+	kept clear at its right end, and as tall as that button so the
+	two share one centre line. Static, so the capture menu anchors to
+	the card itself. */
 	.prompt-tools {
-		position: absolute;
-		top: 0.45rem;
-		right: 0.6rem;
+		position: static;
+		order: 5;
+		margin-top: auto;
 		z-index: 5;
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
+		min-height: 1.7rem;
+		padding-right: 2.6rem;
+		/* The first icon's padding: its glyph lines up with the text. */
+		margin-left: -0.2rem;
+	}
+	/* Attachment strip: above the text inside the card (the editor
+	appends its field after the markup, so order lifts the strip). */
+	.tray {
+		order: -1;
 	}
 	/* The editor mounts one frame after first paint (effect, not
 	markup): until its node lands, the tools and send button stay
-	hidden so they never flash ahead of the editable text. No layout
-	risk — both are absolutely positioned. */
+	hidden so they never flash ahead of the editable text
+	(visibility keeps the row's height, so nothing shifts). */
 	.prompt:not(:has(.ta-input)) .prompt-tools,
 	.prompt:not(:has(.ta-input)) .send-btn {
 		visibility: hidden;
@@ -947,9 +926,9 @@ stop, so both rules below stay suppressed. -->
 	.prompt-tools :global(.action-glyph) {
 		height: 1.05em;
 	}
-	/* Capture source menu: rises above the tools row, right-aligned,
-	growing up-and-left — the composer sits at the viewport bottom,
-	so a downward menu clips off-screen. The scrim takes click-off
+	/* Capture source menu: rises above the card from its left edge
+	(where the tools row starts), growing up-and-right — the composer
+	sits at the viewport bottom, so a downward menu clips off-screen. The scrim takes click-off
 	(the row has no click-away exemption); Esc closes through the
 	page ladder. */
 	.capture-scrim {
@@ -963,7 +942,7 @@ stop, so both rules below stay suppressed. -->
 	.capture-menu {
 		position: absolute;
 		bottom: calc(100% + 0.4rem);
-		right: 0;
+		left: 0;
 		z-index: 70;
 		min-width: 14rem;
 		max-width: min(22rem, calc(100vw - 3rem));
@@ -1095,20 +1074,6 @@ stop, so both rules below stay suppressed. -->
 	.prompt[data-empty="true"] :global(.ta-input:not(:focus)) {
 		caret-color: transparent;
 	}
-	/* Jump trigger joins the cluster in long threads: reserve its seat
-	on top of whichever combo is live (var composition, not ×4 rules). */
-	.prompt:has(.wp-jump) {
-		--tools-extra: 1.8rem;
-	}
-	/* Correction toggle joins beside a set reply language: same seat.
-	Both present stack (the double-:has wins by specificity, so no
-	order dependence between the two singles). */
-	.prompt:has(.correct-btn):has(.wp-jump) {
-		--tools-extra: 3.6rem;
-	}
-	.prompt:has(.correct-btn) {
-		--tools-extra: 1.8rem;
-	}
 	/* Textarea composer: the typed text tracks the prompt's own
 	size (⌘[ / ⌘], the slider — never the message text size), so a
 	fixed 0.95rem box next to huge prompt type never strands the
@@ -1126,8 +1091,7 @@ stop, so both rules below stay suppressed. -->
 		glyphs beside it. The composer carries no ruby, so it keeps
 		its own closer rhythm. */
 		line-height: 1.4;
-		padding: 0.6rem
-			var(--tools-space, calc(var(--tools-pad) + var(--tools-extra))) 0.6rem 0;
+		padding: 0 0 0.35rem;
 		caret-color: #1c1c1e;
 		caret-color: var(--ink);
 		/* Mechanical twin of the cm rules: same pairs, Android-only node. */
@@ -1144,11 +1108,10 @@ stop, so both rules below stay suppressed. -->
 		overflow-y: auto;
 		max-height: 40vh;
 		outline: none;
-		/* No visible scrollbar: the native bar hugs the card's right
-		edge, which is exactly where the tool cluster and send button
-		float — the transient overlay bar slides underneath them.
-		Scrolling still works (wheel, keyboard, caret tracking); only
-		the bar itself is gone, so nothing can sit under a button. */
+		/* No visible scrollbar: the native bar would hug the card's
+		right edge and eat into the full-width text. Scrolling still
+		works (wheel, keyboard, caret tracking); only the bar itself
+		is gone. */
 		scrollbar-width: none;
 	}
 	.prompt :global(.ta-input::-webkit-scrollbar) {
@@ -1169,23 +1132,6 @@ stop, so both rules below stay suppressed. -->
 		user-select: none;
 		-webkit-user-select: none;
 	}
-	/* Tool seating rides the DOM, not JS classes: .mic-btn renders
-	exactly when dictation is available and .ann-wrap exactly when
-	drafts exist, so :has() below is the single source of truth.
-	Tiers track the buttons actually present: four icons (converse
-	rides with the mic) ≈ 6.5rem in-page, five with capture ≈
-	8.3rem — each plus ~1rem of breathing room, never more, or
-	single-line text wraps a word early with empty card beside
-	it. */
-	.prompt:has(.mic-btn):has(.capture-btn) :global(.ta-input) {
-		--tools-pad: 9.1rem;
-	}
-	.prompt:has(.mic-btn) :global(.ta-input) {
-		--tools-pad: 7.6rem;
-	}
-	/* Tool seating for the dock's presence rides with the dock
-	(`ReviewDock.svelte`): :has() matches the dock in the DOM at
-	runtime, whichever component renders it. */
 	.prompt {
 		/* Own size track (--prompt-font, set on .app from the prompt
 		text-size setting): every --font-scale read inside the

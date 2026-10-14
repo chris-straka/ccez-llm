@@ -34,11 +34,9 @@ function pageStyle(): string {
 describe("attachments strip surfaces", () => {
 	it("keeps the strip surfaces scoped to the component", () => {
 		const css = attachmentsStyle();
-		expect(css).toMatch(/\.attachments\s*\{[^}]*position:\s*absolute/);
 		expect(css).toContain(".attachments li.card");
 		expect(css).toContain(".attachments .ocr-btn:disabled");
 		expect(css).toContain(".file-kind");
-		expect(css).toContain(".attachments.composer-idle");
 		expect(pageStyle()).not.toMatch(/\.attachments\s*\{/);
 		expect(pageStyle()).not.toContain(".file-kind");
 	});

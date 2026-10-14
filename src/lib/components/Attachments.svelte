@@ -1,5 +1,6 @@
-<!-- Attachment strip: pills and image/pasted-text cards floating over the
-thread above the composer, plus the drag-to-scroll strip gesture. The page
+<!-- Attachment strip: pills and image/pasted-text cards inside the
+composer card above the text (the page passes it as the composer's
+tray), plus the drag-to-scroll strip gesture. The page
 owns the attachments array, the expanded-pill set, the drag flag, the OCR
 busy id, and the editor/toast side effects; this component owns the strip
 markup, the card buttons, and the surfaces (Svelte scoping binds the CSS
@@ -32,22 +33,18 @@ whenever the tray area is active. -->
 		dragging: boolean;
 		/** Attachment id with OCR in flight (its button shows …). */
 		busyId: string | null;
-		/** Composer idle: the strip rides the prompt's slide/fade. */
-		idle: boolean;
 		/** Inline notice text (tray-active condition only; the line itself
 		stays paged in the shared `.error` look). */
 		inlineError: string | null;
 		actions: AttachmentsActions;
 	}
 
-	let { attachments, dragging, busyId, idle, inlineError, actions }: Props =
-		$props();
+	let { attachments, dragging, busyId, inlineError, actions }: Props = $props();
 </script>
 
 {#if attachments.length > 0 || inlineError}
 	<ul
 		class="attachments"
-		class:composer-idle={idle}
 		class:dragging
 		onpointerdown={actions.dragStart}
 		onpointermove={actions.dragMove}
@@ -130,12 +127,8 @@ whenever the tray area is active. -->
 
 <style>
 	.attachments {
-		position: absolute;
-		left: 1.2rem;
-		right: 1.2rem;
-		z-index: 25;
-		/* Gaps stay thread territory (selectable, scrollable): only
-		the pills and cards take pointer events. */
+		/* Gaps belong to the card floor (a click there lands the
+		caret): only the pills and cards take pointer events. */
 		pointer-events: none;
 		list-style: none;
 		display: flex;
@@ -144,26 +137,20 @@ whenever the tray area is active. -->
 		align-items: center;
 		flex-wrap: nowrap;
 		gap: 0.4rem;
-		margin: 0 1.2rem;
-		padding: 0.3rem 0 0.15rem;
+		margin: 0 0 0.5rem;
+		padding: 0;
 		box-sizing: border-box;
-		max-width: calc(100% - 2.4rem);
+		max-width: 100%;
 		overflow-x: auto;
 		/* Plain scrolling row, never a bar: revealing one on hover
 		reshapes the row on classic scrollbars, so every card jumps
 		a few pixels. Scroll still works (wheel, touch, drag, keys);
 		clipped cards are the affordance. */
 		scrollbar-width: none;
-		/* Pinned tray width (was the shared width group in the page
-		stylesheet): the strip shares the prompt's box line for line —
-		same gutter math (--sbw rides main now, so both see it),
-		same 36rem cap — so paste tags and their × sit on top of the
-		prompt instead of spilling left at wide chat widths. */
-		width: calc(100% - 2.4rem - var(--sbw, 0px));
-		max-width: min(calc(var(--chat-width, 36) * 1rem), 36rem);
-		margin-left: auto;
-		margin-right: auto;
-		right: calc(1.2rem + var(--sbw, 0px));
+	}
+	/* Rendered empty for an inline error alone: no gap above the text. */
+	.attachments:not(:has(li)) {
+		margin: 0;
 	}
 	.attachments::-webkit-scrollbar {
 		width: 0;
@@ -308,33 +295,5 @@ whenever the tray area is active. -->
 	:global(html[data-theme="dark"]) .attachments button {
 		color: #f2f2f7;
 		color: var(--ink);
-	}
-	/* Idle-hide rides the prompt's slide/fade so no pill lingers over
-	the chat, and restores with it on the next input. */
-	.attachments {
-		transition:
-			transform 0.25s ease,
-			opacity 0.25s ease,
-			visibility 0s;
-	}
-	.attachments.composer-idle {
-		/* Same 0.75rem settle and ramp as the card: the old
-		full-height slide outran the prompt — taller trays visibly
-		faster. The fade does the hiding; the slide just settles. */
-		transform: translateY(0.75rem);
-		opacity: 0;
-		visibility: hidden;
-		pointer-events: none;
-		transition:
-			transform 0.25s ease,
-			opacity 0.25s ease,
-			visibility 0s linear 0.25s;
-	}
-	/* Reduced motion settles the summon instantly: no slide, no fade
-	ramp on the strip — what lands is the final frame. */
-	@media (prefers-reduced-motion: reduce) {
-		.attachments {
-			transition: none;
-		}
 	}
 </style>

@@ -247,7 +247,7 @@ test("annotating a repeated character anchors the selected repeat", async ({
 /** The prompt's review card grows up and to the left of its pill —
 never right over the send button's airspace — and opens covering the
 pill, so the cursor is already inside it. */
-test("prompt review card opens up and to the left", async ({ page }) => {
+test("prompt review card opens up and to the right", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.press("Enter");
 	await pinFiled(page);
@@ -262,9 +262,9 @@ test("prompt review card opens up and to the left", async ({ page }) => {
 		const p = rect(".prompt-tools .ann-pill");
 		if (!r || !w || !p) return null;
 		return {
-			cardRight: r.right,
+			cardLeft: r.left,
 			cardTop: r.y,
-			wrapRight: w.right,
+			wrapLeft: w.left,
 			wrapTop: w.top,
 			pillCX: p.x + p.width / 2,
 			pillCY: p.y + p.height / 2,
@@ -272,9 +272,10 @@ test("prompt review card opens up and to the left", async ({ page }) => {
 		};
 	});
 	if (!boxes) throw new Error("review card missing boxes");
-	// Grows upward from the pill, right-aligned with it.
+	// Grows upward from the pill, left-aligned with it (the pill
+	// leads the tools row at the card's left edge).
 	expect(boxes.cardTop).toBeLessThan(boxes.wrapTop);
-	expect(Math.abs(boxes.cardRight - boxes.wrapRight)).toBeLessThanOrEqual(2);
+	expect(Math.abs(boxes.cardLeft - boxes.wrapLeft)).toBeLessThanOrEqual(2);
 	// The pill stays exposed below the open card (the card must never
 	// cover its own toggle, or click-to-close has no target): the gap
 	// is the 0.5rem offset, horizontally the pill sits under the card.

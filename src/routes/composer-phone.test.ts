@@ -40,18 +40,6 @@ function composerStyle(): string {
 }
 
 describe("phone composer two bars", () => {
-	it("makes the top bar text-only (no tools reservation on phones)", () => {
-		const css = composerStyle();
-		expect(css).toContain(
-			":global(.app[data-android]) .prompt :global(.ta-input)"
-		);
-		// The tools live in the row below, so the field drops the
-		// desktop right-side reservation instead of squeezing text.
-		expect(css).toMatch(
-			/:global\(\.app\[data-android\]\) \.prompt :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*0rem/
-		);
-	});
-
 	it("caps the field and never inflates it on focus", () => {
 		const css = composerStyle();
 		// One floor, one cap, focused or not: the old rest-only clamp
@@ -71,9 +59,9 @@ describe("phone composer two bars", () => {
 
 	it("keeps the tools row static below the text as its own bar", () => {
 		const css = composerStyle();
-		expect(css).toMatch(
-			/:global\(\.app\[data-android\]\) \.prompt-tools\s*\{[^}]*position:\s*static/
-		);
+		// One layout for every platform: the base rule carries it.
+		expect(css).toMatch(/\n\t\.prompt-tools\s*\{[^}]*position:\s*static/);
+		expect(css).toMatch(/\n\t\.prompt-tools\s*\{[^}]*order:\s*5/);
 	});
 
 	it("draws no divider between the bars", () => {
