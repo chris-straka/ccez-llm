@@ -318,6 +318,7 @@
 	} from "$lib/selSlices";
 	import {
 		joinSlicesWithBlocks,
+		SEL_TEXT_SKIP,
 		scopeSlices,
 		selectionSlices,
 		shrinkPanelToContent,
@@ -326,7 +327,14 @@
 		tintSelectionSpans,
 		unwrapFuriganaTint
 	} from "$lib/selTint";
-	import { caretOffsetInBlock, nodeAtBlockOffset } from "$lib/caret";
+	import {
+		baseCaret,
+		baseSpanPoints,
+		blockBaseText,
+		caretOffsetInBlock,
+		nodeAtBlockOffset,
+		type BaseText
+	} from "$lib/caret";
 	import { frontendPingOnDone } from "$lib/turns";
 	import { NativeTurns } from "$lib/native-turns.svelte";
 	import { replySystemPrompt } from "$lib/replyPrompt";
@@ -5378,7 +5386,8 @@
 		}
 		// The create marker never splits a word in half: boundaries cut
 		// mid-word snap out to the word's edges before the menu reads
-		// the quote (CJK has no word characters, so it never snaps).
+		// the quote (CJK and Hangul never snap: one hanzi or syllable
+		// stands as drawn).
 		if (live) snapSelectionToWordEdges(live);
 		// Multi-click summons wait for the sequence to settle (see
 		// multiClickMenuAt): press 4 must land on text, never on the
@@ -9681,7 +9690,11 @@
 						// handles. Other scripts keep the span engine.
 						if (msgTapSeq.count === 2) {
 							msgDoubleTapPin = { id: start.msgId, at: now };
-							const cjk = cjkWordRangeAtPoint(ended.clientX, ended.clientY);
+							const cjk = cjkWordRangeAtPoint(
+								ended.clientX,
+								ended.clientY,
+								"block"
+							);
 							if (cjk) {
 								try {
 									const pick = window.getSelection();
@@ -12047,9 +12060,10 @@
 			if (!clickGuardsPass(event)) return;
 			// Native double-click rounds CJK boundaries
 			// engine-dependently (塔 lands や): a point-anchored
-			// CJK pick replaces it — other scripts keep the native
-			// selection untouched.
-			const cjk = cjkWordRangeAtPoint(event.clientX, event.clientY);
+			// CJK pick replaces it, segmented over the paragraph's
+			// base text so pinyin ruby never cuts 什么 down to 什 —
+			// other scripts keep the native selection untouched.
+			const cjk = cjkWordRangeAtPoint(event.clientX, event.clientY, "block");
 			if (cjk) {
 				try {
 					const pick = window.getSelection();
@@ -12765,7 +12779,15 @@
 				const length = node.textContent?.length ?? 0;
 				span.setStart(node, Math.min(start, length));
 				span.setEnd(node, Math.min(end, length));
-				return [...span.getClientRects()].some(
+				return rangeHitsPoint(span, x, y);
+			} catch {
+				return false;
+			}
+		}
+		/** True when the point lands inside the range's screen rects. */
+		function rangeHitsPoint(range: Range, x: number, y: number): boolean {
+			try {
+				return [...range.getClientRects()].some(
 					(rect) =>
 						x >= rect.left - 2 &&
 						x <= rect.right + 2 &&
@@ -12781,9 +12803,17 @@
 		 * Point-anchored CJK word range: candidate segments around the
 		 * caret, keeping the first whose on-screen rect actually
 		 * contains the point — the click, not the rounding, decides.
-		 * Null for non-CJK points (native selection stands).
+		 * `across: "block"` segments the paragraph's base text (ruby
+		 * readings and badges skipped), so a word split over per-hanzi
+		 * pinyin ruby (什么) comes back whole; "node" segments the hit
+		 * text node alone. Null for non-CJK points (native selection
+		 * stands).
 		 */
-		function cjkWordRangeAtPoint(x: number, y: number): Range | null {
+		function cjkWordRangeAtPoint(
+			x: number,
+			y: number,
+			across: "node" | "block" = "node"
+		): Range | null {
 			const at = document.elementFromPoint(x, y);
 			const body =
 				at instanceof Element ? at.closest(".messages .rendered") : null;
@@ -12811,12 +12841,27 @@
 			if (base && base.node !== origins[0]?.node)
 				origins.push({ node: base.node, offset: base.index });
 			for (const origin of origins) {
-				const text = origin.node.textContent ?? "";
-				const offsets = [
-					origin.offset,
-					origin.offset - 1,
-					origin.offset + 1
-				].filter(
+				const block =
+					across === "block"
+						? origin.node.parentElement?.closest(
+								"p, li, pre, td, th, dt, dd, blockquote, h1, h2, h3, h4, h5, h6"
+							)
+						: null;
+				const flat: BaseText =
+					across === "node"
+						? {
+								text: origin.node.textContent ?? "",
+								nodes: [{ node: origin.node, start: 0 }]
+							}
+						: blockBaseText(
+								document,
+								block && body.contains(block) ? block : body,
+								SEL_TEXT_SKIP
+							);
+				const caret = baseCaret(flat, origin.node, origin.offset);
+				if (caret === null) continue;
+				const text = flat.text;
+				const offsets = [caret, caret - 1, caret + 1].filter(
 					(off, i, all) =>
 						off >= 0 && off <= text.length && all.indexOf(off) === i
 				);
@@ -12825,15 +12870,15 @@
 					if (!bounds) continue;
 					const word = text.slice(bounds[0], bounds[1]);
 					if (!word || !CJK_WORD_RE.test(word)) continue;
-					if (rangeContainsPoint(origin.node, bounds[0], bounds[1], x, y)) {
-						try {
-							const range = document.createRange();
-							range.setStart(origin.node, bounds[0]);
-							range.setEnd(origin.node, bounds[1]);
-							return range;
-						} catch {
-							continue;
-						}
+					const points = baseSpanPoints(flat, bounds[0], bounds[1]);
+					if (!points) continue;
+					try {
+						const range = document.createRange();
+						range.setStart(points.start.node, points.start.offset);
+						range.setEnd(points.end.node, points.end.offset);
+						if (rangeHitsPoint(range, x, y)) return range;
+					} catch {
+						continue;
 					}
 				}
 			}

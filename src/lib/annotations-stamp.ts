@@ -1753,6 +1753,8 @@ function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
 	}
 }
 
+const HANGUL_RE = /\p{Script=Hangul}/u;
+
 /**
  * Expand a live selection to word edges (same rule as
  * snapOffsetsToWordEdges, applied per boundary text node so
@@ -1765,6 +1767,9 @@ function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
  * engines; paint must survive).
  */
 export function snapSelectionToWordEdges(selection: Selection): boolean {
+	// Hangul never snaps: a drag over one syllable keeps just it, as
+	// the engine drew it (double-click takes the word).
+	const snaps = (ch: string): boolean => isWordChar(ch) && !HANGUL_RE.test(ch);
 	try {
 		if (!selection || selection.isCollapsed || selection.rangeCount === 0)
 			return false;
@@ -1780,12 +1785,7 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 		if (scN instanceof Text) {
 			const text = scN.textContent ?? "";
 			let s = Math.max(0, Math.min(so, text.length));
-			while (
-				s > 0 &&
-				isWordChar(text[s - 1] ?? "") &&
-				isWordChar(text[s] ?? "")
-			)
-				s -= 1;
+			while (s > 0 && snaps(text[s - 1] ?? "") && snaps(text[s] ?? "")) s -= 1;
 			so = s;
 		}
 		if (ecN instanceof Text) {
@@ -1793,8 +1793,8 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 			let e = Math.max(0, Math.min(eo, text.length));
 			while (
 				e < text.length &&
-				isWordChar(text[e - 1] ?? "") &&
-				isWordChar(text[e] ?? "")
+				snaps(text[e - 1] ?? "") &&
+				snaps(text[e] ?? "")
 			)
 				e += 1;
 			eo = e;
@@ -1811,17 +1811,13 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 			if (!prev) break;
 			const left = prev.textContent ?? "";
 			const right = scN.textContent ?? "";
-			if (
-				!isWordChar(left[left.length - 1] ?? "") ||
-				!isWordChar(right[0] ?? "")
-			)
-				break;
+			if (!snaps(left[left.length - 1] ?? "") || !snaps(right[0] ?? "")) break;
 			scN = prev;
 			let s = left.length;
 			while (
 				s > 0 &&
-				isWordChar(left[s - 1] ?? "") &&
-				isWordChar(s === left.length ? (right[0] ?? "") : (left[s] ?? ""))
+				snaps(left[s - 1] ?? "") &&
+				snaps(s === left.length ? (right[0] ?? "") : (left[s] ?? ""))
 			)
 				s -= 1;
 			so = s;
@@ -1837,19 +1833,13 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 			if (!next) break;
 			const left = ecN.textContent ?? "";
 			const right = next.textContent ?? "";
-			if (
-				!isWordChar(left[left.length - 1] ?? "") ||
-				!isWordChar(right[0] ?? "")
-			)
-				break;
+			if (!snaps(left[left.length - 1] ?? "") || !snaps(right[0] ?? "")) break;
 			ecN = next;
 			let e = 0;
 			while (
 				e < right.length &&
-				isWordChar(
-					e === 0 ? (left[left.length - 1] ?? "") : (right[e - 1] ?? "")
-				) &&
-				isWordChar(right[e] ?? "")
+				snaps(e === 0 ? (left[left.length - 1] ?? "") : (right[e - 1] ?? "")) &&
+				snaps(right[e] ?? "")
 			)
 				e += 1;
 			eo = e;

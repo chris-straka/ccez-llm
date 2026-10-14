@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { dragQuote, seedChat } from "./helpers";
+import { dragQuote, quoteRect, seedChat } from "./helpers";
 
 test.describe("desktop", () => {
 	const SENTENCE = "テストを確認しました。何かお手伝いできることはありますか？";
@@ -252,6 +252,113 @@ test.describe("desktop", () => {
 			).toContain(char);
 			await page.evaluate(() => window.getSelection()?.removeAllRanges());
 		}
+	});
+
+	/** Drags in Chinese and Korean keep exactly what the engine drew: a
+	single hanzi or a single Hangul syllable stands on its own (no
+	snapping out to the whole run or the spaced word). */
+	test("dragging one hanzi or one Hangul syllable keeps just it", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "你在做什么呢？我不知道。" },
+			{ role: "assistant", content: "한국어를 공부하고 있어요." }
+		]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").nth(1)).toBeVisible({
+			timeout: 60_000
+		});
+		await waitForToastToFade(page);
+		for (const [article, char] of [
+			[0, "什"],
+			[0, "么"],
+			[1, "공"],
+			[1, "부"]
+		] as const) {
+			await dragQuote(page, article, char);
+			await expect
+				.poll(() =>
+					page.evaluate(() => window.getSelection()?.toString() ?? "")
+				)
+				.toBe(char);
+			await page.keyboard.press("Escape");
+			await page.evaluate(() => window.getSelection()?.removeAllRanges());
+		}
+	});
+
+	/** Double-click takes the segmenter's word in Chinese and Korean
+	(什么 from either half, never 什 or 么 alone; the spaced Korean
+	word from any of its syllables). */
+	test("double-clicking Chinese or Korean selects the word", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "你在做什么呢？我不知道。" },
+			{ role: "assistant", content: "한국어를 공부하고 있어요." }
+		]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").nth(1)).toBeVisible({
+			timeout: 60_000
+		});
+		await waitForToastToFade(page);
+		for (const [article, char, word] of [
+			[0, "什", "什么"],
+			[0, "么", "什么"],
+			[1, "부", "공부하고"]
+		] as const) {
+			const rect = await quoteRect(page, article, char);
+			await page.mouse.dblclick(
+				rect.x + rect.width / 2,
+				rect.y + rect.height / 2
+			);
+			await expect
+				.poll(() =>
+					page.evaluate(() => window.getSelection()?.toString() ?? "")
+				)
+				.toBe(word);
+			await page.keyboard.press("Escape");
+			await page.evaluate(() => window.getSelection()?.removeAllRanges());
+		}
+	});
+
+	/** Pinned pinyin puts every hanzi in its own ruby: double-click
+	still takes the whole word across them, and a drag over one hanzi
+	still quotes just that hanzi. */
+	test("pinyin ruby keeps word double-click and one-hanzi drags", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "你在做什么呢？我不知道。" }
+		]);
+		await page.goto("/");
+		const actions = page.locator("article.assistant .actions");
+		await expect(actions).toBeVisible({ timeout: 60_000 });
+		await actions.locator('button:has-text("拼音")').click();
+		const body = page.locator("article .rendered").first();
+		await expect(body.locator("ruby").first()).toBeVisible({
+			timeout: 60_000
+		});
+		await waitForToastToFade(page);
+		const quote = (): Promise<string> =>
+			page.evaluate(() => {
+				const live = window.getSelection();
+				if (!live || live.rangeCount === 0) return "";
+				const frag = live.getRangeAt(0).cloneContents();
+				for (const rt of frag.querySelectorAll("rt, rp")) rt.remove();
+				return frag.textContent ?? "";
+			});
+		for (const char of ["什", "么"]) {
+			const rect = await quoteRect(page, 0, char);
+			await page.mouse.dblclick(
+				rect.x + rect.width / 2,
+				rect.y + rect.height / 2
+			);
+			await expect.poll(quote).toBe("什么");
+			await page.keyboard.press("Escape");
+			await page.evaluate(() => window.getSelection()?.removeAllRanges());
+		}
+		await dragQuote(page, 0, "么");
+		await expect.poll(quote).toBe("么");
 	});
 
 	/** Long CJK drag selection (the reader's case): Annotate files the

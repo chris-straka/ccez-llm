@@ -305,6 +305,22 @@ describe("snapSelectionToWordEdges", () => {
 		return sel;
 	}
 
+	it("keeps a Hangul syllable drag as drawn", () => {
+		document.body.innerHTML = "<p>한국어를 공부하고 있어요</p>";
+		const node = document.querySelector("p")?.firstChild;
+		if (!(node instanceof Text)) throw new Error("no text");
+		const sel = selectIn(node, 5, 6);
+		expect(snapSelectionToWordEdges(sel)).toBe(false);
+		expect(sel.toString()).toBe("공");
+		// Latin beside it still snaps out to its own edges.
+		document.body.innerHTML = "<p>Korean 공부 study</p>";
+		const mixed = document.querySelector("p")?.firstChild;
+		if (!(mixed instanceof Text)) throw new Error("no text");
+		const pick = selectIn(mixed, 8, 14);
+		expect(snapSelectionToWordEdges(pick)).toBe(true);
+		expect(pick.toString()).toBe("부 study");
+	});
+
 	it("expands a mid-word drag to whole words, preserving direction", () => {
 		document.body.innerHTML = "<p>hello world</p>";
 		const node = document.querySelector("p")?.firstChild;
