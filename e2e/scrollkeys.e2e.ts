@@ -314,27 +314,45 @@ test("d hold ramps: second window outruns the first, then cruises fast", async (
 		parked,
 		{ timeout: 10_000 }
 	);
-	const start = await scrollTop(page);
-	await page.waitForTimeout(250);
-	const m1 = await scrollTop(page);
-	await page.waitForTimeout(250);
-	const m2 = await scrollTop(page);
+	// Sample in the page, one read per frame with its timestamp: two
+	// Playwright round trips per window skew the windows on a loaded
+	// runner, while in-page samples time each window exactly.
+	const samples = await page.evaluate(
+		() =>
+			new Promise<Array<{ t: number; top: number }>>((resolve) => {
+				const box = document.querySelector(".messages") as HTMLElement | null;
+				const out: Array<{ t: number; top: number }> = [];
+				const t0 = performance.now();
+				const step = (now: number) => {
+					out.push({ t: now - t0, top: box?.scrollTop ?? 0 });
+					if (now - t0 < 500) requestAnimationFrame(step);
+					else resolve(out);
+				};
+				requestAnimationFrame(step);
+			})
+	);
 	await page.keyboard.up("d");
 	const max = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		return box ? box.scrollHeight - box.clientHeight : 0;
 	});
-	expect(m2, "the hold ran out of room before window two closed").toBeLessThan(
-		max
-	);
+	const first = samples[0];
+	const last = samples[samples.length - 1];
+	const mid = samples.find((s) => s.t >= 250) ?? last;
+	if (!first || !last || !mid) throw new Error("no scroll samples");
+	expect(
+		last.top,
+		"the hold ran out of room before window two closed"
+	).toBeLessThan(max);
 	// First window rides the ramp (starts at j/k speed), the second
 	// cruises near peak: the hold accelerates instead of kicking.
-	// Bounds stay wide for headless rAF pacing.
-	const w1 = m1 - start;
-	const w2 = m2 - m1;
-	expect(w1).toBeGreaterThan(0);
-	expect(w2).toBeGreaterThan(w1);
-	expect(w2).toBeGreaterThan(300);
+	// Speeds per real elapsed ms, so frame pacing can't fake a ramp.
+	const v1 = (mid.top - first.top) / Math.max(1, mid.t - first.t);
+	const v2 = (last.top - mid.top) / Math.max(1, last.t - mid.t);
+	expect(v1).toBeGreaterThan(0);
+	expect(v2).toBeGreaterThan(v1);
+	// 300px per quarter second at cruise.
+	expect(v2).toBeGreaterThan(1.2);
 });
 
 test("gg goes to top, G to the bottom", async ({ page }) => {
