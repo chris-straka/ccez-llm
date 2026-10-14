@@ -1,8 +1,10 @@
 //! Hover-reveal traffic lights (macOS).
 //!
 //! The shell uses an overlay titlebar, so the close/minimize/zoom
-//! buttons paint over the content at all times. They fade out until
-//! the pointer reaches them, then fade back in — macOS fullscreen
+//! buttons paint over the content at all times. Every window starts
+//! with them hidden (and re-hides on focus, resize and un-minimize,
+//! when AppKit redraws them opaque); they fade in only while the
+//! pointer is at their corner — macOS fullscreen
 //! keeps its own hover chrome, so a fullscreen window forces them
 //! visible instead of fighting it.
 //!
@@ -72,8 +74,7 @@ impl ScreenRect {
 #[cfg(target_os = "macos")]
 mod imp {
     use std::ptr::NonNull;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::OnceLock;
+    use std::sync::{Mutex, Once};
 
     use block2::RcBlock;
     use objc2::rc::Retained;
@@ -88,24 +89,25 @@ mod imp {
 
     use super::{hover_pad, target_alpha, ScreenRect, FADE_SECS};
 
-    /// Live AppKit handle plus the last shown state (change-only
+    /// One watched window plus its last shown state (change-only
     /// fades: setting the animator target on every mouse move would
     /// restart the ramp under a resting pointer).
-    struct Handles {
-        window: *mut NSWindow,
-        shown: AtomicBool,
+    struct Watched {
+        label: String,
+        window: Retained<NSWindow>,
+        shown: bool,
     }
 
-    // SAFETY: only ever dereferenced on the main thread (the event
-    // monitor, tracking callbacks, and `run_on_main_thread` all run
-    // there), and the window outlives the app.
-    unsafe impl Send for Handles {}
-    unsafe impl Sync for Handles {}
+    // SAFETY: only ever touched on the main thread (the event monitor,
+    // tracking callbacks, window events, and `run_on_main_thread` all
+    // run there); the Mutex just satisfies the static.
+    unsafe impl Send for Watched {}
 
-    static STATE: OnceLock<Handles> = OnceLock::new();
+    static WATCHED: Mutex<Vec<Watched>> = Mutex::new(Vec::new());
+    static MONITOR: Once = Once::new();
 
     // SAFETY: stateless tracking owner — no ivars, no shared mutation.
-    // The window rides the static above; both callbacks just refresh.
+    // The windows ride the static above; both callbacks just refresh.
     define_class!(
         #[unsafe(super(NSResponder))]
         #[name = "CcezTrafficLights"]
@@ -118,17 +120,23 @@ mod imp {
             unsafe fn mouse_entered(&self, _event: &NSEvent) {
                 // Window (re-)entered, possibly straight onto the
                 // lights with no move yet: read the absolute state.
-                refresh();
+                refresh(false);
             }
 
             #[unsafe(method(mouseExited:))]
             unsafe fn mouse_exited(&self, _event: &NSEvent) {
                 // Pointer left the window: the monitor goes quiet, so
                 // this refresh settles the buttons hidden.
-                refresh();
+                refresh(false);
             }
         }
     );
+
+    const BUTTONS: [NSWindowButton; 3] = [
+        NSWindowButton::CloseButton,
+        NSWindowButton::MiniaturizeButton,
+        NSWindowButton::ZoomButton,
+    ];
 
     fn is_fullscreen(window: &NSWindow) -> bool {
         window.styleMask().contains(NSWindowStyleMask::FullScreen)
@@ -155,54 +163,52 @@ mod imp {
 
     fn hovered(window: &NSWindow, pad: f64) -> bool {
         let at: NSPoint = NSEvent::mouseLocation();
-        [
-            NSWindowButton::CloseButton,
-            NSWindowButton::MiniaturizeButton,
-            NSWindowButton::ZoomButton,
-        ]
-        .into_iter()
-        .filter_map(|kind| button_rect(window, kind))
-        .any(|rect| rect.contains(at.x, at.y, pad))
+        BUTTONS
+            .into_iter()
+            .filter_map(|kind| button_rect(window, kind))
+            .any(|rect| rect.contains(at.x, at.y, pad))
     }
 
-    /// Absolute refresh: read hover + fullscreen + motion state and
-    /// fade only when the shown state actually flips. The hit test
-    /// rides the current state's own pad (wide to hide, tight to
-    /// show) so boundary jitter can't strobe the fade.
-    fn refresh() {
-        let Some(state) = STATE.get() else {
+    /// Absolute refresh of every watched window: read hover +
+    /// fullscreen + motion state and fade only when the shown state
+    /// flips. The hit test rides the current state's own pad (wide to
+    /// hide, tight to show) so boundary jitter can't strobe the fade.
+    /// `force` re-applies the target instantly whatever the cached
+    /// state says: AppKit draws fresh (and re-laid-out) buttons at
+    /// full alpha, so arming, focus and un-minimizing must settle
+    /// them from the live read, not the cache.
+    fn refresh(force: bool) {
+        let Ok(mut watched) = WATCHED.lock() else {
             return;
         };
-        // SAFETY: main thread, window outlives the app.
-        let window = unsafe { &*state.window };
-        let shown = state.shown.load(Ordering::SeqCst);
-        let show = target_alpha(hovered(window, hover_pad(shown)), is_fullscreen(window)) > 0.5;
-        if show != state.shown.swap(show, Ordering::SeqCst) {
-            fade(if show { 1.0 } else { 0.0 });
+        for entry in watched.iter_mut() {
+            let window = &*entry.window;
+            let show = target_alpha(
+                hovered(window, hover_pad(entry.shown)),
+                is_fullscreen(window),
+            ) > 0.5;
+            if force {
+                entry.shown = show;
+                set_alpha(window, if show { 1.0 } else { 0.0 }, 0.0);
+            } else if show != entry.shown {
+                entry.shown = show;
+                let secs = if reduce_motion() { 0.0 } else { FADE_SECS };
+                set_alpha(window, if show { 1.0 } else { 0.0 }, secs);
+            }
         }
     }
 
-    fn fade(alpha: f64) {
-        let Some(state) = STATE.get() else {
-            return;
-        };
+    fn set_alpha(window: &NSWindow, alpha: f64, secs: f64) {
         NSAnimationContext::beginGrouping();
-        if reduce_motion() {
-            // Instant settle under Reduce Motion, like the web UI.
-            NSAnimationContext::currentContext().setDuration(0.0);
-        } else {
-            NSAnimationContext::currentContext().setDuration(FADE_SECS);
-        }
-        // SAFETY: main thread, window outlives the app.
-        let window = unsafe { &*state.window };
-        for kind in [
-            NSWindowButton::CloseButton,
-            NSWindowButton::MiniaturizeButton,
-            NSWindowButton::ZoomButton,
-        ] {
+        NSAnimationContext::currentContext().setDuration(secs);
+        for kind in BUTTONS {
             let Some(button) = window.standardWindowButton(kind) else {
                 continue;
             };
+            if secs == 0.0 {
+                button.setAlphaValue(alpha);
+                continue;
+            }
             // The animator proxy carries the alpha change through the
             // grouping above; setting alpha directly would snap.
             let animator: Retained<NSButton> = unsafe { msg_send![&*button, animator] };
@@ -211,33 +217,41 @@ mod imp {
         NSAnimationContext::endGrouping();
     }
 
+    /// One app-wide hover monitor: every mouse move recomputes every
+    /// watched window from live button geometry. The event MUST be
+    /// returned or the pointer freezes.
+    fn arm_monitor() {
+        MONITOR.call_once(|| {
+            let watcher = RcBlock::new(|event: NonNull<NSEvent>| -> *mut NSEvent {
+                refresh(false);
+                event.as_ptr()
+            });
+            // SAFETY: block takes and returns a valid event pointer;
+            // the leaked block and monitor token outlive the app.
+            let token = unsafe {
+                NSEvent::addLocalMonitorForEventsMatchingMask_handler(
+                    NSEventMask::MouseMoved,
+                    &watcher,
+                )
+            };
+            std::mem::forget(watcher);
+            // The token only names the monitor for removal; leaking it
+            // keeps the registration alive for the app's lifetime,
+            // which is exactly the hover contract (never unhooked).
+            std::mem::forget(token);
+        });
+    }
+
     fn apply(window: &tauri::WebviewWindow) {
         let Ok(ptr) = window.ns_window() else {
             return;
         };
-        // SAFETY: main thread (run_on_main_thread), window outlives setup.
-        let ns_window: &NSWindow = unsafe { &*(ptr as *mut NSWindow) };
-
-        // Hover monitor: every mouse move recomputes from live button
-        // geometry. The event MUST be returned or the pointer freezes.
-        let watcher = RcBlock::new(|event: NonNull<NSEvent>| -> *mut NSEvent {
-            refresh();
-            event.as_ptr()
-        });
-        // SAFETY: block takes and returns a valid event pointer; the
-        // leaked block and monitor token outlive the app.
-        let token = unsafe {
-            NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::MouseMoved, &watcher)
+        // SAFETY: main thread (run_on_main_thread); the pointer is a
+        // live NSWindow, retained here until the window is destroyed.
+        let Some(ns_window) = (unsafe { Retained::retain(ptr as *mut NSWindow) }) else {
+            return;
         };
-        std::mem::forget(watcher);
-        // The token only names the monitor for removal; forgetting it
-        // leaks the registration alive for the app's lifetime, which
-        // is exactly the hover contract (never unhooked).
-        std::mem::forget(token);
-        let _ = STATE.set(Handles {
-            window: ns_window as *const NSWindow as *mut NSWindow,
-            shown: AtomicBool::new(false),
-        });
+        arm_monitor();
 
         // Content-view tracking area: the monitor only fires on moves,
         // so window enter/exit refresh explicitly (teleport straight
@@ -262,17 +276,47 @@ mod imp {
             };
             content.addTrackingArea(&area);
         }
-        // Leaked for the app's lifetime: tracking areas do not retain
-        // their owner, and setup runs once.
+        // Leaked for the window's lifetime: tracking areas do not
+        // retain their owner.
         std::mem::forget(delegate);
-        // Resting state from the absolute read, not an assumption.
-        refresh();
+
+        if let Ok(mut watched) = WATCHED.lock() {
+            watched.retain(|w| w.label != window.label());
+            watched.push(Watched {
+                label: window.label().to_string(),
+                window: ns_window,
+                shown: false,
+            });
+        }
+        // Resting state from the absolute read, applied whatever the
+        // buttons currently show: they start hidden unless the
+        // pointer already sits on them.
+        refresh(true);
     }
 
-    /// Arm hover-reveal on the main window. Main thread only.
+    /// Arm hover-reveal on a window. Safe from any thread.
     pub fn watch(window: tauri::WebviewWindow) {
         let owned = window.clone();
         let _ = window.run_on_main_thread(move || apply(&owned));
+        // Focus (un-minimizing makes the window key) and resizes
+        // (zoom, full screen exit, deminiaturize re-layout) re-settle
+        // from the live read; a destroyed window drops its handle.
+        let label = window.label().to_string();
+        let main = window.clone();
+        window.on_window_event(move |event| match event {
+            tauri::WindowEvent::Focused(_) | tauri::WindowEvent::Resized(_) => {
+                let _ = main.run_on_main_thread(|| refresh(true));
+            }
+            tauri::WindowEvent::Destroyed => {
+                let label = label.clone();
+                let _ = main.run_on_main_thread(move || {
+                    if let Ok(mut watched) = WATCHED.lock() {
+                        watched.retain(|w| w.label != label);
+                    }
+                });
+            }
+            _ => {}
+        });
     }
 }
 

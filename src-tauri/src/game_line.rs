@@ -47,6 +47,9 @@ fn open_game_line_desktop(app: &tauri::AppHandle) -> Result<(), String> {
             .focused(true)
             .build()
             .map_err(|_| "the game line could not open".to_string())?;
+    // Same hover-reveal traffic lights as the main window.
+    #[cfg(target_os = "macos")]
+    crate::trafficlights::watch(window.clone());
     // The settings toggle mirrors the window: report its close so the
     // main window can flip the toggle back (a native-frame X gives the
     // frontend no other signal).
