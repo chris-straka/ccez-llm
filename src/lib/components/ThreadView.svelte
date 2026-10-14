@@ -561,7 +561,16 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	{/each}
 	<!-- Sending status renders in `SendingIndicator.svelte`; the page
 	keeps send/fetch state and labels. -->
-	<SendingIndicator phase={sendingPhase} elapsed={sendElapsed} {waitingLabel} />
+	<SendingIndicator
+		phase={sendingPhase}
+		elapsed={sendElapsed}
+		{waitingLabel}
+		onenter={() => {
+			if (messages[messages.length - 1]?.role === "assistant")
+				actions.hoverRow(messages.length - 1);
+		}}
+		onleave={() => actions.hoverRow(-1)}
+	/>
 </div>
 
 <style>

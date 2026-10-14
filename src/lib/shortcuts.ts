@@ -42,7 +42,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		{
 			group: move,
 			name: "Chats list",
-			keys: "Swipe right · two-finger swipe right"
+			keys: "Swipe right · hold, then swipe right · two-finger swipe right"
 		},
 		{
 			group: move,
@@ -176,6 +176,7 @@ export function desktopShortcuts(
 			name: "Delete",
 			keys: isMac ? "⌘Delete · ⌘D · Shift+D" : "Ctrl+Delete · Shift+D"
 		},
+		{ group: hover, name: "Undo delete", keys: `${meta}Z` },
 		{
 			group: chats,
 			name: "Search chats",
@@ -213,7 +214,9 @@ export function desktopShortcuts(
 			keys: "Hover it in the list, then the pencil"
 		},
 		{ group: chats, name: "Delete this chat", keys: `${shiftMeta}Delete` },
+		{ group: chats, name: "Chat position", keys: "Hold Shift" },
 		{ group: prompt, name: "Edit newest message", keys: `${meta}E` },
+		{ group: prompt, name: "Stop the reply", keys: "Hold the send button" },
 		{
 			group: prompt,
 			name: "Rerun a prompt",

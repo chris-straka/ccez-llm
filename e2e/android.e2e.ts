@@ -90,7 +90,7 @@ test.describe("gestures", () => {
 		// The list row teaches its two openers; the switcher owns the
 		// double-tap now, and fold and settings rows exist.
 		await expect(modal.locator('dt:text-is("Chats list") + dd')).toHaveText(
-			"Swipe right · two-finger swipe right"
+			"Swipe right · hold, then swipe right · two-finger swipe right"
 		);
 		await expect(modal.locator('dt:text-is("Fold a message")')).toBeVisible();
 		await expect(modal.locator('dt:text-is("Settings")')).toBeVisible();
@@ -707,6 +707,53 @@ test.describe("touch", () => {
 		const panel = page.locator(".settings-panel");
 		await swipeTwoFinger(page, 300, 150);
 		await expect(panel).not.toHaveClass(/closed/);
+	});
+
+	/** Hold, then drag right without lifting: the chats list opens
+	mid-stroke. A drag that never rested waits for the lift like any
+	swipe. */
+	test("hold then swipe opens the chats list while holding", async ({
+		page
+	}) => {
+		await seedChat(page, [{ role: "assistant", content: "hello there" }]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const aside = page.locator("aside:has(button.new)");
+		await expect(aside).toHaveClass(/collapsed/);
+		const stroke = (phase: "start" | "move", x: number) =>
+			page.evaluate(
+				({ phase, x }) => {
+					const target = document.querySelector("article .rendered");
+					if (!target) throw new Error("no article");
+					const t = new Touch({
+						identifier: 4,
+						target,
+						clientX: x,
+						clientY: 300
+					});
+					target.dispatchEvent(
+						new TouchEvent(phase === "start" ? "touchstart" : "touchmove", {
+							bubbles: true,
+							cancelable: true,
+							touches: [t]
+						})
+					);
+				},
+				{ phase, x }
+			);
+		// A quick drag (no rest) does not open mid-stroke.
+		await stroke("start", 120);
+		await stroke("move", 220);
+		await expect(aside).toHaveClass(/collapsed/);
+		await page.evaluate(() =>
+			window.dispatchEvent(new TouchEvent("touchcancel", { bubbles: true }))
+		);
+		// Rest, then drag: open before the finger lifts.
+		await stroke("start", 120);
+		await page.waitForTimeout(450);
+		await stroke("move", 140);
+		await stroke("move", 220);
+		await expect(aside).not.toHaveClass(/collapsed/);
 	});
 
 	test("two-finger swipe right summons the chats list", async ({ page }) => {
@@ -2823,6 +2870,84 @@ test.describe("always-visible prompt", () => {
 			]);
 		}
 		await touch("touchEnd", []);
+		expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
+	});
+
+	/** Pinch is the text-size gesture everywhere on a phone: over the
+	settings panel it steps the text size too, and the page itself
+	never zooms (page zoom is off in the viewport tag). */
+	test("pinch over settings changes the text size, never zooms", async ({
+		page
+	}) => {
+		await seed(page, { fontScale: 1 }, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		expect(
+			await page.evaluate(
+				() =>
+					document
+						.querySelector('meta[name="viewport"]')
+						?.getAttribute("content") ?? ""
+			)
+		).toContain("user-scalable=no");
+		// Two-finger swipe left opens settings.
+		await page.evaluate(() => {
+			const touch = (id: number, x: number) =>
+				new Touch({
+					identifier: id,
+					target: document.body,
+					clientX: x,
+					clientY: 500
+				});
+			const fire = (type: string, at: number, lifted = false) =>
+				window.dispatchEvent(
+					new TouchEvent(type, {
+						bubbles: true,
+						cancelable: true,
+						touches: lifted ? [] : [touch(1, at), touch(2, at + 40)],
+						changedTouches: [touch(1, at), touch(2, at + 40)]
+					})
+				);
+			fire("touchstart", 300);
+			fire("touchmove", 150);
+			fire("touchend", 150, true);
+		});
+		const panel = page.locator(".settings-panel");
+		await expect(panel).not.toHaveClass(/closed/);
+		const box = await panel.boundingBox();
+		if (!box) throw new Error("no settings panel");
+		const cx = box.x + box.width / 2;
+		const cy = box.y + box.height / 2;
+		const scale = () =>
+			page.evaluate(
+				() =>
+					(
+						JSON.parse(
+							localStorage.getItem("ccez-llm-settings-v1") ?? "{}"
+						) as { fontScale?: number }
+					).fontScale ?? 1
+			);
+		const cdp = await page.context().newCDPSession(page);
+		const touch = (
+			type: "touchStart" | "touchMove" | "touchEnd",
+			points: { x: number; y: number }[]
+		) =>
+			cdp.send("Input.dispatchTouchEvent", {
+				type,
+				touchPoints: points.map((p, id) => ({ ...p, id }))
+			});
+		await touch("touchStart", [
+			{ x: cx - 40, y: cy },
+			{ x: cx + 40, y: cy }
+		]);
+		for (let i = 1; i <= 12; i++) {
+			await touch("touchMove", [
+				{ x: cx - 40 - i * 6, y: cy },
+				{ x: cx + 40 + i * 6, y: cy }
+			]);
+		}
+		await touch("touchEnd", []);
+		await expect.poll(scale, { timeout: 5000 }).toBeGreaterThan(1);
 		expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
 	});
 

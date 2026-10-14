@@ -335,10 +335,16 @@ test("thinking chip counts up and tints", async ({ page }) => {
 	await expect(sending.locator(".sending-elapsed")).toContainText(/· \d+s/, {
 		timeout: 12_000
 	});
+	// The count fades in on hover and back out on leave.
 	const elapsed = sending.locator(".sending-elapsed");
-	await expect(elapsed).toBeHidden();
+	const opacity = () =>
+		elapsed.evaluate((el) => Number(getComputedStyle(el).opacity));
+	await expect(elapsed).toHaveCSS("opacity", "0");
+	await expect(elapsed).toHaveCSS("transition-property", "opacity");
 	await sending.locator(".sending-chip").hover();
-	await expect(elapsed).toBeVisible();
+	await expect.poll(opacity).toBeGreaterThan(0.7);
+	await page.mouse.move(5, 5);
+	await expect.poll(opacity).toBe(0);
 	// No backplate: the chip is plain status text and the color lives
 	// on the dots — three distinct hues in a blue-teal-green run.
 	const dotColors = await page.evaluate(() => {

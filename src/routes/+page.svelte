@@ -26,6 +26,9 @@
 		clampChatIndex,
 		messageIndexFromId,
 		deleteMessage,
+		restoreDeletedMessages,
+		cancelSend,
+		type DeletedMessage,
 		stageMessage,
 		branchFrom,
 		dismissFailedAssistant,
@@ -56,6 +59,12 @@
 		type ChatId,
 		type ChatMsgId
 	} from "$lib/chat";
+	import {
+		fileComposerDraft,
+		sendAgeSec,
+		syncSendStarts,
+		type ComposerDraft
+	} from "$lib/chatSwitch";
 	import {
 		loadSettings,
 		saveSettings,
@@ -346,6 +355,7 @@
 		micButtonsShown,
 		altKeyLabel,
 		edgeSwipeTarget,
+		holdSwipeOpensChats,
 		contentSwipeTarget,
 		messageFoldSwipe,
 		pinchZoomStep,
@@ -389,7 +399,8 @@
 		sidebarListAction,
 		sidebarSpeakTarget,
 		spaceKeyAction,
-		enterKeyAction
+		enterKeyAction,
+		counterPeekStep
 	} from "$lib/keybindings";
 	import {
 		closestFromTarget,
@@ -482,6 +493,7 @@
 		submitAction,
 		sendAction,
 		editMessageAction,
+		editReasks,
 		newestUserMessageIndex,
 		commitEditTarget,
 		shouldRumbleOnFirstToken
@@ -538,7 +550,7 @@
 		isPromptIdle,
 		stageOwnedByOverlay,
 		pointInRect,
-		sendHoldArmed,
+		sendHoldAction,
 		columnBounds,
 		gutterSide,
 		rowWorkRunning,
@@ -2796,6 +2808,10 @@
 	const altm = $derived(altKeyLabel(isMac));
 	let hasText = $state(false);
 	let altHeld = $state(false);
+	/** Shift held alone outside the prompt: the chat counter shows. */
+	let counterPeek = $state(false);
+	let counterPeekTimer: ReturnType<typeof setTimeout> | null = null;
+	const COUNTER_PEEK_MS = 250;
 	// Quiet to send: while a reply streams, the lib drops every send
 	// and stage — but only after doSend/stage already emptied the
 	// composer. Gating here keeps the button dead AND the draft intact,
@@ -2982,6 +2998,7 @@
 			// also keys on activeChatId) from ever filing one chat's
 			// drafts under another's id.
 			drafts.fileChat(from);
+			swapComposerDraft(from, id);
 			selectChat(chatState, id);
 			drafts.restoreChat(id);
 			// Answers lost to a restart refire here (a chat switch
@@ -3006,18 +3023,26 @@
 	// Every chat switch lands the box: chats with a filed scroll
 	// position (see saveChatScroll) return where you left, and chats
 	// with nothing filed start at the top like today. Streaming chats
-	// always follow the reply bottom. Search-hit jumps register their
-	// own scroll after this, so they still win. Runs inside the
-	// switch mutation (flushed first): a frame callback lands too
-	// late — the transition swaps content after it.
+	// always follow the reply bottom (still thinking included: the
+	// box would otherwise keep the last chat's offset, often the top).
+	// Search-hit jumps register their own scroll after this, so they
+	// still win. Runs inside the switch mutation (flushed first): a
+	// frame callback lands too late — the transition swaps content
+	// after it.
 	function restoreChatScroll(id: ChatId): void {
-		if (isSending(chatState, id)) return;
+		const live =
+			isSending(chatState, id) ||
+			nativeTurns.live.has(id) ||
+			nativeTurns.fetching.has(id);
 		const saved = chatScrollTops.get(id);
 		flushSync();
 		if (!scrollBox || chatState.activeChatId !== id) return;
 		// Instant: the column eases programmatic jumps, and a smooth
 		// restore retargets (or dies) across the switch transition.
-		scrollBox.scrollTo({ top: saved ?? 0, behavior: "instant" });
+		scrollBox.scrollTo({
+			top: live ? scrollBox.scrollHeight : (saved ?? 0),
+			behavior: "instant"
+		});
 		viewport.anchor = null;
 	}
 
@@ -4223,6 +4248,7 @@
 			// persist the empty list under the old id (draft restore
 			// on return would come back blank).
 			drafts.fileChat(chatState.activeChatId);
+			swapComposerDraft(chatState.activeChatId, null);
 			resetDraftExtras();
 			// Minting switches without a transition, so the preview
 			// clears here (transitionToChat covers its own path).
@@ -4246,7 +4272,11 @@
 		transitionToChat(step.id);
 		// Landing is the switch effect's job (filed position, else
 		// top): a smooth top-scroll here would fight the restore.
-		if (focus) enterEditMode();
+		// An empty chat is a fresh chat however it was reached: the
+		// mint flag lands it in the prompt too, never a visible but
+		// unfocused composer.
+		const landedEmpty = activeChat(chatState).messages.length === 0;
+		if (focus || (focusMint && landedEmpty)) enterEditMode();
 	}
 
 	/** Enter the cursor chat from the keyboard, close the list, and land in its prompt. */
@@ -4323,6 +4353,7 @@
 		// list under the old chat's id and return-restore comes back
 		// blank (same ordering as transitionToChat's save-before-load).
 		drafts.fileChat(chatState.activeChatId);
+		swapComposerDraft(chatState.activeChatId, null);
 		resetDraftExtras();
 		newChat(chatState);
 		newsMode.clear();
@@ -4487,6 +4518,30 @@
 		prevMarkerCount = countMarkers(doc);
 		prevFileMarkerCount = countMarkers(doc, FILE_MARKER);
 		prevPastedCount = countPasteSlots(doc);
+	}
+
+	/** Unsent composer text (and its pills), one per chat: switching
+	chats files the leaving chat's prompt and brings back the
+	entering chat's, so a half-typed message never follows you into
+	another chat. Session memory only, like the scroll positions. */
+	const composerDrafts = new SvelteMap<ChatId, ComposerDraft<Attachment>>();
+	function swapComposerDraft(from: ChatId, to: ChatId | null): void {
+		if (!editor || from === to) return;
+		const text = editor.getText();
+		fileComposerDraft(composerDrafts, from, { text, attachments });
+		const next = to === null ? undefined : composerDrafts.get(to);
+		if (to !== null) composerDrafts.delete(to);
+		if (!next && text === "" && attachments.length === 0) return;
+		// Programmatic swap: the tag/pill reconcile must not read the
+		// rewrite as deleted tags.
+		markerSyncMuted = true;
+		try {
+			attachments = next ? [...next.attachments] : [];
+			editor.setText(next?.text ?? "");
+			syncMarkerCounts();
+		} finally {
+			markerSyncMuted = false;
+		}
 	}
 
 	/* Tag → attachment reconciliation lives in $lib/attachments. */
@@ -5336,8 +5391,7 @@
 		}
 		void done.then(
 			() => {
-				stopAudioForMessage(target.id);
-				deleteMessage(chatState, index);
+				removeMessage(index);
 				flashCopyToast("Cut to clipboard");
 			},
 			() => flashErrorToast("Couldn't copy to the clipboard.")
@@ -6275,8 +6329,7 @@
 		}
 		refsPopOpen = null;
 		if (plan.kind === "delete") {
-			stopAudioForMessage(msg.id);
-			deleteMessage(chatState, index);
+			removeMessage(index);
 		} else editMessageContent(chatState, messageId, plan.bare);
 		flashToast("Sent annotations cleared");
 	}
@@ -7385,37 +7438,31 @@
 	}
 
 	/** Seconds since the viewed chat started sending (the Thinking
-	chip counts the wait up). No cleanup return on purpose: token
-	updates may re-run this watcher mid-send, and tearing the
-	interval down there would stall the count — the branches below
-	own it for both send paths, so neither doSend nor resend
-	touches it. */
-	let sendElapsed = $state(0);
+	chip counts the wait up). Each chat keeps its own start time, so
+	leaving a thinking chat and coming back shows the request's true
+	age instead of restarting at zero. Native turns never raise the
+	TS sending flag, so a detached turn counts on its own liveness. */
+	const sendStarts = new Map<ChatId, number>();
+	let sendNow = $state(Date.now());
 	let sendTick: ReturnType<typeof setInterval> | null = null;
-	let wasSending = false;
 	$effect(() => {
-		// Native turns never raise the TS sending flag, so a detached
-		// turn counts the wait up on its own liveness instead.
-		const sending =
-			isSending(chatState, viewChat.id) ||
-			nativeTurns.fetching.has(viewChat.id) ||
-			nativeTurns.live.has(viewChat.id);
-		if (sending && !wasSending) {
-			wasSending = true;
-			sendElapsed = 0;
-			const t0 = Date.now();
-			if (sendTick !== null) clearInterval(sendTick);
+		const live = [
+			...chatState.sendingChatIds,
+			...nativeTurns.fetching,
+			...nativeTurns.live
+		];
+		syncSendStarts(sendStarts, live, Date.now());
+		sendNow = Date.now();
+		if (live.length > 0 && sendTick === null) {
 			sendTick = setInterval(() => {
-				sendElapsed = Math.floor((Date.now() - t0) / 1000);
+				sendNow = Date.now();
 			}, 1000);
-		} else if (!sending && wasSending) {
-			wasSending = false;
-			if (sendTick !== null) {
-				clearInterval(sendTick);
-				sendTick = null;
-			}
+		} else if (live.length === 0 && sendTick !== null) {
+			clearInterval(sendTick);
+			sendTick = null;
 		}
 	});
+	const sendElapsed = $derived(sendAgeSec(sendStarts, viewChat.id, sendNow));
 
 	/** Inline chat rename (sidebar row): the page owns it so the Esc
 	ladder can cancel it like every other inline edit. */
@@ -7800,12 +7847,50 @@
 		flashToast("Branched");
 	}
 
-	/** Row message delete (touch): chat.ts deletes, the tick lives
-	here. Keyboard and cut paths keep their own silence. */
-	function dropMessage(index: number): void {
+	/** Deleted messages, newest last: ⌘Z puts them back one delete
+	at a time. Session memory only. */
+	const deletedMessages: DeletedMessage[][] = [];
+	/**
+	 * Every message delete goes through here (keys, row button, cut,
+	 * gestures): audio for it stops, a reply still thinking stops its
+	 * request (both engines), and what left is filed for ⌘Z.
+	 */
+	function removeMessage(index: number): void {
 		const doomed = chat.messages[index];
-		if (doomed) stopAudioForMessage(doomed.id);
-		deleteMessage(chatState, index);
+		if (!doomed) return;
+		stopAudioForMessage(doomed.id);
+		const chatId = chat.id;
+		const last = chat.messages.length - 1;
+		const nativeLive =
+			nativeTurns.live.has(chatId) || nativeTurns.fetching.has(chatId);
+		const removed = deleteMessage(chatState, index);
+		// The native runner keeps going without the TS abort: stop it
+		// when its placeholder (or the question it answers) left.
+		if (nativeLive && index >= last - 1) void nativeTurns.stopChat(chatId);
+		if (removed.length === 0) return;
+		deletedMessages.push(removed);
+		if (deletedMessages.length > 50) deletedMessages.shift();
+	}
+	/** ⌘Z: the newest delete comes back where it was. False when
+	there is nothing left to restore (the key then passes through). */
+	function undoMessageDelete(): boolean {
+		while (deletedMessages.length > 0) {
+			const entry = deletedMessages.pop();
+			if (entry && restoreDeletedMessages(chatState, entry)) {
+				const chatId = entry[0]?.chatId;
+				if (chatId && chatId !== chatState.activeChatId)
+					transitionToChat(chatId);
+				flashToast(entry.length > 1 ? "Messages restored" : "Message restored");
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Row message delete (touch): the tick lives here. Keyboard and
+	cut paths keep their own silence. */
+	function dropMessage(index: number): void {
+		removeMessage(index);
 		if (!androidUI) return;
 		buzzTap();
 	}
@@ -7823,18 +7908,16 @@
 	 * annotation block is provider context, not edit text, so only the
 	 * prose seeds the editor; its refs come back as pending annotations
 	 * so saving re-bakes the same context. Attachments ride along on
-	 * their own state — the composer's draft stays untouched. No-op
-	 * mid-send.
+	 * their own state — the composer's draft stays untouched. Opens
+	 * mid-send too: saving the pending reply's question re-asks it.
 	 */
 	function editMessage(index: number) {
 		// Target gates live in editMessageAction (pinned in
 		// submit.test.ts); refs seeding and the edit effects stay here.
 		const editAction = editMessageAction(chat.messages, index, {
-			sending: chatState.sending,
 			editingId: editingMsgId
 		});
-		if (editAction === "ignore-sending" || editAction === "ignore-not-user")
-			return;
+		if (editAction === "ignore-not-user") return;
 		if (editAction === "toggle-off") {
 			cancelMessageEdit();
 			return;
@@ -7930,6 +8013,8 @@
 	 */
 	function saveMessageEdit(): void {
 		const id = editingMsgId;
+		const chatId = chatState.activeChatId;
+		const before = activeChat(chatState).messages.find((m) => m.id === id);
 		if (id) {
 			const src = msgEditor ?? editor;
 			const prev = activeChat(chatState).messages.find((m) => m.id === id);
@@ -7964,6 +8049,66 @@
 			flashToast("Message edited");
 		}
 		resetInlineEdit();
+		const after = activeChat(chatState).messages.find((m) => m.id === id);
+		const sending =
+			isSending(chatState, chatId) ||
+			nativeTurns.live.has(chatId) ||
+			nativeTurns.fetching.has(chatId);
+		if (
+			id &&
+			editReasks(activeChat(chatState).messages, id, {
+				sending,
+				changed: after?.content !== before?.content
+			})
+		) {
+			void reaskAfterEdit(chatId);
+		}
+	}
+
+	/** The pending reply's question changed: stop the old request
+	and ask again with the edited text. */
+	async function reaskAfterEdit(chatId: ChatId): Promise<void> {
+		await stopReply(chatId);
+		// The edit may have outlived its chat, or the user moved on.
+		if (chatState.activeChatId !== chatId) return;
+		const live = activeChat(chatState);
+		const last = live.messages[live.messages.length - 1];
+		// A reply that had started streaming stays as partial text:
+		// it answered the old question, so it goes before re-asking.
+		if (last?.role === "assistant") dismissTrailingReply(chatId);
+		void resend();
+	}
+
+	/**
+	 * Stop a chat's reply in flight (both engines) and wait until it
+	 * settled. A reply that never started leaves no empty bubble.
+	 * Returns whether anything was running.
+	 */
+	async function stopReply(chatId: ChatId): Promise<boolean> {
+		let stopped = false;
+		if (nativeTurns.live.has(chatId) || nativeTurns.fetching.has(chatId)) {
+			await nativeTurns.stopChat(chatId);
+			const target = chatState.chats.find((c) => c.id === chatId);
+			const last = target?.messages[target.messages.length - 1];
+			if (last?.role === "assistant" && last.content === "")
+				dismissTrailingReply(chatId);
+			stopped = true;
+		}
+		if (cancelSend(chatState, chatId)) {
+			stopped = true;
+			// The stream settles on its own tick once the abort lands.
+			for (let i = 0; i < 100 && isSending(chatState, chatId); i++)
+				await new Promise((r) => setTimeout(r, 20));
+		}
+		return stopped;
+	}
+
+	/** Drop a chat's trailing assistant message (a stopped reply). */
+	function dismissTrailingReply(chatId: ChatId): void {
+		const target = chatState.chats.find((c) => c.id === chatId);
+		const last = target?.messages[target.messages.length - 1];
+		if (!target || last?.role !== "assistant") return;
+		restoreChatMessages(chatState, chatId, target.messages.slice(0, -1));
 	}
 
 	/**
@@ -8779,9 +8924,10 @@
 		}
 	};
 
-	/** Send-button hold (touch or desktop mouse, empty composer):
-	stash the reply language and drop to default, or restore the
-	stash — the emoji vanishes and returns. Haptic ticks on every
+	/** Send-button hold (touch or desktop mouse): a reply in flight
+	stops; otherwise, on an empty composer, stash the reply language
+	and drop to default, or restore the stash — the emoji vanishes
+	and returns. Haptic ticks on every
 	switch (phones); desktop toasts the swap like the menus do. */
 	const SEND_HOLD_MS = 500;
 	const replyLangStash = new SvelteMap<ChatId, string>();
@@ -8800,14 +8946,31 @@
 
 	function sendHoldStart(): void {
 		// In-prompt note edits own the arrow (tap files, even empty):
-		// never arm a language swap underneath them. Staged
-		// annotations ride the send either way, so they never block
-		// the hold — only text and attachments disarm it.
-		const empty = composerText() === "" && attachments.length === 0;
-		if (!sendHoldArmed(sendHoldTimer !== null, !!promptAnnEdit, empty)) return;
+		// never arm a hold underneath them. Staged annotations ride
+		// the send either way, so they never block the language
+		// hold — only text and attachments disarm it. A reply in
+		// flight turns the hold into a stop instead.
+		const id = chatState.activeChatId;
+		const action = sendHoldAction({
+			timerRunning: sendHoldTimer !== null,
+			promptNoteEditing: !!promptAnnEdit,
+			composerEmpty: composerText() === "" && attachments.length === 0,
+			replyLive:
+				isSending(chatState, id) ||
+				nativeTurns.live.has(id) ||
+				nativeTurns.fetching.has(id)
+		});
+		if (action === null) return;
 		sendHoldTimer = setTimeout(() => {
 			sendHoldTimer = null;
-			swapReplyLangHold();
+			if (action === "swap-lang") {
+				swapReplyLangHold();
+				return;
+			}
+			buzzBeat("done", androidUI);
+			void stopReply(id).then((stopped) => {
+				if (stopped) flashToast("Reply stopped");
+			});
 		}, SEND_HOLD_MS);
 	}
 
@@ -8878,6 +9041,10 @@
 			void nativeTurns.stopChat(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
+			// The neighbor's own unsent prompt comes back; the dropped
+			// chat's goes with it.
+			swapComposerDraft(id, chatState.activeChatId);
+			composerDrafts.delete(id);
 			drafts.restoreChat(chatState.activeChatId);
 			restoreChatScroll(chatState.activeChatId);
 		} else {
@@ -8888,6 +9055,7 @@
 			void nativeTurns.stopChat(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
+			composerDrafts.delete(id);
 			drafts.fileChat(chatState.activeChatId);
 		}
 		if (
@@ -9086,6 +9254,7 @@
 				const exists = chatState.chats.some((c) => c.id === link.chatId);
 				if (!exists) return;
 				drafts.fileChat(chatState.activeChatId);
+				swapComposerDraft(chatState.activeChatId, link.chatId as ChatId);
 				selectChat(chatState, link.chatId as ChatId);
 				drafts.restoreChat(link.chatId);
 				enterEditMode();
@@ -9256,9 +9425,11 @@
 				const meta = document.querySelector('meta[name="viewport"]');
 				const content = meta?.getAttribute("content") ?? "";
 				if (meta && !content.includes("interactive-widget")) {
+					// Page zoom off: a pinch only ever steps the text
+					// size (see the pinch tracker), never scales the UI.
 					meta.setAttribute(
 						"content",
-						`${content}, interactive-widget=resizes-content`
+						`${content}, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content`
 					);
 				}
 			}
@@ -9518,6 +9689,10 @@
 			zone: FlickZone;
 			inSwitcher: boolean;
 			promptHadFocus: boolean;
+			/** When the finger first travelled off its press point. */
+			leftAt: number | null;
+			/** Hold-then-swipe already opened the chats list. */
+			holdSwiped: boolean;
 		} | null = null;
 		/** Single-finger hold on dead space (quick-switcher summon):
 		armed on touchstart, cancelled by lift, travel, or scroll. */
@@ -9653,7 +9828,9 @@
 					msgId,
 					zone: flickZoneOf(target),
 					inSwitcher,
-					promptHadFocus
+					promptHadFocus,
+					leftAt: null,
+					holdSwiped: false
 				};
 				// Single-finger hold on dead space summons the quick
 				// switcher too (not just the double-tap): a still
@@ -9679,19 +9856,54 @@
 			},
 			{ passive: true }
 		);
-		// A travelling finger is a scroll or swipe, never a hold.
+		// A travelling finger is a scroll or swipe, never a hold. A
+		// finger that rested first and then drags right opens the
+		// chats list while still down (hold-then-swipe).
 		window.addEventListener(
 			"touchmove",
 			(event) => {
-				if (!emptyHoldTimer || !edgeTouch || event.touches.length !== 1) return;
+				if (!edgeTouch || event.touches.length !== 1) return;
 				const touch = event.touches[0];
+				if (!touch) return;
 				if (
-					touch &&
+					edgeTouch.leftAt === null &&
 					Math.hypot(touch.clientX - edgeTouch.x, touch.clientY - edgeTouch.y) >
 						12
 				) {
+					edgeTouch.leftAt = Date.now();
 					clearEmptyHoldTimer();
 				}
+				if (
+					!androidUI ||
+					edgeTouch.holdSwiped ||
+					!edgeTouch.clean ||
+					edgeTouch.rowSwipe ||
+					edgeTouch.codeSwipe ||
+					edgeTouch.chipSwipe ||
+					edgeTouch.inSwitcher ||
+					shortcutsOpen ||
+					flashcards.isOpen ||
+					readerOpen ||
+					inspectChar ||
+					!holdSwipeOpensChats(
+						edgeTouch,
+						edgeTouch.leftAt,
+						touch.clientX,
+						touch.clientY
+					)
+				)
+					return;
+				edgeTouch.holdSwiped = true;
+				// The rest may have started a native word pick: the
+				// stroke was a summon, not a selection.
+				window.getSelection()?.removeAllRanges();
+				chatSwitcherOpen = false;
+				if (settingsOpen) settingsOpen = false;
+				if (settings.sidebarCollapsed) {
+					settings.sidebarCollapsed = false;
+					persistSettings();
+				}
+				buzzBeat("first");
 			},
 			{ passive: true }
 		);
@@ -9701,7 +9913,8 @@
 				const start = edgeTouch;
 				edgeTouch = null;
 				clearEmptyHoldTimer();
-				if (!start) return;
+				// Hold-then-swipe already did its work mid-stroke.
+				if (!start || start.holdSwiped) return;
 				let ended: {
 					identifier: number;
 					clientX: number;
@@ -10357,13 +10570,15 @@
 					threeTrack = null;
 					clearThreeHoldTimer();
 					threeHoldFired = false;
-					// Pinch-to-font arms only in the messages column: the
-					// sidebar and sheets keep the default page zoom.
+					// A pinch anywhere is the text-size gesture (sidebars
+					// and sheets included): page zoom is off on phones,
+					// so no part of the UI ever scales on its own. Fields
+					// keep their fingers.
 					const target = event.target;
 					pinchFont =
 						twoTrack !== null &&
 						target instanceof Element &&
-						target.closest("main .messages") !== null;
+						target.closest("input, textarea, select") === null;
 					pinchBaseline = pinchStartSpread =
 						a && b
 							? Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
@@ -11124,8 +11339,8 @@
 			}
 			if (chord === "edit-newest") {
 				// ⌘E pulls the newest own message into in-place
-				// editing from anywhere — same gates as E (no-op
-				// mid-send, a second press toggles back off). With
+				// editing from anywhere — same gates as E (a second
+				// press toggles back off). With
 				// no own message it buzzes instead, like an
 				// off-text speak chord.
 				consumeEvent(event);
@@ -11273,8 +11488,7 @@
 				const target = chat.messages[hoveredIdx];
 				if (target) {
 					consumeEvent(event);
-					stopAudioForMessage(target.id);
-					deleteMessage(chatState, hoveredIdx);
+					removeMessage(hoveredIdx);
 					return;
 				}
 			}
@@ -11402,10 +11616,15 @@
 				const target = chat.messages[hoveredIdx];
 				if (target) {
 					consumeEvent(event);
-					stopAudioForMessage(target.id);
-					deleteMessage(chatState, hoveredIdx);
+					removeMessage(hoveredIdx);
 					return;
 				}
+			}
+			if (chrome === "undo-delete") {
+				// ⌘Z outside fields: deleted messages come back. With
+				// nothing deleted the key passes through untouched.
+				if (undoMessageDelete()) consumeEvent(event);
+				return;
 			}
 			// One snapshot for every hovered-message hotkey below: the
 			// guards each walked the target themselves, so this is also
@@ -11670,9 +11889,7 @@
 				// to hit while reading. Physical code, so any layout's D
 				// works. Buttons and links keep their own keys.
 				event.preventDefault();
-				const doomed = chat.messages[hoveredIdx];
-				if (doomed) stopAudioForMessage(doomed.id);
-				deleteMessage(chatState, hoveredIdx);
+				removeMessage(hoveredIdx);
 				return;
 			}
 			if (msgAction === "delete-badge" && annotateMode.hoverBadgeId !== null) {
@@ -13282,6 +13499,27 @@
 		const onAlt = (event: KeyboardEvent) => {
 			if (event.key === "Alt") altHeld = event.type === "keydown";
 		};
+		// Holding Shift on its own outside the prompt peeks the chat
+		// counter; a short hold first, so Shift chords never flash it.
+		const onShiftPeek = (event: KeyboardEvent) => {
+			const step = counterPeekStep({
+				...keyFacts(event),
+				type: event.type === "keyup" ? "keyup" : "keydown",
+				repeat: event.repeat,
+				inEditable: isEditableTarget(event.target)
+			});
+			if (step === null) return;
+			if (counterPeekTimer !== null) clearTimeout(counterPeekTimer);
+			counterPeekTimer = null;
+			if (step === "hide") {
+				counterPeek = false;
+				return;
+			}
+			counterPeekTimer = setTimeout(() => {
+				counterPeekTimer = null;
+				counterPeek = true;
+			}, COUNTER_PEEK_MS);
+		};
 		/**
 		 * Escape keyup: a HOLD past the threshold exits fullscreen; a
 		 * tap does nothing here (the keydown path above already
@@ -13297,6 +13535,9 @@
 		};
 		const onBlur = () => {
 			altHeld = false;
+			counterPeek = false;
+			if (counterPeekTimer !== null) clearTimeout(counterPeekTimer);
+			counterPeekTimer = null;
 			escDownAt = 0;
 			stopScrollHold();
 			// A drag released off-window never sees mouseup: drop the
@@ -13531,6 +13772,8 @@
 		window.addEventListener("keydown", onKey, true);
 		window.addEventListener("keydown", onAlt);
 		window.addEventListener("keyup", onAlt);
+		window.addEventListener("keydown", onShiftPeek);
+		window.addEventListener("keyup", onShiftPeek);
 		window.addEventListener("keyup", onEscapeUp);
 		window.addEventListener("keyup", releaseScrollHold);
 		window.addEventListener("blur", onBlur);
@@ -13787,6 +14030,8 @@
 			window.removeEventListener("keydown", onKey, true);
 			window.removeEventListener("keydown", onAlt);
 			window.removeEventListener("keyup", onAlt);
+			window.removeEventListener("keydown", onShiftPeek);
+			window.removeEventListener("keyup", onShiftPeek);
 			window.removeEventListener("keyup", onEscapeUp);
 			window.removeEventListener("keyup", releaseScrollHold);
 			window.removeEventListener("blur", onBlur);
@@ -14475,6 +14720,20 @@
 		}}
 	/>
 
+	{#if !androidUI}
+		<!-- Chat counter peek (Shift held outside the prompt): where
+		this chat sits in the list, quiet in the top-right corner.
+		Always mounted so it fades both ways. -->
+		<p
+			class="chat-counter"
+			class:shown={counterPeek}
+			aria-hidden={!counterPeek}
+		>
+			{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState
+				.chats.length}
+		</p>
+	{/if}
+
 	{#if androidUI && chatSwitcherOpen}
 		<!-- Phone chat switcher: card plus mint/delete actions through
 		the shared modal shell. The page owns chat state and the open
@@ -14832,6 +15091,36 @@
 	reads in both themes. A tap dismisses; silence still expires it. */
 	/* The speech-error notice renders in `Toasts.svelte` now (same
 	always-dark surface, moved with the markup). */
+	/* Phones never page-zoom: pinch is the text-size gesture
+	everywhere (settings and chats sidebars included), so the whole
+	app pans only. Inner touch-action rules intersect with this. */
+	.app[data-android] {
+		touch-action: pan-x pan-y;
+	}
+	.chat-counter {
+		position: fixed;
+		top: calc(0.7rem + env(safe-area-inset-top, 0px));
+		right: 1rem;
+		z-index: 60;
+		margin: 0;
+		padding: 0.2rem 0.6rem;
+		border-radius: 999px;
+		background: var(--bg);
+		color: var(--muted);
+		font-size: calc(0.85rem * var(--font-scale, 1));
+		font-variant-numeric: tabular-nums;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.2s ease;
+	}
+	.chat-counter.shown {
+		opacity: 1;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.chat-counter {
+			transition: none;
+		}
+	}
 	@keyframes voice-pulse {
 		0%,
 		100% {

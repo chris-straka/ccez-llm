@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, type Page } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** New chat mid-stream: the fresh chat stays clean, the origin keeps
@@ -480,4 +480,151 @@ test("a filtered pick into a folded message pulses it", async ({ page }) => {
 	await expect(page.locator("article.landed")).toHaveCount(1, {
 		timeout: 3_000
 	});
+});
+
+/** Two long chats, the prompt always shown, and a reply that thinks
+for a long while before its first token. */
+async function seedThinkingPair(page: Page): Promise<void> {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-mock-first-ms", "30000");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 0 })
+		);
+		const body = (tag: string) =>
+			Array.from({ length: 40 }, (_, i) => `${tag} line ${i}`).join("\n\n");
+		const chat = (id: string, createdAt: number, tag: string) => ({
+			id,
+			createdAt,
+			replyLang: null,
+			messages: [0, 1, 2, 3].map((i) => ({
+				id: `${id}-m${i}`,
+				role: i % 2 ? "assistant" : "user",
+				content: i % 2 ? body(tag) : `${tag} question ${i}`,
+				usage: null,
+				error: null
+			}))
+		});
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([chat("e2e-a", 1, "Alpha"), chat("e2e-b", 2, "Beta")])
+		);
+	});
+}
+
+/** Leaving a thinking chat and coming back: the request is not sent
+again, the count shows its true age, the box lands at the bottom
+where the reply will appear, and each chat keeps its own unsent
+prompt text. */
+test("a thinking chat keeps its draft, age, and place across a switch", async ({
+	page
+}) => {
+	await seedThinkingPair(page);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Alpha question",
+		{ timeout: 60_000 }
+	);
+	const input = page.locator(".ta-input");
+	await input.click();
+	await page.keyboard.type("hello there");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".sending")).toBeVisible();
+	await page.keyboard.type("draft for alpha");
+	const elapsed = page.locator(".sending-elapsed");
+	await expect(elapsed).toHaveText(/· [3-9]s/, { timeout: 10_000 });
+	// Away: Beta's prompt is its own (empty), and gets its own draft.
+	await page.keyboard.press("ControlOrMeta+Shift+J");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Beta question"
+	);
+	await expect(input).toHaveValue("");
+	await page.keyboard.type("draft for beta");
+	await page.waitForTimeout(1200);
+	// Back: Alpha's draft, the true age, and the bottom of the thread.
+	await page.keyboard.press("ControlOrMeta+Shift+K");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Alpha question"
+	);
+	await expect(input).toHaveValue("draft for alpha");
+	await expect(elapsed).toHaveText(/· ([4-9]|\d\d)s/);
+	const gap = await page
+		.locator("main .messages")
+		.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
+	expect(gap).toBeLessThan(8);
+	// Never resent: one request, one question, one pending reply.
+	expect(
+		await page.evaluate(
+			() =>
+				(window as unknown as { __ccezMockStreams?: number }).__ccezMockStreams
+		)
+	).toBe(1);
+	await expect(page.locator("article")).toHaveCount(6);
+	// And Beta still has its own.
+	await page.keyboard.press("ControlOrMeta+Shift+J");
+	await expect(input).toHaveValue("draft for beta");
+});
+
+/** ⇧⌘J onto an existing empty newest chat is a fresh chat too: the
+prompt takes focus, never a visible but unfocused composer. */
+test("shift-cmd-j onto an empty chat focuses the prompt", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-full",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{
+							id: "e2e-full-m0",
+							role: "assistant",
+							content: "full chat here",
+							usage: null,
+							error: null
+						}
+					]
+				},
+				{ id: "e2e-empty", createdAt: 2, replyLang: null, messages: [] }
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered")).toContainText(
+		"full chat here",
+		{ timeout: 60_000 }
+	);
+	await page.keyboard.press("Meta+Shift+J");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 10_000 });
+	await expect
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
+		.toBe(true);
+});
+
+/** Shift held on its own outside the prompt peeks the chat counter in
+the top-right corner; typing a capital in the prompt never does. */
+test("holding Shift peeks the chat counter", async ({ page }) => {
+	await seedThinkingPair(page);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Alpha question",
+		{ timeout: 60_000 }
+	);
+	const counter = page.locator(".chat-counter");
+	await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+	await page.keyboard.down("Shift");
+	await expect(counter).toHaveClass(/shown/);
+	await expect(counter).toHaveText("1 / 2");
+	await page.keyboard.up("Shift");
+	await expect(counter).not.toHaveClass(/shown/);
+	await page.locator(".ta-input").click();
+	await page.keyboard.down("Shift");
+	await page.waitForTimeout(500);
+	await expect(counter).not.toHaveClass(/shown/);
+	await page.keyboard.up("Shift");
 });

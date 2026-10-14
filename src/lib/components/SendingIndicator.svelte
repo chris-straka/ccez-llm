@@ -10,9 +10,13 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 		phase: "fetch" | "waiting" | null;
 		elapsed: number;
 		waitingLabel: string;
+		/** Pointer over the status: it stands for the pending reply
+		(the delete keys reach a reply that has not landed). */
+		onenter?: () => void;
+		onleave?: () => void;
 	}
 
-	let { phase, elapsed, waitingLabel }: Props = $props();
+	let { phase, elapsed, waitingLabel, onenter, onleave }: Props = $props();
 </script>
 
 {#if phase === "fetch"}
@@ -20,7 +24,13 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 	(even after chatter printed, when Thinking already retired).
 	The elapsed count keeps running, so a long fetch reads as
 	working, never stalled. -->
-	<p class="sending" role="status" aria-label="Fetching a page">
+	<p
+		class="sending"
+		role="status"
+		aria-label="Fetching a page"
+		onmouseenter={onenter}
+		onmouseleave={onleave}
+	>
 		<span class="sending-chip"
 			>Fetching<span class="tdots" aria-hidden="true"
 				><span>.</span><span>.</span><span>.</span></span
@@ -30,7 +40,13 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 		>
 	</p>
 {:else if phase === "waiting"}
-	<p class="sending" role="status" aria-label="Waiting for a reply">
+	<p
+		class="sending"
+		role="status"
+		aria-label="Waiting for a reply"
+		onmouseenter={onenter}
+		onmouseleave={onleave}
+	>
 		<span class="sending-chip"
 			>{waitingLabel}<span class="tdots" aria-hidden="true"
 				><span>.</span><span>.</span><span>.</span></span
@@ -73,20 +89,26 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 	}
 	.sending-elapsed {
 		font-variant-numeric: tabular-nums;
-		opacity: 0.8;
 	}
-	/* The count stays out of the way until asked: hover the chip to
-	reveal it. Touch clients have no hover, so it always shows
-	there. (Visibility only — the text still ticks for tests.) */
+	/* The count stays out of the way until asked: hovering the chip
+	fades it in, leaving fades it back out. Touch clients have no
+	hover, so it always shows there. (Opacity only — the text keeps
+	its place and still ticks.) */
 	.sending-chip .sending-elapsed {
-		display: none;
+		opacity: 0;
+		transition: opacity 0.25s ease;
 	}
 	.sending-chip:hover .sending-elapsed {
-		display: inline;
+		opacity: 0.8;
 	}
 	@media (hover: none) {
 		.sending-chip .sending-elapsed {
-			display: inline;
+			opacity: 0.8;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.sending-chip .sending-elapsed {
+			transition: none;
 		}
 	}
 </style>

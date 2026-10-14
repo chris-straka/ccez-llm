@@ -31,7 +31,8 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Branch from here",
 			"Trim above here",
 			"Jump to its start / end",
-			"Delete"
+			"Delete",
+			"Undo delete"
 		]
 	],
 	[
@@ -45,13 +46,15 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Newer / older chat",
 			"Read a chat's name",
 			"Rename a chat",
-			"Delete this chat"
+			"Delete this chat",
+			"Chat position"
 		]
 	],
 	[
 		"Prompt & model",
 		[
 			"Edit newest message",
+			"Stop the reply",
 			"Rerun a prompt",
 			"Pasted text expand / collapse",
 			"Reply language",
@@ -127,6 +130,7 @@ describe("shortcuts menu copy", () => {
 		expect(keys.get("Edit newest message")).toBe("⌘E");
 		expect(keys.get("Delete")).toBe("⌘Delete · ⌘D · Shift+D");
 		expect(keys.get("Delete this chat")).toBe("⇧⌘Delete");
+		expect(keys.get("Undo delete")).toBe("⌘Z");
 		// Hover is the section's premise: its keys never repeat it.
 		for (const row of rows.filter((r) => r.group === HOVER_GROUP))
 			expect(row.keys).not.toMatch(/hover/i);
@@ -181,6 +185,7 @@ describe("shortcuts menu copy", () => {
 		expect(keys.get("Search chats")).toBe("Ctrl+K · Ctrl+P");
 		expect(keys.get("Delete")).toBe("Ctrl+Delete · Shift+D");
 		expect(keys.get("Delete this chat")).toBe("Ctrl+Shift+Delete");
+		expect(keys.get("Undo delete")).toBe("Ctrl+Z");
 		expect(keys.get("Fullscreen")).toBe("F11");
 		expect(keys.get("Edit newest message")).toBe("Ctrl+E");
 		expect(keys.get("Text size")).toBe("Ctrl+Plus / Ctrl+Minus");
@@ -276,7 +281,7 @@ describe("shortcuts menu copy", () => {
 		]);
 		const byName = new Map(touchShortcuts().map((r) => [r.name, r.keys]));
 		expect(byName.get("Chats list")).toBe(
-			"Swipe right · two-finger swipe right"
+			"Swipe right · hold, then swipe right · two-finger swipe right"
 		);
 		expect(byName.get("Quick switcher")).toBe(
 			"Two-finger hold · double-tap empty space · swipe to cycle"
