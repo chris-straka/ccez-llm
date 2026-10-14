@@ -600,3 +600,18 @@ test("right-click a bare kanji word in the Korean line speaks Japanese", async (
 	expect((await spoken(page)).join("")).toContain("尾");
 	expect(await spokenLang(page)).toEqual(["ja-JP"]);
 });
+
+test("right-click a wave-dash suffix reads its kana once", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: KO_JA_PLURALS }]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered li").nth(1)).toBeVisible({
+		timeout: 60_000
+	});
+	const at = await selectQuote(page, "〜達");
+	await page.mouse.click(at.x, at.y, { button: "right" });
+	await expect
+		.poll(() => spoken(page), { timeout: 30_000 })
+		.not.toHaveLength(0);
+	expect(await spoken(page)).toEqual(["たち"]);
+	expect(await spokenLang(page)).toEqual(["ja-JP"]);
+});

@@ -562,6 +562,7 @@
 		webSpeechErrorCopy,
 		speechErrorStep,
 		punjabiSpeechText,
+		trimAffixMarks,
 		effectiveSpeechLang,
 		stopSpeaking,
 		micAvailable,
@@ -6862,7 +6863,11 @@
 		// transliteration instead of the default voice going silent.
 		quote = punjabiSpeechText(quote, voices);
 		context = punjabiSpeechText(context, voices);
+		// The probe reads before the affix trim: 〜達 still finds its
+		// sentence.
 		const probe = localeProbe(context, quote, messageId);
+		// A suffix's notation mark (〜達) is never spoken.
+		quote = trimAffixMarks(quote);
 		const lang = effectiveSpeechLang(
 			await quoteLangForContext(
 				probe,

@@ -113,6 +113,17 @@ export function effectiveSpeechLang(
 }
 
 /**
+ * A highlight minus the affix marks at its edges: grammar notation
+ * writes a suffix as 〜達 or ~들, and voices read the mark aloud (or
+ * stumble on it). Marks inside the text stay; a highlight of marks
+ * alone passes through untouched. Pure.
+ */
+export function trimAffixMarks(text: string): string {
+	const trimmed = text.replace(/^[\s〜～~]+|[\s〜～~]+$/gu, "");
+	return trimmed === "" ? text : trimmed;
+}
+
+/**
  * Speakable text for an utterance: Gurmukhi runs become Devanagari
  * when no Punjabi voice is installed but a Hindi one is, so the
  * downstream Hindi voice reads ~the right sounds instead of the

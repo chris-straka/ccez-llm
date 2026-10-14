@@ -20,6 +20,7 @@ import {
 	webVoiceAvailable,
 	effectiveSpeechLang,
 	punjabiSpeechText,
+	trimAffixMarks,
 	splitGlossHalves,
 	splitSpeechSegments,
 	speakText,
@@ -309,6 +310,21 @@ describe("effectiveSpeechLang", () => {
 	});
 	it("never routes on an unloaded inventory", () => {
 		expect(effectiveSpeechLang("la", [])).toBe("la");
+	});
+});
+
+describe("trimAffixMarks", () => {
+	it("drops suffix notation marks at the edges", () => {
+		expect(trimAffixMarks("〜たち")).toBe("たち");
+		expect(trimAffixMarks("〜達")).toBe("達");
+		expect(trimAffixMarks("～들")).toBe("들");
+		expect(trimAffixMarks("~ing ")).toBe("ing");
+		expect(trimAffixMarks("お〜")).toBe("お");
+	});
+
+	it("keeps inner marks and mark-only text", () => {
+		expect(trimAffixMarks("10〜20")).toBe("10〜20");
+		expect(trimAffixMarks("〜")).toBe("〜");
 	});
 });
 
