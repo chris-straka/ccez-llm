@@ -21,8 +21,6 @@ the record). Screenshots the owner attached are in
   button still shows on the other chat.
 - Open the annotation overlay menu, switch chat and come back: it is still
   on the overlay menu. Owner leans to "close it", not sure.
-- Annotations stop loading when the owner goes to another chat; they
-  should keep loading in the background.
 - Add a keyboard or mouse shortcut that deletes all annotations on a
   message.
 - Remove the feature where annotations attach to the main text prompt to

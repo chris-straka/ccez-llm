@@ -232,6 +232,9 @@ export class AnnotationDrafts {
 		// (its reply still lands on the same id).
 		if (this.asking.has(ann.id)) return;
 		this.asking.add(ann.id);
+		// The chat the note was filed in: the reply lands there even
+		// when another chat is open by then.
+		const chatId = this.deps.getActiveChatId();
 		try {
 			const provider = await this.deps.resolveProvider();
 			if (!provider) {
@@ -251,6 +254,17 @@ export class AnnotationDrafts {
 				context: this.deps.answerContextFor(ann),
 				...(ann.brief ? { brief: true } : {})
 			});
+			if (chatId !== this.deps.getActiveChatId()) {
+				// Answered in the background: the leaving switch filed
+				// the note away, so the answer joins it in storage and
+				// the chat restores it orange on return.
+				saveDraftAnnotations(
+					chatId,
+					attachAnnotationAnswer(loadDraftAnnotations(chatId), ann.id, answer),
+					this.deps.getChatIds()
+				);
+				return;
+			}
 			this.list = attachAnnotationAnswer(this.list, ann.id, answer);
 			// Story notes have no badge to turn orange or pin from:
 			// an answered one joins the review dock directly (and

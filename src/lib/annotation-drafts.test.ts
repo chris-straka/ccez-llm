@@ -207,6 +207,37 @@ describe("ask flow", () => {
 		]);
 	});
 
+	it("an answer landing after a chat switch files into its own chat", async () => {
+		let land: (answer: string) => void = () => {};
+		const { drafts, calls, setActive } = harness({
+			active: "c1",
+			chats: ["c1", "c2"],
+			answer: () =>
+				new Promise<string>((resolve) => {
+					land = resolve;
+				})
+		});
+		const q = note({ comment: "why?" });
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(calls.answers).toHaveLength(1));
+		// Leave for c2 while the request is on the wire.
+		drafts.fileChat("c1" as ChatId);
+		setActive("c2");
+		drafts.restoreChat("c2");
+		land("réponse");
+		await asked;
+		expect(drafts.list).toEqual([]);
+		expect(loadDraftAnnotations("c1")[0]?.answer).toBe("réponse");
+		// Coming back restores it answered, with no second request.
+		setActive("c1");
+		drafts.restoreChat("c1");
+		drafts.resumeUnanswered();
+		await new Promise((r) => setTimeout(r, 10));
+		expect(drafts.list[0]?.answer).toBe("réponse");
+		expect(calls.answers).toHaveLength(1);
+	});
+
 	it("ask failure banners, stays blue, and skips later resumes", async () => {
 		const { drafts, calls } = harness({
 			answer: async () => {
