@@ -253,21 +253,29 @@ test.describe("mock shell feed", () => {
 		await openFrenchNews(page);
 		const panel = page.locator(".news-panel");
 		await expect(panel.locator(".news-card")).toHaveCount(3);
-		// Columns and the list switch both follow the text size: a mid
-		// window at 1.6x keeps two grid columns, 2.2x turns to list rows.
+		// Columns and the list switch follow a damped text size: a mid
+		// window keeps three columns at 1.5x, two through 3x, and only
+		// 4x turns to list rows, whose thumbnail grows with the text.
 		const layoutAt = (scale: number) =>
 			panel.evaluate((el, s) => {
 				el.style.setProperty("--font-scale", String(s));
 				const grid = getComputedStyle(el.querySelector(".news-cards")!);
 				const card = getComputedStyle(el.querySelector(".news-card")!);
+				const thumb = el.querySelector(".news-thumb")!.clientWidth;
 				return {
 					cols: grid.gridTemplateColumns.split(" ").length,
-					list: card.display === "grid"
+					list: card.display === "grid",
+					thumb
 				};
 			}, scale);
-		expect(await layoutAt(1)).toEqual({ cols: 3, list: false });
-		expect(await layoutAt(1.6)).toEqual({ cols: 2, list: false });
-		expect(await layoutAt(2.2)).toEqual({ cols: 1, list: true });
+		expect(await layoutAt(1)).toMatchObject({ cols: 3, list: false });
+		expect(await layoutAt(1.5)).toMatchObject({ cols: 3, list: false });
+		expect(await layoutAt(2)).toMatchObject({ cols: 2, list: false });
+		expect(await layoutAt(3)).toMatchObject({ cols: 2, list: false });
+		const list = await layoutAt(4);
+		expect(list).toMatchObject({ cols: 1, list: true });
+		// A third of the row at most, never the old fixed stamp.
+		expect(list.thumb).toBeGreaterThan(200);
 	});
 
 	test("image miss settles to a letter tile", async ({ page }) => {

@@ -42,12 +42,6 @@ the record). Screenshots the owner attached are in
 
 ## Layout and text size
 
-- At 290% the thumbnails get tiny; at 300% the layout goes single column;
-  3 -> 2 columns already at 200% is too early.
-- The prompt text size slider looks like it goes much higher, but a third
-  of the way is already very large.
-- Keyboard shortcuts for growing and shrinking the prompt width may not be
-  symmetrical.
 - Arabic bullets and lists may be formatted wrong; numbered lists trail off
   screen on Android.
 - Typing "مَا is what" in the prompt shows up as "is what مَا" in replies

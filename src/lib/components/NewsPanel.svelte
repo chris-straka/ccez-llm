@@ -559,12 +559,16 @@ everything else is theme tokens, never raw hex. -->
 		cursor: pointer;
 	}
 
-	/* Grid: as many 12.5em columns as fit (three on a laptop at 100%,
-	two at big text in a mid window). The list is the query container
-	and its em is --t, so giant text sizes drop columns instead of
-	squeezing headlines. */
+	/* Grid: as many 12.5em columns as fit. The list is the query
+	container and its em is a damped text size (the text scale to the
+	0.6 power: 200% text makes 1.5x columns, 300% makes 1.9x), so big
+	type drops columns late instead of at the first step past 200%,
+	and headlines (which ride the full --t) wrap inside them. Cards
+	size their own text from --t and --u, never this em. */
 	.news-cards {
+		/* Webviews without pow() keep the undamped text size. */
 		font-size: var(--t);
+		font-size: calc(var(--u, 1rem) * pow(var(--font-scale, 1), 0.6));
 		container-type: inline-size;
 		list-style: none;
 		margin: 0;
@@ -752,13 +756,16 @@ everything else is theme tokens, never raw hex. -->
 	/* List rows with a thumbnail wherever the grid would fall to one
 	column (two 12.5em columns plus the 0.6em gap), so no width or
 	text size ever gets one huge picture per story. em in a container
-	query is the container's font size (--t), so this follows the text
-	size; calc(var()) is not allowed here (lightningcss rejects it). */
+	query is the container's font size (the damped unit above), so
+	this follows the text size; calc(var()) is not allowed here
+	(lightningcss rejects it). The thumbnail grows with that unit
+	too, up to a third of the row, so giant text never pairs with a
+	stamp-sized picture. */
 	@container (width < 25.75em) {
 		.news-card,
 		.skel-card {
 			display: grid;
-			grid-template-columns: calc(6.5 * var(--u, 1rem)) 1fr;
+			grid-template-columns: min(6.5em, 33%) 1fr;
 			align-items: start;
 			gap: calc(0.7 * var(--u, 1rem));
 			padding: calc(0.5 * var(--u, 1rem));
