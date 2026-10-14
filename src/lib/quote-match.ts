@@ -6,6 +6,7 @@
  */
 import type { ChatMsgId } from "./chat";
 import type { AnnotationId } from "./annotations";
+import { isWordChar } from "./sel-geometry";
 
 /**
  * Single-character typographic folds so quotes match across markdown
@@ -111,6 +112,85 @@ export function locateQuote(
 		endNode: last.node,
 		endOffset: last.offset + 1
 	};
+}
+
+/**
+ * Every place an annotated quote repeats, for repeat ink: the matches
+ * at or after the annotated one (`from`, an occurrence index counted
+ * like locateQuote's, so the annotation itself is the first hit), plus
+ * case-folded matches past it (Haus after haus). Spaced scripts repeat
+ * as whole words only (art never inks start), spaceless ones anywhere.
+ * Non-overlapping, in document order. Pure: node texts in.
+ */
+export function locateQuoteRepeats(
+	nodeTexts: string[],
+	quote: string,
+	from = 0
+): QuoteLocation[] {
+	const q = stripForMatch(quote).stripped;
+	if (!q || !/[\p{L}\p{N}]/u.test(q)) return [];
+	let hay = "";
+	const map: { node: number; offset: number }[] = [];
+	nodeTexts.forEach((text, node) => {
+		const s = stripForMatch(text);
+		for (let i = 0; i < s.stripped.length; i++) {
+			const offset = s.offsets[i];
+			const ch = s.stripped[i];
+			if (offset === undefined || ch === undefined) continue;
+			map.push({ node, offset });
+			hay += ch;
+		}
+	});
+	// The annotated match anchors the run; an overrun anchors at the
+	// first match, like locateQuote.
+	let start = -1;
+	for (let seen = 0, at = 0; seen <= from; seen++) {
+		const hit = hay.indexOf(q, at);
+		if (hit === -1) break;
+		start = hit;
+		at = hit + q.length;
+	}
+	if (start === -1) start = hay.indexOf(q);
+	// Case folding only where it keeps offsets (İ grows when lowered).
+	const lower = hay.toLowerCase();
+	const lq = q.toLowerCase();
+	const folded = lower.length === hay.length && lq.length === q.length;
+	const search = folded ? lower : hay;
+	const needle = folded ? lq : q;
+	if (start === -1 && folded) start = search.indexOf(needle);
+	if (start === -1) return [];
+	const charAt = (node: number, offset: number): string =>
+		nodeTexts[node]?.[offset] ?? "";
+	const wordEdge = (inside: string, outside: string): boolean =>
+		!isWordChar(inside) || !isWordChar(outside);
+	const out: QuoteLocation[] = [];
+	for (let at = search.indexOf(needle, start); at !== -1;) {
+		const first = map[at];
+		const last = map[at + needle.length - 1];
+		if (!first || !last) break;
+		// The annotated match itself always counts (art picked inside
+		// start); repeats need whole words.
+		const whole =
+			at === start ||
+			(wordEdge(
+				charAt(first.node, first.offset),
+				charAt(first.node, first.offset - 1)
+			) &&
+				wordEdge(
+					charAt(last.node, last.offset),
+					charAt(last.node, last.offset + 1)
+				));
+		if (whole) {
+			out.push({
+				startNode: first.node,
+				startOffset: first.offset,
+				endNode: last.node,
+				endOffset: last.offset + 1
+			});
+			at = search.indexOf(needle, at + needle.length);
+		} else at = search.indexOf(needle, at + 1);
+	}
+	return out;
 }
 
 /**

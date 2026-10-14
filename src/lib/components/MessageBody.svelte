@@ -28,6 +28,8 @@
 	import { type AnnotationMark, type AnnotationId } from "$lib/annotations";
 	import { annRefsFor } from "$lib/annotation-block";
 	import { applyMarks } from "$lib/annotations-stamp";
+	import type { RepeatInk } from "$lib/ann-repeats";
+	import { clearRepeatInks, paintRepeatInks } from "$lib/ann-repeat-paint";
 
 	interface Props {
 		message: ChatMsg;
@@ -45,6 +47,8 @@
 		foldPreview?: string | null;
 		/** Annotation badges to stamp onto this message's quoted spans. */
 		marks?: AnnotationMark[];
+		/** Annotated quotes to ink here, repeats included (ann-repeats.ts). */
+		repeats?: RepeatInk[];
 		/**
 		 * The one annotation (by id) whose quote also gets the yellow wash:
 		 * the annotation whose comment box is currently open. Saved
@@ -144,6 +148,7 @@
 		folded,
 		foldPreview = null,
 		marks = [],
+		repeats = [],
 		washId = null,
 		onBadgeClick,
 		onAttachAction,
@@ -235,6 +240,21 @@
 	readings never reserve room. */
 	let aidTall = $state(false);
 
+	/* Ink changes alone repaint without re-rendering the body; the
+	stamp above repaints after every render. */
+	$effect(() => {
+		const inks = streaming || folded ? [] : repeats;
+		void tick().then(() => {
+			if (bodyEl) paintRepeatInks(bodyEl, inks);
+		});
+	});
+	$effect(() => {
+		const el = bodyEl;
+		return () => {
+			if (el) clearRepeatInks(el);
+		};
+	});
+
 	$effect(() => {
 		// Paste folds splice before render (reading aids keep full text).
 		// A redacted body renders with folds like the stored one: fold
@@ -321,6 +341,8 @@
 			void tick().then(() => {
 				if (!bodyEl) return;
 				applyMarks(bodyEl, items, skipMarks, wash);
+				// Fresh text nodes need fresh ink ranges.
+				paintRepeatInks(bodyEl, skipMarks ? [] : untrack(() => repeats));
 				stampRunOutputs();
 				for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
 					if (!(wrap instanceof HTMLElement)) continue;

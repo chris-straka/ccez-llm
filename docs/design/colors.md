@@ -81,6 +81,9 @@ platforms can't share one vendor's identity. So the palette is
 | `--shadow-raised`  | `none`                  | `0 10px 30px` at `.35`   | The composer floats on dark; light stays flat                                                                                                                                    |
 | `--thinking-2`     | `#5ac8fa`               | `#64d2ff`                | Thinking dots middle step (sky; dot 1 rides `--accent`)                                                                                                                          |
 | `--thinking-3`     | `#34c759`               | `#30d158`                | Thinking dots last step (green)                                                                                                                                                  |
+| `--rep-ink0`       | `#6d28d9`               | `#c4b5fd`                | Repeat ink 1 (violet): an annotated quote and the same text further down the chat (`::highlight(ccez-rep-0)`)                                                                    |
+| `--rep-ink1`       | `#155e75`               | `#67e8f9`                | Repeat ink 2 (cyan). Inks cycle; no red or pink, which the default own ink and errors own                                                                                        |
+| `--rep-ink2`       | `#3f6212`               | `#bef264`                | Repeat ink 3 (olive / lime). Reading tints beat the ink while their panel is up                                                                                                  |
 | `--own-pink`       | `#be185d`               | `#f9a8d4`                | Own-message ink: default swatch (deep rose / pink), wired via `main[data-own-ink]`                                                                                               |
 | `--own-blue`       | `#1d4ed8`               | `#93c5fd`                | Own-message ink swatch                                                                                                                                                           |
 | `--own-green`      | `#15803d`               | `#86efac`                | Own-message ink swatch                                                                                                                                                           |
@@ -142,6 +145,13 @@ ignores the styles: a raw `#fff` button stays white inside Sepia.
 
 ## Log
 
+- **2026-10-14 — Repeat inks.** Annotated quotes take an ink, and
+  the same text later in the chat takes it too (`--rep-ink0..2`:
+  violet, cyan, olive light; violet, cyan, lime dark; all at least
+  6:1 on every page style). Ink colour only, no wash or underline, so
+  repeats read as plainly as the rest. Painted as Custom Highlights
+  (no DOM moves); a selection-reading tint drops the ink on its
+  kanji while the panel is up, since a highlight colour would hide it.
 - **2026-10-12 — System joins the scheme toggle.** The Follow the
   system checkbox became a third pill: Light | Dark | System. While
   following, both tile rows show under quiet Light and Dark captions,

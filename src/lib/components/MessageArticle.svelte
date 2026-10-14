@@ -22,6 +22,7 @@ where the text sat, like the composer's promptEl pattern). -->
 	import type { LocalAid } from "$lib/reading";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
+	import type { RepeatInk } from "$lib/ann-repeats";
 	import type { AnnotationRef } from "$lib/annotation-block";
 	import SentAttachments, {
 		type SentAttachmentsActions
@@ -89,6 +90,7 @@ where the text sat, like the composer's promptEl pattern). -->
 		sourcesWanted: boolean;
 		foldPreview: string | null;
 		marks: AnnotationMark[] | undefined;
+		repeats: RepeatInk[] | undefined;
 		washId: string | null | undefined;
 		expandedTags: string[];
 		textOverride: string | null;
@@ -143,6 +145,7 @@ where the text sat, like the composer's promptEl pattern). -->
 		sourcesWanted,
 		foldPreview,
 		marks,
+		repeats,
 		washId,
 		expandedTags,
 		textOverride,
@@ -235,6 +238,7 @@ where the text sat, like the composer's promptEl pattern). -->
 		folded={isFolded}
 		{foldPreview}
 		marks={marks ?? []}
+		repeats={repeats ?? []}
 		washId={washId ?? null}
 		onBadgeHover={actions.setHoverBadge}
 		onBadgeClick={actions.badgeClick}

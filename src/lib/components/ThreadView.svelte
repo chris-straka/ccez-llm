@@ -12,6 +12,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		SentTagAction
 	} from "$lib/attachments";
 	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
+	import type { RepeatInk } from "$lib/ann-repeats";
 	import { annRefsFor, REFS_ONLY_BODY } from "$lib/annotation-block";
 	import { correctionHtmlFor } from "$lib/correction";
 	import {
@@ -49,6 +50,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		hoverRow: (index: number) => void;
 		sentTagModels: (msg: ChatMsg, base: string) => AttachTagModel[];
 		marksFor: (messageId: ChatMsgId) => AnnotationMark[];
+		repeatsFor: (messageId: ChatMsgId) => RepeatInk[];
 		aidedTextFor: (msg: ChatMsg) => string | null;
 		localAidsOverrideFor: (msg: ChatMsg) => LocalAid[];
 		pinnedKinds: (id: string) => LocalAid[];
@@ -462,6 +464,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
 					: null}
 				marks={actions.marksFor(msg.id)}
+				repeats={actions.repeatsFor(msg.id)}
 				{washId}
 				{expandedTags}
 				textOverride={actions.aidedTextFor(msg)}

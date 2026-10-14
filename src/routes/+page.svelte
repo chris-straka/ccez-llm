@@ -242,6 +242,7 @@
 		type AnnotationMark,
 		type StoryAnchor
 	} from "$lib/annotations";
+	import { repeatInksByMessage, type RepeatInk } from "$lib/ann-repeats";
 	import { resolveSentRefTarget, locateQuote } from "$lib/quote-match";
 	import {
 		withAnnotations,
@@ -6415,6 +6416,21 @@
 				pendingAnn
 			)
 		);
+	}
+
+	/** Repeat inks for the whole chat (see ann-repeats.ts). */
+	const repeatInks = $derived(
+		repeatInksByMessage(
+			chat.messages.map((m) => m.id),
+			drafts.list
+		)
+	);
+	/** Repeat inks by message, memoized by content like the badges. */
+	const memoRepeats = createRefMemo<RepeatInk>(
+		(r) => `${r.ink}:${r.from}:${r.quote}`
+	);
+	function repeatsFor(messageId: ChatMsgId): RepeatInk[] {
+		return memoRepeats(messageId, repeatInks.get(messageId) ?? []);
 	}
 
 	/** Pinned or hover-peeked model-aid text for a message (tashkeel). */
@@ -14393,6 +14409,7 @@
 				},
 				sentTagModels,
 				marksFor,
+				repeatsFor,
 				aidedTextFor,
 				localAidsOverrideFor,
 				pinnedKinds,

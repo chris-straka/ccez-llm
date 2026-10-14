@@ -30,6 +30,12 @@ html {
 	--pair1: #b25e09;
 	--pair2: #00755a;
 	--pair3: #a85a8a;
+	/* Repeat inks (ann-repeats.ts): annotated quotes and their
+	repeats, cycling violet, cyan, olive. No red or pink: the default
+	own-message ink is pink, and red reads as an error. */
+	--rep-ink0: #6d28d9;
+	--rep-ink1: #155e75;
+	--rep-ink2: #3f6212;
 	--ok-wash: #e6f4ea;
 	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
@@ -82,6 +88,9 @@ html[data-theme="light"] {
 	--pair1: #b25e09;
 	--pair2: #00755a;
 	--pair3: #a85a8a;
+	--rep-ink0: #6d28d9;
+	--rep-ink1: #155e75;
+	--rep-ink2: #3f6212;
 	--ok-wash: #e6f4ea;
 	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
@@ -139,6 +148,9 @@ html[data-theme="dark"] {
 	--pair1: #ff9f0a;
 	--pair2: #2dd4a7;
 	--pair3: #64d2ff;
+	--rep-ink0: #c4b5fd;
+	--rep-ink1: #67e8f9;
+	--rep-ink2: #bef264;
 	--ok-wash: #12351f;
 	--sel-tint: rgba(10, 132, 255, 0.4);
 	--ok: #7cc3a3;
@@ -455,6 +467,17 @@ html[data-theme="dark"] ::highlight(ccez-ann-d2) {
 }
 html[data-theme="dark"] ::highlight(ccez-ann-d3) {
 	background-color: rgba(245, 158, 11, 0.08);
+}
+/* Repeat ink (see ann-repeat-paint.ts): annotated quotes and the
+same text further down the chat, in the annotation's ink. */
+::highlight(ccez-rep-0) {
+	color: var(--rep-ink0);
+}
+::highlight(ccez-rep-1) {
+	color: var(--rep-ink1);
+}
+::highlight(ccez-rep-2) {
+	color: var(--rep-ink2);
 }
 /* Jump-landing flash (see ANN_FLASH_NAME): same draft yellow as the
 live wash, never stacked with it — the jump clears the hover wash

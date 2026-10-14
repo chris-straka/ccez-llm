@@ -1,5 +1,6 @@
 import { firstContentRect } from "$lib/sel-geometry";
 import { slicePoint, spanSliceOverlap, type SelSlice } from "$lib/selSlices";
+import { refreshRepeatInks } from "$lib/ann-repeat-paint";
 
 /**
  * Selection tint: tintSelectionSpans and friends.
@@ -340,6 +341,7 @@ export function tintSelectionSpans(
 			// Partial tint still preserves every character: fall through
 			// and restore the highlight regardless.
 		}
+		refreshRepeatInks();
 		// Surgery keeps a live range tracking the same characters, so
 		// an intact highlight is already correct — leave it (and the
 		// native handles) alone. Only re-resolve when the engine lost
@@ -376,4 +378,5 @@ export function unwrapFuriganaTint(): void {
 		parent.removeChild(el);
 	});
 	parents.forEach((parent) => parent.normalize());
+	if (spans.length > 0) refreshRepeatInks();
 }

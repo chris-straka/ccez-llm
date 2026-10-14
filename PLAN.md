@@ -23,14 +23,6 @@ the record). Screenshots the owner attached are in
   never read); whether a Han-only word inside a Korean paragraph should
   show pinyin at all is still open.
 
-## Annotations, round 2 (owner, 2026-10-14)
-
-- Colour-code repeats: text later in a message that was already annotated
-  above gets the same colour as its first annotation. The owner wants
-  colour, not dimming or underlines ("dimming would make it harder to
-  read"). Colours must stay readable in light and dark themes and must not
-  clash with the reading colours (`docs/design/colors.md`).
-
 ## Selection and inspect
 
 - Mouse selection of Chinese feels strange; the browser's own behaviour is

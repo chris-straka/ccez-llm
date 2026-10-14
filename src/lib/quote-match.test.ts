@@ -3,6 +3,7 @@ import {
 	findQuotedMessage,
 	resolveSentRefTarget,
 	locateQuote,
+	locateQuoteRepeats,
 	occurrenceAtPosition,
 	paragraphForQuote
 } from "./quote-match";
@@ -202,5 +203,44 @@ describe("paragraphForQuote", () => {
 		expect(paragraphForQuote(two, "旅行", 7)).toBe(
 			"日本語の旅行は楽しいです。"
 		);
+	});
+});
+
+describe("locateQuoteRepeats", () => {
+	const spans = (texts: string[], quote: string, from = 0): string[] =>
+		locateQuoteRepeats(texts, quote, from).map((loc) =>
+			loc.startNode === loc.endNode
+				? `${loc.startNode}:${texts[loc.startNode]?.slice(loc.startOffset, loc.endOffset)}`
+				: `${loc.startNode}-${loc.endNode}`
+		);
+
+	it("finds the annotated match and every repeat after it", () => {
+		expect(spans(["Das Haus. Ein Haus, mein Haus."], "Haus", 1)).toEqual([
+			"0:Haus",
+			"0:Haus"
+		]);
+	});
+
+	it("folds case for repeats", () => {
+		expect(spans(["haus und Haus"], "haus")).toEqual(["0:haus", "0:Haus"]);
+	});
+
+	it("repeats whole words in spaced scripts only", () => {
+		expect(spans(["art, start, art"], "art")).toEqual(["0:art", "0:art"]);
+		// The annotated match itself counts even inside a word.
+		expect(spans(["start art"], "art")).toEqual(["0:art", "0:art"]);
+	});
+
+	it("repeats anywhere in spaceless scripts", () => {
+		expect(spans(["露軍の攻撃。露の国"], "露")).toEqual(["0:露", "0:露"]);
+	});
+
+	it("spans text nodes", () => {
+		expect(spans(["ein ", "gro", "ßes Haus"], "großes")).toEqual(["1-2"]);
+	});
+
+	it("finds nothing for punctuation or a missing quote", () => {
+		expect(spans(["Hallo!"], "!")).toEqual([]);
+		expect(spans(["Hallo"], "Welt")).toEqual([]);
 	});
 });
