@@ -77,6 +77,7 @@
 		FONT_SCALE_MAX,
 		stepFontScale,
 		stepChatWidth,
+		stepPromptWidth,
 		MESSAGE_GAP_DEFAULT,
 		LINE_HEIGHT_DEFAULT,
 		effectiveChatWidth,
@@ -3876,8 +3877,14 @@
 	 * column. */
 	function adjustPromptWidth(delta: number): void {
 		if (androidUI) return;
-		const current = settings.promptWidth ?? PROMPT_WIDTH_BASE_REM;
-		const next = stepChatWidth(current, delta);
+		const cap = effectiveChatWidth(
+			androidUI,
+			settings.fontScale,
+			settings.chatWidth ?? CHAT_WIDTH_DEFAULT
+		);
+		const stored = settings.promptWidth ?? PROMPT_WIDTH_BASE_REM;
+		const current = Math.min(stored, cap);
+		const next = stepPromptWidth(stored, cap, delta);
 		if (next === current) {
 			flashToast(`Prompt width ${current} rem (limit)`);
 			return;

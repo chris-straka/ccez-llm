@@ -4,6 +4,9 @@
 		CHAT_WIDTH_MAX,
 		CHAT_WIDTH_MIN,
 		PROMPT_WIDTH_BASE_REM,
+		PROMPT_SLIDER_STEPS,
+		promptSliderPosition,
+		promptSliderScale,
 		MESSAGE_GAP_DEFAULT,
 		LINE_HEIGHT_DEFAULT,
 		LINE_HEIGHT_MAX,
@@ -447,17 +450,23 @@
 			onclick={() => (settings.promptScale = 1)}>(100%)</button
 		>
 		<span class="font-row">
+			<!-- Log travel over the same 80-2000% range: each stretch
+			multiplies the size alike, so a third of the way is ~235%,
+			not 700%. -->
 			<input
 				type="range"
-				min="80"
-				max={2000}
-				step="5"
-				value={Math.round((settings.promptScale ?? 1) * 100)}
+				min="0"
+				max={PROMPT_SLIDER_STEPS}
+				step="1"
+				value={promptSliderPosition(settings.promptScale ?? 1)}
 				aria-label="Prompt text size percent"
+				aria-valuetext="{Math.round((settings.promptScale ?? 1) * 100)}%"
 				onpointerdown={noteSliderPress}
 				onpointerup={(e) => sliderRelease(e, () => (settings.promptScale = 1))}
 				oninput={(e) => {
-					settings.promptScale = Number(e.currentTarget.value) / 100;
+					settings.promptScale = promptSliderScale(
+						Number(e.currentTarget.value)
+					);
 				}}
 			/>
 			<output>{Math.round((settings.promptScale ?? 1) * 100)}%</output>

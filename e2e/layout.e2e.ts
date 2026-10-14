@@ -120,7 +120,9 @@ test("text size scales messages and badges, prompt slider scales the composer", 
 	const promptSize = page.locator(
 		'.settings-panel input[aria-label="Prompt text size percent"]'
 	);
-	await promptSize.fill("200");
+	// Log travel: position 285 of 1000 reads 200%.
+	await promptSize.fill("285");
+	await expect(promptSize).toHaveAttribute("aria-valuetext", "200%");
 	await expect
 		.poll(() => px(".prompt .ta-input"), { timeout: 5_000 })
 		.toBeCloseTo(editorBefore * 2, 1);

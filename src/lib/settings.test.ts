@@ -21,6 +21,9 @@ import {
 	effectivePromptWidth,
 	stepFontScale,
 	stepChatWidth,
+	stepPromptWidth,
+	promptSliderScale,
+	promptSliderPosition,
 	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
 	PROMPT_IDLE_MAX,
@@ -972,6 +975,35 @@ describe("step helpers", () => {
 		expect(stepChatWidth(36, 2)).toBe(38);
 		expect(stepChatWidth(120, 2)).toBe(120);
 		expect(stepChatWidth(28, -2)).toBe(28);
+	});
+
+	it("steps the prompt width from what shows, capped at the column", () => {
+		// Stored past a 36rem column: grow is a limit, shrink moves at once.
+		expect(stepPromptWidth(60, 36, 2)).toBe(36);
+		expect(stepPromptWidth(60, 36, -2)).toBe(34);
+		// Mirror images inside the column.
+		expect(stepPromptWidth(stepPromptWidth(30, 36, 2), 36, -2)).toBe(30);
+		expect(stepPromptWidth(stepPromptWidth(30, 36, -2), 36, 2)).toBe(30);
+		expect(stepPromptWidth(28, 36, -2)).toBe(28);
+		// Phones' full-bleed column caps at the slider max.
+		expect(stepPromptWidth(120, 999, 2)).toBe(120);
+	});
+
+	it("prompt size slider keeps 80-2000% on a log curve", () => {
+		expect(promptSliderScale(0)).toBe(0.8);
+		expect(promptSliderScale(1000)).toBe(20);
+		// A third of the way is moderate, not huge; halfway is 400%.
+		expect(promptSliderScale(333)).toBeCloseTo(2.35, 5);
+		expect(promptSliderScale(500)).toBe(4);
+		// Positions round-trip through the scales they show.
+		for (const scale of [0.8, 1, 1.5, 2, 4, 10, 20]) {
+			expect(promptSliderScale(promptSliderPosition(scale))).toBeCloseTo(
+				scale,
+				1
+			);
+		}
+		expect(promptSliderPosition(1)).toBe(69);
+		expect(promptSliderPosition(50)).toBe(1000);
 	});
 });
 
