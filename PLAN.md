@@ -8,8 +8,6 @@ the record). Screenshots the owner attached are in
 
 ## Annotations (A, the overlay, badges)
 
-- Typing `A` to annotate a Japanese sentence does not focus the new
-  textbox; the owner has to click into it.
 - In the "A" annotation text bar the text sits too close to the left edge
   when there is little text.
 - Highlight text, the annotate menu button appears, switch chat: the

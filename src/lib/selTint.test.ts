@@ -224,6 +224,21 @@ describe("tint + unwrap roundtrip", () => {
 		expect(div.textContent).toBe("日本語テスト");
 	});
 
+	it("leaves the caret in a focused text field instead of restoring", () => {
+		const div = rendered("日本語テスト");
+		const slices = selectionSlices(selectAll(div)) ?? [];
+		const box = document.createElement("textarea");
+		document.body.append(box);
+		box.focus();
+		window.getSelection()?.collapse(document.body, 0);
+		expect(tintSelectionSpans(slices, [{ start: 0, end: 2, color: 1 }])).toBe(
+			true
+		);
+		expect(div.querySelector("span.frbt1")?.textContent).toBe("日本");
+		expect(window.getSelection()?.isCollapsed).toBe(true);
+		expect(document.activeElement).toBe(box);
+	});
+
 	it("refuses without a live highlight", () => {
 		const div = rendered("abc");
 		expect(tintSelectionSpans(scopeSlices(div), [])).toBe(false);

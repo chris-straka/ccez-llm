@@ -320,6 +320,16 @@ export function tintSelectionSpans(
 			kept.toString() === expected
 		)
 			return true;
+		// A text field holding focus (the create pill's note box) owns
+		// the caret: putting the highlight back would pull typing out
+		// of it, so the tint stands without the highlight.
+		const active = document.activeElement;
+		if (
+			active instanceof HTMLTextAreaElement ||
+			active instanceof HTMLInputElement ||
+			(active instanceof HTMLElement && active.isContentEditable)
+		)
+			return true;
 		const fresh = scopeSlices(scope);
 		const a = slicePoint(fresh, highlightBase);
 		const b = slicePoint(fresh, highlightBase + total);
