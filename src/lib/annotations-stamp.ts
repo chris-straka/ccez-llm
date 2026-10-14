@@ -624,12 +624,14 @@ function wrapLeaving(
 		// post-hoc check can tell our disturbance from a redraw the
 		// user started in the meantime), so leave the transparent mark
 		// for the next stamp, which unwraps it under save/restore like
-		// any other mark.
-		const live = document.getSelection();
+		// any other mark. The root's own document, not the global: the
+		// fade can outlive a torn-down test DOM.
+		const doc = root.ownerDocument;
+		const live = doc.getSelection();
 		if (live && live.rangeCount > 0 && !live.isCollapsed) return;
 		for (const mark of doomed) {
 			if (mark.classList.contains("leaving")) {
-				mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
+				mark.replaceWith(doc.createTextNode(mark.textContent ?? ""));
 			}
 		}
 	}, WASH_FADE_MS);
