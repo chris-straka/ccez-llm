@@ -95,20 +95,37 @@ test("a held j moves inside the tap window, no dead start", async ({
 	page
 }) => {
 	const before = await scrollTop(page);
-	const t0 = Date.now();
+	// Time it in the page (keydown to first scroll), not across
+	// Playwright round trips, which a loaded runner stretches.
+	await page.evaluate(() => {
+		const w = window as unknown as { __jDown?: number; __jMoved?: number };
+		const box = document.querySelector(".messages");
+		window.addEventListener(
+			"keydown",
+			(e) => {
+				if (e.key === "j" && w.__jDown === undefined)
+					w.__jDown = performance.now();
+			},
+			true
+		);
+		box?.addEventListener("scroll", () => {
+			if (w.__jDown !== undefined && w.__jMoved === undefined)
+				w.__jMoved = performance.now();
+		});
+	});
 	await page.keyboard.down("j");
 	// The glide accrues from the first frame: motion must register
 	// well inside the 150ms tap window (the old dead start first
 	// moved at the window's far edge).
 	await page.waitForFunction(
-		(prev) => {
-			const box = document.querySelector(".messages") as HTMLElement | null;
-			return box !== null && box.scrollTop > prev;
-		},
-		before,
+		() => (window as unknown as { __jMoved?: number }).__jMoved !== undefined,
+		undefined,
 		{ timeout: 2_000 }
 	);
-	const dt = Date.now() - t0;
+	const dt = await page.evaluate(() => {
+		const w = window as unknown as { __jDown?: number; __jMoved?: number };
+		return (w.__jMoved ?? Infinity) - (w.__jDown ?? 0);
+	});
 	await page.keyboard.up("j");
 	expect(dt).toBeLessThan(150);
 	expect(await scrollTop(page)).toBeGreaterThan(before);
