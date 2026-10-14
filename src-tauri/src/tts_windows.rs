@@ -131,7 +131,7 @@ pub fn sapi_rate_for(lang: &str) -> i32 {
 
 /// SAPI speech rate for a speak request: the per-language base from
 /// [`sapi_rate_for`] plus the Voice speed multiplier (1.0 = normal,
-/// clamped 0.5x–1.5x upstream) mapped linearly onto ±5 steps. Pure:
+/// clamped 0.25x–1.5x upstream) mapped linearly, 10 steps per 1x. Pure:
 /// out-of-range multipliers saturate at the SAPI −10..10 rails, never
 /// a panic (`as` casts saturate; NaN reads as 0). Unit-tested.
 pub fn sapi_speak_rate(lang: &str, rate: f32) -> i32 {
@@ -631,6 +631,9 @@ mod windows_tts_tests {
         assert_eq!(sapi_speak_rate("zh-CN", 1.0), -2);
         assert_eq!(sapi_speak_rate("zh-CN", 0.5), -7);
         assert_eq!(sapi_speak_rate("zh-CN", 1.5), 3);
+        // Quarter speed stays below half speed.
+        assert_eq!(sapi_speak_rate("en-US", 0.25), -8);
+        assert_eq!(sapi_speak_rate("zh-CN", 0.25), -10);
         // Out-of-range multipliers saturate at the SAPI rails.
         assert_eq!(sapi_speak_rate("en-US", 3.0), 10);
         assert_eq!(sapi_speak_rate("en-US", -1.0), -10);

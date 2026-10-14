@@ -542,6 +542,25 @@ mod imp {
         }
     }
 
+    /// AVSpeech rate for a lang at a Voice speed multiplier. At and
+    /// above 1x the multiplier scales the per-language base. Below 1x
+    /// it runs linearly from the base down to 0.0 at the slider
+    /// minimum: AVSpeech slows far less than its numbers suggest under
+    /// the 0.5 default (measured with `AVSpeechSynthesizer.write` on
+    /// macOS 26, en-US: 0.25 plays at 0.77x the default pace, 0.0 at
+    /// 0.56x), so scaling the base straight down left 0.5x barely
+    /// slower than normal. 0.0 is the engine's floor. Pure and
+    /// unit-tested.
+    fn av_speech_rate(lang: &str, rate: f32) -> f32 {
+        let base = speech_rate_for(lang);
+        let av = if rate >= 1.0 {
+            base * rate
+        } else {
+            base * (rate - super::RATE_MIN) / (1.0 - super::RATE_MIN)
+        };
+        av.clamp(0.0, 1.0)
+    }
+
     /// Utterance with the shared voice pick and the shared rate, for
     /// speech and render alike. `ctx` tags the `tauri dev` log lines
     /// (`speak id=7`, `render`). One line per utterance in the terminal:
@@ -573,7 +592,7 @@ mod imp {
                     );
                 }
             }
-            utterance.setRate((speech_rate_for(lang) * rate).clamp(0.0, 1.0));
+            utterance.setRate(av_speech_rate(lang, rate));
             utterance
         }
     }
@@ -837,7 +856,7 @@ mod imp {
 
     #[cfg(test)]
     mod system_id_tests {
-        use super::{identify_lang, speech_rate_for, split_system_id};
+        use super::{av_speech_rate, identify_lang, speech_rate_for, split_system_id};
 
         #[test]
         fn short_samples_reach_the_recognizer() {
@@ -883,6 +902,24 @@ mod imp {
             assert_eq!(speech_rate_for("cmn"), 0.45);
             assert_eq!(speech_rate_for("en-US"), 0.5);
             assert_eq!(speech_rate_for("ja"), 0.5);
+        }
+
+        #[test]
+        fn slow_speeds_reach_the_engine_floor() {
+            assert_eq!(av_speech_rate("en-US", 1.0), 0.5);
+            assert_eq!(av_speech_rate("zh-CN", 1.0), 0.45);
+            assert_eq!(av_speech_rate("en-US", 1.5), 0.75);
+            // The slider minimum lands on AVSpeech's slowest rate.
+            assert_eq!(av_speech_rate("en-US", 0.25), 0.0);
+            assert_eq!(av_speech_rate("zh-CN", 0.25), 0.0);
+            let half = av_speech_rate("en-US", 0.5);
+            assert!(half > 0.0 && half < 0.25, "{half}");
+            // Every step down the slider is slower.
+            let steps: Vec<f32> = [0.25, 0.3, 0.5, 0.75, 1.0, 1.25, 1.5]
+                .iter()
+                .map(|m| av_speech_rate("en-US", *m))
+                .collect();
+            assert!(steps.windows(2).all(|w| w[0] < w[1]), "{steps:?}");
         }
 
         #[test]
@@ -974,11 +1011,16 @@ pub fn tts_speak(
     }
 }
 
-/// Speed multiplier from the frontend, clamped to 0.5x-1.5x (missing or
-/// non-finite reads as 1.0). Pure.
+/// Slowest Voice speed multiplier (`VOICE_SPEED_MIN` in settings.ts).
+pub const RATE_MIN: f32 = 0.25;
+/// Fastest Voice speed multiplier (`VOICE_SPEED_MAX` in settings.ts).
+pub const RATE_MAX: f32 = 1.5;
+
+/// Speed multiplier from the frontend, clamped to 0.25x-1.5x (missing
+/// or non-finite reads as 1.0). Pure.
 pub fn clamp_rate(rate: Option<f32>) -> f32 {
     match rate {
-        Some(r) if r.is_finite() => r.clamp(0.5, 1.5),
+        Some(r) if r.is_finite() => r.clamp(RATE_MIN, RATE_MAX),
         _ => 1.0,
     }
 }
@@ -1022,7 +1064,8 @@ mod rate_tests {
     fn clamps_the_speed_multiplier() {
         assert_eq!(clamp_rate(None), 1.0);
         assert_eq!(clamp_rate(Some(f32::NAN)), 1.0);
-        assert_eq!(clamp_rate(Some(0.1)), 0.5);
+        assert_eq!(clamp_rate(Some(0.25)), 0.25);
+        assert_eq!(clamp_rate(Some(0.1)), 0.25);
         assert_eq!(clamp_rate(Some(3.0)), 1.5);
         assert_eq!(clamp_rate(Some(0.8)), 0.8);
     }

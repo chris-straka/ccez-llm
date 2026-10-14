@@ -209,6 +209,81 @@ test.describe("native-fallback", () => {
 	});
 });
 
+test.describe("web-speech-utterances", () => {
+	/** Web speech stubbed to record each utterance's text, rate, and
+	language (nothing plays), so the read-aloud settings are observable. */
+	async function recordSpeech(
+		page: Parameters<typeof seedChat>[0]
+	): Promise<void> {
+		await page.addInitScript(() => {
+			const w = window as unknown as {
+				__utterances: Array<{ text: string; rate: number; lang: string }>;
+			};
+			w.__utterances = [];
+			const synth = window.speechSynthesis;
+			if (!synth) return;
+			synth.speak = ((u: SpeechSynthesisUtterance) => {
+				w.__utterances.push({ text: u.text, rate: u.rate, lang: u.lang });
+			}) as typeof synth.speak;
+			synth.cancel = (() => undefined) as typeof synth.cancel;
+		});
+	}
+	const utterances = (page: Parameters<typeof seedChat>[0]) =>
+		page.evaluate(
+			() =>
+				(
+					window as unknown as {
+						__utterances: Array<{ text: string; rate: number; lang: string }>;
+					}
+				).__utterances
+		);
+
+	test("voice speed slides down to a quarter and reaches the utterance", async ({
+		page
+	}) => {
+		await recordSpeech(page);
+		await seedChat(
+			page,
+			[
+				{
+					role: "assistant",
+					content:
+						"Take it slowly.\n\nlorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+				}
+			],
+			null,
+			{ voiceEngine: "web" }
+		);
+		await page.goto("/");
+		const article = page.locator("article.assistant");
+		await expect(article).toBeVisible({ timeout: 60_000 });
+		await page.keyboard.press("Meta+,");
+		const panel = page.locator(".settings-panel");
+		await expect(panel).not.toHaveClass(/closed/);
+		const slider = panel.locator('input[aria-label="Voice speed"]');
+		await slider.focus();
+		await page.keyboard.press("Home");
+		await expect(slider).toHaveValue("0.25");
+		const row = panel.locator(
+			'label.slider-row:has(input[aria-label="Voice speed"])'
+		);
+		await expect(row.locator("output")).toHaveText("0.25×");
+		await row.scrollIntoViewIfNeeded();
+		await row.screenshot({ path: ".screenshots/speech-speed-quarter.png" });
+		await page.keyboard.press("Escape");
+		await expect(panel).toHaveClass(/closed/);
+		await article.hover();
+		await article
+			.locator('button[aria-label="Read this message aloud"]')
+			.click();
+		await expect
+			.poll(async () => (await utterances(page)).length)
+			.toBeGreaterThan(0);
+		// The browser stores rate as a 32-bit float.
+		for (const u of await utterances(page)) expect(u.rate).toBeCloseTo(0.25, 5);
+	});
+});
+
 test.describe("ios-voice", () => {
 	/** iPhone Safari UA: rides the same phone UI as Android (see isIOSUserAgent). */
 	const IPHONE_UA =

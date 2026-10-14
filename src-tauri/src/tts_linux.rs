@@ -87,7 +87,8 @@ impl Backend {
     /// [`espeak_voice_for`]), overridden by an explicit settings voice.
     /// Both carry the Voice speed multiplier (`rate`, 1.0 = normal):
     /// `spd-say -r` and espeak `-s` (see [`spd_rate`] /
-    /// [`espeak_speed`]).
+    /// [`espeak_speed`]), plus an espeak `-g` word gap below espeak's
+    /// slowest pace (see [`espeak_word_gap`]).
     pub fn speak_argv(
         &self,
         lang: &str,
@@ -111,31 +112,58 @@ impl Backend {
                     .filter(|v| !v.is_empty())
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| espeak_voice_for(lang));
-                vec![
+                let mut argv = vec![
                     "-v".into(),
                     pick,
                     "-s".into(),
                     espeak_speed(rate).to_string(),
-                    text.into(),
-                ]
+                ];
+                let gap = espeak_word_gap(rate);
+                if gap > 0 {
+                    argv.push("-g".into());
+                    argv.push(gap.to_string());
+                }
+                argv.push(text.into());
+                argv
             }
         }
     }
 }
 
 /// `spd-say -r` value (-100..100, 0 is the default) for the Voice
-/// speed multiplier (1.0 = normal, clamped 0.5x–1.5x upstream).
+/// speed multiplier (1.0 = normal, clamped 0.25x–1.5x upstream).
 /// Pure: out-of-range multipliers saturate at the rails, never a
 /// panic (`as` casts saturate; NaN reads as 0). Unit-tested.
 pub fn spd_rate(rate: f32) -> i32 {
     (((rate - 1.0) * 100.0).round() as i32).clamp(-100, 100)
 }
 
+/// espeak's default pace in words per minute.
+const ESPEAK_WPM: f32 = 175.0;
+/// espeak's slowest pace (`espeakRATE_MINIMUM`): slower `-s` values
+/// read at this pace anyway.
+const ESPEAK_MIN_WPM: f32 = 80.0;
+
 /// `espeak-ng`/`espeak` `-s` words-per-minute for the Voice speed
-/// multiplier: 175 is espeak's default pace. Pure (floored at 1 so a
-/// wild multiplier never formats a non-positive speed). Unit-tested.
+/// multiplier: 175 is espeak's default pace, floored at espeak's own
+/// minimum of 80 (NaN reads as the floor). Pure and unit-tested.
 pub fn espeak_speed(rate: f32) -> i32 {
-    ((175.0 * rate).round() as i32).max(1)
+    ((ESPEAK_WPM * rate).round() as i32).max(ESPEAK_MIN_WPM as i32)
+}
+
+/// `espeak` `-g` word gap (10 ms units) that makes up the pace `-s`
+/// cannot reach: below 80 wpm (about 0.46x) each word gets the extra
+/// time it would have taken at the requested pace, so 0.25x still
+/// reads slower than 0.5x. 0 when no gap is needed (or the multiplier
+/// is not a positive number). Approximate: espeak scales the gap with
+/// its speed. Pure and unit-tested.
+pub fn espeak_word_gap(rate: f32) -> i32 {
+    let wpm = ESPEAK_WPM * rate;
+    if wpm.is_nan() || wpm <= 0.0 || wpm >= ESPEAK_MIN_WPM {
+        return 0;
+    }
+    let extra_ms = 60_000.0 / wpm - 60_000.0 / ESPEAK_MIN_WPM;
+    (extra_ms / 10.0).round() as i32
 }
 
 /// `espeak-ng`/`espeak` voice name for a BCP-47 lang: the primary
@@ -604,8 +632,8 @@ mod imp {
 #[cfg(test)]
 mod linux_tts_tests {
     use super::{
-        candidate_paths, espeak_speed, espeak_voice_for, parse_espeak_voices, parse_spd_voices,
-        pick_backend, spd_rate, Backend,
+        candidate_paths, espeak_speed, espeak_voice_for, espeak_word_gap, parse_espeak_voices,
+        parse_spd_voices, pick_backend, spd_rate, Backend,
     };
 
     #[test]
@@ -653,7 +681,20 @@ mod linux_tts_tests {
         assert_eq!(espeak_speed(1.0), 175);
         assert_eq!(espeak_speed(0.5), 88);
         assert_eq!(espeak_speed(1.5), 263);
-        assert_eq!(espeak_speed(f32::NAN), 1);
+        assert_eq!(espeak_speed(f32::NAN), 80);
+        // Below espeak's 80 wpm floor the pace holds and words space out.
+        assert_eq!(espeak_speed(0.25), 80);
+        assert_eq!(espeak_word_gap(1.0), 0);
+        assert_eq!(espeak_word_gap(0.5), 0);
+        assert_eq!(espeak_word_gap(0.25), 62);
+        assert!(espeak_word_gap(0.3) < espeak_word_gap(0.25));
+        assert_eq!(espeak_word_gap(f32::NAN), 0);
+        assert_eq!(espeak_word_gap(0.0), 0);
+        assert_eq!(spd_rate(0.25), -75);
+        assert_eq!(
+            Backend::EspeakNg.speak_argv("fr-FR", None, 0.25, "salut"),
+            vec!["-v", "fr", "-s", "80", "-g", "62", "salut"]
+        );
         assert_eq!(
             Backend::SpeechDispatcher.speak_argv("de-DE", None, 0.5, "Hallo"),
             vec!["-l", "de-DE", "-r", "-50", "Hallo"]

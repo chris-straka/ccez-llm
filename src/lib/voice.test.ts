@@ -500,8 +500,11 @@ describe("speech rate", () => {
 	it("clamps the voice speed multiplier and falls back to normal", () => {
 		setSpeechRate(0.7);
 		expect(currentSpeechRate()).toBe(0.7);
+		// Quarter speed is in range on every engine; below it clamps.
+		setSpeechRate(0.25);
+		expect(currentSpeechRate()).toBe(0.25);
 		setSpeechRate(0.1);
-		expect(currentSpeechRate()).toBe(0.5);
+		expect(currentSpeechRate()).toBe(0.25);
 		setSpeechRate(9);
 		expect(currentSpeechRate()).toBe(1.5);
 		setSpeechRate(Number.NaN);

@@ -4,7 +4,12 @@ import {
 	hasDistinctiveChinese,
 	transliterateGurmukhi
 } from "./reading";
-import type { VoiceEngine } from "./settings";
+import {
+	VOICE_SPEED_DEFAULT,
+	VOICE_SPEED_MAX,
+	VOICE_SPEED_MIN,
+	type VoiceEngine
+} from "./settings";
 
 /**
  * Voice mode (Stage 6): sentence-chunked speech queue with skip-midway,
@@ -442,9 +447,11 @@ function synthesis(): SpeechSynthesis | null {
  * reads it, and threading it through each caller would touch dozens
  * of call sites for one number. The page pushes the setting here.
  */
-let speechRate = 1;
+let speechRate = VOICE_SPEED_DEFAULT;
 export function setSpeechRate(rate: number): void {
-	speechRate = Number.isFinite(rate) ? Math.min(1.5, Math.max(0.5, rate)) : 1;
+	speechRate = Number.isFinite(rate)
+		? Math.min(VOICE_SPEED_MAX, Math.max(VOICE_SPEED_MIN, rate))
+		: VOICE_SPEED_DEFAULT;
 }
 export function currentSpeechRate(): number {
 	return speechRate;

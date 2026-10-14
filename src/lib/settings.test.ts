@@ -281,6 +281,14 @@ describe("settings", () => {
 		slow.voiceSpeed = 0.7;
 		saveSettings(slow, memoryStore);
 		expect(loadSettings(memoryStore).voiceSpeed).toBe(0.7);
+		const quarter = blankSettings();
+		quarter.voiceSpeed = 0.25;
+		saveSettings(quarter, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(0.25);
+		const crawl = blankSettings();
+		crawl.voiceSpeed = 0.05;
+		saveSettings(crawl, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(0.25);
 		const fast = blankSettings();
 		fast.voiceSpeed = 4;
 		saveSettings(fast, memoryStore);
