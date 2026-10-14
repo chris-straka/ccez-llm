@@ -1,7 +1,7 @@
 /**
- * The baked annotation text block: formatting prompt inclusions into
- * messages, splitting them back into refs, and rebaking on edit.
- * Split out of annotations.ts (section C).
+ * The baked annotation text block carried by older sent messages:
+ * formatting refs into a message, splitting them back out, and
+ * rebaking on an own-message edit. Nothing new bakes on send.
  */
 
 /**
@@ -31,10 +31,9 @@ export function formatAnnotations(
 }
 
 /**
- * Append the annotation block to outgoing prompt text. Only pinned
- * annotations ever reach here (see promptInclusions) — approval is
- * the pin, and deleting the annotation is the only removal.
- * Numbering sequences from the kept order with no gaps.
+ * Append the annotation block to message text: an own-message edit
+ * rebakes the refs its message already carried (deleting one drops
+ * it). Numbering sequences from the kept order with no gaps.
  */
 export function withAnnotations(
 	prompt: string,

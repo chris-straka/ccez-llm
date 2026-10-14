@@ -1,30 +1,24 @@
-<!-- Pinned-annotations dock: answered annotations whose badge
-plus pinned them to the send prompt (quote, question, and answer
-each). Unpinned rows live at their badges until pinned. The page
-owns the annotations array, the open/highlight ids, and the
-quote/copy/remove/unpin/edit behaviors; this component owns the
-dock markup and its surfaces (Svelte scoping binds the CSS to this
+<!-- Annotation dock: the row a badge tap opened (quote, question,
+and answer when it has one). Rows live at their badges otherwise.
+The page owns the annotations array, the open/highlight ids, and
+the quote/copy/remove/edit behaviors; this component owns the dock
+markup and its surfaces (Svelte scoping binds the CSS to this
 markup). No inline editor lives here: the pencil opens the edit
 card, which rewords and re-asks at once. -->
 <script lang="ts">
 	import {
 		annotationCountLabel,
-		canPinAnnotation,
 		type Annotation,
 		type AnnotationId
 	} from "$lib/annotations";
 	import ActionIcon from "./ActionIcon.svelte";
 
-	/** Page-owned dock behaviors. Pinning lives on the badge
-	(double-click; the dock lists pinned rows only), so no pin
-	action crosses here — only unpin. */
+	/** Page-owned dock behaviors. */
 	export interface ReviewDockActions {
 		toggle: () => void;
-		clearAll: () => void;
 		quote: (ann: Annotation) => void;
 		copy: (quote: string, comment: string) => void;
 		remove: (id: AnnotationId) => void;
-		unpin: (id: AnnotationId) => void;
 		editOrange: (id: AnnotationId) => void;
 	}
 
@@ -46,8 +40,8 @@ card, which rewords and re-asks at once. -->
 	}: Props = $props();
 </script>
 
-<!-- Pinned-annotations dock: plus-pinned rows only, each with
-its quote, question, and answer. -->
+<!-- Annotation dock: the open row, with its quote, question, and
+answer. -->
 <div class="ann-wrap" class:pinned={open}>
 	<button
 		type="button"
@@ -63,16 +57,6 @@ its quote, question, and answer. -->
 		{annotationCountLabel(items.length)}
 	</button>
 	<div class="review" role="dialog" aria-label="Annotations" data-fade-scroll>
-		<div class="review-tools">
-			<button
-				type="button"
-				aria-label="Remove pinned annotations"
-				title="Remove pinned annotations"
-				onclick={actions.clearAll}
-			>
-				Clear pinned
-			</button>
-		</div>
 		{#each items as ann, n (ann.id)}
 			<!-- Only the quote navigates: one jump per
 			annotation, on the text itself. The note stays
@@ -117,13 +101,10 @@ its quote, question, and answer. -->
 				<div class="review-head">
 					<span class="review-label">-</span>
 					<span class="review-comment">{ann.comment || "—"}</span>
-					{#if canPinAnnotation(ann)}
+					{#if ann.answer !== undefined}
 						<!-- Answered rows own the wording: the pencil
-						rewords and re-asks at once. Pinning happens at
-						the badge's plus, so the only prompt action here
-						is Unpin — no per-row Add exists by design. The
-						highlighted open row may still be waiting (blue):
-						it reads and deletes here until its answer lands. -->
+						rewords and re-asks at once. A waiting (blue) row
+						reads and deletes here until its answer lands. -->
 						<button
 							type="button"
 							class="review-pencil"
@@ -133,17 +114,6 @@ its quote, question, and answer. -->
 						>
 							<ActionIcon kind="pencil" />
 						</button>
-						{#if ann.pinnedToPrompt === true}
-							<button
-								type="button"
-								class="review-add"
-								title="Remove this annotation from the send prompt"
-								aria-label="Remove annotation {n + 1} from prompt"
-								onclick={() => actions.unpin(ann.id)}
-							>
-								Unpin
-							</button>
-						{/if}
 					{/if}
 				</div>
 				{#if ann.answer !== undefined}
@@ -253,27 +223,6 @@ its quote, question, and answer. -->
 		overflow-x: auto;
 		min-width: 0;
 	}
-	/* Unpin: the solid primary pill (same fill as the send
-	button) — the row's one call to action, never a quiet twin.
-	The qualified selector outranks the generic head-button ghost
-	base, which would otherwise paint it transparent. */
-	.review-head button.review-add {
-		font-size: 0.78rem;
-		font-weight: 600;
-		cursor: pointer;
-		border-radius: 999px;
-		padding: 0.28rem 0.9rem;
-		border: 1px solid #007aff;
-		border-color: var(--accent);
-		background: #007aff;
-		background: var(--accent);
-		color: #fff;
-		color: var(--accent-ink);
-		transition: opacity 0.15s ease;
-	}
-	.review-head button.review-add:hover {
-		opacity: 0.8;
-	}
 	/* The answer always shows under its annotation: plain text at
 	note size, never a popup-only reveal. */
 	.review-answer {
@@ -327,25 +276,6 @@ its quote, question, and answer. -->
 	.ann-pill {
 		font-weight: 650;
 	}
-	/* Clear-all heads the popup, top-right. */
-	.review-tools {
-		display: flex;
-		justify-content: flex-end;
-		padding: 0.35rem 0.2rem 0.1rem;
-	}
-	.review-tools button {
-		border: 0;
-		background: none;
-		cursor: pointer;
-		font-size: 0.85rem;
-		color: #6e6e73;
-		color: var(--muted);
-		padding: 0.1rem 0.3rem;
-	}
-	.review-tools button:hover {
-		color: #94250a;
-		color: var(--danger);
-	}
 	/* Phones track the chat text size in the review card: every fixed
 	rem above scales with it (desktop keeps its compact sizes). The
 	.app ancestor stays global (it renders paged, unscopable). */
@@ -353,7 +283,6 @@ its quote, question, and answer. -->
 		font-size: calc(0.82rem * var(--font-scale, 1));
 	}
 	:global(.app[data-android]) .review-head button,
-	:global(.app[data-android]) .review-tools button,
 	:global(.app[data-android]) .review-label {
 		font-size: calc(0.75rem * var(--font-scale, 1));
 	}

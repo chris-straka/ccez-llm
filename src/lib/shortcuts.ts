@@ -86,7 +86,6 @@ export function touchShortcuts(): ShortcutRow[] {
 			keys: "Select one Han character, then Inspect"
 		},
 		{ group: sel, name: "Move the selection menu", keys: "Drag it" },
-		{ group: sel, name: "Pin / unpin annotation", keys: "Double-tap badge" },
 		{
 			group: sel,
 			name: "Cancel an annotation",
@@ -262,11 +261,6 @@ export function desktopShortcuts(
 			keys: "Triple-click / quadruple-click"
 		},
 		{ group: mouse, name: "Delete annotation", keys: "Hover badge + Delete" },
-		{
-			group: mouse,
-			name: "Pin / unpin annotation",
-			keys: "Double-click badge"
-		},
 		{
 			group: mouse,
 			name: "Fold / unfold code",

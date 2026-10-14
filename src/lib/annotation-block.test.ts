@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-	addAnnotation,
-	setPromptPinned,
-	promptInclusions,
-	attachAnnotationAnswer
-} from "./annotations";
+import { addAnnotation, attachAnnotationAnswer } from "./annotations";
 import {
 	clearBakedAnnotations,
 	formatAnnotations,
@@ -159,51 +154,35 @@ describe("annotation block", () => {
 		expect(withAnnotations("explain", [])).toBe("explain");
 	});
 
-	it("bakes only pinned annotations; deleting is the only removal", () => {
+	it("bakes the given refs, numbering from the kept order", () => {
 		const filed = addAnnotation(
 			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
 			"m1" as ChatMsgId,
 			"alphabet",
 			"letters?"
 		);
-		// Nothing pinned: the prompt goes out bare (no omit state —
-		// creating never includes).
-		expect(withAnnotations("explain", promptInclusions(filed))).toBe("explain");
-		const list = setPromptPinned(
-			setPromptPinned(filed, filed[0]!.id, true),
-			filed[1]!.id,
-			true
-		);
-		expect(withAnnotations("explain", promptInclusions(list))).toBe(
+		// Nothing given: the text goes out bare.
+		expect(withAnnotations("explain", [])).toBe("explain");
+		expect(withAnnotations("explain", filed)).toBe(
 			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n2. "alphabet" — letters?'
 		);
-		// Unpinning one resequences numbering from the kept order.
-		const oneOut = setPromptPinned(list, list[0]!.id, false);
-		expect(promptInclusions(oneOut)).toHaveLength(1);
-		expect(withAnnotations("explain", promptInclusions(oneOut))).toBe(
+		// Dropping one resequences numbering from the kept order.
+		expect(withAnnotations("explain", filed.slice(1))).toBe(
 			'explain\n\nAnnotated selections:\n1. "alphabet" — letters?'
-		);
-		// None pinned: bare again.
-		const noneOut = setPromptPinned(oneOut, oneOut[1]!.id, false);
-		expect(withAnnotations("explain", promptInclusions(noneOut))).toBe(
-			"explain"
 		);
 	});
 
-	it("bakes pinned answers as quote, question, and reply", () => {
+	it("bakes answers as quote, question, and reply", () => {
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
 		const answered = attachAnnotationAnswer(
 			list,
 			list[0]!.id,
 			"because reasons\nsecond line"
 		);
-		const pinned = setPromptPinned(answered, list[0]!.id, true);
-		expect(withAnnotations("explain", promptInclusions(pinned))).toBe(
+		expect(withAnnotations("explain", answered)).toBe(
 			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n   Answer: because reasons second line'
 		);
-		const split = splitAnnotationBlock(
-			withAnnotations("explain", promptInclusions(pinned))
-		);
+		const split = splitAnnotationBlock(withAnnotations("explain", answered));
 		expect(split?.refs).toEqual([
 			{
 				n: 1,

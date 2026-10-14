@@ -12,8 +12,8 @@ import { seedChat } from "./helpers";
  * 3. numbered badges scale with the message font size;
  * 4. empty annotations bake a "?" so the model sees the confusion;
  * 5. annotations-only messages render as an em-dash with the count UI above;
- * 6. dock Unpin animates symmetrically, and pinned chips ride
- *    token surfaces (filed notes never edit in an overlay);
+ * 6. filed notes never edit in an overlay (the dock row reads and
+ *    deletes; the edit card rewords);
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
@@ -32,6 +32,8 @@ test("review dock respects its width cap at 200% type", async ({ page }) => {
 			"ccez-llm-settings-v1",
 			JSON.stringify({ ...prev, fontScale: 2 })
 		);
+		// A waiting badge opens the dock; a ready one opens its card.
+		window.localStorage.setItem("ccez-mock-chat-ms", "60000");
 	});
 	await page.goto("/");
 	// The middle message: badges at either chrome edge take no hits.
@@ -61,14 +63,14 @@ test("review dock respects its width cap at 200% type", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(pop).toHaveCount(0, { timeout: 5_000 });
-	// The dock lists pinned rows only: wait for the answer,
-	// pin the badge (double-click), then open the dock.
-	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(1, {
-		timeout: 30_000
-	});
-	await page.locator("button.ccez-ann-badge").nth(0).dblclick();
-	await page.keyboard.press("Escape");
-	await page.locator(".prompt-tools .ann-pill").click();
+	// A waiting badge opens the dock on its row (a ready answer
+	// opens its card instead): keyboard-activate it.
+	await expect(page.locator("button.ccez-ann-badge.ans-waiting")).toHaveCount(
+		1,
+		{ timeout: 30_000 }
+	);
+	await page.locator("button.ccez-ann-badge").nth(0).focus();
+	await page.keyboard.press("Enter");
 	const card = page.locator(".ann-wrap .review");
 	await expect(card).toHaveCSS("opacity", "1");
 	// Content-sized up to its cap: 30rem (480px) plus borders.

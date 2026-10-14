@@ -1,6 +1,6 @@
 /**
  * Annotation model: a quoted selection from a message plus an optional
- * comment, wrapped into the next query. Ids, add/delete/pin list verbs,
+ * comment, asked as its own question. Ids, add/delete list verbs,
  * badge marks, and small UI helpers. Quote matching lives in
  * quote-match.ts, the baked text block in annotation-block.ts, draft
  * storage in annotation-drafts-store.ts, and menu/panel geometry in
@@ -51,16 +51,6 @@ export interface Annotation {
 	 * comment. Absent means unanswered — badges stay neutral.
 	 */
 	answer?: string;
-	/**
-	 * Pinned to the send prompt (the badge's plus on an answered
-	 * annotation): the prompt overlay lists it as quote, question,
-	 * and answer, and the next send bakes all three as context.
-	 * Unpinned annotations never enter the prompt — creating one
-	 * only files its badge. Absent means unpinned; consumed (reset)
-	 * by the send that bakes it, and never persisted (fresh loads
-	 * start unpinned, so a stale approval can't ride a later send).
-	 */
-	pinnedToPrompt?: boolean;
 	/**
 	 * Filed by bare A (the instant path, no note): answered as a short
 	 * gloss instead of the full lesson Shift+A and typed questions get.
@@ -207,25 +197,6 @@ export function quoteDirection(quote: string): "rtl" | "ltr" | null {
 }
 
 /**
- * Prompt inclusions for a send: pinned annotations only. Creating
- * one never includes it — only the badge's plus pins it. The
- * dock lists the same pinned set; the message carries these
- * (quote, question, and answer each).
- */
-export function promptInclusions(list: Annotation[]): Annotation[] {
-	return list.filter((a) => a.pinnedToPrompt === true);
-}
-
-/**
- * Add-to-prompt eligibility: answered annotations only. Blue
- * (waiting) annotations are never asked, edited, or prompted —
- * creating one only files its badge until the reply lands.
- */
-export function canPinAnnotation(ann: { answer?: string }): boolean {
-	return ann.answer !== undefined;
-}
-
-/**
  * Hold-to-delete eligibility: every filed badge, blue (waiting)
  * or orange (answered) alike. Late answers landing after a
  * waiting badge's delete attach to nothing (see
@@ -233,38 +204,6 @@ export function canPinAnnotation(ann: { answer?: string }): boolean {
  */
 export function canHoldDeleteBadge(ann: { id: string } | undefined): boolean {
 	return ann !== undefined;
-}
-
-/**
- * Remove every prompt-pinned annotation, keeping the rest filed:
- * the dock's clear-all empties the prompt overlay, never the
- * badges. Pure — filed-but-unpinned notes survive the call.
- */
-export function clearPromptPinned(list: Annotation[]): Annotation[] {
-	return list.filter((a) => a.pinnedToPrompt !== true);
-}
-
-/** Pin one annotation to the send prompt (never deletes it). */
-export function setPromptPinned(
-	list: Annotation[],
-	id: AnnotationId,
-	pinned: boolean
-): Annotation[] {
-	let touched = false;
-	const next = list.map((a) => {
-		if (a.id !== id) return a;
-		if (pinned) {
-			if (a.pinnedToPrompt === true) return a;
-			touched = true;
-			return { ...a, pinnedToPrompt: true };
-		}
-		if (a.pinnedToPrompt !== true) return a;
-		touched = true;
-		const rest = { ...a };
-		delete rest.pinnedToPrompt;
-		return rest;
-	});
-	return touched ? next : list;
 }
 
 /** Ask one annotation right away (every filing asks its own
@@ -399,12 +338,12 @@ export function aidedTextForMsg(
 }
 
 /**
- * Seed pending annotations from a message's baked refs: the baked
- * block is provider context, not edit text, so saving re-bakes the
- * same context from these seeds. They arrive pinned (already approved
- * once — unpinning or deleting one in the dock drops it from the
- * save) with their answers, so an untouched save rebakes the block
- * as it was. The bake's "?" placeholder reads back as no comment.
+ * Seed annotations from a message's baked refs for an own-message
+ * edit: the baked block is provider context, not edit text, so saving
+ * re-bakes the same context from whichever seeds survive the edit
+ * (deleting one drops it from the save). They arrive with their
+ * answers, so an untouched save rebakes the block as it was. The
+ * bake's "?" placeholder reads back as no comment.
  */
 export function seedAnnotationsFromRefs(
 	messageId: ChatMsgId,
@@ -415,8 +354,7 @@ export function seedAnnotationsFromRefs(
 		messageId,
 		quote: r.quote,
 		comment: r.comment === "?" ? "" : r.comment,
-		...(r.answer ? { answer: r.answer } : {}),
-		pinnedToPrompt: true
+		...(r.answer ? { answer: r.answer } : {})
 	}));
 }
 
@@ -424,19 +362,15 @@ export function seedAnnotationsFromRefs(
  * The chat's annotations once an own-message edit ends. The edit
  * swaps the live list for the message's ref seeds, so the filed list
  * is stashed at entry and comes back here, plus anything filed during
- * the edit that the save didn't bake (seeds never survive: they live
- * in the message). Null stash (edit opened in another chat) keeps the
- * live extras only.
+ * the edit (seeds never survive: they live in the message). Null
+ * stash (edit opened in another chat) keeps the live extras only.
  */
 export function annotationsAfterEdit(
 	stash: Annotation[] | null,
 	live: Annotation[],
-	seedIds: ReadonlySet<string>,
-	saved: boolean
+	seedIds: ReadonlySet<string>
 ): Annotation[] {
-	const extras = live.filter(
-		(a) => !seedIds.has(a.id) && !(saved && a.pinnedToPrompt === true)
-	);
+	const extras = live.filter((a) => !seedIds.has(a.id));
 	return [...(stash ?? []), ...extras];
 }
 

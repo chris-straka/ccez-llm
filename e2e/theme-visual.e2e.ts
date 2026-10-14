@@ -453,26 +453,26 @@ for (const t of THEMES) {
 				? /^rgba\(0, 0, 0, 0\.15\) 0px 0px 0px \d+(\.\d+)?px/
 				: /^rgba\(0, 0, 0, 0\.45\) 0px 0px 0px \d+(\.\d+)?px/
 		);
+		// Slow the ask: a waiting badge opens the dock on its row (a
+		// ready answer opens its card instead).
+		await page.evaluate(() =>
+			localStorage.setItem("ccez-mock-chat-ms", "60000")
+		);
 		await page.keyboard.type("note");
 		await page.keyboard.press("Enter");
-		// Unpinned filings show no pill: pin with two Enters
-		// first, then the pill rises (the number never changes).
-		const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+		const badge = page.locator("button.ccez-ann-badge.ans-waiting").first();
 		await expect(badge).toBeVisible({ timeout: 30_000 });
 		await badge.focus();
-		await page.keyboard.press("Enter");
 		await page.keyboard.press("Enter");
 		await expect(badge).toHaveText("1");
 		const pill = page.locator(".prompt-tools .ann-pill");
 		await expect(pill).toBeVisible();
-		// Fresh saves highlight their review row.
+		// The open row highlights.
 		await expect(page.locator(".review-item.highlight")).toHaveCSS(
 			"background-color",
 			L ? "rgb(238, 244, 255)" : "rgb(18, 35, 61)"
 		);
-		// The card toggles on pill click (hover never opens it).
 		const card = page.locator(".ann-wrap .review");
-		await pill.click();
 		await expect
 			.poll(() => card.evaluate((el) => getComputedStyle(el).opacity), {
 				timeout: 2000
@@ -480,9 +480,7 @@ for (const t of THEMES) {
 			.toBe("1");
 		await expect(card).toHaveCSS("background-color", v.overlay);
 		await expect(card).toHaveCSS("border-color", v.overlayLine);
-		// Park the cursor clear of the card: the pill click that opened
-		// it can leave it hovering the delete button, which then reads
-		// ink instead of rest.
+		// Park the cursor clear of the card so nothing reads hovered.
 		await page.mouse.move(8, 8);
 		await expect(page.locator(".review-label").first()).toHaveCSS(
 			"color",
@@ -491,23 +489,12 @@ for (const t of THEMES) {
 		const del = page.locator(".review-head button.review-del").first();
 		await expect(del).toHaveCSS("color", v.muted);
 		await del.hover();
-		// Deletes hover danger, like the sidebar × and Clear pinned —
-		// never ink.
+		// Deletes hover danger, like the sidebar × — never ink.
 		await expect(del).toHaveCSS("color", v.danger);
 		await expect(page.locator(".ann-wrap")).toHaveCSS("border-color", v.line);
 		await expect(pill).toHaveCSS("color", v.muted);
-		const clear = page.locator(".review-tools button");
-		await expect(clear).toHaveCSS("color", v.muted);
-		await clear.hover();
-		await expect(clear).toHaveCSS("color", v.danger);
-		// The dock's Unpin is the solid accent pill: accent fill,
-		// readable ink — and the composer stays empty (pins never
-		// render in the prompt itself).
-		const unpin = page.locator(".review-add");
-		await expect(unpin).toHaveCSS(
-			"background-color",
-			L ? "rgb(0, 122, 255)" : "rgb(10, 132, 255)"
-		);
+		// The composer stays empty (annotations never render in the
+		// prompt itself).
 		await page.mouse.click(4, 300);
 		// The hint is a placeholder attribute, never draft text:
 		// only a real value counts.

@@ -285,17 +285,20 @@ test("prompt review card opens up and to the left", async ({ page }) => {
 	expect(gap).toBeLessThanOrEqual(24);
 });
 
-/** The sent message's refs card opens covering its number pill. */
+/** The sent message's refs card opens covering its number pill
+(older messages carry baked blocks; nothing new bakes on send). */
 test("message refs card opens over its number", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	await page.keyboard.type("meaning?");
-	await page.keyboard.press("Enter");
-	await pinFiled(page);
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
-	await page.locator(".ta-input").click();
-	await page.keyboard.type("go");
-	await page.waitForTimeout(600);
-	await page.keyboard.press("Enter");
+	await seedChat(page, [
+		{ role: "assistant", content: "テストを確認しました" },
+		{
+			role: "user",
+			content: 'go\n\nAnnotated selections:\n1. "確認しました" — meaning?'
+		}
+	]);
+	await page.goto("/");
+	await expect(page.locator("article.user .rendered")).toBeVisible({
+		timeout: 60_000
+	});
 	const pill = page.locator("article.user .ann-refs-pill");
 	await expect(pill).toHaveText("1");
 	await pill.click();
@@ -316,33 +319,37 @@ test("message refs card opens over its number", async ({ page }) => {
 	expect(inside).toBe(true);
 });
 
-/** Hover the prompt pill via coordinates: the open card covers the
-pill by design, so locator.hover() can't hit-target it afterwards. */
+/** The dock is open on its row: the pill stands and the card is up. */
 async function openPromptReview(page: Page): Promise<void> {
 	const pill = page.locator(".prompt-tools .ann-pill");
 	await expect(pill).toBeVisible();
-	await pill.click();
 	await expect(page.locator(".prompt-tools .review")).toHaveCSS("opacity", "1");
 }
 
-/** Pin the freshly filed annotation: wait for its answer, focus the
-badge, Enter opens its card, Enter re-press pins it — the prompt pill
-rises with its count. Nothing is pinned on file anymore, so every
-pill-gated flow goes through here. */
+/** Open the dock on the freshly filed note: focus its badge (still
+waiting — see openAnnotate's slow ask; a ready answer opens its card
+instead), Enter opens the dock on its row, and the pill rises. */
 async function pinFiled(page: Page): Promise<void> {
-	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toBeVisible({ timeout: 30_000 });
 	await badge.focus();
 	await page.keyboard.press("Enter");
-	await page.keyboard.press("Enter");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(1);
-	// The pin path leaves the answer card open over the thread: shut
-	// it so later steps start from a clean layer stack.
-	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible({
+		timeout: 5_000
+	});
 }
 
-/** Select a quote and open its comment box through the real UI. */
+/** Let the mock answer at once: tests that need the orange badge
+(answer card, edit card) call this before filing. */
+async function fastAsks(page: Page): Promise<void> {
+	await page.evaluate(() => localStorage.removeItem("ccez-mock-chat-ms"));
+}
+
+/** Select a quote and open its comment box through the real UI. The
+ask is slowed first so the filed badge stays waiting: dock flows
+open on the badge, and only a waiting badge opens the dock. */
 async function openAnnotate(page: Page, quote: string): Promise<void> {
+	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	await page
 		.locator(`article .rendered:has-text("${quote}")`)
 		.first()
@@ -616,16 +623,14 @@ test("escape closes the dock without losing the note", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	await pinFiled(page);
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
-	await page.keyboard.press("Escape");
-	// The pill toggles the dock on its pinned row.
-	await page.locator(".prompt-tools .ann-pill").click();
 	const dock = page.locator(".ann-wrap .review");
-	await expect(dock).toHaveCSS("opacity", "1");
 	await expect(page.locator(".ann-wrap .review-item")).toHaveCount(1);
-	// Escape closes the dock; the note stands.
+	// Escape closes the dock; the note stands, and the badge opens
+	// the dock again on its row.
 	await page.keyboard.press("Escape");
-	await expect(dock).toHaveCSS("opacity", "0");
-	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	await pinFiled(page);
 	await expect(dock).toHaveCSS("opacity", "1");
 	await expect(page.locator(".review-comment").first()).toHaveText("go");
 	// Leaving the badge must unwash (the pill click above left the
@@ -644,14 +649,13 @@ test("escape closes the dock without losing the note", async ({ page }) => {
 	expect(leftover).toBe(0);
 });
 
-/** Enter with no text files the (empty) annotation for submit: the
-badge files at once, the pill rises once it is pinned. */
+/** Enter with no text files the (empty) annotation: the badge
+files at once. */
 test("enter with an empty draft files the annotation", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
-	await pinFiled(page);
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
 });
 
 /** Flooding the comment box never spills past it: unbroken text wraps. */
@@ -666,15 +670,13 @@ test("flooding the comment box stays inside it", async ({ page }) => {
 	expect(sizes.scroll).toBeLessThanOrEqual(sizes.client + 1);
 });
 
-/** Draft annotations survive a restart: reload restores the badge.
-Pins never persist (fresh loads start unpinned, so a stale approval
-can't ride a later send) — the pill is gone until re-pinned. */
+/** Draft annotations survive a restart: reload restores the badge
+with nothing docked. */
 test("draft annotations survive a reload", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.locator(".ann-pop textarea").fill("go");
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
-	await pinFiled(page);
 	await page.reload();
 	await expect(page.locator("article .rendered").first()).toBeVisible({
 		timeout: 60_000
@@ -683,12 +685,13 @@ test("draft annotations survive a reload", async ({ page }) => {
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 });
 
-/** Re-pressing the answered badge pins it: the card stays put and
-the prompt pill rises (Esc and click-away close, the dock's Unpin
-removes). */
-test("answer card re-press pins the annotation", async ({ page }) => {
+/** Re-pressing the answered badge closes its card again (a
+double-click's second press); the badge keeps its number and no
+dock or pill appears. */
+test("answer card re-press closes the card", async ({ page }) => {
 	test.setTimeout(120_000);
 	await openAnnotate(page, "確認しました");
+	await fastAsks(page);
 	await page.locator(".ann-pop textarea").fill("what does this mean?");
 	await page.keyboard.press("Enter");
 	// Filing asks at once (separate request, mock provider): the
@@ -696,111 +699,53 @@ test("answer card re-press pins the annotation", async ({ page }) => {
 	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
 	await expect(badge).toBeVisible({ timeout: 30_000 });
 	// Keyboard-activate (the sticky header intercepts pointer hits
-	// over badges): the card opens, re-press pins it instead.
+	// over badges): the card opens, re-press closes it.
 	await badge.focus();
 	await page.keyboard.press("Enter");
 	const card = page.locator(".ann-answer");
 	await expect(card).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");
-	await expect(card).toBeVisible();
+	await expect(card).toHaveCount(0);
 	await expect(badge).toHaveText("1");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
+	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 });
 
-/** The orange pencil rewords the question and re-asks at once
-(the dock row carries the new wording under its fresh answer). */
-test("orange pencil rewords and re-asks the annotation", async ({ page }) => {
+/** E on the open answer card rewords the question and re-asks at
+once (the edit card reopens carrying the new wording). */
+test("the answer card's edit rewords and re-asks the annotation", async ({
+	page
+}) => {
 	test.setTimeout(120_000);
 	await openAnnotate(page, "確認しました");
+	await fastAsks(page);
 	await page.locator(".ann-pop textarea").fill("why here?");
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
 	await expect(badge).toBeVisible({ timeout: 30_000 });
-	await pinFiled(page);
-	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-	// Keyboard-activated pencil (the sticky header intercepts pointer
-	// hits over badges): the edit card opens carrying the wording.
-	const pencil = page.locator(".review-pencil");
-	await pencil.focus();
+	// Keyboard-activate (the sticky header intercepts pointer hits
+	// over badges): the card opens, E opens the edit card on it.
+	await badge.focus();
 	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("e");
 	const card = page.locator(".ann-pop");
 	await expect(card).toBeVisible();
 	await expect(card.locator("textarea")).toHaveValue("why here?");
 	await card.locator("textarea").fill("why there?");
 	await page.keyboard.press("Enter");
 	// Saving rewrites the comment and fires a fresh request: the
-	// toast confirms, the badge asks again, the row keeps the new
-	// wording under its answer.
+	// toast confirms, the badge asks again, and the edit card
+	// carries the new wording next time.
 	await expect(page.locator(".toast:not(.error)")).toHaveText(
 		"Annotation edited",
 		{ timeout: 10_000 }
 	);
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready").first()
-	).toBeVisible({ timeout: 30_000 });
-	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".review-comment").first()).toHaveText(
-		"why there?"
-	);
-	await expect(page.locator(".review-answer").first()).not.toBeEmpty();
-});
-
-/** Pinning lists the annotation in the prompt button's overlay
-(quote, question, answer) — nothing renders inside the prompt
-itself. Only plus-pinned annotations bake into a send. */
-test("pinning lists the annotation in the button overlay", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	await page.locator(".ann-pop textarea").fill("typed");
-	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
 	await expect(badge).toBeVisible({ timeout: 30_000 });
-	// Nothing pinned: no pill at all, the prompt goes out bare.
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	// A second Enter pins (keyboard: the sticky header eats pointer
-	// hits over badges; the number never changes). The pill rises
-	// with its count.
 	await badge.focus();
 	await page.keyboard.press("Enter");
-	await expect(badge).toHaveText("1");
-	await page.keyboard.press("Enter");
-	await expect(badge).toHaveText("1");
-	const pill = page.locator(".prompt-tools .ann-pill");
-	await expect(pill).toHaveCount(1);
-	await expect(pill).toHaveAttribute("aria-label", "1 annotation");
-	// The overlay carries the pinned row: quote, question, answer.
-	await pill.click();
-	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-	const rows = page.locator(".ann-wrap .review-item");
-	await expect(rows).toHaveCount(1);
-	await expect(rows.first()).toContainText("typed");
-	// Unpinning drops the pill again (the annotation stays filed).
-	await page.locator('button:has-text("Unpin")').click();
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(1);
-});
-
-/** Sending bakes the pinned annotations with the message: the composer
-pill is gone while the reply is still on its way. */
-test("sending clears pending annotations immediately", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	await page.keyboard.type("meaning?");
-	await page.keyboard.press("Enter");
-	await pinFiled(page);
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
-	await page.locator(".ta-input").click();
-	await page.keyboard.type("go");
-	// The Enter that filed the annotation must not double as a send.
-	await page.waitForTimeout(600);
-	await page.keyboard.press("Enter");
-	// The pill leaves with the send, not with the reply.
-	await expect(page.locator("article.user .rendered")).toContainText("go");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	await expect(
-		page.locator("article.assistant .rendered").last()
-	).toContainText("Mock reply");
-	// The sent message carries the block (folded with its count).
-	await expect(page.locator("article.user .ann-refs-pill")).toHaveText("1");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("e");
+	await expect(card.locator("textarea")).toHaveValue("why there?");
 });
 
 /** The pencil edits an own message, then resends it: the message
@@ -879,36 +824,6 @@ test("E key edits the hovered own message", async ({ page }) => {
 	await expect(page.locator("article.user .rendered")).toContainText(
 		"helo world"
 	);
-});
-
-/** Clear-all removes only prompt-pinned annotations: the pinned
-badge goes, a filed-but-unpinned badge (and its pill) stays. */
-test("clear-all keeps unpinned annotations", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "テストを確認しました" },
-		{ role: "assistant", content: "何かお手伝いできますか" }
-	]);
-	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({
-		timeout: 60_000
-	});
-	await openAnnotate(page, "確認しました");
-	await page.keyboard.press("Enter");
-	await openAnnotate(page, "お手伝い");
-	await page.keyboard.press("Enter");
-	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toHaveCount(2, {
-		timeout: 30_000
-	});
-	// Pin the first badge; the second stays filed but unpinned.
-	await page.locator("button.ccez-ann-badge").nth(0).dblclick();
-	await page.keyboard.press("Escape");
-	await openPromptReview(page);
-	await expect(page.locator(".review-quote")).toHaveCount(1);
-	await page.locator(".review-tools button").click();
-	// The pinned badge is gone; the filed-but-unpinned badge stays
-	// (and with nothing pinned the dock unmounts its pill).
-	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 });
 
 /** Multi-paragraph quotes wash without painting the paragraph gaps: no
@@ -1645,13 +1560,14 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	});
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
+	// Slow the ask: only a waiting badge opens the dock.
+	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.keyboard.press("Enter");
-	// The filed quote is the whole words, never the cut fragment: pin
-	// it into the dock and read the row's quote.
+	// The filed quote is the whole words, never the cut fragment: open
+	// the dock on its badge and read the row's quote.
 	await pinFiled(page);
-	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(
 		/hello world/
 	);
@@ -1764,35 +1680,6 @@ test("numbered badges grow with the message font size", async ({ page }) => {
 	expect(parseFloat(big)).toBeGreaterThan(parseFloat(small));
 });
 
-test("empty annotations bake a question mark for the model", async ({
-	page
-}) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "alpha beta gamma delta" }
-	]);
-	await page.goto("/");
-	const para = page.locator("article.assistant .rendered p").first();
-	await expect(para).toBeVisible({ timeout: 60_000 });
-	await para.dblclick({ position: { x: 10, y: 10 } });
-	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	// Enter with no text files the empty annotation (click-away would cancel it).
-	await page.keyboard.press("Enter");
-	// Only pinned annotations reach the dock: pin, then the wrap stands.
-	await pinFiled(page);
-	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
-	// Send the empty prompt with the annotation attached (mock provider).
-	await page.locator(".ta-input").click();
-	await page.keyboard.press("Enter");
-	const user = page.locator("article.user").first();
-	await expect(user).toBeVisible();
-	// Click-toggled (hover never opens it): prove the toggle
-	// genuinely opened it via its opacity transition.
-	await user.locator(".ann-refs-pill").click();
-	await expect(user.locator(".ann-refs-pop")).toHaveCSS("opacity", "1");
-	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
-});
-
 test("empty questions file and ask; rows never edit inline", async ({
 	page
 }) => {
@@ -1805,24 +1692,24 @@ test("empty questions file and ask; rows never edit inline", async ({
 	await para.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	// Slow the ask so the badge stays waiting (a ready answer opens
+	// its card, never the dock).
+	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	// Enter with no text files the empty question (no ghost): filing
-	// asks it as "?" at once, and the mock provider answers.
+	// asks it as "?" at once.
 	await page.keyboard.press("Enter");
 	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready").first()
+		page.locator("button.ccez-ann-badge.ans-waiting").first()
 	).toBeVisible({ timeout: 30_000 });
 	// A chat draft is already underway: filing must not clobber it.
 	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.type("chat draft");
-	// The pill toggles the review (hover never opens it): pin first
-	// (nothing is pinned on file), then the row shows the empty
-	// comment with its answer — no inline editor, no staged box
-	// (rewording opens the edit card instead).
+	// The badge opens the dock on its row: the empty comment shows
+	// as a dash — no inline editor, no staged box (rewording opens
+	// the edit card instead).
 	await pinFiled(page);
-	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 	await expect(page.locator(".review-comment").first()).toHaveText("—");
-	await expect(page.locator(".review-answer").first()).not.toBeEmpty();
 	await expect(page.locator(".review textarea")).toHaveCount(0);
 	await expect(page.locator(".staged-pill")).toHaveCount(0);
 	// The composer draft survived untouched (the pill fields its own box).
@@ -1849,18 +1736,13 @@ test("row control hover moves no buttons", async ({ page }) => {
 	await expect(para).toBeVisible({ timeout: 60_000 });
 	await para.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
+	// Slow the ask: only a waiting badge opens the dock.
+	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
-	// The dock lists double-click-pinned rows only: pin with two
-	// Enters first, then open the pill for geometry.
-	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
-	await expect(badge).toBeVisible({ timeout: 30_000 });
-	await badge.focus();
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Enter");
-	await expect(badge).toHaveText("1");
-	await page.locator(".prompt-tools .ann-pill").click();
+	// Open the dock on the waiting badge for geometry.
+	await pinFiled(page);
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 	const boxes = () =>
 		page.evaluate(() => {
@@ -1978,20 +1860,10 @@ test("sent refs card dismisses on Escape and outside press", async ({
 	page
 }) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "alpha beta gamma delta" }
+		{ role: "assistant", content: "alpha beta gamma delta" },
+		{ role: "user", content: 'go\n\nAnnotated selections:\n1. "alpha" — ?' }
 	]);
 	await page.goto("/");
-	const para = page.locator("article.assistant .rendered p").first();
-	await expect(para).toBeVisible({ timeout: 60_000 });
-	await para.dblclick({ position: { x: 10, y: 10 } });
-	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	await page.keyboard.press("Enter");
-	// Only pinned annotations reach the dock: pin, then the wrap stands.
-	await pinFiled(page);
-	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
-	await page.locator(".ta-input").click();
-	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
 	await expect(user).toBeVisible();
 	const pill = user.locator(".ann-refs-pill");
@@ -2015,20 +1887,17 @@ fires when focus leaves the card, not between its own buttons. */
 test("tab through the badge edit card keeps it open", async ({ page }) => {
 	test.setTimeout(120_000);
 	await openAnnotate(page, "確認しました");
+	await fastAsks(page);
 	await page.locator(".ann-pop textarea").fill("typed");
 	await page.keyboard.press("Enter");
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready").first()
-	).toBeVisible({ timeout: 30_000 });
-	// Nothing is pinned on file: pin before the pill exists.
-	await pinFiled(page);
-	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-	// Keyboard-activated pencil: the edit card opens carrying the
-	// filed wording, focus landing in its field.
-	const pencil = page.locator(".review-pencil");
-	await pencil.focus();
+	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(badge).toBeVisible({ timeout: 30_000 });
+	// Keyboard-activate the card, then E: the edit card opens
+	// carrying the filed wording, focus landing in its field.
+	await badge.focus();
 	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("e");
 	const card = page.locator(".ann-pop");
 	await expect(card).toBeVisible();
 	const field = card.locator("textarea");
@@ -2051,13 +1920,7 @@ test("tab through the badge edit card keeps it open", async ({ page }) => {
 	await expect(
 		card.locator('button[aria-label="Save annotation"]')
 	).toBeVisible();
-	// One Escape per layer: the first closes the review dock behind
-	// the card (the card stays open, focus inside); the second
-	// cancels the card itself.
-	await page.keyboard.press("Escape");
-	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "0");
-	await expect(card).toBeVisible();
-	expect(await insideCard()).toBe(true);
+	// Escape cancels the card itself.
 	await page.keyboard.press("Escape");
 	await expect(card).toHaveCount(0);
 });

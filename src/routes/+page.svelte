@@ -218,7 +218,6 @@
 		type SentTagAction
 	} from "$lib/attachments";
 	import {
-		promptInclusions,
 		canHoldDeleteBadge,
 		buildMarksFor,
 		aidedTextForMsg,
@@ -1095,6 +1094,10 @@
 	let msgEditor: PromptEditor | null = null;
 	/** Seed text for the in-place editor (prose plus image-marker lines). */
 	let editingSeed = $state("");
+	/** Ids of the refs seeded into the live list for the open edit:
+	the save rebakes whichever of them survive (deleting one drops
+	it from the block). */
+	let editingSeedIds = new Set<string>();
 	/** Attachments of the message under edit (the composer's own stay untouched). */
 	let editingAttachments = $state<Attachment[]>([]);
 	/** Last reconciled marker counts inside the in-place editor (images, files, pastes). */
@@ -6331,21 +6334,6 @@
 		return true;
 	}
 
-	function clearAllAnnotations(): void {
-		// Pinned only: filed-but-unpinned badges survive (double-click
-		// adds to the prompt; clear-all only takes those back).
-		drafts.clearPromptPins();
-		pendingAnn = null;
-		reviewOpen = false;
-		highlightAnnId = null;
-		// An in-prompt edit dies with the list: hand the composer
-		// back its drafted chat text instead of stranding the note.
-		if (promptAnnEdit) exitPromptAnnEdit();
-		// Clearing everything thumps like a delete (done): the same
-		// unmistakable triple against single-tap ticks.
-		buzzBeat("done");
-	}
-
 	/**
 	 * Badge arrays by message, memoized by content: the render effect
 	 * subscribes to the array identity, so a freshly built array per
@@ -7594,16 +7582,11 @@
 			editor?.getPastes() ?? []
 		);
 		const outgoing = attachments;
-		// Pinned annotations bake as context (quote, question, answer
-		// each); everything else filed stays filed — badges outlive
-		// the send, and pins consume (the baked message carries them
-		// now, so the next send starts unpinned).
-		const outgoingAnnotations = drafts.consumePromptPins();
 		// The prompt empties the moment the message goes out — not when the
 		// (possibly long) reply finishes streaming in. Filed annotations
-		// survive the send (badges stay, answered or not); only pins
-		// consume. Attachment pills clear with it (`outgoing` already
-		// captured them for the send).
+		// survive the send untouched (badges stay, answered or not;
+		// nothing rides along as context). Attachment pills clear with
+		// it (`outgoing` already captured them for the send).
 		editor?.clear();
 		attachments = [];
 		pendingAnn = null;
@@ -7623,7 +7606,7 @@
 		// pills splice back inline at their tags (kept attachments ride
 		// along; pasted ones are already prose).
 		const { stored, kept, pastedFolds } = spliceSendText(text, outgoing);
-		const baked = withAnnotations(stored, outgoingAnnotations);
+		const baked = stored;
 		// Native turns detach here and complete via turn-done (or the
 		// return/boot scan); the shared tail runs at completion, not here.
 		if (nativeConfig) {
@@ -7860,6 +7843,7 @@
 		if (!msg) return;
 		const refs = annRefsFor(msg.content);
 		const seeds = refs ? seedAnnotationsFromRefs(msg.id, refs.refs) : [];
+		editingSeedIds = new Set(seeds.map((a) => a.id));
 		drafts.beginOwnEdit(chatState.activeChatId, seeds);
 		editingAttachments = msg.attachments ? [...msg.attachments] : [];
 		// Message content carries no stripped markers on save, so the
@@ -7888,8 +7872,9 @@
 	 * Inline-edit-only reset: drops the edit (annotations, attachments,
 	 * edit id) while leaving the composer's own draft exactly alone.
 	 */
-	function resetInlineEdit(saved = false): void {
-		drafts.endOwnEdit(chatState.activeChatId, saved);
+	function resetInlineEdit(): void {
+		drafts.endOwnEdit(chatState.activeChatId);
+		editingSeedIds = new Set();
 		reviewOpen = false;
 		editingMsgId = null;
 		editingAttachments = [];
@@ -7959,10 +7944,15 @@
 				editingSeed,
 				prev?.pasteFolds
 			);
+			// The block the message carried rebakes from its surviving
+			// seeds: nothing else filed ever enters a message.
 			editMessageContent(
 				chatState,
 				id,
-				withAnnotations(stored, promptInclusions(drafts.list)),
+				withAnnotations(
+					stored,
+					drafts.list.filter((a) => editingSeedIds.has(a.id))
+				),
 				{
 					attachments: editingAttachments,
 					pasteFolds: keepFolds
@@ -7973,7 +7963,7 @@
 			// annotation edit gets ("Annotation edited").
 			flashToast("Message edited");
 		}
-		resetInlineEdit(id !== null);
+		resetInlineEdit();
 	}
 
 	/**
@@ -14322,11 +14312,9 @@
 				inspect: openInspect,
 				review: {
 					toggle: () => (reviewOpen = !reviewOpen),
-					clearAll: clearAllAnnotations,
 					quote: (ann: Annotation) => annotateMode.reviewQuoteClick(ann),
 					copy: copyAnnotation,
 					remove: (id: AnnotationId) => annotateMode.removeAnnotation(id),
-					unpin: (id: AnnotationId) => annotateMode.unpinAnnotation(id),
 					editOrange: editOrangeAnnotation
 				}
 			}}

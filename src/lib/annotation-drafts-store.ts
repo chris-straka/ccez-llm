@@ -6,7 +6,7 @@ import type { Annotation, StoryAnchor } from "./annotations";
 
 /**
  * Draft annotations persist per chat across restarts (live extras, not
- * the baked blocks — sending bakes pins while filed notes survive).
+ * the baked blocks older messages carry; filed notes outlive sends).
  * Shape-checked on the way back in: corrupt entries drop, valid ones
  * restore; quotes that no longer match simply list without a badge,
  * never an error.
@@ -48,9 +48,6 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			at: typeof a.at === "number" ? a.at : 0,
 			// Answers persist with drafts like the comment: a reload
 			// must not un-ask an answered annotation back to blue.
-			// Pins never persist (fresh loads start unpinned, so a
-			// stale approval can't ride a later send); deleting is
-			// the only removal.
 			...(typeof a.answer === "string" && a.answer ? { answer: a.answer } : {})
 		});
 	}

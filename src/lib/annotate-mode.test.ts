@@ -215,35 +215,6 @@ describe("commitPending", () => {
 });
 
 describe("badge actions", () => {
-	it("pins answered notes, never blue ones", () => {
-		const { mode, calls, getAnnotations, setAnnotations } = harness();
-		setAnnotations([
-			note({ id: "a" as AnnotationId, answer: "yes" }),
-			note({ id: "b" as AnnotationId })
-		]);
-		mode.pinAnnotation("a" as AnnotationId);
-		mode.pinAnnotation("b" as AnnotationId);
-		mode.pinAnnotation("gone" as AnnotationId);
-		expect(getAnnotations().find((a) => a.id === "a")?.pinnedToPrompt).toBe(
-			true
-		);
-		expect(getAnnotations().find((a) => a.id === "b")?.pinnedToPrompt).not.toBe(
-			true
-		);
-		expect(calls.errors).toEqual(["Annotation no longer exists"]);
-	});
-
-	it("unpins without deleting", () => {
-		const { mode, getAnnotations, setAnnotations } = harness();
-		setAnnotations([
-			note({ id: "a" as AnnotationId, answer: "yes", pinnedToPrompt: true })
-		]);
-		mode.unpinAnnotation("a" as AnnotationId);
-		const kept = getAnnotations().find((a) => a.id === "a");
-		expect(kept).toBeDefined();
-		expect(kept?.pinnedToPrompt).not.toBe(true);
-	});
-
 	it("removes with a thump, clears the wash, drops the pill", () => {
 		const { mode, calls, setAnnotations, setHighlight } = harness();
 		setAnnotations([note()]);
@@ -455,9 +426,9 @@ describe("openBadge", () => {
 		expect(calls.unstuck).toBe(1);
 	});
 
-	it("re-pressing an open card toggles its prompt pin", () => {
-		const { mode, calls, getAnnotations, setAnnotations } = harness();
-		setAnnotations([note({ answer: "yes", pinnedToPrompt: true })]);
+	it("re-pressing an open card closes it", () => {
+		const { mode, calls, setAnnotations } = harness();
+		setAnnotations([note({ answer: "yes" })]);
 		mode.answerPop = {
 			id: "ann-1" as AnnotationId,
 			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
@@ -467,11 +438,8 @@ describe("openBadge", () => {
 			gap: 3
 		};
 		mode.openBadge("ann-1" as AnnotationId);
-		expect(getAnnotations()[0]?.pinnedToPrompt).not.toBe(true);
-		expect(mode.answerPop?.id).toBe("ann-1");
-		mode.openBadge("ann-1" as AnnotationId);
-		expect(getAnnotations()[0]?.pinnedToPrompt).toBe(true);
-		// Toggling never re-reads or re-opens.
+		expect(mode.answerClosing).toBe(true);
+		// Closing never re-reads or re-opens.
 		expect(calls.speak).toEqual([]);
 		expect(calls.review).toEqual([]);
 	});

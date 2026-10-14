@@ -429,16 +429,10 @@ describe("draft annotation persistence", () => {
 		expect(loadDraftAnnotations("c2")).toEqual([]);
 	});
 
-	it("restores answers with drafts but resets pins", () => {
+	it("restores answers with drafts", () => {
 		// A reload must not un-ask an answered annotation back to
-		// blue — but pins never persist, so a stale approval can't
-		// ride a later send. There is no omit state: deleting is
-		// the only removal.
-		saveDraftAnnotations(
-			"c1",
-			[ann({ answer: "because", pinnedToPrompt: true })],
-			["c1"]
-		);
+		// blue. There is no omit state: deleting is the only removal.
+		saveDraftAnnotations("c1", [ann({ answer: "because" })], ["c1"]);
 		expect(loadDraftAnnotations("c1")).toEqual([ann({ answer: "because" })]);
 	});
 

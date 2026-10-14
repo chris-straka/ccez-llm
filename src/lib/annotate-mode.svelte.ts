@@ -1,8 +1,6 @@
 import {
 	duplicateAnnotationId,
 	deleteAnnotation,
-	canPinAnnotation,
-	setPromptPinned,
 	newAnnotationId,
 	type Annotation,
 	type AnnotationId,
@@ -822,10 +820,9 @@ export class AnnotateMode {
 	 * Badge click: a ready answer opens in its own popup, anything
 	 * else opens the review dock on the annotation's row — filed
 	 * notes never edit inline in the dock (the pencil opens the
-	 * edit card). Re-pressing an open card's badge toggles its
-	 * prompt pin (a double-click's second press lands here); the
-	 * card stays put and the badge keeps its number — Esc and
-	 * click-away close, the dock's Unpin removes.
+	 * edit card). Re-pressing an open card's badge closes the card
+	 * (a double-click's second press lands here); the badge keeps
+	 * its number either way.
 	 */
 	openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
 		const current = this.deps.getAnnotations().find((a) => a.id === id);
@@ -849,16 +846,14 @@ export class AnnotateMode {
 		// pill, like cancel.
 		if (this.deps.cancelPillFor(id)) return;
 		if (!current) return;
-		// A ready answer opens in its own popup: re-press toggles
-		// its prompt pin instead of shutting the card — pin, or
-		// unpin when already pinned (double-click both ways). An
-		// open pill for the same note settles first through the
-		// proper cancel path so typed text is never dropped.
+		// A ready answer opens in its own popup: re-press closes it
+		// again (a toggle, like the dock's pill). An open pill for
+		// the same note settles first through the proper cancel
+		// path so typed text is never dropped.
 		if (current.answer) {
 			const open = this.answerPop;
 			if (open && !this.answerClosing && open.id === id) {
-				if (current.pinnedToPrompt === true) this.unpinAnnotation(id);
-				else this.pinAnnotation(id);
+				this.closeAnswerPop();
 				return;
 			}
 			this.deps.cancelPillFor(id);
@@ -1066,31 +1061,6 @@ export class AnnotateMode {
 			};
 			this.deps.flashJumpMark(locate);
 		}
-	}
-
-	/** Pin an answered annotation to the send prompt (the only
-	Add-to-prompt in the app): the overlay chip lists it as quote,
-	question, and answer, and the next send bakes all three as
-	context. Blue annotations never pin — creating one only files
-	its badge until the reply lands. */
-	pinAnnotation(id: AnnotationId): void {
-		const current = this.deps.getAnnotations().find((a) => a.id === id);
-		if (!current) {
-			this.deps.toastError("Annotation no longer exists");
-			return;
-		}
-		if (!canPinAnnotation(current)) return;
-		this.deps.setAnnotations(
-			setPromptPinned(this.deps.getAnnotations(), id, true)
-		);
-	}
-
-	/** Unpin: the annotation stays filed (badge, dock) — only the
-	next send omits it. */
-	unpinAnnotation(id: AnnotationId): void {
-		this.deps.setAnnotations(
-			setPromptPinned(this.deps.getAnnotations(), id, false)
-		);
 	}
 
 	removeAnnotation(id: string): void {

@@ -81,7 +81,6 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Ask to expand",
 			"Select sentence / paragraph",
 			"Delete annotation",
-			"Pin / unpin annotation",
 			"Fold / unfold code"
 		]
 	],
@@ -271,7 +270,6 @@ describe("shortcuts menu copy", () => {
 					"Speak",
 					"Inspect character",
 					"Move the selection menu",
-					"Pin / unpin annotation",
 					"Cancel an annotation"
 				]
 			]
@@ -295,7 +293,6 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
 		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
 		expect(byName.get("Copy")).toBe("Select text, then Copy");
-		expect(byName.get("Pin / unpin annotation")).toBe("Double-tap badge");
 		const all = touchShortcuts()
 			.map((r) => r.keys)
 			.join("\n");

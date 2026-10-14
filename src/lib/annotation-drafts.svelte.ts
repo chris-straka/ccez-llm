@@ -2,11 +2,8 @@ import { SvelteSet } from "svelte/reactivity";
 import {
 	annotationsAfterEdit,
 	attachAnnotationAnswer,
-	clearPromptPinned,
 	deleteAnnotation,
 	filePendingAnnotation,
-	promptInclusions,
-	setPromptPinned,
 	unansweredAnnotations,
 	type Annotation,
 	type AnnotationId
@@ -39,7 +36,7 @@ export interface AnnotationDraftsDeps {
 
 /**
  * Draft annotation state for the active chat (filed list, edit stash,
- * per-chat load/save, pins, filing, and the ask flow). Moved out of
+ * per-chat load/save, filing, and the ask flow). Moved out of
  * +page.svelte verbatim (B); the page wires the deps and keeps DOM,
  * focus, and toasts. Same shape as AnnotateMode/NewsMode: a plain
  * const holding the instance, never inside $state.
@@ -49,9 +46,9 @@ export class AnnotationDrafts {
 
 	/**
 	 * Draft annotations for the active chat, restored from storage on
-	 * launch: unsent quotes survive a restart (sending still bakes and
-	 * clears, switching chats still starts clean — the save below
-	 * records the empty list either way).
+	 * launch: filed notes survive a restart and outlive sends;
+	 * switching chats starts clean (the save below records the empty
+	 * list either way).
 	 */
 	list = $state<Annotation[]>([]);
 
@@ -85,11 +82,11 @@ export class AnnotationDrafts {
 	filed(): Annotation[] {
 		const stash = this.stash;
 		if (!stash) return this.list;
-		return annotationsAfterEdit(stash.list, this.list, stash.seedIds, false);
+		return annotationsAfterEdit(stash.list, this.list, stash.seedIds);
 	}
 
-	/** Raw list replace: the annotate-mode seam (badge pin/unpin,
-	delete) and nothing else — named verbs below cover the rest. */
+	/** Raw list replace: the annotate-mode seam (delete, clear) and
+	nothing else — named verbs below cover the rest. */
 	setList(next: Annotation[]): void {
 		this.list = next;
 	}
@@ -144,16 +141,15 @@ export class AnnotationDrafts {
 	}
 
 	/** Own-message edit exit: the filed list comes back, plus anything
-	filed during the edit that the save didn't bake (null stash — an
-	edit opened in another chat — keeps the live extras only). */
-	endOwnEdit(activeChatId: ChatId, saved: boolean): void {
+	filed during the edit (null stash — an edit opened in another
+	chat — keeps the live extras only). */
+	endOwnEdit(activeChatId: ChatId): void {
 		const stash = this.stash;
 		this.stash = null;
 		this.list = annotationsAfterEdit(
 			stash && stash.chatId === activeChatId ? stash.list : null,
 			this.list,
-			stash?.seedIds ?? new SvelteSet(),
-			saved
+			stash?.seedIds ?? new SvelteSet()
 		);
 	}
 
@@ -198,27 +194,6 @@ export class AnnotationDrafts {
 		this.list = deleteAnnotation(this.list, id);
 	}
 
-	/** Clear-all: drop every prompt-pinned note; filed-but-unpinned
-	badges survive. */
-	clearPromptPins(): void {
-		this.list = clearPromptPinned(this.list);
-	}
-
-	/** Send bake: pinned annotations go out as context (quote,
-	question, answer each) and consume (the baked message carries
-	them now, so the next send starts unpinned); everything else
-	filed stays filed — badges outlive the send. */
-	consumePromptPins(): Annotation[] {
-		const included = promptInclusions(this.list);
-		this.list = this.list.map((a) => {
-			if (a.pinnedToPrompt !== true) return a;
-			const next = { ...a };
-			delete next.pinnedToPrompt;
-			return next;
-		});
-		return included;
-	}
-
 	/** Fire one annotation's own model request: never linked to the
 	main prompt or history — later questions file while earlier ones
 	are still waiting. Failures banner (toast on phones) and leave
@@ -256,17 +231,16 @@ export class AnnotationDrafts {
 				...(ann.brief ? { brief: true } : {})
 			});
 			this.attachAnswer(chatId, ann.id, answer);
-			// Story notes have no badge to turn orange or pin from:
-			// an answered one joins the review dock directly (and
-			// rides the launched session as context), and its card
-			// opens while the story is still on screen (resume
-			// scans for long-closed panels attach silently).
-			if (!ann.messageId && ann.story && answer.trim()) {
-				if (chatId === this.deps.getActiveChatId())
-					this.list = setPromptPinned(this.list, ann.id, true);
-				if (this.deps.isNewsStoryOpen(ann.story.link))
-					this.deps.openBadge(ann.id);
-			}
+			// Story notes have no badge to turn orange: an answered
+			// one opens its card while the story is still on screen
+			// (resume scans for long-closed panels attach silently).
+			if (
+				!ann.messageId &&
+				ann.story &&
+				answer.trim() &&
+				this.deps.isNewsStoryOpen(ann.story.link)
+			)
+				this.deps.openBadge(ann.id);
 		} catch (error) {
 			this.failed.add(ann.id);
 			const message = error instanceof Error ? error.message : String(error);

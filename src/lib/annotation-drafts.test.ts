@@ -156,28 +156,18 @@ describe("per-chat file and restore", () => {
 });
 
 describe("own-message edits", () => {
-	it("saving keeps the filed drafts and drops baked pins", () => {
+	it("ending the edit keeps the filed drafts and the live extras", () => {
 		const { drafts } = harness({ active: "c1" });
 		const filed = note({ id: "f" as AnnotationId, answer: "yes" });
 		drafts.setList([filed]);
-		const seeds = [note({ id: "s" as AnnotationId, pinnedToPrompt: true })];
+		const seeds = [note({ id: "s" as AnnotationId })];
 		drafts.beginOwnEdit("c1" as ChatId, seeds);
 		expect(drafts.list).toEqual(seeds);
-		// A note filed mid-edit (unpinned) survives the save; seeds
-		// never do, and saved pins baked into the message.
+		// A note filed mid-edit survives; seeds never do (they live
+		// in the message).
 		drafts.setList([...seeds, note({ id: "extra" as AnnotationId })]);
-		drafts.endOwnEdit("c1" as ChatId, true);
+		drafts.endOwnEdit("c1" as ChatId);
 		expect(drafts.list.map((a) => a.id)).toEqual(["f", "extra"]);
-	});
-
-	it("cancelling keeps the filed drafts and the live extras", () => {
-		const { drafts } = harness({ active: "c1" });
-		drafts.setList([note({ id: "f" as AnnotationId })]);
-		const seeds = [note({ id: "s" as AnnotationId, pinnedToPrompt: true })];
-		drafts.beginOwnEdit("c1" as ChatId, seeds);
-		drafts.endOwnEdit("c1" as ChatId, false);
-		// Saved=false keeps pinned extras (nothing baked).
-		expect(drafts.list.map((a) => a.id)).toEqual(["f"]);
 	});
 
 	it("an edit opened in another chat keeps the live extras only", () => {
@@ -188,7 +178,7 @@ describe("own-message edits", () => {
 			note({ id: "s" as AnnotationId }),
 			note({ id: "x" as AnnotationId })
 		]);
-		drafts.endOwnEdit("c2" as ChatId, true);
+		drafts.endOwnEdit("c2" as ChatId);
 		expect(drafts.list.map((a) => a.id)).toEqual(["x"]);
 	});
 });
@@ -334,7 +324,7 @@ describe("ask flow", () => {
 		await vi.waitFor(() => expect(second.calls.answers).toHaveLength(1));
 	});
 
-	it("an answered story note pins and opens while its story is open", async () => {
+	it("an answered story note opens while its story is open", async () => {
 		const { drafts, calls } = harness({ storyOpen: true });
 		const story: Annotation = {
 			id: "ann-1" as AnnotationId,
@@ -345,11 +335,11 @@ describe("ask flow", () => {
 		};
 		drafts.setList([story]);
 		await drafts.ask(story);
-		expect(drafts.list[0]?.pinnedToPrompt).toBe(true);
+		expect(drafts.list[0]?.answer).toBe("réponse");
 		expect(calls.badges).toEqual(["ann-1"]);
 	});
 
-	it("a closed story pins silently", async () => {
+	it("a closed story attaches silently", async () => {
 		const { drafts, calls } = harness({ storyOpen: false });
 		const story: Annotation = {
 			id: "ann-1" as AnnotationId,
@@ -360,7 +350,7 @@ describe("ask flow", () => {
 		};
 		drafts.setList([story]);
 		await drafts.ask(story);
-		expect(drafts.list[0]?.pinnedToPrompt).toBe(true);
+		expect(drafts.list[0]?.answer).toBe("réponse");
 		expect(calls.badges).toEqual([]);
 	});
 });
@@ -401,30 +391,7 @@ describe("filing", () => {
 	});
 });
 
-describe("pins and send", () => {
-	it("pin then send bakes the pin and unpins", () => {
-		const { drafts } = harness();
-		drafts.setList([
-			note({ id: "p" as AnnotationId, answer: "yes", pinnedToPrompt: true }),
-			note({ id: "u" as AnnotationId, answer: "yes" })
-		]);
-		const included = drafts.consumePromptPins();
-		expect(included.map((a) => a.id)).toEqual(["p"]);
-		// Badges survive; only pins consume.
-		expect(drafts.list).toHaveLength(2);
-		expect(drafts.list.every((a) => a.pinnedToPrompt !== true)).toBe(true);
-	});
-
-	it("clear-all drops pins, keeps unpinned badges", () => {
-		const { drafts } = harness();
-		drafts.setList([
-			note({ id: "p" as AnnotationId, pinnedToPrompt: true }),
-			note({ id: "u" as AnnotationId })
-		]);
-		drafts.clearPromptPins();
-		expect(drafts.list.map((a) => a.id)).toEqual(["u"]);
-	});
-
+describe("deleting", () => {
 	it("deleteById drops one note", () => {
 		const { drafts } = harness();
 		drafts.setList([

@@ -159,25 +159,18 @@ shared `.error` look. -->
 			}
 		};
 	}
-	/** The dock lists pinned annotations only: unpinned rows live
-	at their badges (the orange popup edits/deletes, the answer
-	card reads) until a double-click pins them here — a second
-	double-click unpins them back. The highlighted open row joins
-	too, so tapping a badge opens its dock row even before it is
-	pinned. */
-	const pinnedAnnotations = $derived(
-		annotations.filter((a) => a.pinnedToPrompt === true)
-	);
+	/** The dock shows the one row a badge tap opened (a waiting
+	note: its quote, question, copy and delete). Annotations live at
+	their badges otherwise — the answer card reads, the pencil
+	rewords — and nothing in the dock rides the next send. */
 	const openAnnotation = $derived(
 		highlightId ? (annotations.find((a) => a.id === highlightId) ?? null) : null
 	);
-	// The open row joins only with the review open (badge tap):
+	// The open row shows only with the review open (badge tap):
 	// answer-card opens keep their highlight without sprouting
 	// a pill.
 	const dockItems = $derived(
-		openAnnotation && openAnnotation.pinnedToPrompt !== true && reviewOpen
-			? [...pinnedAnnotations, openAnnotation]
-			: pinnedAnnotations
+		openAnnotation && reviewOpen ? [openAnnotation] : []
 	);
 	/** Hands-free toggle copy: idle invites, live names the phase. */
 	const converseLive = $derived(conversePhase !== "idle");
@@ -302,10 +295,10 @@ stop, so both rules below stay suppressed. -->
 			{/if}
 		{/if}
 		{#if dockItems.length > 0}
-			<!-- Pinned-annotations dock through ReviewDock: the page
-			keeps the array, ids, and behaviors; the component owns
-			the dock and its surfaces (no inline editor: the pencil
-			opens the edit card, pin approval lives on the badge). -->
+			<!-- The open annotation's dock row through ReviewDock: the
+			page keeps the array, ids, and behaviors; the component
+			owns the dock and its surfaces (no inline editor: the
+			pencil opens the edit card). -->
 			<ReviewDock
 				items={dockItems}
 				open={reviewOpen}

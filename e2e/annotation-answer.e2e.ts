@@ -80,102 +80,16 @@ test("staged question asks on send and the reply lands as its answer", async ({
 	expect(badgeBox).toBeTruthy();
 	expect(cardBox).toBeTruthy();
 	expect(cardBox!.y).toBeGreaterThanOrEqual(badgeBox!.y + badgeBox!.height);
-	// The answer also displays always under its dock row (green
-	// annotated-text chip plus the reply text) — never popup-only.
-	// The dock lists pinned rows only, so a second Enter pins
-	// first (the card stays open through approval).
+	// Nothing docks or rides the prompt: the card is the answer's
+	// one home, and a second Enter closes it again.
+	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 	await page.keyboard.press("Enter");
-	await page.keyboard.press("Escape");
-	await page.locator(".prompt-tools .ann-pill").click();
-	const dock = page.locator(".ann-wrap .review");
-	await expect(dock).toHaveCSS("opacity", "1");
-	await expect(page.locator(".review-quote.annotated").first()).toBeVisible();
-	await expect(page.locator(".review-answer").first()).toContainText(
-		"Mock reply to:"
-	);
+	await expect(card).toHaveCount(0);
 });
 
-/** The badge keeps its number: opening the card reads, a second
-Enter (a double-click's second press) pins the annotation into the
-send, a further re-press unpins it again (double-click toggles),
-the dock's Unpin removes it again. The sent message carries
-the approved block (quote, question, answer). */
-test("badge re-press pins the send, dock Unpin removes it", async ({
-	page
-}) => {
-	test.setTimeout(120_000);
-	await seedChat(page, [
-		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
-	]);
-	await page.addInitScript(() => {
-		localStorage.setItem("ccez-mock-chat-ms", "2500");
-	});
-	await page.goto("/");
-	const article = page.locator("article.assistant");
-	await expect(article).toBeVisible({ timeout: 60_000 });
-	await dragQuote(page, 0, "riverbank");
-	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	// Shift+A opens the box (bare A files and sends at once now).
-	await page.keyboard.press("A");
-	await askAtFile(page, "what lives here?");
-	// Nothing pinned: the badge keeps its number, no pill anywhere.
-	const badge = page.locator("button.ccez-ann-badge.ans-ready");
-	await expect(badge).toHaveText("1");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	// Keyboard-open the card (no press — pointer hits die on the
-	// sticky header): the badge keeps its number.
-	await badge.focus();
-	await page.keyboard.press("Enter");
-	const card = page.locator(".ann-answer");
-	await expect(card).toBeVisible({ timeout: 10_000 });
-	await expect(badge).toHaveText("1");
-	// A second Enter pins (the double-click path): number stays,
-	// pill rises with its count, and the card stays open
-	// (approval is not dismissal).
-	await page.keyboard.press("Enter");
-	await expect(badge).toHaveText("1");
-	const pill = page.locator(".prompt-tools .ann-pill");
-	await expect(pill).toHaveAttribute("aria-label", "1 annotation");
-	await expect(card).toBeVisible();
-	// A further re-press unpins again (double-click toggles):
-	// number stays, pill gone, card still open.
-	await page.keyboard.press("Enter");
-	await expect(badge).toHaveText("1");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	await expect(card).toBeVisible();
-	// And back: re-press pins once more.
-	await page.keyboard.press("Enter");
-	await expect(pill).toHaveAttribute("aria-label", "1 annotation");
-	// The dock's Unpin removes again: number stays, pill gone.
-	await pill.click();
-	await page.locator('button:has-text("Unpin")').click();
-	await expect(badge).toHaveText("1");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	// Pin once more and send: the send carries the approved block.
-	// Display splits it out of the message text into the sent-refs
-	// card, so the proof is the card, not raw block text.
-	await badge.focus();
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Enter");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveAttribute(
-		"aria-label",
-		"1 annotation"
-	);
-	await page.keyboard.press("Escape");
-	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.type("go");
-	await page.locator(".send-btn").click();
-	const refs = page.locator("article.user .ann-refs").last();
-	await expect(refs).toBeVisible({ timeout: 30_000 });
-	await refs.locator(".ann-refs-pill").click();
-	await expect(refs.locator(".ann-refs-item")).toHaveCount(1);
-	await expect(refs).toContainText("riverbank");
-	await expect(refs).toContainText("what lives here?");
-});
-
-/** An unpinned annotation never reaches the send: filing and
-answering leave the prompt bare. */
-test("unapproved annotations never bake into a send", async ({ page }) => {
+/** Annotations never reach the send: filing and answering leave
+the prompt bare, and nothing rides along as context. */
+test("annotations never bake into a send", async ({ page }) => {
 	test.setTimeout(120_000);
 	await seedChat(page, [
 		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
@@ -203,8 +117,7 @@ test("unapproved annotations never bake into a send", async ({ page }) => {
 	await expect(page.locator("article.user .ann-refs")).toHaveCount(0);
 });
 
-/** A reload resets pins: a stale approval can't ride a later send,
-while the answer itself persists orange. */
+/** The answer persists orange across a reload. */
 test("answered annotations stay orange across a reload", async ({ page }) => {
 	test.setTimeout(120_000);
 	await seedChat(page, [
@@ -224,19 +137,10 @@ test("answered annotations stay orange across a reload", async ({ page }) => {
 	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({
 		timeout: 10_000
 	});
-	// Pin with a second Enter, then reload: the answer persists
-	// orange but the pin resets — no pill, nothing riding the
-	// next send. The badge keeps its number throughout.
+	// Reload: the answer persists orange and the badge keeps its
+	// number; nothing docks.
 	const badge = page.locator("button.ccez-ann-badge.ans-ready");
-	await badge.focus();
-	await page.keyboard.press("Enter");
 	await expect(badge).toHaveText("1");
-	await page.keyboard.press("Enter");
-	await expect(badge).toHaveText("1");
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveAttribute(
-		"aria-label",
-		"1 annotation"
-	);
 	await page.reload();
 	await expect(article).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({

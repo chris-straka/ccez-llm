@@ -534,12 +534,13 @@ test("long drafts cap the prompt height and scroll", async ({ page }) => {
 	expect(sizes.scroll).toBeGreaterThan(sizes.client);
 });
 
-/** The prompt review card toggles on pill click (opacity and
-visibility transition, never a display snap): hover alone never
-opens it, and mouse travel never closes it. */
-test("prompt review card toggles on pill click", async ({ page }) => {
+/** The prompt review card opens on its badge and closes on its
+pill: mouse travel never closes it. */
+test("prompt review card closes on pill click", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "fading review card" }]);
 	await page.goto("/");
+	// Slow the ask: only a waiting badge opens the dock.
+	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	await page
 		.locator('article .rendered:has-text("fading review card")')
 		.first()
@@ -548,35 +549,22 @@ test("prompt review card toggles on pill click", async ({ page }) => {
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.press("Enter");
-	// Pin the filing (nothing pins on file): Enter opens its answer
-	// card, re-press pins it, Escape shuts the card.
-	const ready = page.locator("button.ccez-ann-badge.ans-ready").first();
-	await expect(ready).toBeVisible({ timeout: 30_000 });
-	await ready.focus();
-	await page.keyboard.press("Enter");
+	const waiting = page.locator("button.ccez-ann-badge.ans-waiting").first();
+	await expect(waiting).toBeVisible({ timeout: 30_000 });
+	await waiting.focus();
 	await page.keyboard.press("Enter");
 	const pill = page.locator(".prompt-tools .ann-pill");
 	await expect(pill).toBeVisible();
-	await page.keyboard.press("Escape");
 	const card = page.locator(".ann-wrap .review");
 	const opacity = () => card.evaluate((el) => getComputedStyle(el).opacity);
-	// Closed: invisible but laid out (display fade needs the box).
-	expect(await opacity()).toBe("0");
-	// Hover alone opens nothing.
-	const box = await pill.boundingBox();
-	if (!box) throw new Error("pill has no box");
-	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-	await page.waitForTimeout(400);
-	expect(await opacity()).toBe("0");
-	// The click toggles open; wandering the mouse keeps it open.
-	await pill.click();
 	await expect.poll(opacity, { timeout: 2000 }).toBe("1");
+	// Wandering the mouse keeps it open.
 	await page.mouse.move(4, 300);
 	await page.waitForTimeout(400);
 	expect(await opacity()).toBe("1");
-	// And back shut.
+	// The pill shuts it: the dock leaves with its row.
 	await pill.click();
-	await expect.poll(opacity, { timeout: 2000 }).toBe("0");
+	await expect(page.locator(".ann-wrap.pinned")).toHaveCount(0);
 });
 
 /** The draft text uses the same typeface as the chat messages — the

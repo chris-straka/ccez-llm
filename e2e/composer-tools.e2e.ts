@@ -11,9 +11,11 @@ test.beforeEach(async ({ page }) => {
 	});
 });
 
-/** Select a word, save it as an annotation, and pin it; resolves
-with the pill. Nothing pins on file anymore. */
+/** Select a word, save it as an annotation, and open its dock row;
+resolves with the pill. The ask is slowed first: only a waiting
+badge opens the dock (a ready answer opens its card). */
 async function addAnnotation(page: Page) {
+	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	// Click on the text itself: the container's center is empty space
 	// for short left-aligned messages and selects nothing.
 	await page
@@ -25,18 +27,15 @@ async function addAnnotation(page: Page) {
 	// files nothing.
 	await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");
-	// Pin the filing (keyboard: the sticky header eats pointer hits
-	// over badges): Enter opens its answer card, re-press pins it.
-	const ready = page.locator("button.ccez-ann-badge.ans-ready").first();
-	await expect(ready).toBeVisible({ timeout: 30_000 });
-	await ready.focus();
-	await page.keyboard.press("Enter");
+	// Open the dock on the waiting badge (keyboard: the sticky
+	// header eats pointer hits over badges).
+	const waiting = page.locator("button.ccez-ann-badge.ans-waiting").first();
+	await expect(waiting).toBeVisible({ timeout: 30_000 });
+	await waiting.focus();
 	await page.keyboard.press("Enter");
 	const badge = page.locator(".prompt-tools .ann-pill");
 	await expect(badge).toHaveText("1");
-	// The pin path leaves the answer card open: shut it so later
-	// steps start from a clean layer stack.
-	await page.keyboard.press("Escape");
+	await expect(page.locator(".prompt-tools .review")).toHaveCSS("opacity", "1");
 	return badge;
 }
 
@@ -594,15 +593,13 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	expect(overflow).toBeGreaterThan(0);
 });
 
-test("popup touches the badge and clear-all lives inside it", async ({
+test("popup touches the badge and its row deletes from inside", async ({
 	page
 }) => {
 	const badge = await addAnnotation(page);
 
-	// The pill toggles the popup (hover never opens it): it floats
-	// just above the tools row with the pill left exposed, so the
-	// toggle stays clickable while open.
-	await page.locator(".prompt-tools .ann-pill").click();
+	// The popup floats just above the tools row with the pill left
+	// exposed, so the toggle stays clickable while open.
 	const review = page.locator(".prompt-tools .review");
 	await expect(review).toHaveCSS("opacity", "1");
 	const reviewBox = await review.boundingBox();
@@ -612,9 +609,9 @@ test("popup touches the badge and clear-all lives inside it", async ({
 	expect(gap).toBeGreaterThanOrEqual(0);
 	expect(gap).toBeLessThanOrEqual(14);
 
-	// Clear-all is inside the popup now, not beside the badge.
-	await expect(page.locator(".prompt-tools .ann-clear")).toHaveCount(0);
-	await page.locator(".review-tools button").click();
+	// The row's delete drops the note; the pill goes with the row.
+	await page.locator(".review-del").click();
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
 	await expect(badge).toHaveCount(0);
 });
 
@@ -663,11 +660,11 @@ test("desktop send-hold stashes and restores the reply language", async ({
 	});
 });
 
-/** Send-hold still swaps the reply language with a staged
-annotation: the annotation rides the send either way, so it must
-not disarm the hold. (The hero language menu only renders on empty
-chats, so the reply language arrives via the seed instead.) */
-test("send-hold clears the reply language past a staged annotation", async ({
+/** Send-hold still swaps the reply language with a filed
+annotation on the thread: filing must not disarm the hold. (The
+hero language menu only renders on empty chats, so the reply
+language arrives via the seed instead.) */
+test("send-hold clears the reply language past a filed annotation", async ({
 	page
 }) => {
 	await seedChat(
@@ -687,18 +684,10 @@ test("send-hold clears the reply language past a staged annotation", async ({
 	const pop = page.locator(".ann-pop.fresh");
 	await expect(pop).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");
-	// Pin the staged filing (nothing pins on file): Enter opens its
-	// answer card, re-press pins it, Escape shuts the card.
-	const ready = page.locator("button.ccez-ann-badge.ans-ready").first();
-	await expect(ready).toBeVisible({ timeout: 30_000 });
-	await ready.focus();
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Enter");
-	await expect(page.locator(".prompt-tools .ann-pill")).toBeVisible({
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
 		timeout: 10_000
 	});
-	await page.keyboard.press("Escape");
-	// Hold the send: the stash clears despite the staged annotation.
+	// Hold the send: the stash clears despite the filed annotation.
 	const send = page.locator(".send-btn");
 	const box = await send.boundingBox();
 	if (!box) throw new Error("no send button box");

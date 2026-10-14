@@ -13,11 +13,7 @@ import {
 	annotationCopyText,
 	filePendingAnnotation,
 	promptAnnWashIdFor,
-	promptInclusions,
-	clearPromptPinned,
-	canPinAnnotation,
 	canHoldDeleteBadge,
-	setPromptPinned,
 	attachAnnotationAnswer,
 	unansweredAnnotations,
 	badgeAnswerClass,
@@ -49,41 +45,9 @@ describe("annotations", () => {
 		expect(list).toEqual([]);
 	});
 
-	it("clear-all removes only prompt-pinned annotations", () => {
-		const filed = addAnnotation(
-			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
-			"m1" as ChatMsgId,
-			"alphabet",
-			"letters?"
-		);
-		const pinned = setPromptPinned(filed, filed[0]!.id, true);
-		const cleared = clearPromptPinned(pinned);
-		expect(cleared.map((a) => a.quote)).toEqual(["alphabet"]);
-		expect(clearPromptPinned(filed)).toHaveLength(2);
-	});
-
 	it("holds every filed badge to delete, blue or orange", () => {
 		expect(canHoldDeleteBadge(undefined)).toBe(false);
 		expect(canHoldDeleteBadge({ id: "blue" })).toBe(true);
-	});
-
-	it("offers pinning only for answered annotations, pins them", () => {
-		expect(canPinAnnotation({})).toBe(false);
-		expect(canPinAnnotation({ answer: "because reasons" })).toBe(true);
-		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
-		// Creating never includes: the prompt goes out bare.
-		expect(promptInclusions(list)).toHaveLength(0);
-		expect(withAnnotations("explain", promptInclusions(list))).toBe("explain");
-		const pinned = setPromptPinned(list, list[0]!.id, true);
-		expect(pinned[0]?.pinnedToPrompt).toBe(true);
-		expect(list[0]?.pinnedToPrompt).toBeUndefined();
-		expect(promptInclusions(pinned)).toHaveLength(1);
-		// Unpinning drops the flag (the annotation itself stays).
-		const unpinned = setPromptPinned(pinned, list[0]!.id, false);
-		expect(unpinned[0]).not.toHaveProperty("pinnedToPrompt");
-		expect(promptInclusions(unpinned)).toHaveLength(0);
-		// Unknown id: nothing changes.
-		expect(setPromptPinned(list, "missing" as AnnotationId, true)).toBe(list);
 	});
 
 	it("restarts refire exactly the answerless drafts", () => {
@@ -280,11 +244,7 @@ describe("buildMarksFor", () => {
 		expect(marks[0]!.preview).toBeUndefined();
 	});
 
-	it("keeps pin and arm states off the mark (page-side only)", () => {
-		const pinned = setPromptPinned(list, list[0]!.id, true);
-		const marks = buildMarksFor(pinned, m1, false, null);
-		expect(marks[0]).not.toHaveProperty("pinned");
-		expect(marks[0]).not.toHaveProperty("armed");
+	it("keeps page-side states off the mark", () => {
 		const loose = buildMarksFor(list, m1, false, null);
 		expect(loose[0]).not.toHaveProperty("pinned");
 		expect(loose[0]).not.toHaveProperty("armed");
@@ -370,7 +330,7 @@ describe("seedAnnotationsFromRefs", () => {
 		expect(seedAnnotationsFromRefs(m1, [])).toEqual([]);
 	});
 
-	it("rebakes an untouched block byte-for-byte (pins and answers kept)", () => {
+	it("rebakes an untouched block byte-for-byte (answers kept)", () => {
 		const content = withAnnotations("hallo", [
 			{ quote: "Bahnhof", comment: "", answer: "train station" },
 			{ quote: "Nähe", comment: "near?" }
@@ -378,39 +338,35 @@ describe("seedAnnotationsFromRefs", () => {
 		const split = splitAnnotationBlock(content)!;
 		const seeds = seedAnnotationsFromRefs("m1" as ChatMsgId, split.refs);
 		expect(seeds[0]?.comment).toBe("");
-		expect(withAnnotations(split.text, promptInclusions(seeds))).toBe(content);
+		expect(withAnnotations(split.text, seeds)).toBe(content);
 	});
 });
 
 describe("annotationsAfterEdit", () => {
-	const ann = (id: string, pinned = false): Annotation => ({
+	const ann = (id: string): Annotation => ({
 		id: id as AnnotationId,
 		messageId: "m" as ChatMsgId,
 		quote: id,
-		comment: "",
-		...(pinned ? { pinnedToPrompt: true } : {})
+		comment: ""
 	});
 
 	it("restores the filed list and drops the seeds", () => {
 		const filed = [ann("filed")];
-		const live = [ann("seed", true)];
-		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), false)).toEqual(
-			filed
-		);
-		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), true)).toEqual(
-			filed
-		);
+		const live = [ann("seed")];
+		expect(annotationsAfterEdit(filed, live, new Set(["seed"]))).toEqual(filed);
 	});
 
-	it("keeps notes filed mid-edit unless the save baked them", () => {
-		const live = [ann("seed", true), ann("new"), ann("newPinned", true)];
+	it("keeps notes filed mid-edit", () => {
+		const live = [ann("seed"), ann("new"), ann("later")];
 		const ids = (list: Annotation[]) => list.map((a) => a.id);
-		expect(
-			ids(annotationsAfterEdit([], live, new Set(["seed"]), true))
-		).toEqual(["new"]);
-		expect(
-			ids(annotationsAfterEdit(null, live, new Set(["seed"]), false))
-		).toEqual(["new", "newPinned"]);
+		expect(ids(annotationsAfterEdit([], live, new Set(["seed"])))).toEqual([
+			"new",
+			"later"
+		]);
+		expect(ids(annotationsAfterEdit(null, live, new Set(["seed"])))).toEqual([
+			"new",
+			"later"
+		]);
 	});
 });
 

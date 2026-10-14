@@ -137,16 +137,6 @@ describe("annotation edit Save animation", () => {
 		expect(css).toMatch(/\.ann-save\s*\{[^}]*transition:/);
 		expect(css).toContain(".ann-save:hover");
 	});
-
-	it("animates the dock Unpin pill symmetrically on hover in/out", () => {
-		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		// Symmetric means the transition lives on the base rule, not
-		// :hover (a hover-only transition snaps back on leave).
-		expect(css).toMatch(
-			/\.review-head button\.review-add\s*\{[^}]*transition:/
-		);
-		expect(css).toContain(".review-head button.review-add:hover");
-	});
 });
 
 describe("review delete button", () => {
