@@ -49,8 +49,6 @@ the record). Screenshots the owner attached are in
 
 ## News, listen, video
 
-- Singapore news, Chinese in the Asian submenu: the articles are all in
-  English.
 - No News or Listen button on the front page until a language is picked
   from the language menu.
 - The video playback UI feels weird.

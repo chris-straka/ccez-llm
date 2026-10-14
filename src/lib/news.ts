@@ -953,6 +953,23 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 		}
 	},
 	zh: {
+		// Google has no Chinese Singapore edition (zh + SG redirects to
+		// English), so the chip reads the Chinese papers' Singapore
+		// desks through a Google News search pinned to a zh-Hans edition.
+		SG: {
+			gl: "SG",
+			label: "Singapore",
+			merge: [
+				{
+					url: "https://news.google.com/rss/search?q=site:zaobao.com.sg/news/singapore+when:3d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+					source: "联合早报"
+				},
+				{
+					url: "https://news.google.com/rss/search?q=site:8world.com/singapore+when:3d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+					source: "8world"
+				}
+			]
+		},
 		US: {
 			gl: "US",
 			label: "U.S.",

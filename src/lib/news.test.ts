@@ -408,6 +408,18 @@ describe("news feeds", () => {
 		]);
 	});
 
+	it("reads Singapore in Chinese, never the English edition", () => {
+		// zh + SG on Google redirects to the English edition.
+		const sg = newsRegionsFor("zh")!.find((r) => r.gl === "SG")!;
+		expect(sg.translate).toBeUndefined();
+		expect(newsRssUrl("zh", "SG")).toBeNull();
+		expect(sg.merge?.map((t) => t.url)).toEqual([
+			expect.stringContaining("site:zaobao.com.sg/news/singapore"),
+			expect.stringContaining("site:8world.com/singapore")
+		]);
+		for (const t of sg.merge ?? []) expect(t.url).toContain("ceid=CN:zh-Hans");
+	});
+
 	it("reads native desks where a world service publishes the language", () => {
 		// French U.S. and Global go fully native (no AI
 		// translation); German keeps the translated feeds.
