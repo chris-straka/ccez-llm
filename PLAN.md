@@ -10,10 +10,6 @@ the record). Screenshots the owner attached are in
 
 - In the "A" annotation text bar the text sits too close to the left edge
   when there is little text.
-- Highlight text, the annotate menu button appears, switch chat: the
-  button still shows on the other chat.
-- Open the annotation overlay menu, switch chat and come back: it is still
-  on the overlay menu. Owner leans to "close it", not sure.
 - Add a keyboard or mouse shortcut that deletes all annotations on a
   message.
 - Remove the feature where annotations attach to the main text prompt to

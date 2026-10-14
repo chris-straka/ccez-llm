@@ -2891,6 +2891,7 @@
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
+		if (id !== from) closeAnnotationSurfaces();
 		newsMode.clear();
 		const mutate = (): void => {
 			// File the leaving chat's scroll first (a no-op mid-peek,
@@ -4197,10 +4198,29 @@
 		requestAnimationFrame(() => focusSideChat(sideIdx));
 	}
 
+	/**
+	 * Leaving a chat closes every annotation surface that addresses
+	 * its messages: the selection menu, the review dock, the answer
+	 * card, and the create pill (a typed note files first, an empty
+	 * one cancels). Runs before the leaving chat's drafts file away,
+	 * so a filed note lands in the chat it quotes.
+	 */
+	function closeAnnotationSurfaces(): void {
+		annotateMode.selMenu = null;
+		reviewOpen = false;
+		annotateMode.closeAnswerPop();
+		if (annPop && !annPopClosing) {
+			if (annDraft.trim()) saveAnnPop();
+			else cancelAnnPop();
+		}
+		highlightAnnId = null;
+	}
+
 	/** Unsent composer extras quote one chat's messages — never carry over. */
 	function resetDraftExtras(): void {
 		drafts.clearForNewChat();
 		reviewOpen = false;
+		annotateMode.closeAnswerPop();
 		editingMsgId = null;
 		editingAttachments = [];
 		highlightAnnId = null;
@@ -8922,6 +8942,7 @@
 				}
 				const exists = chatState.chats.some((c) => c.id === link.chatId);
 				if (!exists) return;
+				if (link.chatId !== chatState.activeChatId) closeAnnotationSurfaces();
 				drafts.fileChat(chatState.activeChatId);
 				selectChat(chatState, link.chatId as ChatId);
 				drafts.restoreChat(link.chatId);
