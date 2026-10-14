@@ -39,12 +39,3 @@ the record). Screenshots the owner attached are in
   out to the eojeol on 2026-10-14; the Chinese part needs a repro from
   the Mac: double-click already picks the segmenter word, single-hanzi
   drags are not snapped.)
-
-## News, listen, video
-
-- No News or Listen button on the front page until a language is picked
-  from the language menu.
-- The video playback UI feels weird.
-- Video clips look corrupted: from the start of the second clip onward.
-- Video clips: the "type what you hear" box is too wide, and the video
-  controls must stay reachable the whole time.

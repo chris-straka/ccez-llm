@@ -23,6 +23,9 @@ fold under it (`ListenGloss`). -->
 		audioStatus: "idle" | "loading" | "ready" | "error";
 		/** The video's picture once downloaded (null: still frames). */
 		videoUrl: string | null;
+		/** Some clip still waits to be answered: that one hosts the
+		 * picture, whichever clip is playing. */
+		anyOpen: boolean;
 		actions: {
 			play: (slow: boolean) => void;
 			seek: (t: number) => void;
@@ -44,6 +47,7 @@ fold under it (`ListenGloss`). -->
 		position,
 		audioStatus,
 		videoUrl,
+		anyOpen,
 		actions
 	}: Props = $props();
 
@@ -54,21 +58,26 @@ fold under it (`ListenGloss`). -->
 	 * or paused mid-way. */
 	const at = $derived(position?.i === clip.i ? position.t : null);
 	const scrub = $derived(Boolean(span) && (open || at !== null));
-	/** The moving picture shows on the clip in play: the one waiting,
-	 * or any playing or paused mid-way. Others keep their still frame. */
-	const screen = $derived(Boolean(videoUrl && span) && (open || at !== null));
+	/** One moving picture in the thread: on the clip waiting to be
+	 * answered, or (once every clip is answered) on the clip playing
+	 * or paused mid-way. Others keep their still frame. */
+	const screen = $derived(
+		Boolean(videoUrl && span) && (open || (!anyOpen && at !== null))
+	);
 	let video = $state<HTMLVideoElement | null>(null);
-	// The picture follows the sound: muted, same playhead, same speed.
+	// The picture follows the sound: muted, same playhead, same speed,
+	// whichever clip is sounding (an answered clip finishing its line
+	// shows here too, so the picture never jumps rows mid-sentence).
 	// The audio element owns time; the video only corrects when it
-	// drifts past a few frames, so playback stays smooth.
+	// drifts past a few frames and isn't already seeking, so playback
+	// stays smooth and seeks never pile up.
 	$effect(() => {
 		const v = video;
 		if (!v || !span) return;
-		const mine = playing?.i === clip.i;
-		const t = at ?? span.start;
-		v.playbackRate = mine && playing?.slow ? 0.75 : 1;
-		if (Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
-		if (mine) {
+		const t = position?.t ?? span.start;
+		v.playbackRate = playing?.slow ? 0.75 : 1;
+		if (!v.seeking && Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
+		if (playing) {
 			if (v.paused) v.play().catch(() => {});
 		} else if (!v.paused) v.pause();
 	});
@@ -128,108 +137,113 @@ fold under it (`ListenGloss`). -->
 </script>
 
 <div class="clip" class:open class:answered class:has-screen={screen}>
-	{#if screen}
-		<div class="screen">
-			<video
-				bind:this={video}
-				src={videoUrl}
-				muted
-				playsinline
-				preload="auto"
-				disablepictureinpicture
-				aria-label="The clip's video"
-				onloadedmetadata={(e) => {
-					// A seek before metadata is dropped: land on the clip now.
-					if (span) e.currentTarget.currentTime = at ?? span.start;
+	<!-- The player: picture on top, its controls joined underneath as
+	one card, sized so both always fit above the composer. Without a
+	picture the controls are a plain row. -->
+	<div class="player">
+		{#if screen}
+			<div class="screen">
+				<video
+					bind:this={video}
+					src={videoUrl}
+					muted
+					playsinline
+					preload="auto"
+					disablepictureinpicture
+					aria-label="The clip's video"
+					onloadedmetadata={(e) => {
+						// A seek before metadata is dropped: land on the clip now.
+						if (span) e.currentTarget.currentTime = position?.t ?? span.start;
+					}}
+				></video>
+			</div>
+		{/if}
+		<div class="controls">
+			{#if !screen && frame && frameState !== "error"}
+				<span
+					class="frame"
+					class:shown={frameState === "ok"}
+					style={frameStyle}
+					aria-hidden="true"
+				></span>
+			{/if}
+			<button
+				type="button"
+				class="play"
+				class:on={here && !playing?.slow}
+				aria-label={here && !playing?.slow ? "Pause" : "Play clip"}
+				title="Play (Space)"
+				disabled={audioStatus === "error"}
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.play(false);
 				}}
-			></video>
+			>
+				{#if here && !playing?.slow}
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><rect x="4" y="3.5" width="2.8" height="9" rx="1" /><rect
+							x="9.2"
+							y="3.5"
+							width="2.8"
+							height="9"
+							rx="1"
+						/></svg
+					>
+				{:else}
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><path
+							d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z"
+						/></svg
+					>
+				{/if}
+			</button>
+			<button
+				type="button"
+				class="slow"
+				class:on={here && playing?.slow}
+				title="Slow replay (S)"
+				disabled={audioStatus === "error"}
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.play(true);
+				}}>0.75×</button
+			>
+			{#if scrub && span}
+				<input
+					class="scrub"
+					type="range"
+					min={span.start}
+					max={span.end}
+					step="0.05"
+					value={at ?? span.start}
+					aria-label="Position in the clip"
+					disabled={audioStatus !== "ready"}
+					style="--fill: {(((at ?? span.start) - span.start) /
+						Math.max(span.end - span.start, 0.01)) *
+						100}%"
+					oninput={(e) => actions.seek(Number(e.currentTarget.value))}
+					onchange={(e) => e.currentTarget.blur()}
+					onclick={(e) => e.stopPropagation()}
+				/>
+			{/if}
+			<span class="where">
+				{clip.i + 1} / {session.clips.length}
+				{#if audioStatus === "loading"}
+					· <span class="busy">loading audio…</span>
+				{:else if audioStatus === "error"}
+					· audio didn't load
+				{/if}
+			</span>
+			<button
+				type="button"
+				class="source"
+				title="Open at {stamp} on YouTube"
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.openSource(source);
+				}}>{stamp} ↗</button
+			>
 		</div>
-	{/if}
-	<div class="controls">
-		{#if !screen && frame && frameState !== "error"}
-			<span
-				class="frame"
-				class:shown={frameState === "ok"}
-				style={frameStyle}
-				aria-hidden="true"
-			></span>
-		{/if}
-		<button
-			type="button"
-			class="play"
-			class:on={here && !playing?.slow}
-			aria-label={here && !playing?.slow ? "Pause" : "Play clip"}
-			title="Play (Space)"
-			disabled={audioStatus === "error"}
-			onclick={(e) => {
-				e.stopPropagation();
-				actions.play(false);
-			}}
-		>
-			{#if here && !playing?.slow}
-				<svg viewBox="0 0 16 16" aria-hidden="true"
-					><rect x="4" y="3.5" width="2.8" height="9" rx="1" /><rect
-						x="9.2"
-						y="3.5"
-						width="2.8"
-						height="9"
-						rx="1"
-					/></svg
-				>
-			{:else}
-				<svg viewBox="0 0 16 16" aria-hidden="true"
-					><path
-						d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z"
-					/></svg
-				>
-			{/if}
-		</button>
-		<button
-			type="button"
-			class="slow"
-			class:on={here && playing?.slow}
-			title="Slow replay (S)"
-			disabled={audioStatus === "error"}
-			onclick={(e) => {
-				e.stopPropagation();
-				actions.play(true);
-			}}>0.75×</button
-		>
-		{#if scrub && span}
-			<input
-				class="scrub"
-				type="range"
-				min={span.start}
-				max={span.end}
-				step="0.05"
-				value={at ?? span.start}
-				aria-label="Position in the clip"
-				disabled={audioStatus !== "ready"}
-				style="--fill: {(((at ?? span.start) - span.start) /
-					Math.max(span.end - span.start, 0.01)) *
-					100}%"
-				oninput={(e) => actions.seek(Number(e.currentTarget.value))}
-				onchange={(e) => e.currentTarget.blur()}
-				onclick={(e) => e.stopPropagation()}
-			/>
-		{/if}
-		<span class="where">
-			{clip.i + 1} / {session.clips.length}
-			{#if audioStatus === "loading"}
-				· <span class="busy">loading audio…</span>
-			{:else if audioStatus === "error"}
-				· audio didn't load
-			{/if}
-		</span>
-		<button
-			type="button"
-			class="source"
-			title="Open at {stamp} on YouTube"
-			onclick={(e) => {
-				e.stopPropagation();
-				actions.openSource(source);
-			}}>{stamp} ↗</button
-		>
 	</div>
 	{#if open}
 		<div class="ask">
@@ -542,8 +556,12 @@ fold under it (`ListenGloss`). -->
 		gap: 0.5rem;
 		flex-wrap: wrap;
 	}
+	/* A clip's line is a sentence: the field fits one, not the whole
+	column. Under a picture the row lines up with the player. */
 	.guess-box {
-		flex: 1 1 12rem;
+		flex: 1 1 10rem;
+		box-sizing: border-box;
+		max-width: 20rem;
 		min-width: 0;
 		font: inherit;
 		font-size: 0.9rem;
@@ -579,16 +597,26 @@ fold under it (`ListenGloss`). -->
 	.step.next {
 		color: var(--accent);
 	}
-	/* The clip in play shows its video centered above the controls,
-	16:9, as wide as the column allows (the still frame steps aside). */
-	.screen {
+	/* The clip in play shows its picture as one centered card with
+	its controls joined underneath, like any player. The card's width
+	also respects the window's height (the picture never passes ~45%
+	of it), so the controls and the guess row below always fit above
+	the composer without scrolling. */
+	.clip.has-screen .player,
+	.clip.has-screen .ask {
 		align-self: center;
-		width: min(100%, 36rem);
-		aspect-ratio: 16 / 9;
-		border-radius: 0.6rem;
+		box-sizing: border-box;
+		width: min(100%, 36rem, calc(45dvh * 16 / 9));
+	}
+	.clip.has-screen .player {
+		border-radius: 0.7rem;
 		overflow: hidden;
 		background: #000;
 		animation: screen-in 0.25s ease;
+	}
+	.screen {
+		aspect-ratio: 16 / 9;
+		background: #000;
 	}
 	.screen video {
 		display: block;
@@ -596,13 +624,51 @@ fold under it (`ListenGloss`). -->
 		height: 100%;
 		object-fit: contain;
 	}
+	.clip.has-screen .controls {
+		padding: 0.4rem 0.6rem;
+		background: #1c1c1e;
+		color: #f2f2f7;
+	}
+	.clip.has-screen .where,
+	.clip.has-screen .source {
+		color: rgba(242, 242, 247, 0.72);
+	}
+	.clip.has-screen .source:hover {
+		color: #fff;
+	}
+	.clip.has-screen .slow {
+		color: rgba(242, 242, 247, 0.8);
+		border-color: rgba(242, 242, 247, 0.28);
+	}
+	.clip.has-screen .slow.on,
+	.clip.has-screen .slow:hover {
+		color: #fff;
+		border-color: rgba(242, 242, 247, 0.6);
+	}
+	.clip.has-screen .scrub {
+		flex: 1 1 9rem;
+	}
+	.clip.has-screen .scrub::-webkit-slider-runnable-track {
+		background: linear-gradient(
+			to right,
+			var(--accent) var(--fill),
+			rgba(242, 242, 247, 0.3) var(--fill)
+		);
+	}
+	.clip.has-screen .scrub::-moz-range-track {
+		background: linear-gradient(
+			to right,
+			var(--accent) var(--fill),
+			rgba(242, 242, 247, 0.3) var(--fill)
+		);
+	}
 	@keyframes screen-in {
 		from {
 			opacity: 0;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.screen {
+		.clip.has-screen .player {
 			animation: none;
 		}
 	}

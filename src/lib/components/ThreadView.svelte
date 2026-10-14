@@ -251,6 +251,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		trimIdx,
 		onUndoTrim
 	}: Props = $props();
+	/** A drill clip still waits to be answered (it hosts the picture). */
+	const clipOpen = $derived(
+		messages.some((m) => m.clip !== undefined && m.clip.heard === undefined)
+	);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -380,6 +384,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					playing={listen.mode.playing}
 					position={listen.mode.position}
 					videoUrl={listen.mode.videoUrl}
+					anyOpen={clipOpen}
 					audioStatus={listen.mode.audioStatus}
 					actions={{
 						play: (slow: boolean) => {

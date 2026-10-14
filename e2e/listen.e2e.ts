@@ -527,6 +527,21 @@ test("the clip in play shows the video, centered; others keep a still", async ({
 	]);
 	const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
 	expect(Math.abs(mid(clipBox!) - mid(screenBox!))).toBeLessThan(2);
+	// One player card: the controls sit under the picture, and the
+	// card plus the guess row fit the window; the field fits a line.
+	const fit = await page.evaluate(() => {
+		const clip = document.querySelector(".clip.open")!;
+		const screen = clip.querySelector(".screen")!.getBoundingClientRect();
+		const bar = clip.querySelector(".controls")!.getBoundingClientRect();
+		const ask = clip.querySelector(".ask")!.getBoundingClientRect();
+		const box = clip.querySelector(".guess-box")!.getBoundingClientRect();
+		return {
+			joined: Math.abs(bar.top - screen.bottom) < 1,
+			tall: screen.height <= window.innerHeight * 0.45 + 1,
+			field: box.width <= 20 * 16 + 1
+		};
+	});
+	expect(fit).toEqual({ joined: true, tall: true, field: true });
 	// Moving on: the new clip carries the picture, the answered one not.
 	await clips.first().getByRole("button", { name: "Next ›" }).click();
 	await expect(clips).toHaveCount(2);
