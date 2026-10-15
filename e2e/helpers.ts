@@ -62,6 +62,12 @@ export async function seedChat(
 					}
 				])
 			);
+			// A never-opened chat lands at its bottom; specs here start
+			// reading at the top, as a chat left there would.
+			window.localStorage.setItem(
+				"ccez-llm-chat-scroll-v1",
+				JSON.stringify({ "e2e-chat": { bottom: false, top: 0, anchor: null } })
+			);
 		},
 		{ messages, replyLang, extraSettings }
 	);

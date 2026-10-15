@@ -758,7 +758,7 @@ test("sidebar preview reserves action space without showing the row", async ({
 
 /** Returning to a chat restores where you left: every switch files
 the leaving chat's scroll position, and the landing puts it back —
-chats with nothing filed still start at the top. */
+chats never opened land at their bottom. */
 test("returning to a chat restores its scroll position", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
@@ -799,18 +799,22 @@ test("returning to a chat restores its scroll position", async ({ page }) => {
 	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
-	// The unvisited chat starts at the top like today.
+	// The unvisited chat lands at its bottom.
 	await rows.nth(1).click();
 	await expect
-		.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 })
-		.toBe(0);
+		.poll(
+			() =>
+				box.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop),
+			{ timeout: 8000 }
+		)
+		.toBeLessThanOrEqual(1);
 	// Back on the first chat: where it was left, not the top.
 	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await rows.nth(0).click();
 	await expect
 		.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 })
-		.toBeGreaterThan(200);
+		.toBe(300);
 });
 
 /** An empty chat never hides the composer: arriving with the flag set

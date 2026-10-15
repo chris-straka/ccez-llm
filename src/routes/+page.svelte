@@ -518,6 +518,14 @@
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import { isPermissionDismissal } from "$lib/intake";
+	import {
+		CHAT_SCROLL_KEY,
+		chatScrollLanding,
+		markFor,
+		parseChatScrolls,
+		serializeChatScrolls,
+		type ChatScrollMark
+	} from "$lib/chat-scroll";
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
 	import {
 		copyExportText,
@@ -724,15 +732,31 @@
 	/** Scrollbar thumb shows while a scroll is in flight, then fades.
 	The stop hold is short (120ms): momentum scrolls land events in
 	tight bursts, so anything longer just delays the fadeout. */
-	/** Filed scroll positions, one per chat: switching back lands
-	where you left instead of at the top. Session memory only —
-	never persisted (reloads boot at the fresh-box top like today).
-	Previews never file: mid-peek the box shows another chat. */
-	const chatScrollTops = new SvelteMap<ChatId, number>();
-	/** File the active chat's scroll position (see chatScrollTops). */
+	/** Filed scroll marks, one per chat (see chat-scroll.ts): switching
+	back or reloading lands where you left. Persisted on scroll rest,
+	switches, and page hide. Previews never file: mid-peek the box
+	shows another chat. */
+	const chatScrolls = new SvelteMap<ChatId, ChatScrollMark>();
+	/** File the active chat's scroll mark (see chatScrolls). */
 	function saveChatScroll(): void {
 		if (previewChatId !== null || !scrollBox) return;
-		chatScrollTops.set(chatState.activeChatId, scrollBox.scrollTop);
+		chatScrolls.set(
+			chatState.activeChatId,
+			markFor({
+				stuck: viewport.stick,
+				scrollTop: scrollBox.scrollTop,
+				scrollHeight: scrollBox.scrollHeight,
+				clientHeight: scrollBox.clientHeight,
+				anchor: viewport.anchor ?? readScrollAnchor(scrollBox)
+			})
+		);
+	}
+	function persistChatScrolls(): void {
+		try {
+			localStorage.setItem(CHAT_SCROLL_KEY, serializeChatScrolls(chatScrolls));
+		} catch {
+			// Storage full or unavailable: marks still hold in memory.
+		}
 	}
 	function noteScrolling(): void {
 		// The menu tracks its highlight through scrolls (trackSelMenu
@@ -790,16 +814,17 @@
 				};
 			}
 		}
-		saveChatScroll();
 		if (scrollBox) noteStick(scrollBox);
 		scrollBox?.classList.add("scrolling");
 		window.clearTimeout(viewport.idleTimer);
 		viewport.idleTimer = window.setTimeout(() => {
+		saveChatScroll();
 			scrollBox?.classList.remove("scrolling");
 			updateWpPos();
 		}, 120);
 	}
 	let focusMode: "edit" | "scroll" = $state("edit");
+			persistChatScrolls();
 	/**
 	 * Whether scroll mode started in the prompt: only then does Ctrl+G
 	 * hop back to a focused, type-ready composer. Entering from a
@@ -3079,30 +3104,42 @@
 		mutate();
 	}
 
-	// Every chat switch lands the box: chats with a filed scroll
-	// position (see saveChatScroll) return where you left, and chats
-	// with nothing filed start at the top like today. Streaming chats
-	// always follow the reply bottom (still thinking included: the
-	// box would otherwise keep the last chat's offset, often the top).
-	// Search-hit jumps register their own scroll after this, so they
-	// still win. Runs inside the switch mutation (flushed first): a
-	// frame callback lands too late — the transition swaps content
-	// after it.
+	// Every chat switch lands the box: chats with a filed mark (see
+	// saveChatScroll) return where you left, and chats never opened or
+	// left at the bottom land at the bottom (streaming ones then follow
+	// the reply). Search-hit jumps register their own scroll after
+	// this, so they still win. Runs inside the switch mutation
+	// (flushed first): a frame callback lands too late — the
+	// transition swaps content after it.
 	function restoreChatScroll(id: ChatId): void {
-		const live =
-			isSending(chatState, id) ||
-			nativeTurns.live.has(id) ||
-			nativeTurns.fetching.has(id);
-		const saved = chatScrollTops.get(id);
+		persistChatScrolls();
 		flushSync();
-		if (!scrollBox || chatState.activeChatId !== id) return;
+		if (chatState.activeChatId !== id) return;
+		landChatScroll(id);
+	}
+	/** Put the box where chat `id` was left and re-derive the stick and
+	reading anchor from that mark, never from the chat shown before:
+	a stick flag carried over from a chat left at its bottom would let
+	the next resize (a reply rendering, the keyboard, a reflow) yank
+	this one to its bottom. The anchor then holds the spot while late
+	layout (fonts, markdown, a reload's first paints) settles. */
+	function landChatScroll(id: ChatId): void {
+		const box = scrollBox;
+		if (!box) return;
+		const land = chatScrollLanding(chatScrolls.get(id));
 		// Instant: the column eases programmatic jumps, and a smooth
 		// restore retargets (or dies) across the switch transition.
-		scrollBox.scrollTo({
-			top: live ? scrollBox.scrollHeight : (saved ?? 0),
-			behavior: "instant"
-		});
-		viewport.anchor = null;
+		if (land.kind === "bottom") {
+			viewport.stick = true;
+			viewport.anchor = null;
+			box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
+		} else {
+			viewport.stick = false;
+			viewport.anchor = land.anchor;
+			box.scrollTo({ top: land.top, behavior: "instant" });
+			holdScrollOnResize();
+		}
+		viewport.lastTop = box.scrollTop;
 	}
 
 	/** Jump to a palette hit: its chat, scrolled to its message. */
@@ -4463,11 +4500,9 @@
 	function endPreview(): void {
 		if (previewChatId === null) return;
 		previewChatId = null;
-		const saved = chatScrollTops.get(chatState.activeChatId);
-		if (saved === undefined || !scrollBox) return;
+		if (!chatScrolls.has(chatState.activeChatId) || !scrollBox) return;
 		flushSync();
-		if (previewChatId === null && scrollBox)
-			scrollBox.scrollTo({ top: saved, behavior: "instant" });
+		if (previewChatId === null) landChatScroll(chatState.activeChatId);
 	}
 	const previewChat = $derived(
 		previewChatId && previewChatId !== chatState.activeChatId
@@ -8413,6 +8448,43 @@
 	function scrollToBottom() {
 		viewport.stick = true;
 		// Resisted at submit: a held finger means stay, not scroll.
+	/** Boot: read the filed marks and land the opening chat on its own
+	(a reload comes back where it was left). Hiding the page files the
+	open chat's mark: Android may kill a backgrounded WebView without
+	another event. */
+	let chatScrollBooted = false;
+	$effect(() => {
+		const box = scrollBox;
+		if (!box) return;
+		if (!chatScrollBooted) {
+			chatScrollBooted = true;
+			untrack(() => {
+				let raw: string | null = null;
+				try {
+					raw = localStorage.getItem(CHAT_SCROLL_KEY);
+				} catch {
+					// Unavailable storage boots with no marks.
+				}
+				const ids = chatState.chats.map((c) => c.id);
+				for (const [id, mark] of parseChatScrolls(raw, ids))
+					chatScrolls.set(id as ChatId, mark);
+			});
+			void tick().then(() => landChatScroll(chatState.activeChatId));
+		}
+		const hide = (): void => {
+			saveChatScroll();
+			persistChatScrolls();
+		};
+		const onVisibility = (): void => {
+			if (document.visibilityState === "hidden") hide();
+		};
+		window.addEventListener("pagehide", hide);
+		document.addEventListener("visibilitychange", onVisibility);
+		return () => {
+			window.removeEventListener("pagehide", hide);
+			document.removeEventListener("visibilitychange", onVisibility);
+		};
+	});
 		if (viewport.holding) return;
 		scrollBox?.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
 	}
@@ -9131,7 +9203,8 @@
 			// runner settles and the shade notice dismisses too.
 			void nativeTurns.stopChat(id);
 			deleteChat(chatState, id);
-			chatScrollTops.delete(id);
+			chatScrolls.delete(id);
+			persistChatScrolls();
 			// The neighbor's own unsent prompt comes back; the dropped
 			// chat's goes with it.
 			swapComposerDraft(id, chatState.activeChatId);
@@ -9145,7 +9218,8 @@
 			// or the shade notice orphans.
 			void nativeTurns.stopChat(id);
 			deleteChat(chatState, id);
-			chatScrollTops.delete(id);
+			chatScrolls.delete(id);
+			persistChatScrolls();
 			composerDrafts.delete(id);
 			drafts.fileChat(chatState.activeChatId);
 		}
