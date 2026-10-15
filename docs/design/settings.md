@@ -6,8 +6,10 @@ easy to misclick and the sidebar was small and hard to read
 
 ## Form: a wider right-hand panel, not a page or modal
 
-Settings stays a panel docked on the right, now 30rem wide (was 22rem)
-with larger type, and a full-screen sheet on phones as before.
+Settings stays a panel docked on the right, now up to 30rem wide (was
+22rem) with larger type, and a full-screen sheet on phones as before.
+On smaller windows it narrows (down to 24rem) so the default chat
+column stays visible beside it.
 
 Why not a full settings page or a centered modal: most settings change
 how the chat looks (text size, spacing, widths, theme, message color),

@@ -143,6 +143,10 @@ test("sliders ignore track clicks and the wheel, move by thumb drag", async ({
 /** The jump bar scrolls a group under itself and marks it current. */
 test("section bar jumps between groups", async ({ page }) => {
 	const nav = page.locator(".settings-panel .settings-nav");
+	// All six pills fit one row at the default window size.
+	expect(await nav.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(
+		true
+	);
 	await nav.getByRole("button", { name: "Look" }).click();
 	await expect(nav.getByRole("button", { name: "Look" })).toHaveAttribute(
 		"aria-current",

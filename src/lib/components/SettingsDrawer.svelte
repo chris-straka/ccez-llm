@@ -98,11 +98,19 @@ bookkeeping reads it). -->
 		left: auto;
 		top: 0;
 		bottom: 0;
-		width: 30rem;
+		/* Wide where the window has room, narrower on small windows so
+		the default chat column stays visible beside it (the chat is
+		the live preview for most settings). The inner shares it. */
+		--settings-w: clamp(
+			24rem,
+			calc(100vw * var(--ui-scale-inv, 1) - 56rem),
+			30rem
+		);
+		width: var(--settings-w);
 		/* Interface-size zoom (Settings > Interface size): text,
 		padding, and widths scale together per surface, which rem
-		can't do. Zoom multiplies the fixed width too (30rem reads
-		75rem at 250%), so the reciprocal var caps the rendered box
+		can't do. Zoom multiplies the fixed width too (24rem reads
+		60rem at 250%), so the reciprocal var caps the rendered box
 		to the viewport — a no-op at 100% on any sane window. */
 		zoom: var(--ui-scale, 1);
 		max-width: calc(100vw * var(--ui-scale-inv, 1));
@@ -130,7 +138,7 @@ bookkeeping reads it). -->
 		inner widths are definite, so inline-size containment changes
 		nothing except enabling the query. */
 		container-type: inline-size;
-		width: 28.6rem;
+		width: calc(var(--settings-w) - 1.4rem);
 		flex-shrink: 0;
 		/* Right-docked panels clip from the left: the header (the close
 		target) stays put while collapsing, so it lands back under the cursor. */
