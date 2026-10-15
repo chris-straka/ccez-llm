@@ -435,6 +435,17 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...msgBase, key: "d", code: "KeyD" })).toBe(null);
 	});
 
+	it("clears a hovered message's annotations on Shift+Delete", () => {
+		for (const key of ["Delete", "Backspace"]) {
+			const chord = { ...msgBase, key, shiftKey: true };
+			expect(messageKeyAction(chord)).toBe("delete-hovered-annotations");
+			expect(messageKeyAction({ ...chord, inField: true })).toBe(null);
+			expect(messageKeyAction({ ...chord, inEditable: true })).toBe(null);
+			expect(messageKeyAction({ ...chord, metaKey: true })).toBe(null);
+			expect(messageKeyAction({ ...chord, hoveredIdx: -1 })).toBe(null);
+		}
+	});
+
 	it("drops a hovered badge on bare Delete/Backspace, nothing else", () => {
 		const badge = { ...msgBase, hoverBadgeId: "ann-1" };
 		expect(messageKeyAction({ ...badge, key: "Delete" })).toBe("delete-badge");
@@ -447,9 +458,10 @@ describe("messageKeyAction", () => {
 		expect(
 			messageKeyAction({ ...badge, hoverBadgeId: null, key: "Delete" })
 		).toBe(null);
-		// Modifiers and typing targets keep their keys.
+		// Shift widens to every note on the message; other modifiers
+		// and typing targets keep their keys.
 		expect(messageKeyAction({ ...badge, key: "Delete", shiftKey: true })).toBe(
-			null
+			"delete-hovered-annotations"
 		);
 		expect(messageKeyAction({ ...badge, key: "Delete", metaKey: true })).toBe(
 			null

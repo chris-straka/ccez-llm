@@ -101,6 +101,7 @@ export type MessageKeyAction =
 	| "cut-hovered"
 	| "delete-hovered"
 	| "delete-badge"
+	| "delete-hovered-annotations"
 	| "branch-hovered"
 	| "rerun-hovered"
 	| "speak-hovered"
@@ -263,6 +264,20 @@ export function messageKeyAction(
 		(facts.hoverBadgeId ?? null) !== null
 	)
 		return "delete-badge";
+	// Shift+Delete/Backspace over a hovered message drops every
+	// annotation on it (the message itself stays; Shift+D deletes
+	// that).
+	if (
+		(facts.key === "Delete" || facts.key === "Backspace") &&
+		facts.shiftKey &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		hovered &&
+		!facts.inField &&
+		!facts.inEditable
+	)
+		return "delete-hovered-annotations";
 	// Shift+C branches from the hovered message, Shift+R reads it
 	// aloud. Physical codes like Shift+D, so any layout's keys work
 	// (Shift+CapsLock spellings included); fields and rich editors

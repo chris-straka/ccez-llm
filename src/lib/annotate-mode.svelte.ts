@@ -1,7 +1,6 @@
 import {
 	duplicateAnnotationId,
 	deleteAnnotation,
-	canPinAnnotation,
 	setPromptPinned,
 	newAnnotationId,
 	type Annotation,
@@ -823,10 +822,9 @@ export class AnnotateMode {
 	 * Badge click: a ready answer opens in its own popup, anything
 	 * else opens the review dock on the annotation's row — filed
 	 * notes never edit inline in the dock (the pencil opens the
-	 * edit card). Re-pressing an open card's badge toggles its
-	 * prompt pin (a double-click's second press lands here); the
-	 * card stays put and the badge keeps its number — Esc and
-	 * click-away close, the dock's Unpin removes.
+	 * edit card). Re-pressing an open card's badge (a double-click's
+	 * second press lands here) leaves the card as it is — Esc and
+	 * click-away close it.
 	 */
 	openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
 		const current = this.deps.getAnnotations().find((a) => a.id === id);
@@ -850,18 +848,13 @@ export class AnnotateMode {
 		// pill, like cancel.
 		if (this.deps.cancelPillFor(id)) return;
 		if (!current) return;
-		// A ready answer opens in its own popup: re-press toggles
-		// its prompt pin instead of shutting the card — pin, or
-		// unpin when already pinned (double-click both ways). An
-		// open pill for the same note settles first through the
-		// proper cancel path so typed text is never dropped.
+		// A ready answer opens in its own popup; re-pressing its
+		// badge keeps the card. An open pill for the same note
+		// settles first through the proper cancel path so typed
+		// text is never dropped.
 		if (current.answer) {
 			const open = this.answerPop;
-			if (open && !this.answerClosing && open.id === id) {
-				if (current.pinnedToPrompt === true) this.unpinAnnotation(id);
-				else this.pinAnnotation(id);
-				return;
-			}
+			if (open && !this.answerClosing && open.id === id) return;
 			this.deps.cancelPillFor(id);
 			const anchorAt = anchor ?? {
 				x: window.innerWidth / 2,
@@ -1069,29 +1062,34 @@ export class AnnotateMode {
 		}
 	}
 
-	/** Pin an answered annotation to the send prompt (the only
-	Add-to-prompt in the app): the overlay chip lists it as quote,
-	question, and answer, and the next send bakes all three as
-	context. Blue annotations never pin — creating one only files
-	its badge until the reply lands. */
-	pinAnnotation(id: AnnotationId): void {
-		const current = this.deps.getAnnotations().find((a) => a.id === id);
-		if (!current) {
-			this.deps.toastError("Annotation no longer exists");
-			return;
-		}
-		if (!canPinAnnotation(current)) return;
-		this.deps.setAnnotations(
-			setPromptPinned(this.deps.getAnnotations(), id, true)
-		);
-	}
-
-	/** Unpin: the annotation stays filed (badge, dock) — only the
-	next send omits it. */
+	/** Unpin a story note or an edited message's baked note: it
+	stays filed (badge, dock) — only the next send omits it. Message
+	notes never pin; they live at their badges. */
 	unpinAnnotation(id: AnnotationId): void {
 		this.deps.setAnnotations(
 			setPromptPinned(this.deps.getAnnotations(), id, false)
 		);
+	}
+
+	/** Drop every annotation on one message (Shift+Delete over it):
+	the open card and pill go with their notes. False when the
+	message carries none. */
+	removeAnnotationsOn(messageId: ChatMsgId): boolean {
+		const doomed = this.deps
+			.getAnnotations()
+			.filter((a) => a.messageId === messageId)
+			.map((a) => a.id);
+		if (doomed.length === 0) return false;
+		this.deps.buzzDelete();
+		this.deps.setAnnotations(
+			this.deps.getAnnotations().filter((a) => a.messageId !== messageId)
+		);
+		const open = this.answerPop;
+		if (open && doomed.includes(open.id)) this.closeAnswerPop();
+		const highlight = this.deps.getHighlight();
+		if (highlight && doomed.includes(highlight)) this.deps.setHighlight(null);
+		for (const id of doomed) this.deps.dismissPill(id);
+		return true;
 	}
 
 	removeAnnotation(id: string): void {

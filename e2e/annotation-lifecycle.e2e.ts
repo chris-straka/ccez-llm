@@ -150,3 +150,39 @@ test("chat switches close annotation surfaces and answers keep loading", async (
 	await expect(badge).toHaveClass(/ans-ready/, { timeout: 1000 });
 	await expect(page.locator(".ann-wrap.pinned")).toHaveCount(0);
 });
+
+/** Shift+Delete over a message clears every annotation on it and
+leaves the message (and other messages' notes) alone. */
+test("shift delete clears a hovered message's annotations", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" },
+		{ role: "user", content: "and the heron waits by the reeds" }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	for (const quote of ["riverbank", "fog"]) {
+		await dragQuote(page, 0, quote);
+		await page.keyboard.press("a");
+	}
+	await dragQuote(page, 1, "heron");
+	await page.keyboard.press("a");
+	const first = page.locator("article").nth(0).locator("button.ccez-ann-badge");
+	const second = page
+		.locator("article")
+		.nth(1)
+		.locator("button.ccez-ann-badge");
+	await expect(first).toHaveCount(2);
+	await expect(second).toHaveCount(1);
+	const para = page.locator("article.assistant .rendered p").first();
+	const box = await para.boundingBox();
+	if (!box) throw new Error("no paragraph box");
+	await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2);
+	await page.keyboard.press("Shift+Backspace");
+	await expect(first).toHaveCount(0);
+	await expect(second).toHaveCount(1);
+	await expect(page.locator("article.assistant")).toContainText("riverbank");
+});

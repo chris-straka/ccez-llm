@@ -53,7 +53,7 @@ test("list runs in sections, hovered-message keys first", async ({ page }) => {
 		"Edit your message",
 		"Rerun / regenerate",
 		"Summon / hide window",
-		"Pin / unpin annotation",
+		"Delete annotation",
 		"Speak text aloud"
 	]) {
 		await expect(keys.locator(`dt:text-is("${name}")`)).toBeVisible();

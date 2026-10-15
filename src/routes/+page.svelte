@@ -11564,6 +11564,15 @@
 				annotateMode.removeAnnotation(annotateMode.hoverBadgeId);
 				return;
 			}
+			if (msgAction === "delete-hovered-annotations") {
+				// Shift+Delete over a message clears its annotations;
+				// a message with none keeps the key for nothing else.
+				const target = viewChat.messages[hoveredIdx];
+				if (target && annotateMode.removeAnnotationsOn(target.id)) {
+					consumeEvent(event);
+					return;
+				}
+			}
 			if (msgAction === "copy-hovered") {
 				// C copies the hovered message as plain text (the row
 				// button's own path, toast included) — only with nothing
