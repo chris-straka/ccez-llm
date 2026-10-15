@@ -49,6 +49,41 @@ export function keyFacts(
 	};
 }
 
+/** Facts the IME guard reads: the base plus composition flags. */
+export interface ImeKeyFacts extends KeyEventFacts {
+	isComposing: boolean;
+	keyCode: number;
+}
+
+/**
+ * Cmd/Ctrl chords that must win over a layout's dead keys. The
+ * Canadian Multilingual Standard (CSA) layout puts a dead circumflex
+ * on the physical [ key (and ¸ on ]), so Ctrl+Shift+[ reaches a
+ * focused prompt as `key: "Dead"`, IME-flagged (keyCode 229 or
+ * isComposing in WebKit): the bracket chords match the physical key
+ * and must be handled (and consumed) before the field composes a ^.
+ */
+export function layoutChordKey(facts: KeyEventFacts): boolean {
+	if (!facts.metaKey && !facts.ctrlKey) return false;
+	return (
+		facts.key === "Dead" ||
+		facts.code === "BracketLeft" ||
+		facts.code === "BracketRight"
+	);
+}
+
+/**
+ * Whether an IME owns this keydown, so app keys must leave it alone
+ * (picking kanji, confirming a candidate: WebKit can deliver the
+ * confirming Enter with `isComposing` false but keyCode 229). A
+ * Cmd/Ctrl chord on a dead key is the app's, never the IME's (see
+ * layoutChordKey).
+ */
+export function imeOwnsKey(facts: ImeKeyFacts): boolean {
+	if (!facts.isComposing && facts.keyCode !== 229) return false;
+	return !layoutChordKey(facts);
+}
+
 /** Bare key: no modifier held. */
 function bare(mods: KeyModifiers): boolean {
 	return !mods.metaKey && !mods.ctrlKey && !mods.altKey && !mods.shiftKey;
@@ -758,6 +793,17 @@ export function quickLangIndexForKey(key: string): number {
 	return QUICK_LANG_KEYS.indexOf(key);
 }
 
+/** Quick-language index for a keydown: the typed digit, else the
+physical digit row (layouts like AZERTY type "&" on the 1 key). */
+export function quickLangIndex(
+	facts: Pick<KeyEventFacts, "key" | "code">
+): number {
+	const byKey = facts.key.length === 1 ? quickLangIndexForKey(facts.key) : -1;
+	if (byKey !== -1) return byKey;
+	const digit = /^Digit(\d)$/.exec(facts.code)?.[1];
+	return digit === undefined ? -1 : quickLangIndexForKey(digit);
+}
+
 /**
  * Sidebar/settings/zoom chords in handler dispatch order (shift group,
  * zoom, shift-comma, then the plain panel block). Same token across
@@ -782,7 +828,8 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		if (facts.code === "BracketRight") return "toggle-settings";
 		if (facts.code === "KeyH") return "dismiss-or-sidebar";
 		if (facts.code === "KeyL") return "dismiss-or-settings";
-		if (facts.code === "Slash") return "shortcuts-toggle";
+		// "?" lives off the Slash key on many layouts (CSA: Shift+6).
+		if (facts.code === "Slash" || facts.key === "?") return "shortcuts-toggle";
 		if (facts.code === "KeyJ") return "step-chat-newer";
 		if (facts.code === "KeyK") return "step-chat-older";
 	}
@@ -795,14 +842,20 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		(facts.key === "=" ||
 			facts.key === "+" ||
 			facts.key === "-" ||
-			facts.key === "_")
+			facts.key === "_" ||
+			facts.code === "Equal" ||
+			facts.code === "Minus" ||
+			facts.code === "NumpadAdd" ||
+			facts.code === "NumpadSubtract")
 	)
 		return "zoom";
+	// Shift turns the comma key into "<" on US and "'" on CSA: the
+	// physical key counts on every layout.
 	if (
 		cmd &&
 		!facts.altKey &&
 		facts.shiftKey &&
-		(facts.key === "<" || facts.key === ",")
+		(facts.key === "<" || facts.key === "," || facts.code === "Comma")
 	) {
 		return "toggle-settings";
 	}
@@ -817,13 +870,13 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		// Shell only: a browser claims ⌘/Ctrl+B (bookmarks bar).
 		if (facts.inShell && facts.key.toLowerCase() === "b")
 			return "toggle-sidebar";
-		if (facts.key === ".") return "toggle-settings";
-		if (facts.key === ",") return "toggle-settings";
+		if (facts.key === "." || facts.code === "Period") return "toggle-settings";
+		if (facts.key === "," || facts.code === "Comma") return "toggle-settings";
 		// Shell only: in a browser ⌘1…⌘0 / Ctrl+1…0 switch tabs, and
 		// the page must not swallow them. In the shell the digits
 		// always pick the reply language, empty chat or not — never
 		// a chat jump.
-		if (facts.inShell && quickLangIndexForKey(facts.key) !== -1) {
+		if (facts.inShell && quickLangIndex(facts) !== -1) {
 			return "quick-lang";
 		}
 		// Shell only: the browser claims ⌘[ / ⌘] (history) and
@@ -859,6 +912,16 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		}
 	}
 	return null;
+}
+
+/** Zoom chord direction: the typed sign when it is one, else the
+physical key (the minus keys shrink). */
+export function zoomNarrows(
+	facts: Pick<KeyEventFacts, "key" | "code">
+): boolean {
+	if (facts.key === "-" || facts.key === "_") return true;
+	if (facts.key === "=" || facts.key === "+") return false;
+	return facts.code === "Minus" || facts.code === "NumpadSubtract";
 }
 
 /** Facts the open chat-list sidebar reads. */

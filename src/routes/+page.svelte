@@ -110,6 +110,7 @@
 	} from "$lib/languages";
 	import { listProviders, type ProviderId } from "$lib/providers/registry";
 	import { isImeKey } from "$lib/editContext";
+	import { createChordCompositionGuard } from "$lib/chord-composition";
 	import {
 		OFFLINE_FALLBACK_ID,
 		offlineTarget,
@@ -398,7 +399,9 @@
 		promptIdleKeyAction,
 		sendKeyAction,
 		summonHideAction,
-		quickLangIndexForKey,
+		quickLangIndex,
+		zoomNarrows,
+		imeOwnsKey,
 		scrollEnterAction,
 		scrollModeAction,
 		unselectedScrollAction,
@@ -515,9 +518,6 @@
 		type ScrollAnchor,
 		type ViewportState
 	} from "$lib/viewport";
-	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
-
-	import { isPermissionDismissal } from "$lib/intake";
 	import {
 		CHAT_SCROLL_KEY,
 		chatScrollLanding,
@@ -526,6 +526,9 @@
 		serializeChatScrolls,
 		type ChatScrollMark
 	} from "$lib/chat-scroll";
+	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
+
+	import { isPermissionDismissal } from "$lib/intake";
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
 	import {
 		copyExportText,
@@ -815,16 +818,16 @@
 			}
 		}
 		if (scrollBox) noteStick(scrollBox);
+		saveChatScroll();
 		scrollBox?.classList.add("scrolling");
 		window.clearTimeout(viewport.idleTimer);
 		viewport.idleTimer = window.setTimeout(() => {
-		saveChatScroll();
 			scrollBox?.classList.remove("scrolling");
 			updateWpPos();
+			persistChatScrolls();
 		}, 120);
 	}
 	let focusMode: "edit" | "scroll" = $state("edit");
-			persistChatScrolls();
 	/**
 	 * Whether scroll mode started in the prompt: only then does Ctrl+G
 	 * hop back to a focused, type-ready composer. Entering from a
@@ -8445,9 +8448,6 @@
 			if (frame) cancelAnimationFrame(frame);
 		};
 	});
-	function scrollToBottom() {
-		viewport.stick = true;
-		// Resisted at submit: a held finger means stay, not scroll.
 	/** Boot: read the filed marks and land the opening chat on its own
 	(a reload comes back where it was left). Hiding the page files the
 	open chat's mark: Android may kill a backgrounded WebView without
@@ -8485,6 +8485,9 @@
 			document.removeEventListener("visibilitychange", onVisibility);
 		};
 	});
+	function scrollToBottom() {
+		viewport.stick = true;
+		// Resisted at submit: a held finger means stay, not scroll.
 		if (viewport.holding) return;
 		scrollBox?.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
 	}
@@ -11244,8 +11247,16 @@
 		const onKey = (event: KeyboardEvent) => {
 			// An IME owns its keys mid-composition: Enter picks the
 			// candidate and Esc drops the candidate list, never an app
-			// action or a closed layer.
-			if (isImeKey(event)) return;
+			// action or a closed layer. Cmd/Ctrl chords on a layout's
+			// dead keys (CSA's [ is a dead ^) stay the app's.
+			if (
+				imeOwnsKey({
+					...keyFacts(event),
+					isComposing: event.isComposing,
+					keyCode: event.keyCode
+				})
+			)
+				return;
 			// An open language menu owns letters, arrows, and Enter.
 			if (openLangMenu && langMenuKey(event)) {
 				consumeEvent(event);
@@ -11736,7 +11747,7 @@
 				// shell has no browser-chrome zoom to fall back on). With Shift
 				// held the same chords widen/narrow the chat column instead.
 				consumeEvent(event);
-				const narrow = event.key === "-" || event.key === "_";
+				const narrow = zoomNarrows(event);
 				if (event.shiftKey) adjustChatWidth(narrow ? -2 : 2);
 				else adjustFontScale(narrow ? -0.1 : 0.1);
 				return;
@@ -11761,7 +11772,7 @@
 				// ⌘1…⌘0 toggles the priority language in flag order —
 				// pressing the active one's key clears it again. The
 				// body checks the code exists first.
-				const code = QUICK_LANG_CODES[quickLangIndexForKey(event.key)];
+				const code = QUICK_LANG_CODES[quickLangIndex(event)];
 				if (code) {
 					consumeEvent(event);
 					if (activeReplyCode === code) clearReplyLang();
@@ -13962,7 +13973,15 @@
 		void listenMenuActions();
 		void listenGameLine();
 		void wireDeepLinks();
-		window.addEventListener("keydown", onKey, true);
+		// A chord the app consumed off a dead key must not leave the
+		// field composing its accent (see chord-composition.ts).
+		const chordComposition = createChordCompositionGuard(document);
+		const onKeyDown = (event: KeyboardEvent): void => {
+			onKey(event);
+			if (event.defaultPrevented && (isImeKey(event) || event.key === "Dead"))
+				chordComposition.undo(event.target);
+		};
+		window.addEventListener("keydown", onKeyDown, true);
 		window.addEventListener("keydown", onAlt);
 		window.addEventListener("keyup", onAlt);
 		window.addEventListener("keydown", onShiftPeek);
@@ -14221,7 +14240,8 @@
 				// Already torn down.
 			}
 			unlistenCapture = null;
-			window.removeEventListener("keydown", onKey, true);
+			window.removeEventListener("keydown", onKeyDown, true);
+			chordComposition.dispose();
 			window.removeEventListener("keydown", onAlt);
 			window.removeEventListener("keyup", onAlt);
 			window.removeEventListener("keydown", onShiftPeek);
