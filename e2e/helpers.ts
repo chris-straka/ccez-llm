@@ -247,3 +247,38 @@ export function expectBoxesStable(
 		}
 	}
 }
+
+/**
+ * Drive a settings stepper (spinbutton) or slider to `value` the way
+ * a keyboard user would: focus it, then arrow toward the target one
+ * step at a time. Steppers only land on their ladder rungs, so pick a
+ * rung. `rank` orders non-numeric ladders (the idle stepper).
+ */
+export async function setSettingValue(
+	page: Page,
+	name: string,
+	value: number,
+	rank: (v: number) => number = (v) => v
+): Promise<void> {
+	const control = page.locator(`.settings-panel [aria-label="${name}"]`);
+	for (let i = 0; i < 300; i++) {
+		const now = Number(await control.getAttribute("aria-valuenow"));
+		if (Math.abs(now - value) < 1e-6) return;
+		// Refocus per press: an interface-size step re-lays out an
+		// open chat list, which takes focus back to its active row.
+		await control.focus();
+		await page.keyboard.press(
+			rank(now) < rank(value) ? "ArrowUp" : "ArrowDown"
+		);
+	}
+	throw new Error(`${name} never reached ${value}`);
+}
+
+/** A settings control's current value (aria-valuenow). */
+export async function settingValue(page: Page, name: string): Promise<number> {
+	return Number(
+		await page
+			.locator(`.settings-panel [aria-label="${name}"]`)
+			.getAttribute("aria-valuenow")
+	);
+}

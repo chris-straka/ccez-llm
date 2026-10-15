@@ -2,12 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	clampPromptIdleSec,
 	columnBounds,
-	draggedSliderPastTop,
 	formatIdleTimeout,
-	IDLE_SLIDER_BOTTOM,
-	IDLE_SLIDER_TOP,
-	idleSettingToSlider,
-	idleSliderToSetting,
 	isPromptIdle,
 	pointInRect,
 	sendHoldAction,
@@ -15,7 +10,6 @@ import {
 	rowWorkRunning,
 	messageActionsTapAllowed,
 	promptParkedFor,
-	SLIDER_DRAG_RESET_PX,
 	stageOwnedByOverlay,
 	type StageOwnerFlags
 } from "./chrome";
@@ -62,44 +56,12 @@ describe("clampPromptIdleSec", () => {
 	});
 });
 
-describe("idle slider mapping", () => {
-	it("tops at 10s with the top tick meaning never", () => {
+describe("formatIdleTimeout", () => {
+	it("reads always, seconds, and never", () => {
 		expect(PROMPT_IDLE_MAX).toBe(10);
-		expect(IDLE_SLIDER_TOP).toBe(PROMPT_IDLE_MAX + 1);
-		expect(idleSliderToSetting(IDLE_SLIDER_TOP)).toBe(PROMPT_IDLE_NEVER);
-		expect(idleSliderToSetting(6)).toBe(6);
-	});
-
-	it("parks never-hide on the top tick, seconds below it", () => {
-		expect(idleSettingToSlider(PROMPT_IDLE_NEVER)).toBe(IDLE_SLIDER_TOP);
-		expect(idleSettingToSlider(0)).toBe(IDLE_SLIDER_TOP);
-		expect(idleSettingToSlider(6)).toBe(6);
-	});
-
-	it("reads the top tick as never, the rest as seconds", () => {
 		expect(formatIdleTimeout(PROMPT_IDLE_NEVER)).toBe("never");
 		expect(formatIdleTimeout(6)).toBe("6 s");
-	});
-
-	it("parks always-hide on the bottom tick", () => {
-		expect(IDLE_SLIDER_BOTTOM).toBe(1);
-		expect(idleSliderToSetting(IDLE_SLIDER_BOTTOM)).toBe(PROMPT_IDLE_ALWAYS);
-		expect(idleSettingToSlider(PROMPT_IDLE_ALWAYS)).toBe(IDLE_SLIDER_BOTTOM);
 		expect(formatIdleTimeout(PROMPT_IDLE_ALWAYS)).toBe("always");
-	});
-});
-
-describe("draggedSliderPastTop", () => {
-	it("needs a full upward travel past the threshold", () => {
-		expect(draggedSliderPastTop(200, 200 - SLIDER_DRAG_RESET_PX)).toBe(true);
-		expect(draggedSliderPastTop(200, 200 - SLIDER_DRAG_RESET_PX + 1)).toBe(
-			false
-		);
-	});
-
-	it("ignores downward and sideways travel", () => {
-		expect(draggedSliderPastTop(200, 400)).toBe(false);
-		expect(draggedSliderPastTop(200, 200)).toBe(false);
 	});
 });
 

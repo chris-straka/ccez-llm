@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, setSettingValue, settingValue } from "./helpers";
 
 /** Settings panel: five thinking pills share one row, labels stay terse. */
 test.beforeEach(async ({ page }) => {
@@ -31,61 +31,154 @@ test("own-bubble toggle reads as Background on my messages, under Enable", async
 	).toBeVisible();
 });
 
-/** Text size caps at 2000% on desktop (phones share the stored range). */
-test("desktop text slider caps at 2000 percent", async ({ page }) => {
+/** Text size reaches 2000% on desktop (phones share the stored range). */
+test("desktop text size steps up to 2000 percent", async ({ page }) => {
+	const size = page.getByRole("spinbutton", {
+		name: "Text size percent",
+		exact: true
+	});
+	await expect(size).toHaveAttribute("aria-valuemax", "2000");
+	await expect(size).toHaveAttribute("aria-valuemin", "80");
+	await setSettingValue(page, "Text size percent", 2000);
 	await expect(
-		page.locator('.settings-panel input[aria-label="Text size percent"]')
-	).toHaveAttribute("max", "2000");
+		page.getByRole("button", { name: "Increase text size" })
+	).toBeDisabled();
 });
 
 /** Annotation popups scale 10–200% of message text, reset to 100%. */
-test("annotation popup slider caps at 200 percent", async ({ page }) => {
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Annotation popup size percent"]'
-	);
-	await expect(slider).toHaveAttribute("max", "200");
-	await expect(slider).toHaveAttribute("min", "10");
-	await slider.fill("50");
-	await expect(slider).toHaveValue("50");
+test("annotation popup size spans 10 to 200 percent", async ({ page }) => {
+	const size = page.getByRole("spinbutton", {
+		name: "Annotation popup size percent"
+	});
+	await expect(size).toHaveAttribute("aria-valuemax", "200");
+	await expect(size).toHaveAttribute("aria-valuemin", "10");
+	await setSettingValue(page, "Annotation popup size percent", 50);
+	await expect(size).toHaveText("50%");
 	await page
 		.locator('.settings-panel button[title="Reset to the default popup size"]')
 		.click();
-	await expect(slider).toHaveValue("100");
+	await expect(size).toHaveAttribute("aria-valuenow", "100");
 });
 
-test("text size reset button restores 100 percent", async ({ page }) => {
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Text size percent"]'
-	);
-	await slider.fill("200");
-	await expect(slider).toHaveValue("200");
-	await page
-		.locator('.settings-panel button[title="Reset to the default size"]')
-		.click();
-	await expect(slider).toHaveValue("100");
-});
-
-/** Bubble toggle sits below the hover row on desktop. */
-test("own-bubble checkbox follows the hover row", async ({ page }) => {
-	const panel = page.locator(".settings-panel");
-	const tops = await panel.evaluate((el) => {
-		const find = (text: string): number | null => {
-			for (const node of el.querySelectorAll(
-				"fieldset.hover-row legend, label.check"
-			)) {
-				if (node.textContent?.includes(text))
-					return node.getBoundingClientRect().top;
-			}
-			return null;
-		};
-		return {
-			hover: find("message buttons on hover"),
-			bubble: find("Background on my messages")
-		};
+/** Each press moves one rung; the value shows once, inside the
+control; Reset appears only off the default and restores it. */
+test("text size stepper moves one rung per press and resets", async ({
+	page
+}) => {
+	const size = page.getByRole("spinbutton", {
+		name: "Text size percent",
+		exact: true
 	});
-	expect(tops.hover).not.toBeNull();
-	expect(tops.bubble).not.toBeNull();
-	expect(tops.bubble! - tops.hover!).toBeGreaterThan(0);
+	const reset = page.locator(
+		'.settings-panel button[title="Reset to the default size"]'
+	);
+	await expect(reset).toHaveCount(0);
+	await page.getByRole("button", { name: "Increase text size" }).click();
+	await expect(size).toHaveText("110%");
+	await page.getByRole("button", { name: "Increase text size" }).click();
+	await expect(size).toHaveText("120%");
+	await page.getByRole("button", { name: "Decrease text size" }).click();
+	await expect(size).toHaveText("110%");
+	const row = page.locator(".settings-panel .stepper-setting", {
+		has: size
+	});
+	expect((await row.innerText()).match(/110%/g)).toHaveLength(1);
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				getComputedStyle(document.querySelector(".app")!)
+					.getPropertyValue("--font-scale")
+					.trim()
+			)
+		)
+		.toBe("1.1");
+	await reset.click();
+	await expect(size).toHaveText("100%");
+	await expect(reset).toHaveCount(0);
+});
+
+/** Sliders only move from their thumb: a click elsewhere on the
+track and a wheel passing over it leave the value alone. */
+test("sliders ignore track clicks and the wheel, move by thumb drag", async ({
+	page
+}) => {
+	const name = "Voice volume percent";
+	await page.getByRole("slider", { name }).scrollIntoViewIfNeeded();
+	const track = page.locator(".settings-panel .slider-setting", {
+		has: page.getByRole("slider", { name })
+	});
+	const hit = track.locator(".slider-hit");
+	const box = (await hit.boundingBox())!;
+	// Voice volume sits at 100% (thumb at the right end): click the left
+	// third of the track.
+	await page.mouse.click(box.x + box.width * 0.3, box.y + box.height / 2);
+	expect(await settingValue(page, name)).toBe(1);
+	// The wheel over the track scrolls the panel, never the value.
+	const panel = page.locator(".settings-panel");
+	const before = await panel.evaluate((el) => el.scrollTop);
+	await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
+	await page.mouse.wheel(0, 200);
+	await expect
+		.poll(() => panel.evaluate((el) => el.scrollTop))
+		.not.toBe(before);
+	expect(await settingValue(page, name)).toBe(1);
+	// Grab the thumb and drag it left: the value follows.
+	const thumb = (await page.getByRole("slider", { name }).boundingBox())!;
+	await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(
+		thumb.x + thumb.width / 2 - box.width * 0.5,
+		thumb.y + thumb.height / 2,
+		{ steps: 5 }
+	);
+	await page.mouse.up();
+	const dragged = await settingValue(page, name);
+	expect(dragged).toBeGreaterThan(0.3);
+	expect(dragged).toBeLessThan(0.7);
+	await expect(track.locator(".slider-value")).toHaveText(
+		`${Math.round(dragged * 100)}%`
+	);
+});
+
+/** The jump bar scrolls a group under itself and marks it current. */
+test("section bar jumps between groups", async ({ page }) => {
+	const nav = page.locator(".settings-panel .settings-nav");
+	await nav.getByRole("button", { name: "Look" }).click();
+	await expect(nav.getByRole("button", { name: "Look" })).toHaveAttribute(
+		"aria-current",
+		"true"
+	);
+	await expect
+		.poll(async () => {
+			const navBottom =
+				(await nav.boundingBox())!.y + (await nav.boundingBox())!.height;
+			const head = (await page.locator("#look-heading").boundingBox())!.y;
+			return head - navBottom;
+		})
+		.toBeLessThan(40);
+	await nav.getByRole("button", { name: "Reading" }).click();
+	await expect(page.locator("#reading-heading")).toBeInViewport();
+});
+
+/** The Reading sample tracks text size and line spacing live. */
+test("reading preview follows text size and spacing", async ({ page }) => {
+	const preview = page.locator(".settings-panel .reading-preview");
+	const font = () =>
+		preview.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+	const before = await font();
+	await setSettingValue(page, "Text size percent", 200);
+	await expect.poll(font).toBeCloseTo(before * 2, 0);
+	await setSettingValue(page, "Line spacing", 2);
+	await expect(preview).toHaveCSS("line-height", `${(await font()) * 2}px`);
+});
+
+/** Background on my messages is a look, not a feature: it sits in Look. */
+test("own-bubble checkbox sits in the Look group", async ({ page }) => {
+	await expect(
+		page
+			.locator("#settings-look label.check")
+			.filter({ hasText: "Background on my messages" })
+	).toHaveCount(1);
 });
 
 /** macOS always uses system voices: no engine picker bubble. */
@@ -101,12 +194,10 @@ test("no System/Web engine picker on desktop", async ({ page }) => {
 
 /** Chat-width slider resizes the column live and persists the value. */
 test("chat width slider narrows the column and persists", async ({ page }) => {
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Chat width in rem"]'
-	);
+	const slider = page.getByRole("slider", { name: "Chat width in rem" });
 	await expect(slider).toBeVisible();
-	await expect(slider).toHaveAttribute("min", "28");
-	await expect(slider).toHaveAttribute("max", "120");
+	await expect(slider).toHaveAttribute("aria-valuemin", "28");
+	await expect(slider).toHaveAttribute("aria-valuemax", "120");
 	// The composer pins to min(chat-width, 36rem) while articles ride
 	// the raw column var — assert the var, which is what the slider
 	// drives (the 46rem default predates both the cap and 36rem).
@@ -117,8 +208,8 @@ test("chat width slider narrows the column and persists", async ({ page }) => {
 				.trim()
 		);
 	expect(await chatVar()).toBe("36");
-	await slider.fill("32");
-	await expect(slider).toHaveValue("32");
+	await setSettingValue(page, "Chat width in rem", 32);
+	await expect(slider).toHaveAttribute("aria-valuetext", "32 rem");
 	expect(await chatVar()).toBe("32");
 	// Persisted to storage (the seeded init script rewrites settings on
 	// every navigation, so reload-round-trip is covered by the unit
@@ -144,22 +235,19 @@ test("prompt sliders resize the composer only and persist", async ({
 					.trim(),
 			name
 		);
-	const size = page.locator(
-		'.settings-panel input[aria-label="Prompt text size percent"]'
-	);
-	const width = page.locator(
-		'.settings-panel input[aria-label="Prompt width in rem"]'
-	);
+	const size = page.getByRole("spinbutton", {
+		name: "Prompt text size percent"
+	});
+	const width = page.getByRole("slider", { name: "Prompt width in rem" });
 	await expect(size).toBeVisible();
 	await expect(width).toBeVisible();
-	// Prompt text to 200% (log travel: position 285 of 1000): its own
-	// var moves, the message scale stays.
-	await size.fill("285");
+	// Prompt text to 200%: its own var moves, the message scale stays.
+	await setSettingValue(page, "Prompt text size percent", 200);
 	await expect(size).toHaveAttribute("aria-valuetext", "200%");
 	expect(await appVar("--prompt-font")).toBe("2");
 	expect(await appVar("--font-scale")).toBe("1");
 	// Prompt width to 32rem under the 36rem column: the var follows.
-	await width.fill("32");
+	await setSettingValue(page, "Prompt width in rem", 32);
 	expect(await appVar("--prompt-width")).toBe("32");
 	expect(await appVar("--chat-width")).toBe("36");
 	await expect
@@ -202,9 +290,6 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 			).toBe(false);
 		}).toPass({ timeout: 20_000 });
 	await openSettings();
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Chat width in rem"]'
-	);
 	const sidebar = page.locator("aside:not(.settings-panel)");
 	const chatVar = () =>
 		page.evaluate(() =>
@@ -223,7 +308,7 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await expect(sidebar).toHaveClass(/collapsed/);
 	// Wide column: a point just inside its live left edge is content,
 	// not gutter (articles cap at 90%, so a fixed x can't prove this).
-	await slider.fill("80");
+	await setSettingValue(page, "Chat width in rem", 80);
 	expect(await chatVar()).toBe("80");
 	const leftEdge = await page
 		.locator("article.assistant")
@@ -235,9 +320,7 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await expect(sidebar).toHaveClass(/collapsed/);
 	// Narrow column: x=100 is gutter, so the chats list opens.
 	await openSettings();
-	await page
-		.locator('.settings-panel input[aria-label="Chat width in rem"]')
-		.fill("28");
+	await setSettingValue(page, "Chat width in rem", 28);
 	expect(await chatVar()).toBe("28");
 	await page.locator(".settings-panel .panel-head").click();
 	await waitHitTestable();
@@ -424,4 +507,45 @@ test("ml kit pill hides on all-606 when inactive", async ({ page }) => {
 	await expect(
 		panel.getByRole("radio", { name: "ML Kit (on-device)" })
 	).toHaveCount(0);
+});
+
+/** Phones: the same steppers and thumb-only sliders, sized for a
+thumb; a tap on a slider's track leaves it alone. */
+test.describe("phone", () => {
+	test.use({
+		hasTouch: true,
+		isMobile: true,
+		userAgent:
+			"Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+		viewport: { width: 412, height: 915 }
+	});
+
+	test("steppers take taps, slider tracks ignore them", async ({ page }) => {
+		const plus = page.getByRole("button", { name: "Increase text size" });
+		const box = (await plus.boundingBox())!;
+		expect(box.width).toBeGreaterThanOrEqual(44);
+		expect(box.height).toBeGreaterThanOrEqual(44);
+		await plus.tap();
+		await expect(
+			page.getByRole("spinbutton", { name: "Text size percent", exact: true })
+		).toHaveText("110%");
+		const name = "Voice volume percent";
+		const hit = page
+			.locator(".settings-panel .slider-setting", {
+				has: page.getByRole("slider", { name })
+			})
+			.locator(".slider-hit");
+		await hit.scrollIntoViewIfNeeded();
+		const track = (await hit.boundingBox())!;
+		await page.touchscreen.tap(
+			track.x + track.width * 0.25,
+			track.y + track.height / 2
+		);
+		expect(await settingValue(page, name)).toBe(1);
+		// All six section pills fit the phone row.
+		const nav = page.locator(".settings-panel .settings-nav");
+		expect(
+			await nav.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+		).toBe(true);
+	});
 });

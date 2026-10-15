@@ -359,7 +359,7 @@
 	});
 </script>
 
-<section aria-labelledby="provider-heading">
+<section id="settings-model" aria-labelledby="provider-heading">
 	<h2 id="provider-heading">Model provider</h2>
 	<div class="provider-row" role="radiogroup" aria-label="Active provider">
 		{#each listedProviders as def (def.id)}

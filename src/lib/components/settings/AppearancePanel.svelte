@@ -95,9 +95,10 @@
 	}
 </script>
 
-<section aria-labelledby="color-scheme-heading">
-	<h2 id="color-scheme-heading">Color scheme</h2>
+<section id="settings-look" aria-labelledby="look-heading">
+	<h2 id="look-heading">Look</h2>
 	<fieldset class="theme">
+		<legend>Color scheme</legend>
 		<div
 			class="segmented scheme-side"
 			role="radiogroup"
@@ -170,4 +171,8 @@
 			{/each}
 		</div>
 	</fieldset>
+	<label class="check">
+		<input type="checkbox" bind:checked={settings.ownBubble} />
+		<span>Background on my messages</span>
+	</label>
 </section>

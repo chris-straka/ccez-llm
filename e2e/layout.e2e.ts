@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat, toggleSidebar } from "./helpers";
+import { seedChat, setSettingValue, toggleSidebar } from "./helpers";
 
 /** The chat pill spans the full row width flush with the + button
 (the row × overlays instead of reserving its slot). */
@@ -49,13 +49,12 @@ test("text size setting scales text", async ({ page }) => {
 		rendered.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
 	const before = await px();
 	await page.keyboard.press("Meta+,");
-	const size = page.locator(
-		'.settings-panel input[aria-label="Text size percent"]'
-	);
-	await expect(size).toBeVisible({ timeout: 5_000 });
-	await size.fill("110");
+	await expect(
+		page.locator('.settings-panel [aria-label="Text size percent"]')
+	).toBeVisible({ timeout: 5_000 });
+	await setSettingValue(page, "Text size percent", 110);
 	await expect.poll(px).toBeGreaterThan(before);
-	await size.fill("100");
+	await setSettingValue(page, "Text size percent", 100);
 	await expect.poll(px).toBeCloseTo(before, 1);
 });
 
@@ -66,15 +65,14 @@ test("chat width setting scales the column", async ({ page }) => {
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible();
 	await page.keyboard.press("Meta+,");
-	const width = page.locator(
-		'.settings-panel input[aria-label="Chat width in rem"]'
-	);
-	await expect(width).toBeVisible({ timeout: 5_000 });
+	await expect(
+		page.locator('.settings-panel [aria-label="Chat width in rem"]')
+	).toBeVisible({ timeout: 5_000 });
 	const stored = () =>
 		page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"));
-	await width.fill("38");
+	await setSettingValue(page, "Chat width in rem", 38);
 	await expect.poll(stored).toContain('"chatWidth":38');
-	await width.fill("36");
+	await setSettingValue(page, "Chat width in rem", 36);
 	await expect.poll(stored).toContain('"chatWidth":36');
 });
 
@@ -106,23 +104,17 @@ test("text size scales messages and badges, prompt slider scales the composer", 
 	const badgeBefore = await px("button.ccez-ann-badge");
 	// Shell-only chord (browser owns page zoom): drive the setting.
 	await page.keyboard.press("Meta+,");
-	const size = page.locator(
-		'.settings-panel input[aria-label="Text size percent"]'
-	);
-	await expect(size).toBeVisible({ timeout: 5_000 });
-	await size.fill("110");
+	await expect(
+		page.locator('.settings-panel [aria-label="Text size percent"]')
+	).toBeVisible({ timeout: 5_000 });
+	await setSettingValue(page, "Text size percent", 110);
 	await expect
 		.poll(() => px("article .rendered"), { timeout: 5_000 })
 		.toBeCloseTo(msgBefore * 1.1, 1);
 	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore, 1);
 	expect(await px("button.ccez-ann-badge")).toBeCloseTo(badgeBefore * 1.03, 1);
 	// The prompt slider moves only the composer: messages stay put.
-	const promptSize = page.locator(
-		'.settings-panel input[aria-label="Prompt text size percent"]'
-	);
-	// Log travel: position 285 of 1000 reads 200%.
-	await promptSize.fill("285");
-	await expect(promptSize).toHaveAttribute("aria-valuetext", "200%");
+	await setSettingValue(page, "Prompt text size percent", 200);
 	await expect
 		.poll(() => px(".prompt .ta-input"), { timeout: 5_000 })
 		.toBeCloseTo(editorBefore * 2, 1);

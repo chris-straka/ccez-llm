@@ -1,5 +1,10 @@
 import { expect, test } from "./fixtures";
-import { expectBoxesStable, seedChat, toggleSidebar } from "./helpers";
+import {
+	expectBoxesStable,
+	seedChat,
+	setSettingValue,
+	toggleSidebar
+} from "./helpers";
 
 /**
  * App chrome + settings (bucket chromesettings). NOT RUN in this
@@ -1041,51 +1046,49 @@ test("always-hide hides after send", async ({ page }) => {
 });
 
 /** Idle timeout is configurable in settings (always/2–10s/never). */
-test("idle timeout slider persists", async ({ page }) => {
+test("idle timeout stepper persists", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Idle seconds before the prompt hides (bottom is always, top is never)"]'
-	);
-	await expect(slider).toHaveAttribute("min", "1");
-	await expect(slider).toHaveAttribute("max", "11");
-	await slider.fill("10");
+	const name = "Idle seconds before the prompt hides";
+	const idle = page.getByRole("spinbutton", { name });
+	// The seed parks idle at never (0): the top of the ladder.
+	await expect(idle).toHaveText("Never");
+	await expect(
+		page.getByRole("button", { name: "Increase hide prompt after idle" })
+	).toBeDisabled();
+	await page
+		.getByRole("button", { name: "Decrease hide prompt after idle" })
+		.click();
+	await expect(idle).toHaveText("10 s");
 	await expect
 		.poll(() =>
 			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
 		)
 		.toContain('"promptIdleSec":10');
-	await slider.fill("11");
-	await expect
-		.poll(() =>
-			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
-		)
-		.toContain('"promptIdleSec":0');
-	await slider.fill("1");
+	await idle.focus();
+	await page.keyboard.press("Home");
+	await expect(idle).toHaveText("Always");
 	await expect
 		.poll(() =>
 			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
 		)
 		.toContain('"promptIdleSec":-1');
-	await expect(
-		page.locator(".settings-panel output", { hasText: "always" })
-	).toBeVisible();
+	await page.keyboard.press("End");
+	await expect
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
+		.toContain('"promptIdleSec":0');
 });
-
-/** Slider drag-up past the top resets to default (text size). */
-
-/** Clicking the slider label never resets (only the inner button + drag-up do). */
 
 /** Chat width configures past 80rem. */
 test("chat width slider reaches past 80 rem", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Chat width in rem"]'
-	);
-	await expect(slider).toHaveAttribute("max", "120");
-	await slider.fill("100");
-	await expect(slider).toHaveValue("100");
+	const slider = page.getByRole("slider", { name: "Chat width in rem" });
+	await expect(slider).toHaveAttribute("aria-valuemax", "120");
+	await setSettingValue(page, "Chat width in rem", 100);
+	await expect(slider).toHaveAttribute("aria-valuenow", "100");
 	await expect
 		.poll(() =>
 			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
@@ -1118,9 +1121,7 @@ test("message buttons scale with text size when enabled", async ({ page }) => {
 		{ role: "assistant", content: "hello there" }
 	]);
 	await openSettings(page);
-	await page
-		.locator('.settings-panel input[aria-label="Text size percent"]')
-		.fill("200");
+	await setSettingValue(page, "Text size percent", 200);
 	const glyph = page
 		.locator("article.assistant .actions .icon-btn .action-glyph")
 		.first();
@@ -1143,9 +1144,7 @@ test("message icon glyphs scale past double type", async ({ page }) => {
 		{ role: "assistant", content: "hello there" }
 	]);
 	await openSettings(page);
-	await page
-		.locator('.settings-panel input[aria-label="Text size percent"]')
-		.fill("300");
+	await setSettingValue(page, "Text size percent", 300);
 	const glyph = page
 		.locator("article.assistant .actions .icon-btn .action-glyph")
 		.first();
@@ -1216,9 +1215,7 @@ shell-only: the browser owns page zoom, so specs drive the setting). */
 test("chat width setting widens the chat column", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	await page
-		.locator('.settings-panel input[aria-label="Chat width in rem"]')
-		.fill("38");
+	await setSettingValue(page, "Chat width in rem", 38);
 	// Default 36 + one 2rem step.
 	await expect
 		.poll(() =>

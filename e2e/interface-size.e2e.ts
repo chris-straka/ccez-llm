@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { seedChat, toggleSidebar } from "./helpers";
+import { seedChat, setSettingValue, toggleSidebar } from "./helpers";
 
 /**
  * Interface size (Settings > Interface size, 100–250%): the settings
@@ -109,8 +109,8 @@ async function interfaceSizeFlow(
 	const drawer = page.locator(".settings-panel");
 	const list = page.locator("aside:has(button.side-chat)");
 	const modal = page.locator(".modal");
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Interface size percent"]'
+	const size = page.locator(
+		'.settings-panel [aria-label="Interface size percent"]'
 	);
 	// Baseline geometry at 100%. The toast comes first with no
 	// drawers open (the thread copy click matches the latex suite's
@@ -123,7 +123,10 @@ async function interfaceSizeFlow(
 	await page.keyboard.press("Meta+,");
 	await expect(drawer).not.toHaveClass(/closed/);
 	await settledOpen(page, ".settings-panel");
-	const drawerText100 = await textHeight(page, ".settings-panel .reset-width");
+	const drawerText100 = await textHeight(
+		page,
+		".settings-panel .setting-label"
+	);
 	const drawerBox100 = await boxInViewport(page, ".settings-panel", vw, vh);
 	await toggleSidebar(page);
 	await expect(list).not.toHaveClass(/collapsed/);
@@ -141,28 +144,26 @@ async function interfaceSizeFlow(
 	await boxInViewport(page, ".modal", vw, vh);
 	await page.keyboard.press("Escape");
 	// Phones draw one sidebar at a time, so the list folded settings
-	// above: reopen for the slider + measurement.
+	// above: reopen for the stepper + measurement.
 	if (phone) {
 		await page.keyboard.press("Meta+,");
 		await expect(drawer).not.toHaveClass(/closed/);
 		await settledOpen(page, ".settings-panel");
 	}
-	// Crank to 250% through the real slider (change commits on
-	// release; fill alone only fires input).
-	await slider.fill("250");
-	await slider.dispatchEvent("change");
+	// Crank to 250% through the real stepper.
+	await setSettingValue(page, "Interface size percent", 250);
 	await expect
-		.poll(() => textHeight(page, ".settings-panel .reset-width"), {
+		.poll(() => textHeight(page, ".settings-panel .setting-label"), {
 			timeout: 5_000
 		})
 		.toBeGreaterThan(drawerText100 * 2);
-	const out = page.locator(
-		'.settings-panel .slider-row:has(input[aria-label="Interface size percent"]) output'
-	);
-	await expect(out).toHaveText("250%");
+	await expect(size).toHaveText("250%");
 	// Drawer: text at 2.5x. Desktop boxes grow with the zoom; the
 	// phone sheet keeps filling the screen exactly.
-	const drawerText250 = await textHeight(page, ".settings-panel .reset-width");
+	const drawerText250 = await textHeight(
+		page,
+		".settings-panel .setting-label"
+	);
 	// ±4% bands: zoom is exact but small-box text metrics round to
 	// whole pixels (the drawer button reads 2.5625x, not 2.5x).
 	expect(drawerText250 / drawerText100).toBeGreaterThanOrEqual(2.4);

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { AppSettings } from "$lib/settings";
+	import { activeProviderSettings, type AppSettings } from "$lib/settings";
+	import { getProviderDef } from "$lib/providers/registry";
 	import type { VoiceLangFollow } from "$lib/voiceTiers";
 	import { hydrateSecrets, tauriBackendAvailable } from "$lib/secrets";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -7,11 +8,16 @@
 	import ProviderPanel from "./settings/ProviderPanel.svelte";
 	import DefaultsPanel from "./settings/DefaultsPanel.svelte";
 	import AppearancePanel from "./settings/AppearancePanel.svelte";
+	import ReadingPanel from "./settings/ReadingPanel.svelte";
+	import VoiceSection from "./settings/VoiceSection.svelte";
+	import LayoutPanel from "./settings/LayoutPanel.svelte";
 	import UpdatesPanel from "./settings/UpdatesPanel.svelte";
 	import "./settings/panels.css";
 
 	interface Props {
 		settings: AppSettings;
+		/** Drawer open: an opening with no usable key lands on Model. */
+		open?: boolean;
 		onClose: () => void;
 		/** Field commits (key paste/blur) persist through the page. */
 		onCommit: () => void;
@@ -39,6 +45,7 @@
 
 	let {
 		settings = $bindable(),
+		open = false,
 		onClose,
 		onCommit,
 		onShortcuts,
@@ -73,23 +80,74 @@
 			if (selection && !selection.isCollapsed) event.preventDefault();
 		};
 		document.addEventListener("click", keepSelectionWithoutToggle, true);
-		// Slider rows: the reset button is the row label's first
-		// labelable descendant, so clicking the label text or row
-		// would forward-activate the button and reset by accident.
-		// Cancel that forwarded activation unless the click landed on
-		// the button or slider itself (same capture pattern as above).
-		const guardSliderLabel = (event: MouseEvent): void => {
-			const target = event.target;
-			if (!(target instanceof HTMLElement)) return;
-			if (!target.closest(".settings-panel label.slider-row")) return;
-			if (target.closest("button, input")) return;
-			event.preventDefault();
-		};
-		document.addEventListener("click", guardSliderLabel, true);
 		return () => {
 			document.removeEventListener("click", keepSelectionWithoutToggle, true);
-			document.removeEventListener("click", guardSliderLabel, true);
 		};
+	});
+	/** Section jump bar: every group stays in one scroll (search by
+	eye still works), the bar jumps between them and marks where
+	you are. */
+	const SECTIONS = [
+		["reading", "Reading"],
+		["voice", "Voice"],
+		["layout", "Layout"],
+		["look", "Look"],
+		["chat", "Chat"],
+		["model", "Model"]
+	] as const;
+	type SectionId = (typeof SECTIONS)[number][0];
+	let navEl: HTMLElement | undefined = $state();
+	let current = $state<SectionId>("reading");
+	function scroller(): HTMLElement | null {
+		return navEl?.closest<HTMLElement>(".settings-panel") ?? null;
+	}
+	function jump(id: SectionId, instant = false): void {
+		const target = document.getElementById(`settings-${id}`);
+		const box = scroller();
+		if (!target || !box || !navEl) return;
+		current = id;
+		const top =
+			target.getBoundingClientRect().top -
+			box.getBoundingClientRect().top +
+			box.scrollTop -
+			navEl.offsetHeight;
+		const reduce = window.matchMedia?.(
+			"(prefers-reduced-motion: reduce)"
+		).matches;
+		box.scrollTo({ top, behavior: reduce || instant ? "auto" : "smooth" });
+	}
+	/** Nothing sends without a key, so an opening that lacks one
+	starts on the key field instead of Reading. */
+	let wasOpen = false;
+	$effect(() => {
+		const opening = open && !wasOpen;
+		wasOpen = open;
+		if (!opening) return;
+		const def = getProviderDef(
+			settings.activeProviderId,
+			settings.customProviders
+		);
+		if (!activeProviderSettings(settings).apiKey.trim() && !def.publicModels)
+			jump("model", true);
+	});
+	$effect(() => {
+		const box = scroller();
+		if (!box || !navEl) return;
+		const nav = navEl;
+		const spy = (): void => {
+			const line = nav.getBoundingClientRect().bottom + 12;
+			let seen: SectionId = SECTIONS[0][0];
+			for (const [id] of SECTIONS) {
+				const el = document.getElementById(`settings-${id}`);
+				if (el && el.getBoundingClientRect().top <= line) seen = id;
+			}
+			// Scrolled to the end: the last group wins even if short.
+			if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2)
+				seen = SECTIONS[SECTIONS.length - 1]![0];
+			current = seen;
+		};
+		box.addEventListener("scroll", spy, { passive: true });
+		return () => box.removeEventListener("scroll", spy);
 	});
 	let headDown: { x: number; y: number } | null = null;
 	function dragHead(event: MouseEvent): void {
@@ -165,14 +223,22 @@
 		</span>
 	{/if}
 </div>
-<ProviderPanel bind:settings {onCommit} />
-<DefaultsPanel
-	bind:settings
-	{androidUI}
-	{followVoice}
-	gameLineToggle={onGameLineToggle}
-/>
+<nav class="settings-nav" bind:this={navEl} aria-label="Settings sections">
+	{#each SECTIONS as [id, label] (id)}
+		<button
+			type="button"
+			class:current={current === id}
+			aria-current={current === id ? "true" : undefined}
+			onclick={() => jump(id)}>{label}</button
+		>
+	{/each}
+</nav>
+<ReadingPanel bind:settings />
+<VoiceSection bind:settings {androidUI} {followVoice} />
+<LayoutPanel bind:settings {androidUI} />
 <AppearancePanel bind:settings />
+<DefaultsPanel bind:settings {androidUI} gameLineToggle={onGameLineToggle} />
+<ProviderPanel bind:settings {onCommit} />
 <div class="keys-updates">
 	<section aria-labelledby="keys-heading">
 		<h2 id="keys-heading">

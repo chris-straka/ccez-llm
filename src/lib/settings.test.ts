@@ -22,8 +22,6 @@ import {
 	stepFontScale,
 	stepChatWidth,
 	stepPromptWidth,
-	promptSliderScale,
-	promptSliderPosition,
 	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
 	PROMPT_IDLE_MAX,
@@ -987,23 +985,6 @@ describe("step helpers", () => {
 		expect(stepPromptWidth(28, 36, -2)).toBe(28);
 		// Phones' full-bleed column caps at the slider max.
 		expect(stepPromptWidth(120, 999, 2)).toBe(120);
-	});
-
-	it("prompt size slider keeps 80-2000% on a log curve", () => {
-		expect(promptSliderScale(0)).toBe(0.8);
-		expect(promptSliderScale(1000)).toBe(20);
-		// A third of the way is moderate, not huge; halfway is 400%.
-		expect(promptSliderScale(333)).toBeCloseTo(2.35, 5);
-		expect(promptSliderScale(500)).toBe(4);
-		// Positions round-trip through the scales they show.
-		for (const scale of [0.8, 1, 1.5, 2, 4, 10, 20]) {
-			expect(promptSliderScale(promptSliderPosition(scale))).toBeCloseTo(
-				scale,
-				1
-			);
-		}
-		expect(promptSliderPosition(1)).toBe(69);
-		expect(promptSliderPosition(50)).toBe(1000);
 	});
 });
 

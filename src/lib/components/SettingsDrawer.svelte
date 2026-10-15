@@ -68,6 +68,7 @@ bookkeeping reads it). -->
 	<div class="settings-inner">
 		<SettingsPanel
 			bind:settings
+			{open}
 			{followVoice}
 			onCommit={actions.commit}
 			onToast={actions.toast}
@@ -97,11 +98,11 @@ bookkeeping reads it). -->
 		left: auto;
 		top: 0;
 		bottom: 0;
-		width: 22rem;
+		width: 30rem;
 		/* Interface-size zoom (Settings > Interface size): text,
 		padding, and widths scale together per surface, which rem
-		can't do. Zoom multiplies the fixed width too (22rem reads
-		55rem at 250%), so the reciprocal var caps the rendered box
+		can't do. Zoom multiplies the fixed width too (30rem reads
+		75rem at 250%), so the reciprocal var caps the rendered box
 		to the viewport — a no-op at 100% on any sane window. */
 		zoom: var(--ui-scale, 1);
 		max-width: calc(100vw * var(--ui-scale-inv, 1));
@@ -129,7 +130,7 @@ bookkeeping reads it). -->
 		inner widths are definite, so inline-size containment changes
 		nothing except enabling the query. */
 		container-type: inline-size;
-		width: 20.6rem;
+		width: 28.6rem;
 		flex-shrink: 0;
 		/* Right-docked panels clip from the left: the header (the close
 		target) stays put while collapsing, so it lands back under the cursor. */
@@ -160,7 +161,7 @@ bookkeeping reads it). -->
 		Leave the base flex-shrink: 0 alone: in this column container it
 		governs height, protecting the scroll content. */
 		width: 100%;
-		max-width: 26rem;
+		max-width: 32rem;
 		min-width: 0;
 		align-self: center;
 		margin-left: 0;

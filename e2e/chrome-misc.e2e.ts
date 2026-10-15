@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, setSettingValue, settingValue } from "./helpers";
 
 /**
  * Chrome misc: CSS-trivia one-liners collected from chrome.e2e.ts and
@@ -131,51 +131,24 @@ test.describe("phone", () => {
 		expect(transition).toContain("transform");
 	});
 });
-test("dragging the text slider upward resets to 100 percent", async ({
-	page
-}) => {
+/** Clicking a stepper's name never changes its value; only the
+buttons, keys, and the Reset link do. */
+test("clicking a setting's name keeps the value", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Text size percent"]'
-	);
-	await slider.fill("250");
-	await expect(slider).toHaveValue("250");
-	const box = await slider.boundingBox();
-	expect(box).toBeTruthy();
-	await slider.dispatchEvent("pointerdown", {
-		clientY: box!.y + box!.height / 2
-	});
-	await slider.dispatchEvent("pointerup", {
-		clientY: box!.y + box!.height / 2 - 120
-	});
-	await expect(slider).toHaveValue("100");
-});
-test("clicking the chat-width label text keeps the value", async ({ page }) => {
-	await openWithMessages(page, [{ role: "user", content: "hi" }]);
-	await openSettings(page);
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Chat width in rem"]'
-	);
-	await slider.fill("60");
-	await expect(slider).toHaveValue("60");
-	// NOTE: the inner `has` selector must be relative — an absolute
-	// `.settings-panel …` inner selector never matches inside a label.
-	const label = page
-		.locator(".settings-panel label")
-		.filter({ has: page.locator('input[aria-label="Chat width in rem"]') });
-	// Top-left of the label is the label text row, clear of the
-	// slider, readout, and reset button: the value must survive.
-	// Click through the locator, never a cached box: the drawer is
-	// still sliding in, and a stale point lands on the reset button
-	// under load (same as chrome-batch's clickLabelText).
-	await label.click({ position: { x: 20, y: 10 } });
-	await expect(slider).toHaveValue("60");
-	// The inner reset button still restores the default.
+	await setSettingValue(page, "Text size percent", 250);
 	await page
-		.locator('.settings-panel button[title="Reset to the default width"]')
+		.locator(".settings-panel .setting-label", { hasText: /^Text size$/ })
 		.click();
-	await expect(slider).toHaveValue("36");
+	expect(await settingValue(page, "Text size percent")).toBe(250);
+	await page
+		.locator(".settings-panel .setting-label", { hasText: /^Chat width$/ })
+		.click();
+	expect(await settingValue(page, "Chat width in rem")).toBe(36);
+	await page
+		.locator('.settings-panel button[title="Reset to the default size"]')
+		.click();
+	expect(await settingValue(page, "Text size percent")).toBe(100);
 });
 test("top bar shows no text and survives a double-click", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);

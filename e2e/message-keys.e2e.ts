@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, setSettingValue } from "./helpers";
 
 /**
  * Hovered-message keyboard shortcuts (see messageKeyAction): C copies
@@ -163,18 +163,18 @@ test("gap size rides the row gap; pair separation stays a hair above", async ({
 	const def = await threadGaps(page);
 	expect(def.gap).toBeCloseTo(def.root * 0.35, 1);
 	expect(def.pair).toBeCloseTo(def.root * 0.45, 1);
-	// Drive the real slider (a reload would re-run the seed script
+	// Drive the real stepper (a reload would re-run the seed script
 	// and clobber the setting before first paint proves anything).
 	await page.keyboard.press("Meta+,");
 	const panel = page.locator(".settings-panel");
 	await expect(panel).not.toHaveClass(/closed/, { timeout: 10_000 });
-	await panel.getByRole("slider", { name: "Gap size in rem" }).fill("1");
+	await setSettingValue(page, "Gap size in rem", 1);
 	const wide = await threadGaps(page);
 	expect(wide.gap).toBeCloseTo(wide.root * 1, 1);
 	expect(wide.pair).toBeCloseTo(wide.root * 1.1, 1);
 });
 
-test("settings offers the buttons checkbox and the gap slider", async ({
+test("settings offers the buttons checkbox and the gap stepper", async ({
 	page
 }) => {
 	await openThread(page);
@@ -184,9 +184,9 @@ test("settings offers the buttons checkbox and the gap slider", async ({
 	await expect(
 		panel.getByRole("checkbox", { name: "Message buttons", exact: true })
 	).toBeChecked();
-	const slider = panel.getByRole("slider", { name: "Gap size in rem" });
-	await expect(slider).toBeVisible();
-	expect(await slider.inputValue()).toBe("0.35");
+	const gap = panel.getByRole("spinbutton", { name: "Gap size in rem" });
+	await expect(gap).toBeVisible();
+	await expect(gap).toHaveAttribute("aria-valuenow", "0.35");
 });
 
 test("shortcuts modal lists the message keys", async ({ page }) => {

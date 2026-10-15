@@ -1070,37 +1070,3 @@ export function stepPromptWidth(
 	const shown = Math.min(stored, max);
 	return Math.min(max, Math.max(CHAT_WIDTH_MIN, shown + delta));
 }
-
-/** Prompt text-size slider bounds (percent) and travel. */
-export const PROMPT_SLIDER_MIN = 80;
-export const PROMPT_SLIDER_MAX = 2000;
-export const PROMPT_SLIDER_STEPS = 1000;
-
-/**
- * Prompt text-size slider position (0–1000) to a scale: logarithmic,
- * so each stretch of travel multiplies the size by the same factor.
- * The range stays 80–2000% (giant type must stay reachable); only the
- * curve changed: linear put 700% a third of the way along, this puts
- * 100% near the left, 235% at a third, 400% halfway. Rounded to 5%
- * steps below 1000% and 10% above. Pure.
- */
-export function promptSliderScale(position: number): number {
-	const p = Math.min(PROMPT_SLIDER_STEPS, Math.max(0, position));
-	const ratio = PROMPT_SLIDER_MAX / PROMPT_SLIDER_MIN;
-	const percent = PROMPT_SLIDER_MIN * ratio ** (p / PROMPT_SLIDER_STEPS);
-	const grain = percent < 1000 ? 5 : 10;
-	return (Math.round(percent / grain) * grain) / 100;
-}
-
-/** Inverse of `promptSliderScale`: where a scale sits on the slider. Pure. */
-export function promptSliderPosition(scale: number): number {
-	const percent = Math.min(
-		PROMPT_SLIDER_MAX,
-		Math.max(PROMPT_SLIDER_MIN, scale * 100)
-	);
-	const ratio = PROMPT_SLIDER_MAX / PROMPT_SLIDER_MIN;
-	return Math.round(
-		(Math.log(percent / PROMPT_SLIDER_MIN) / Math.log(ratio)) *
-			PROMPT_SLIDER_STEPS
-	);
-}

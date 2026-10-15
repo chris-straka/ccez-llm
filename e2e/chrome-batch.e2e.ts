@@ -2,18 +2,13 @@ import { expect, test, type Page } from "./fixtures";
 import { seedChat, type SeedMessage } from "./helpers";
 
 /**
- * Chrome batch: slider reset scoping, idle-prompt restore allowlist,
+ * Chrome batch: idle-prompt restore allowlist,
  * middle-click toggle, emptied-composer caret (work/batch-chrome).
  */
 
 const LONG = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
 	40
 );
-
-async function openSettings(page: Page) {
-	await page.keyboard.press("Meta+,");
-	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
-}
 
 /** Seed a long thread with a 2s idle timeout (overflows the viewport). */
 async function seedIdleChat(page: Page, messages: SeedMessage[]) {
@@ -60,69 +55,6 @@ function idleTurns(): SeedMessage[] {
 		{ role: "assistant" as const, content: `answer ${n} ${LONG}` }
 	]);
 }
-
-/** Click the label-text row (top-left), clear of slider, readout, and reset button. */
-async function clickLabelText(page: Page, sliderLabel: string) {
-	// NOTE: the inner `has` selector must be relative — an absolute
-	// `.settings-panel …` inner selector never matches inside a label.
-	const label = page
-		.locator(".settings-panel label")
-		.filter({ has: page.locator(`input[aria-label="${sliderLabel}"]`) });
-	// Click through the locator (never a cached box): the drawer is
-	// still settling when these rows run, and a stale point drifts
-	// onto the reset button under load.
-	await label.click({ position: { x: 5, y: 5 } });
-}
-
-/** Only the parens button resets: label/row clicks keep the value, on all three rows. */
-test("slider label text never resets any row", async ({ page }) => {
-	await seedChat(page, [{ role: "user", content: "hi" }]);
-	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({
-		timeout: 60_000
-	});
-	await openSettings(page);
-
-	const text = page.locator(
-		'.settings-panel input[aria-label="Text size percent"]'
-	);
-	await text.fill("250");
-	await expect(text).toHaveValue("250");
-	await clickLabelText(page, "Text size percent");
-	await expect(text).toHaveValue("250");
-	await page
-		.locator('.settings-panel button[title="Reset to the default size"]')
-		.click();
-	await expect(text).toHaveValue("100");
-
-	const width = page.locator(
-		'.settings-panel input[aria-label="Chat width in rem"]'
-	);
-	await width.fill("60");
-	await expect(width).toHaveValue("60");
-	await clickLabelText(page, "Chat width in rem");
-	await expect(width).toHaveValue("60");
-	await page
-		.locator('.settings-panel button[title="Reset to the default width"]')
-		.click();
-	await expect(width).toHaveValue("36");
-
-	const idle = page.locator(
-		'.settings-panel input[aria-label="Idle seconds before the prompt hides (bottom is always, top is never)"]'
-	);
-	await idle.fill("10");
-	await expect(idle).toHaveValue("10");
-	await clickLabelText(
-		page,
-		"Idle seconds before the prompt hides (bottom is always, top is never)"
-	);
-	await expect(idle).toHaveValue("10");
-	// The idle default is always-on (bottom of the slider), not 6s.
-	await page
-		.locator('.settings-panel button[title="Reset to the default idle time"]')
-		.click();
-	await expect(idle).toHaveValue("1");
-});
 
 /** Idle prompt restores on i, Enter, and Space — and on nothing else key- or pointer-wise. */
 test("idle prompt restores only on i, Enter, Space, or real click", async ({

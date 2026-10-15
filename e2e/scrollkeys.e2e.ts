@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, setSettingValue } from "./helpers";
 
 /**
  * Scrollkeys bucket (desktop, nothing selected): bare j/k
@@ -753,11 +753,10 @@ steps' worth of pixels, so lines-per-press stays put. Drives the
 real setting (storage writes race the seed on reload). */
 test("j-step scales with the text size", async ({ page }) => {
 	await page.keyboard.press("Meta+,");
-	const size = page.locator(
-		'.settings-panel input[aria-label="Text size percent"]'
-	);
-	await expect(size).toBeVisible({ timeout: 5_000 });
-	await size.fill("200");
+	await expect(
+		page.locator('.settings-panel [aria-label="Text size percent"]')
+	).toBeVisible({ timeout: 5_000 });
+	await setSettingValue(page, "Text size percent", 200);
 	await expect
 		.poll(
 			() =>
