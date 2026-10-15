@@ -11,6 +11,8 @@ Root keeps what every session needs: `README.md` (what the app is),
 - `design/colors.md` — palette rules (pinned by
   `src/routes/color-tokens.test.ts`).
 - `design/plugins.md` — Tauri plugin inventory and skipped candidates.
+- `design/settings.md` — why settings is a wide docked panel, its
+  groups, and which control each setting gets.
 - `design/listening.md` — listening drills: the loop and the native
   YouTube pipeline (desktop and phone).
 - `investigations/cjkdecomp-eval.md` — license and data verdict behind
