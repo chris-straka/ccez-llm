@@ -628,3 +628,70 @@ test("holding Shift peeks the chat counter", async ({ page }) => {
 	await expect(counter).not.toHaveClass(/shown/);
 	await page.keyboard.up("Shift");
 });
+
+/** The peek is quick and sticky: it lands within ~150 ms of Shift
+going down with a ~100 ms fade, and Shift chords keep it up until
+Shift itself is released (or the window blurs). Timed in the page. */
+test("Shift peek shows fast and survives Shift chords", async ({ page }) => {
+	await seedThinkingPair(page);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Alpha question",
+		{ timeout: 60_000 }
+	);
+	const counter = page.locator(".chat-counter");
+	await page.evaluate(() => {
+		(document.activeElement as HTMLElement | null)?.blur();
+		const el = document.querySelector(".chat-counter")!;
+		const w = window as unknown as Record<string, number>;
+		window.addEventListener(
+			"keydown",
+			(e) => {
+				if (e.key === "Shift" && !e.repeat) w["__shiftAt"] = performance.now();
+			},
+			true
+		);
+		new MutationObserver(() => {
+			if (el.classList.contains("shown") && !w["__shownAt"])
+				w["__shownAt"] = performance.now();
+		}).observe(el, { attributes: true, attributeFilter: ["class"] });
+		el.addEventListener("transitionend", () => {
+			if (!w["__opaqueAt"] && getComputedStyle(el).opacity === "1")
+				w["__opaqueAt"] = performance.now();
+		});
+	});
+	expect(
+		await counter.evaluate((el) => getComputedStyle(el).transitionDuration)
+	).toBe("0.1s");
+	await page.keyboard.down("Shift");
+	await expect(counter).toHaveClass(/shown/);
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => (window as unknown as Record<string, number>)["__opaqueAt"] ?? 0
+			)
+		)
+		.toBeGreaterThan(0);
+	const t = await page.evaluate(() => {
+		const w = window as unknown as Record<string, number>;
+		return {
+			shown: w["__shownAt"]! - w["__shiftAt"]!,
+			opaque: w["__opaqueAt"]! - w["__shiftAt"]!
+		};
+	});
+	expect(t.shown).toBeLessThan(200);
+	expect(t.opaque).toBeLessThan(350);
+	// Shift chords keep it up.
+	await page.keyboard.press("KeyD");
+	await page.keyboard.press("ArrowDown");
+	await page.waitForTimeout(300);
+	await expect(counter).toHaveClass(/shown/);
+	await page.keyboard.up("Shift");
+	await expect(counter).not.toHaveClass(/shown/);
+	// Window blur hides it while Shift is still down.
+	await page.keyboard.down("Shift");
+	await expect(counter).toHaveClass(/shown/);
+	await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+	await expect(counter).not.toHaveClass(/shown/);
+	await page.keyboard.up("Shift");
+});

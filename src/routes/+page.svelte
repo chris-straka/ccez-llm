@@ -2895,10 +2895,12 @@
 	const altm = $derived(altKeyLabel(isMac));
 	let hasText = $state(false);
 	let altHeld = $state(false);
-	/** Shift held alone outside the prompt: the chat counter shows. */
+	/** Shift held outside the prompt: the chat counter shows. */
 	let counterPeek = $state(false);
 	let counterPeekTimer: ReturnType<typeof setTimeout> | null = null;
-	const COUNTER_PEEK_MS = 250;
+	/** Hold before the counter shows: long enough that a Shift tap
+	never flashes it, short enough to read as instant. */
+	const COUNTER_PEEK_MS = 120;
 	// Quiet to send: while a reply streams, the lib drops every send
 	// and stage — but only after doSend/stage already emptied the
 	// composer. Gating here keeps the button dead AND the draft intact,
@@ -13703,8 +13705,8 @@
 		const onAlt = (event: KeyboardEvent) => {
 			if (event.key === "Alt") altHeld = event.type === "keydown";
 		};
-		// Holding Shift on its own outside the prompt peeks the chat
-		// counter; a short hold first, so Shift chords never flash it.
+		// Holding Shift outside the prompt peeks the chat counter after
+		// a short hold, and it stays up until Shift is released.
 		const onShiftPeek = (event: KeyboardEvent) => {
 			const step = counterPeekStep({
 				...keyFacts(event),
@@ -15330,7 +15332,7 @@
 		font-variant-numeric: tabular-nums;
 		pointer-events: none;
 		opacity: 0;
-		transition: opacity 0.2s ease;
+		transition: opacity 0.1s ease;
 	}
 	.chat-counter.shown {
 		opacity: 1;

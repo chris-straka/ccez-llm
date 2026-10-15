@@ -1769,9 +1769,19 @@ describe("counterPeekStep", () => {
 		expect(counterPeekStep({ ...shift, metaKey: true })).toBe("hide");
 	});
 
-	it("hides on release and on any other key", () => {
+	it("hides only on Shift's release", () => {
 		expect(counterPeekStep({ ...shift, type: "keyup" })).toBe("hide");
-		expect(counterPeekStep({ ...shift, key: "D" })).toBe("hide");
+	});
+
+	it("stays up through Shift chords", () => {
+		expect(counterPeekStep({ ...shift, key: "D" })).toBeNull();
+		expect(counterPeekStep({ ...shift, key: "D", metaKey: true })).toBeNull();
 		expect(counterPeekStep({ ...shift, type: "keyup", key: "D" })).toBeNull();
+	});
+
+	it("hides when a key arrives without Shift (missed release)", () => {
+		expect(counterPeekStep({ ...shift, key: "d", shiftKey: false })).toBe(
+			"hide"
+		);
 	});
 });

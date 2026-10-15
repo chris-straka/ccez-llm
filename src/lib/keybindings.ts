@@ -1232,13 +1232,16 @@ export interface CounterPeekFacts extends KeyModifiers {
 /**
  * Shift held on its own outside any text field peeks the chat counter
  * ("2 / 5", top right). "arm" starts the short hold before it shows;
- * Shift's release, or any other key (a Shift chord), hides it. Null
- * leaves it as it is (auto-repeat of the held Shift).
+ * only Shift's release hides it. Other keys pressed with Shift held
+ * leave it up (a Shift chord keeps telling you where you are); a key
+ * arriving without Shift means the release was missed (an OS shortcut
+ * swallowed it), so that hides too. Null leaves it as it is.
  */
 export function counterPeekStep(
 	facts: CounterPeekFacts
 ): "arm" | "hide" | null {
-	if (facts.key !== "Shift") return facts.type === "keydown" ? "hide" : null;
+	if (facts.key !== "Shift")
+		return facts.type === "keydown" && !facts.shiftKey ? "hide" : null;
 	if (facts.type === "keyup") return "hide";
 	if (facts.repeat) return null;
 	if (facts.metaKey || facts.ctrlKey || facts.altKey || facts.inEditable)
