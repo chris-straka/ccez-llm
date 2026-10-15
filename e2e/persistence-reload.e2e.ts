@@ -106,17 +106,23 @@ test("theme choice survives a reload", async ({ page }) => {
 	await panel.locator('.theme-tile[data-tile="dark-ink"]').click();
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	await expect(page.locator("html")).toHaveAttribute("data-dark-style", "ink");
-	// The choice persists asynchronously; wait for the stored value.
+	// The choice persists on a debounce; wait for both stored values
+	// (a save between the two clicks stores dark with the old style).
 	await expect
 		.poll(
 			async () =>
 				page.evaluate((key) => {
 					const raw = window.localStorage.getItem(key);
-					return raw ? (JSON.parse(raw) as { theme?: string }).theme : null;
+					if (!raw) return null;
+					const saved = JSON.parse(raw) as {
+						theme?: string;
+						darkStyle?: string;
+					};
+					return `${saved.theme}/${saved.darkStyle}`;
 				}, SETTINGS_KEY),
 			{ timeout: 15_000 }
 		)
-		.toBe("dark");
+		.toBe("dark/ink");
 	await page.keyboard.press("Escape");
 	await page.reload();
 	await expect(page.locator(".ta-input").first()).toBeVisible({
