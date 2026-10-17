@@ -25,9 +25,10 @@ import {
 	annotationAnswer,
 	buildAnnotationAnswerMessages,
 	tidyAnnotationAnswer,
-	ANNOTATION_BRIEF_WORDS,
+	annotationGlossWords,
+	ANNOTATION_GLOSS_WORDS,
+	ANNOTATION_NOTE_WORDS,
 	ANNOTATION_QUESTION_WORDS,
-	ANNOTATION_ANSWER_WORDS,
 	MODEL_AIDS,
 	MODEL_AID_FOR_SCRIPT,
 	localAidFor,
@@ -1042,7 +1043,7 @@ describe("annotationAnswer", () => {
 	const teach = { ...q, question: "" };
 
 	it("every answer opens with the dictionary equivalent for this sense", () => {
-		for (const ask of [teach, { ...teach, brief: true }, q]) {
+		for (const ask of [teach, q]) {
 			const [system, user] = buildAnnotationAnswerMessages(ask);
 			expect(system!.content).toContain(
 				"the English equivalent of the quote for the sense it has in this passage"
@@ -1061,32 +1062,57 @@ describe("annotationAnswer", () => {
 		}
 	});
 
-	it("bare A stops at the equivalent", () => {
-		const [system, user] = buildAnnotationAnswerMessages({
-			...teach,
-			brief: true
-		});
-		expect(system!.content).toContain(`${ANNOTATION_BRIEF_WORDS} words`);
-		expect(system!.content).toContain("Nothing else.");
-		expect(user!.content).not.toContain("Question:");
-	});
-
-	it("Shift+A may add one useful note, or nothing", () => {
+	it("with no question, adds at most one note on what stopped the learner", () => {
 		const [system, user] = buildAnnotationAnswerMessages(teach);
-		expect(system!.content).toContain(`${ANNOTATION_ANSWER_WORDS} words`);
-		expect(system!.content).toContain("only if it helps, one short sentence");
-		expect(system!.content).toContain("another common sense");
-		expect(system!.content).toContain("stop after the equivalent");
+		expect(system!.content).toContain("at most one short note");
+		expect(system!.content).toContain("most likely stopped them");
+		expect(system!.content).toContain("accepter de + infinitive");
+		expect(system!.content).toContain("Never a second note.");
+		expect(system!.content).toContain("stop after it");
+		expect(system!.content).toContain(
+			`${ANNOTATION_GLOSS_WORDS + ANNOTATION_NOTE_WORDS} words`
+		);
 		expect(user!.content).not.toContain("Question:");
 	});
 
-	it("a typed question gets answered, even on a brief filing", () => {
-		for (const ask of [q, { ...q, brief: true }]) {
-			const [system, user] = buildAnnotationAnswerMessages(ask);
-			expect(system!.content).toContain(`${ANNOTATION_QUESTION_WORDS} words`);
-			expect(system!.content).toContain("answer the question directly");
-			expect(user!.content).toContain("Question: why feminine?");
-		}
+	it("a sentence translates in full, with room to match its length", () => {
+		const sentence = {
+			...teach,
+			quote:
+				"Ce dernier a accepté de coopérer avec le gouvernement central malgré ses réserves."
+		};
+		const [system] = buildAnnotationAnswerMessages(sentence);
+		expect(system!.content).toContain("its natural translation in full");
+		expect(system!.content).toContain(
+			`${annotationGlossWords(sentence.quote) + ANNOTATION_NOTE_WORDS} words`
+		);
+	});
+
+	it("gloss room is the floor for short quotes and grows with long ones", () => {
+		expect(annotationGlossWords("la neige")).toBe(ANNOTATION_GLOSS_WORDS);
+		// Six words: half again, past the floor.
+		expect(annotationGlossWords("Ce dernier a accepté de coopérer.")).toBe(9);
+		expect(
+			annotationGlossWords(
+				"Ce dernier a accepté de coopérer avec le gouvernement central malgré ses réserves."
+			)
+		).toBe(20);
+		// Han and kana have no spaces: two characters count as a word.
+		expect(
+			annotationGlossWords(
+				"彼は政府と協力することに同意したが、まだ多くの疑問が残っている"
+			)
+		).toBe(23);
+	});
+
+	it("a typed question gets answered instead of the note", () => {
+		const [system, user] = buildAnnotationAnswerMessages(q);
+		expect(system!.content).toContain(
+			`${annotationGlossWords(q.quote) + ANNOTATION_QUESTION_WORDS} words`
+		);
+		expect(system!.content).toContain("answer the question directly");
+		expect(system!.content).not.toContain("at most one short note");
+		expect(user!.content).toContain("Question: why feminine?");
 	});
 
 	it("answers in English even when the passage is not", () => {

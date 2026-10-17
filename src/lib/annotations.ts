@@ -51,11 +51,6 @@ export interface Annotation {
 	 * comment. Absent means unanswered — badges stay neutral.
 	 */
 	answer?: string;
-	/**
-	 * Filed by bare A (the instant path, no note): answered as a short
-	 * gloss instead of the full lesson Shift+A and typed questions get.
-	 */
-	brief?: boolean;
 }
 
 export function newAnnotationId(): AnnotationId {

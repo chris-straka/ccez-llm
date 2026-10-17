@@ -887,31 +887,44 @@ export function vocalizeArabic(
 	return runModelAid(provider, "tashkeel", text, signal);
 }
 
-/** Cap for a full (Shift+A) answer: the equivalent plus one useful
-note at most. */
-export const ANNOTATION_ANSWER_WORDS = 35;
-/** Cap when a question is typed: room to answer it, still short. */
-export const ANNOTATION_QUESTION_WORDS = 70;
-/** Cap for a brief (bare A) answer: the equivalent alone. */
-export const ANNOTATION_BRIEF_WORDS = 8;
+/** Floor for the equivalent: a word or short phrase gets this much. */
+export const ANNOTATION_GLOSS_WORDS = 8;
+/** Room for the one note after the equivalent. */
+export const ANNOTATION_NOTE_WORDS = 20;
+/** Room past the equivalent when a question is typed. */
+export const ANNOTATION_QUESTION_WORDS = 60;
+
+/**
+ * Words the equivalent may take: the floor, or half again the quote's
+ * length so a whole sentence translates in full. Han and kana count a
+ * word per two characters (no spaces to split on).
+ */
+export function annotationGlossWords(quote: string): number {
+	const spaced = quote.trim().split(/\s+/).filter(Boolean).length;
+	const cjk = quote.match(
+		/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu
+	);
+	const words = Math.max(spaced, Math.ceil((cjk?.length ?? 0) / 2));
+	return Math.max(ANNOTATION_GLOSS_WORDS, Math.ceil(words * 1.5));
+}
 
 /** One annotation question: the quote, the comment, and its paragraph. */
 export interface AnnotationQuestion {
 	quote: string;
 	question: string;
 	context: string;
-	/** Bare A filing: the equivalent alone (ignored once a question is typed). */
-	brief?: boolean;
 }
 
 /**
  * One-shot messages answering an annotation in its original context.
- * The reader is looking at the passage, so every answer opens with the
- * quote's equivalent for the sense it has there, the way a bilingual
- * dictionary lists it ("Escalation.", "Pounds (sterling).", "Crossed
- * (franchir)."): a translation, never a definition or a retelling of
- * the passage. Bare A stops there; Shift+A may add one useful note; a
- * typed question gets answered. Capped to fit the popup.
+ * The reader highlights what they don't understand, so every answer
+ * opens with the quote's equivalent for the sense it has there, the
+ * way a bilingual dictionary lists it ("Escalation.", "Pounds
+ * (sterling).", "Crossed (franchir)."): a translation sized to the
+ * quote, never a definition or a retelling of the passage. With no
+ * question, at most one note follows, on the piece that most likely
+ * stopped the reader, written so they can reuse it; a typed question
+ * gets answered instead. Capped to fit the popup.
  */
 export function buildAnnotationAnswerMessages(
 	q: AnnotationQuestion,
@@ -919,6 +932,7 @@ export function buildAnnotationAnswerMessages(
 ): Array<{ role: string; content: string }> {
 	const quote = q.quote.trim();
 	const asked = q.question.trim();
+	const glossWords = annotationGlossWords(quote);
 	const equivalent = opts.inPassageLang
 		? `Write in the passage's own language, in plain words an ` +
 			`intermediate learner reads easily. Open with a common synonym ` +
@@ -928,7 +942,8 @@ export function buildAnnotationAnswerMessages(
 			`with the English equivalent of the quote for the sense it has ` +
 			`in this passage, the word or short phrase a bilingual ` +
 			`dictionary lists for that sense ("Escalation.", "Pounds ` +
-			`(sterling).", "Unions.")`;
+			`(sterling).", "Unions."), or for a clause or sentence its ` +
+			`natural translation in full`;
 	const gloss =
 		`The learner is reading the passage right now, so never retell ` +
 		`or explain it. ${equivalent}: never a definition, never a ` +
@@ -939,18 +954,6 @@ export function buildAnnotationAnswerMessages(
 		`ending changed (prend, prendre). If a note cites the passage, ` +
 		`keep its words as they are.`;
 	const user = `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`;
-	if (q.brief && !asked) {
-		return [
-			{
-				role: "system",
-				content:
-					`You gloss a quoted word or phrase for a language learner, ` +
-					`like a bilingual dictionary. ${gloss} Nothing else. At most ` +
-					`${ANNOTATION_BRIEF_WORDS} words.`
-			},
-			{ role: "user", content: user }
-		];
-	}
 	if (asked) {
 		return [
 			{
@@ -959,7 +962,7 @@ export function buildAnnotationAnswerMessages(
 					`You answer a language learner's question about a quoted ` +
 					`word or phrase. ${gloss} Then answer the question directly ` +
 					`in plain connected sentences. No markdown. At most ` +
-					`${ANNOTATION_QUESTION_WORDS} words.`
+					`${glossWords + ANNOTATION_QUESTION_WORDS} words.`
 			},
 			{ role: "user", content: `${user}\n\nQuestion: ${asked}` }
 		];
@@ -968,13 +971,16 @@ export function buildAnnotationAnswerMessages(
 		{
 			role: "system",
 			content:
-				`You gloss a quoted word or phrase for a language learner, ` +
-				`like a bilingual dictionary. ${gloss} Then, only if it helps, ` +
-				`one short sentence: another common sense the learner will ` +
-				`meet ("Also: rock climbing."), an idiom it belongs to, a ` +
-				`register note, or a false friend that genuinely misleads. ` +
-				`When nothing is worth adding, stop after the equivalent. No ` +
-				`markdown. At most ${ANNOTATION_ANSWER_WORDS} words.`
+				`You gloss a quoted word or phrase for a language learner who ` +
+				`highlighted it because something in it stopped them. ${gloss} ` +
+				`Then at most one short note, on the single piece of the quote ` +
+				`that most likely stopped them, written so they can reuse it: ` +
+				`a construction ("accepter de + infinitive"), a reference word ` +
+				`("ce dernier = the latter; feminine cette dernière"), an ` +
+				`idiom, a tense or mood, or a false friend. Give the pattern, ` +
+				`not a grammar lesson. When the equivalent already says it ` +
+				`all, as for a plain word, stop after it. Never a second note. ` +
+				`No markdown. At most ${glossWords + ANNOTATION_NOTE_WORDS} words.`
 		},
 		{ role: "user", content: user }
 	];

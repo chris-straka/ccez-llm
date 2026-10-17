@@ -587,8 +587,7 @@ export class AnnotateMode {
 			quote,
 			comment: "",
 			at,
-			...(aidScope ? { aidScope } : {}),
-			...(instant ? { brief: true } : {})
+			...(aidScope ? { aidScope } : {})
 		};
 		this.deps.setPending(pending);
 		// Creating an annotation always reads the quote back out
