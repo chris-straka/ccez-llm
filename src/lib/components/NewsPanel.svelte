@@ -15,6 +15,7 @@ everything else is theme tokens, never raw hex. -->
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
+		type NewsRegion,
 		type NewsStaged,
 		type NewsStory,
 		type SummarySize
@@ -47,6 +48,9 @@ everything else is theme tokens, never raw hex. -->
 	const stagedStory = $derived(
 		staged ? (panel.stories.find((s) => s.link === staged.link) ?? null) : null
 	);
+	/** Chip name; translated desks say so, matching their dashed rim. */
+	const chipLabel = (region: NewsRegion): string =>
+		region.translate ? `${region.label}, translated` : region.label;
 	/** Plain status words under the chips; one line, always there,
 	 * so nothing below it moves when the words change. */
 	const status = $derived.by(() => {
@@ -129,9 +133,10 @@ everything else is theme tokens, never raw hex. -->
 						class="news-chip"
 						class:on={panel.region === region.gl}
 						class:icon={!!region.icon}
+						class:translated={!!region.translate}
 						aria-pressed={panel.region === region.gl}
-						aria-label={region.label}
-						title={region.label}
+						aria-label={chipLabel(region)}
+						title={chipLabel(region)}
 						onclick={() => actions.region(region.gl)}
 						in:fly={{ y: 8, duration: motionMs(200), delay: motionMs(i * 25) }}
 					>
@@ -498,6 +503,17 @@ everything else is theme tokens, never raw hex. -->
 		font-size: calc(1.1 * var(--u, 1rem));
 		line-height: 1;
 		padding: calc(0.4 * var(--u, 1rem)) calc(0.65 * var(--u, 1rem));
+	}
+	/* Machine-translated desks: dashed rim, a step brighter so it
+	   reads on a phone; white dashes when picked. */
+	.news-chip.translated {
+		border-style: dashed;
+		border-color: #8e8e93;
+		border-color: var(--line-hover);
+	}
+	.news-chip.translated.on {
+		border-color: #fff;
+		border-color: var(--accent-ink);
 	}
 	.news-x {
 		flex: 0 0 auto;

@@ -248,6 +248,31 @@ test.describe("mock shell feed", () => {
 		expect(before).toBe(false);
 	});
 
+	test("translated desks wear a dashed rim; native ones stay solid", async ({
+		page
+	}) => {
+		const rim = (name: string) =>
+			page
+				.locator(".news-chips")
+				.getByRole("button", { name, exact: true })
+				.evaluate((el) => getComputedStyle(el).borderTopStyle);
+		// French reads every world desk natively (France 24, RFI).
+		await openFrenchNews(page);
+		await expect(page.locator(".news-chip.translated")).toHaveCount(0);
+		expect(await rim("U.K.")).toBe("solid");
+		// Japanese has a native Global desk; the U.K. is translated.
+		await page.locator('.lang-menu button:has-text("Asia")').click();
+		await page
+			.locator(".lang-list")
+			.getByRole("menuitem", { name: "Japanese" })
+			.click();
+		await expect(
+			page.getByRole("button", { name: "U.K., translated", exact: true })
+		).toBeVisible();
+		expect(await rim("U.K., translated")).toBe("dashed");
+		expect(await rim("Global")).toBe("solid");
+	});
+
 	test("big text never strands one huge card column", async ({ page }) => {
 		await page.setViewportSize({ width: 920, height: 700 });
 		await openFrenchNews(page);
