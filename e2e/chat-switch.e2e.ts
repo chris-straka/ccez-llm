@@ -629,6 +629,35 @@ test("holding Shift peeks the chat counter", async ({ page }) => {
 	await page.keyboard.up("Shift");
 });
 
+/** ⇧⌘ is the chat-stepping chord's base: holding it peeks the counter
+even from the prompt, and it follows each ⇧⌘J/K step. */
+test("holding Shift+Cmd in the prompt peeks the chat counter", async ({
+	page
+}) => {
+	await seedThinkingPair(page);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Alpha question",
+		{ timeout: 60_000 }
+	);
+	const counter = page.locator(".chat-counter");
+	await page.locator(".ta-input").click();
+	await page.keyboard.down("Shift");
+	await page.keyboard.down("Meta");
+	await expect(counter).toHaveClass(/shown/);
+	await expect(counter).toHaveText("1 / 2");
+	await page.keyboard.press("j");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"Beta question"
+	);
+	await expect(counter).toHaveText("2 / 2");
+	await expect(counter).toHaveClass(/shown/);
+	// Letting go of ⌘ in the prompt leaves a capital-letter Shift.
+	await page.keyboard.up("Meta");
+	await expect(counter).not.toHaveClass(/shown/);
+	await page.keyboard.up("Shift");
+});
+
 /** The peek is quick and sticky: it lands within ~150 ms of Shift
 going down with a ~100 ms fade, and Shift chords keep it up until
 Shift itself is released (or the window blurs). Timed in the page. */

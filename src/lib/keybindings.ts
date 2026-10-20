@@ -1231,8 +1231,11 @@ export interface CounterPeekFacts extends KeyModifiers {
 
 /**
  * Shift held on its own outside any text field peeks the chat counter
- * ("2 / 5", top right). "arm" starts the short hold before it shows;
- * only Shift's release hides it. Other keys pressed with Shift held
+ * ("2 / 5", top right), and so does ⇧⌘ (⇧Ctrl) anywhere, the prompt
+ * included: that pair is the chat-stepping chord's base, so holding it
+ * shows where ⇧⌘J/K will move you. "arm" starts the short hold before
+ * it shows; Shift's release hides it, and so does ⌘'s inside a field
+ * (Shift alone there is a capital). Other keys pressed with Shift held
  * leave it up (a Shift chord keeps telling you where you are); a key
  * arriving without Shift means the release was missed (an OS shortcut
  * swallowed it), so that hides too. Null leaves it as it is.
@@ -1240,11 +1243,15 @@ export interface CounterPeekFacts extends KeyModifiers {
 export function counterPeekStep(
 	facts: CounterPeekFacts
 ): "arm" | "hide" | null {
-	if (facts.key !== "Shift")
+	const cmdKey = facts.key === "Meta" || facts.key === "Control";
+	if (facts.key !== "Shift" && !cmdKey)
 		return facts.type === "keydown" && !facts.shiftKey ? "hide" : null;
-	if (facts.type === "keyup") return "hide";
+	if (facts.type === "keyup") {
+		if (!cmdKey) return "hide";
+		return facts.shiftKey && !facts.inEditable ? null : "hide";
+	}
 	if (facts.repeat) return null;
-	if (facts.metaKey || facts.ctrlKey || facts.altKey || facts.inEditable)
-		return "hide";
-	return "arm";
+	if (facts.altKey || !facts.shiftKey) return "hide";
+	if (facts.metaKey || facts.ctrlKey) return "arm";
+	return facts.inEditable ? "hide" : "arm";
 }

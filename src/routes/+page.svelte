@@ -2895,7 +2895,7 @@
 	const altm = $derived(altKeyLabel(isMac));
 	let hasText = $state(false);
 	let altHeld = $state(false);
-	/** Shift held outside the prompt: the chat counter shows. */
+	/** Shift held outside the prompt, or ⇧⌘ anywhere: the chat counter shows. */
 	let counterPeek = $state(false);
 	let counterPeekTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Hold before the counter shows: long enough that a Shift tap
@@ -13713,8 +13713,9 @@
 		const onAlt = (event: KeyboardEvent) => {
 			if (event.key === "Alt") altHeld = event.type === "keydown";
 		};
-		// Holding Shift outside the prompt peeks the chat counter after
-		// a short hold, and it stays up until Shift is released.
+		// Holding Shift outside the prompt, or ⇧⌘ anywhere, peeks the
+		// chat counter after a short hold; it stays up until Shift is
+		// released.
 		const onShiftPeek = (event: KeyboardEvent) => {
 			const step = counterPeekStep({
 				...keyFacts(event),
@@ -14950,7 +14951,7 @@
 	/>
 
 	{#if !androidUI}
-		<!-- Chat counter peek (Shift held outside the prompt): where
+		<!-- Chat counter peek (Shift held outside the prompt, ⇧⌘ anywhere): where
 		this chat sits in the list, quiet in the top-right corner.
 		Always mounted so it fades both ways. -->
 		<p

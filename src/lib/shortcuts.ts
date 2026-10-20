@@ -214,7 +214,11 @@ export function desktopShortcuts(
 			keys: "Hover it in the list, then the pencil"
 		},
 		{ group: chats, name: "Delete this chat", keys: `${shiftMeta}Delete` },
-		{ group: chats, name: "Chat position", keys: "Hold Shift" },
+		{
+			group: chats,
+			name: "Chat position",
+			keys: `Hold Shift, or ${shiftMeta.replace(/\+$/, "")} in the prompt`
+		},
 		{ group: prompt, name: "Edit newest message", keys: `${meta}E` },
 		{ group: prompt, name: "Stop the reply", keys: "Hold the send button" },
 		{
