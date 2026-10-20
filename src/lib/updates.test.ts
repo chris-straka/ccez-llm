@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+	AUTO_CHECK_EVERY_MS,
 	RELEASES_URL,
+	autoCheckDue,
 	compareVersions,
 	fetchLatestApk,
 	pickApkAsset,
+	runAutoUpdate,
 	runUpdateFlow,
 	updateButtonLabel,
 	updateRouteFor,
+	type AutoUpdateDeps,
 	type UpdateFlowDeps,
 	type UpdaterUpdate,
 	type UpdatePhase
@@ -252,5 +256,69 @@ describe("fetchLatestApk", () => {
 				"0.4.18"
 			)
 		).rejects.toThrow("404");
+	});
+});
+
+describe("autoCheckDue", () => {
+	const hour = 60 * 60 * 1000;
+	it("checks at first launch and after the gap", () => {
+		expect(autoCheckDue(null, 1000)).toBe(true);
+		expect(autoCheckDue(0, AUTO_CHECK_EVERY_MS)).toBe(true);
+	});
+	it("stays quiet inside the gap", () => {
+		expect(autoCheckDue(10 * hour, 11 * hour)).toBe(false);
+	});
+	it("treats a clock that went backwards as due", () => {
+		expect(autoCheckDue(10 * hour, 9 * hour)).toBe(true);
+	});
+});
+
+describe("runAutoUpdate", () => {
+	const update = { version: "9.9.9" } as UpdaterUpdate;
+	function deps(over: Partial<AutoUpdateDeps> = {}) {
+		const calls: string[] = [];
+		let restart: (() => Promise<void>) | null = null;
+		const d: AutoUpdateDeps = {
+			checkForUpdate: async () => update,
+			download: async () => void calls.push("download"),
+			install: async () => void calls.push("install"),
+			relaunchApp: async () => void calls.push("relaunch"),
+			installNow: true,
+			announce: (version, run) => {
+				calls.push(`announce ${version}`);
+				restart = run;
+			},
+			...over
+		};
+		return { d, calls, restart: () => restart?.() };
+	}
+
+	it("downloads, installs, and announces where installing is safe", async () => {
+		const t = deps();
+		expect(await runAutoUpdate(t.d)).toBe("9.9.9");
+		expect(t.calls).toEqual(["download", "install", "announce 9.9.9"]);
+		await t.restart();
+		expect(t.calls.slice(3)).toEqual(["relaunch"]);
+	});
+
+	it("waits for the restart tap to install on Windows", async () => {
+		const t = deps({ installNow: false });
+		await runAutoUpdate(t.d);
+		expect(t.calls).toEqual(["download", "announce 9.9.9"]);
+		await t.restart();
+		expect(t.calls.slice(2)).toEqual(["install", "relaunch"]);
+	});
+
+	it("is silent when up to date or when anything fails", async () => {
+		const none = deps({ checkForUpdate: async () => null });
+		expect(await runAutoUpdate(none.d)).toBeNull();
+		expect(none.calls).toEqual([]);
+		const offline = deps({
+			checkForUpdate: () => Promise.reject(new Error("offline"))
+		});
+		expect(await runAutoUpdate(offline.d)).toBeNull();
+		const broken = deps({ download: () => Promise.reject(new Error("404")) });
+		expect(await runAutoUpdate(broken.d)).toBeNull();
+		expect(broken.calls).toEqual([]);
 	});
 });

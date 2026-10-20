@@ -212,3 +212,55 @@ export async function runUpdateFlow(deps: UpdateFlowDeps): Promise<void> {
 	deps.onPhase({ stage: "restarting" });
 	await deps.relaunchApp();
 }
+
+/**
+ * Background checks: one at launch, then one whenever the window comes
+ * back, never more often than this. No timer loop: a desktop app that
+ * sits open for days still gets checked each time it is used again.
+ */
+export const AUTO_CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+/** localStorage key holding the last background check's epoch ms. */
+export const AUTO_CHECK_KEY = "ccez-llm-update-check-v1";
+
+/** Whether a background check is due. A clock that went backwards
+counts as due rather than silencing checks until it catches up. */
+export function autoCheckDue(lastAt: number | null, now: number): boolean {
+	if (lastAt === null || now < lastAt) return true;
+	return now - lastAt >= AUTO_CHECK_EVERY_MS;
+}
+
+/**
+ * Background update: check, download quietly, and announce once it is
+ * ready. `installNow` installs straight after the download where that
+ * is safe beside the running app (macOS and Linux swap the bundle, and
+ * the next launch runs it); Windows' installer closes the app, so
+ * there it waits for the restart tap. Every failure stays silent: the
+ * Settings button is where update errors get reported.
+ */
+export interface AutoUpdateDeps {
+	checkForUpdate: () => Promise<UpdaterUpdate | null>;
+	download: (update: UpdaterUpdate) => Promise<void>;
+	install: (update: UpdaterUpdate) => Promise<void>;
+	relaunchApp: () => Promise<void>;
+	installNow: boolean;
+	/** Ready readout; `restart` applies the update and relaunches. */
+	announce: (version: string, restart: () => Promise<void>) => void;
+}
+
+export async function runAutoUpdate(
+	deps: AutoUpdateDeps
+): Promise<string | null> {
+	try {
+		const update = await deps.checkForUpdate();
+		if (!update) return null;
+		await deps.download(update);
+		if (deps.installNow) await deps.install(update);
+		deps.announce(update.version, async () => {
+			if (!deps.installNow) await deps.install(update);
+			await deps.relaunchApp();
+		});
+		return update.version;
+	} catch {
+		return null;
+	}
+}

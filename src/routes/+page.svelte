@@ -348,6 +348,12 @@
 	} from "$lib/selTint";
 	import { caretOffsetInBlock, nodeAtBlockOffset } from "$lib/caret";
 	import { frontendPingOnDone } from "$lib/turns";
+	import {
+		AUTO_CHECK_KEY,
+		autoCheckDue,
+		runAutoUpdate,
+		updateRouteFor
+	} from "$lib/updates";
 	import { NativeTurns } from "$lib/native-turns.svelte";
 	import { replySystemPrompt } from "$lib/replyPrompt";
 	import { pinyinRuby } from "$lib/pinyin";
@@ -4459,6 +4465,73 @@
 
 	/** Dev servers (and `tauri dev`) wear the red-dot tab logo. */
 	const devBuild = import.meta.env.DEV === true;
+	/**
+	 * Background update check (desktop release shells only): at launch
+	 * and on each return to the window, at most every few hours, so no
+	 * timer runs. A found update downloads quietly, then a toast offers
+	 * the restart; ignored, it applies at the next launch.
+	 */
+	$effect(() => {
+		const route = updateRouteFor(
+			androidUI,
+			tauriBackendAvailable(),
+			devBuild,
+			isIOSUserAgent(navigator.userAgent)
+		);
+		if (route.kind !== "updater") return;
+		let running = false;
+		let found = false;
+		const maybeCheck = (): void => {
+			if (running || found || document.visibilityState !== "visible") return;
+			let lastAt: number | null = null;
+			try {
+				const raw = localStorage.getItem(AUTO_CHECK_KEY);
+				lastAt = raw === null ? null : Number(raw) || null;
+			} catch {
+				// Storage blocked: check, and let the in-memory flags pace it.
+			}
+			const now = Date.now();
+			if (!autoCheckDue(lastAt, now)) return;
+			try {
+				localStorage.setItem(AUTO_CHECK_KEY, String(now));
+			} catch {
+				// Same as above.
+			}
+			running = true;
+			void runAutoUpdate({
+				checkForUpdate: async () => {
+					const { check } = await import("@tauri-apps/plugin-updater");
+					return check();
+				},
+				download: (update) => update.download(),
+				install: (update) => update.install(),
+				relaunchApp: async () => {
+					const { relaunch } = await import("@tauri-apps/plugin-process");
+					await relaunch();
+				},
+				installNow: !currentPlatform().isWindows,
+				announce: (version, restart) =>
+					flashToast(
+						`Version ${version} is ready · click to restart`,
+						() => void restart(),
+						30_000
+					)
+			})
+				.then((version) => {
+					found = version !== null;
+				})
+				.finally(() => {
+					running = false;
+				});
+		};
+		maybeCheck();
+		window.addEventListener("focus", maybeCheck);
+		document.addEventListener("visibilitychange", maybeCheck);
+		return () => {
+			window.removeEventListener("focus", maybeCheck);
+			document.removeEventListener("visibilitychange", maybeCheck);
+		};
+	});
 	// Switching to a locked provider tries its pre-bundle item once.
 	$effect(() => providerKeys.tryLegacyWhenLocked());
 	let wasLocked = false;
