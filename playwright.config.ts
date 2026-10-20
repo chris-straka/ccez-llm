@@ -68,7 +68,8 @@ export default defineConfig({
 				"**/note-editor.e2e.ts",
 				"**/composer-tools.e2e.ts",
 				"**/paste-preview.e2e.ts",
-				"**/message-edit.e2e.ts"
+				"**/message-edit.e2e.ts",
+				"**/prompt-focus.e2e.ts"
 			]
 		}
 	],

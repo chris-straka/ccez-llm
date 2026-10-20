@@ -4339,8 +4339,10 @@
 			newChat(chatState);
 			scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
 			// Minting brings you home (see doNewChat): an open
-			// sidebar would park the prompt we are landing in.
+			// sidebar or settings panel would park the prompt we are
+			// landing in.
 			settings.sidebarCollapsed = true;
+			settingsOpen = false;
 			persistSettings();
 			if (focus || focusMint) enterEditMode();
 			buzzBeat("send");
@@ -4440,11 +4442,12 @@
 		scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
 		// A minted chat always shows its composer: focusing a hidden
 		// bar focuses nothing (and the hidden restyle drops focus). An
-		// open sidebar parks the prompt, so minting also brings you
-		// home: the list closes like a row-pick.
+		// open sidebar or settings panel parks the prompt, so minting
+		// also brings you home: both close like a row-pick.
 		// Phones stay unfocused: auto-focus pops the keyboard over the
 		// composer instead of pushing it up. Tap in when ready.
 		settings.sidebarCollapsed = true;
+		settingsOpen = false;
 		persistSettings();
 		if (!androidUI) enterEditMode();
 		else restorePrompt();
@@ -8656,6 +8659,10 @@
 		// A fresh editing context always shows the prompt: a minted
 		// chat (or any landing here) must never inherit a hidden bar.
 		restorePrompt();
+		// Where focus sat on entry (a settings panel, a toolbar
+		// button) is not "moved since": the retries below must land
+		// past it, or a parked composer never takes the caret.
+		const from = document.activeElement;
 		editor?.focus();
 		// The visible flip (including its visibility ramp) lands async:
 		// arriving from a hidden or parked composer, the sync focus
@@ -8677,6 +8684,7 @@
 				const settled =
 					active &&
 					active !== document.body &&
+					active !== from &&
 					!(settings.sidebarCollapsed && active.closest("aside"));
 				if (settled) return;
 				const node = document.querySelector<HTMLElement>(".prompt .ta-input");
