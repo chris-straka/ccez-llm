@@ -18,8 +18,11 @@ test("correction mode diffs under the user message and hides the block", async (
 	const toggle = page.locator(".prompt-tools .correct-btn");
 	await expect(toggle).toBeVisible();
 	await expect(toggle).toHaveAttribute("aria-pressed", "false");
+	// Named in words on desktop: a bare pencil read as a mystery.
+	await expect(toggle).toHaveText("Correct");
 	await toggle.click();
 	await expect(toggle).toHaveAttribute("aria-pressed", "true");
+	await expect(toggle).toHaveText("Correcting");
 	await page.locator(".ta-input").click();
 	await page.keyboard.type("Je vais au le parc");
 	await page.keyboard.press("Enter");

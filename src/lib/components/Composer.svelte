@@ -373,7 +373,8 @@ stop, so both rules below stay suppressed. -->
 			send button: the model also corrects the learner's last
 			message into a hidden block that diffs under it. Per chat,
 			default off; hidden without a reply language so the row
-			stays minimal. -->
+			stays minimal. Desktop names it in words (a bare green
+			pencil read as a mystery); phones keep the glyph. -->
 			<button
 				type="button"
 				class="correct-btn"
@@ -384,6 +385,11 @@ stop, so both rules below stay suppressed. -->
 				onclick={() => actions.correctionToggle()}
 			>
 				<ActionIcon kind="pencil" />
+				{#if !android}
+					<span class="correct-word"
+						>{correctionOn ? "Correcting" : "Correct"}</span
+					>
+				{/if}
 			</button>
 		{/if}
 		{#if android && waypointCount > 3 && !hasSelMenu}
@@ -1053,6 +1059,13 @@ stop, so both rules below stay suppressed. -->
 	.converse-btn.on {
 		color: #1f7a4d;
 		color: var(--ok);
+	}
+	/* The pencil's name, small beside it: the button's line-height 0
+	would collapse the text, so the word sets its own. */
+	.correct-word {
+		margin-left: 0.25em;
+		font-size: 0.8em;
+		line-height: 1;
 	}
 	/* No-key lock pins the toggle (the loop stays stoppable: the
 	page only disables while idle). */
