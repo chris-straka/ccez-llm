@@ -6,7 +6,7 @@ import { seedChat } from "./helpers";
  * dev-server port belongs to the human's session).
  *
  * Covers, with real layout:
- * 1. create marker snaps to word edges (never splits a word in half);
+ * 1. a mid-word drag keeps its highlight but files whole words;
  * 2. create textbox anchors below highlights and grows with the note;
  *    the Annotate button never moves;
  * 3. numbered badges scale with the message font size;

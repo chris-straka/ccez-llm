@@ -1527,7 +1527,7 @@ test("review panel copies one annotation", async ({ page }) => {
  * dev-server port belongs to the human's session).
  *
  * Covers, with real layout:
- * 1. create marker snaps to word edges (never splits a word in half);
+ * 1. a mid-word drag keeps its highlight but files whole words;
  * 2. create textbox centers over narrow highlights, keeps cursor
  *    placement for wide ones; the Annotate button never moves;
  * 3. numbered badges scale with the message font size;
@@ -1538,7 +1538,9 @@ test("review panel copies one annotation", async ({ page }) => {
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
-test("mid-word drags snap out to whole words", async ({ page }) => {
+test("mid-word drags keep their highlight but file whole words", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "hello world from Kyoto" }
 	]);
@@ -1562,6 +1564,10 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	});
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
+	// The highlight stays exactly as drawn: no snap out to the words.
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+		"ello worl"
+	);
 	// Slow the ask: only a waiting badge opens the dock.
 	await page.evaluate(() => localStorage.setItem("ccez-mock-chat-ms", "60000"));
 	await page.locator('.sel-menu button:has-text("Annotate")').click();

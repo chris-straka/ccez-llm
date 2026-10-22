@@ -1783,6 +1783,46 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 		if (!selection || selection.isCollapsed || selection.rangeCount === 0)
 			return false;
 		const range = selection.getRangeAt(0);
+		const snapped = wordEdgeBounds(range);
+		if (!snapped) return false;
+		const { scN, so, ecN, eo } = snapped;
+		const anchorFirst =
+			selection.anchorNode === range.startContainer &&
+			selection.anchorOffset === range.startOffset;
+		if (anchorFirst) selection.setBaseAndExtent(scN, so, ecN, eo);
+		else selection.setBaseAndExtent(ecN, eo, scN, so);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * A copy of `range` widened to word edges (the snapSelectionToWordEdges
+ * rule), leaving the live selection exactly as drawn: a drag over half
+ * a word keeps its half highlight, and the quote it files still takes
+ * the whole word. The range itself when nothing moves. Never throws.
+ */
+export function wordEdgeRange(range: Range): Range {
+	try {
+		const snapped = wordEdgeBounds(range);
+		if (!snapped) return range;
+		const out = range.cloneRange();
+		out.setStart(snapped.scN, snapped.so);
+		out.setEnd(snapped.ecN, snapped.eo);
+		return out;
+	} catch {
+		return range;
+	}
+}
+
+/** Word-edge boundaries for a range, or null when it already sits on
+them (shared by the live snap and the quote copy above). */
+function wordEdgeBounds(
+	range: Range
+): { scN: Node; so: number; ecN: Node; eo: number } | null {
+	try {
+		if (range.collapsed) return null;
 		const sc = range.startContainer;
 		const ec = range.endContainer;
 		const so0 = range.startOffset;
@@ -1868,13 +1908,10 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 				e += 1;
 			eo = e;
 		}
-		if (scN === sc && ecN === ec && so === so0 && eo === eo0) return false;
-		const anchorFirst =
-			selection.anchorNode === sc && selection.anchorOffset === so0;
-		if (anchorFirst) selection.setBaseAndExtent(scN, so, ecN, eo);
-		else selection.setBaseAndExtent(ecN, eo, scN, so);
-		return true;
+		if (scN === sc && ecN === ec && so === so0 && eo === eo0) return null;
+		if (!scN || !ecN) return null;
+		return { scN, so, ecN, eo };
 	} catch {
-		return false;
+		return null;
 	}
 }

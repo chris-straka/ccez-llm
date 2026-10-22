@@ -20,7 +20,8 @@ import {
 	equationBodyRange,
 	quoteFragmentText,
 	quoteRange,
-	quoteTextNodes
+	quoteTextNodes,
+	wordEdgeRange
 } from "./annotations-stamp";
 import {
 	annComposerWidth,
@@ -295,7 +296,7 @@ export class AnnotateMode {
 		const headline = this.headlineOf(selection.anchorNode);
 		if (!headline || this.headlineOf(selection.focusNode) !== headline)
 			return null;
-		const frag = selection.getRangeAt(0).cloneContents();
+		const frag = wordEdgeRange(selection.getRangeAt(0)).cloneContents();
 		const quote = quoteFragmentText(frag);
 		if (!quote) return null;
 		const story = this.storyOfHeadline(headline);
@@ -326,8 +327,10 @@ export class AnnotateMode {
 		// Clone the range and drop badge buttons and ruby readings:
 		// selecting across an existing annotation would otherwise bake
 		// its number into the new quote ("Kyoto1 in two sentences"),
-		// and ruby would bake its readings in with the base text.
-		const frag = selection.getRangeAt(0).cloneContents();
+		// and ruby would bake its readings in with the base text. A
+		// boundary cut mid-word quotes the whole word; the highlight
+		// itself stays as drawn.
+		const frag = wordEdgeRange(selection.getRangeAt(0)).cloneContents();
 		const quote = quoteFragmentText(frag);
 		if (!quote) return null;
 		const messageId = this.selectedMessageId(selection);
@@ -373,6 +376,9 @@ export class AnnotateMode {
 				if (selection.isCollapsed) return 0;
 				range = selection.getRangeAt(0);
 			}
+			// The quote took whole words (see messageQuote): count
+			// occurrences from the widened start, not the drawn one.
+			range = wordEdgeRange(range);
 			let node: Node | null = range.startContainer;
 			let offset = range.startOffset;
 			// Element starts point between children: the child at the

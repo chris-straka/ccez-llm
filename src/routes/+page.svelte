@@ -5711,10 +5711,11 @@
 				// Cosmetic: the untrimmed pick still summons.
 			}
 		}
-		// The create marker never splits a word in half: boundaries cut
-		// mid-word snap out to the word's edges before the menu reads
-		// the quote (CJK has no word characters, so it never snaps).
-		if (live) snapSelectionToWordEdges(live);
+		// A drag keeps the highlight exactly as drawn: the quote widens
+		// to whole words on its own (messageQuote), so half a word
+		// still files the word. Multi-click picks still snap: beside a
+		// badge anchor the engine stops a double-click mid-word.
+		if (live && event.detail >= 2) snapSelectionToWordEdges(live);
 		// Multi-click summons wait for the sequence to settle (see
 		// multiClickMenuAt): press 4 must land on text, never on the
 		// menu press 2 or 3 summoned.

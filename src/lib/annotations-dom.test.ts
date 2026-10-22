@@ -17,6 +17,7 @@ import {
 	equationBodyRange,
 	trimParagraphTerminator,
 	snapSelectionToWordEdges,
+	wordEdgeRange,
 	quoteRange,
 	rangesExcludingReadings,
 	wrapRangeInMark,
@@ -294,6 +295,30 @@ describe("trimParagraphTerminator", () => {
 		expect(trimParagraphTerminator(range)).toBe(false);
 		expect(range.toString()).toBe("\n");
 		root.remove();
+	});
+});
+
+describe("wordEdgeRange", () => {
+	it("widens a copy to whole words and leaves the range as drawn", () => {
+		document.body.innerHTML = "<p>hello world</p>";
+		const node = document.querySelector("p")?.firstChild;
+		if (!(node instanceof Text)) throw new Error("no text");
+		const drawn = document.createRange();
+		drawn.setStart(node, 2);
+		drawn.setEnd(node, 9);
+		const wide = wordEdgeRange(drawn);
+		expect(wide.toString()).toBe("hello world");
+		expect(drawn.toString()).toBe("llo wor");
+	});
+
+	it("returns the range itself when it already sits on word edges", () => {
+		document.body.innerHTML = "<p>hello world</p>";
+		const node = document.querySelector("p")?.firstChild;
+		if (!(node instanceof Text)) throw new Error("no text");
+		const drawn = document.createRange();
+		drawn.setStart(node, 0);
+		drawn.setEnd(node, 5);
+		expect(wordEdgeRange(drawn)).toBe(drawn);
 	});
 });
 
