@@ -224,7 +224,9 @@ export interface AnswerPlacement {
  * capped to that side (the body scrolls). Never covers the word or its
  * badge (`clearTop` is the badge's top) and never needs the page to
  * scroll. Centered on the word (on the pointer inside wide quotes),
- * clamped inside the viewport; the tail points back at that x.
+ * clamped inside the viewport; the tail points back at that x. The
+ * card's button row hangs outside it on the far side from the word
+ * (`outside`, px), so that side's room shrinks by it.
  */
 export function placeAnswerPopover(facts: {
 	anchor: AnchorRect;
@@ -240,6 +242,8 @@ export function placeAnswerPopover(facts: {
 	/** Tail depth past the card edge (px). */
 	tail: number;
 	margin?: number;
+	/** Height hung outside the card's far edge (its button row). */
+	outside?: number;
 	/** The quote's article column: a card that fits stays inside it,
 	so a short last line near the column's edge never swings the card
 	out past the text. */
@@ -266,8 +270,9 @@ export function placeAnswerPopover(facts: {
 	const tailInset = Math.min(18, w / 2);
 	const tailX = Math.min(Math.max(target - x, tailInset), w - tailInset);
 	const reach = facts.gap + facts.tail;
-	const below = facts.viewportHeight - m - (anchor.bottom + reach);
-	const above = Math.min(anchor.top, facts.clearTop) - reach - m;
+	const out = facts.outside ?? 0;
+	const below = facts.viewportHeight - m - out - (anchor.bottom + reach);
+	const above = Math.min(anchor.top, facts.clearTop) - reach - m - out;
 	const h = Math.max(1, Math.ceil(facts.cardHeight));
 	const side: "below" | "above" =
 		h <= below || (h > above && below >= above) ? "below" : "above";

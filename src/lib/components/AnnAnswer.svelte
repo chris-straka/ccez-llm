@@ -10,9 +10,19 @@ text, never HTML, so model output can't inject markup. Lines render
 as their own paragraphs; a short first line (the expression and its
 meaning) reads as the note's headline. No close button and no tools
 in the card: clicking off closes it (Esc too); rewording is the E key,
-prompt approval the badge's plus/minus. The one exception rides the
-corner, outside the text: save the quote as a flashcard. -->
+prompt approval the badge's plus/minus. Two buttons hang outside the
+card on the side away from the word: Save (the quote as a flashcard)
+and Reply (opens the field to argue with the answer). The body's
+scroll position is remembered per note, so a long argument reopens
+where it was left. -->
+<script module lang="ts">
+	/** Body scroll per note (badge id), for this session. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
+	const scrollMemory = new Map<string, number>();
+</script>
+
 <script lang="ts">
+	import { tick } from "svelte";
 	import {
 		placeAnswerPopover,
 		type AnchorRect,
@@ -66,10 +76,28 @@ corner, outside the text: save the quote as a flashcard. -->
 		onReply
 	}: Props = $props();
 
-	/** The reply field's text, and its height (the body's scroll cap
-	leaves room for it). */
+	/** The reply field's text, and its height (re-measures the card
+	when it changes). The field shows only after Reply is pressed,
+	for the note it was pressed on. */
 	let reply = $state("");
 	let replyH = $state(0);
+	let replyingFor = $state<string | null>(null);
+	const replying = $derived(onReply !== undefined && replyingFor === badgeId);
+	const fieldH = $derived(replying ? replyH : 0);
+	let field: HTMLTextAreaElement | undefined = $state();
+	/** The button row's height, gap included (placement keeps room
+	for it outside the card). */
+	let actionsH = $state(0);
+	let actionsW = $state(0);
+
+	function toggleReply(): void {
+		if (replying) {
+			replyingFor = null;
+			return;
+		}
+		replyingFor = badgeId;
+		void tick().then(() => field?.focus());
+	}
 	const waiting = $derived(thread.some((t) => t.a === undefined));
 	const splitLines = (text: string): string[] =>
 		text
@@ -85,12 +113,38 @@ corner, outside the text: save the quote as a flashcard. -->
 		if (!ok && reply === "") reply = text;
 	}
 
-	// A new reply or answer scrolls the thread to its end.
+	// A new reply or answer brings its turn into view: the reply's
+	// top at the body's top, so a long answer reads from its start.
+	// Opening a card (or switching notes) leaves the remembered spot.
+	let lastTurn: string | null = null;
 	$effect(() => {
-		void thread.length;
-		void thread.at(-1)?.a;
-		if (body) body.scrollTop = body.scrollHeight;
+		const mark = `${badgeId}/${thread.length}/${thread.at(-1)?.a === undefined}`;
+		const prev = lastTurn;
+		lastTurn = mark;
+		if (prev === null || prev === mark || !prev.startsWith(`${badgeId}/`))
+			return;
+		const q = body?.querySelectorAll<HTMLElement>(".ann-thread-q");
+		const turn = q?.[q.length - 1];
+		if (!body || !turn) return;
+		body.scrollTo({
+			top: Math.max(0, turn.offsetTop - 8),
+			behavior: reducedMotion() ? "auto" : "smooth"
+		});
 	});
+
+	// Reopening a note restores its scroll once the card is placed
+	// (before that the body isn't capped, so nothing scrolls).
+	let restoredFor: string | null = null;
+	$effect(() => {
+		const id = badgeId;
+		if (restoredFor === id || !place || !body) return;
+		restoredFor = id;
+		body.scrollTop = scrollMemory.get(id) ?? 0;
+	});
+	function rememberScroll(): void {
+		if (body && restoredFor === badgeId)
+			scrollMemory.set(badgeId, body.scrollTop);
+	}
 
 	/** Tail depth past the card edge: half the rotated square's diagonal. */
 	const TAIL = 9;
@@ -98,6 +152,10 @@ corner, outside the text: save the quote as a flashcard. -->
 	let card: HTMLDivElement | undefined = $state();
 	let body: HTMLDivElement | undefined = $state();
 	let size = $state<{ w: number; h: number } | null>(null);
+	/** Card height outside the body (reply field, border): the body's
+	cap leaves room for it, so the whole card keeps to the placement's
+	height and never runs onto the word's badge. */
+	let chromeH = $state(0);
 	let vw = $state(typeof window === "undefined" ? 1024 : window.innerWidth);
 	let vh = $state(typeof window === "undefined" ? 768 : window.innerHeight);
 
@@ -141,9 +199,16 @@ corner, outside the text: save the quote as a flashcard. -->
 					viewportHeight: bottomEdge,
 					gap,
 					tail: TAIL,
+					outside: actionsH,
 					...(column ? { column } : {})
 				})
 			: null
+	);
+
+	/** The row hangs from the card's right edge, or its left when a
+	narrow card near the left edge would push it off-screen. */
+	const actionsStart = $derived(
+		place !== null && size !== null && place.x + size.w - actionsW < 8
 	);
 
 	function reducedMotion(): boolean {
@@ -161,6 +226,8 @@ corner, outside the text: save the quote as a flashcard. -->
 		const w = card.offsetWidth;
 		const h = card.offsetHeight - body.clientHeight + body.scrollHeight;
 		if (!size || size.w !== w || size.h !== h) size = { w, h };
+		const chrome = card.offsetHeight - body.offsetHeight;
+		if (chrome !== chromeH) chromeH = chrome;
 	}
 
 	// Observe the text, never the card: the card's own height follows
@@ -171,7 +238,7 @@ corner, outside the text: save the quote as a flashcard. -->
 		void lines;
 		void thread.length;
 		void thread.at(-1)?.a;
-		void replyH;
+		void fieldH;
 		if (!card || !body) return;
 		measure();
 		if (typeof ResizeObserver === "undefined") return;
@@ -269,11 +336,11 @@ corner, outside the text: save the quote as a flashcard. -->
 	style:--ann-max-w="{maxWidth}px"
 	style:--ann-max-h={place ? `${place.maxHeight}px` : "none"}
 	style:--ann-tail-x="{place?.tailX ?? 24}px"
-	style:--ann-reply-h="{replyH}px"
+	style:--ann-chrome-h="{chromeH}px"
 	role="dialog"
 	aria-label="Annotation answer"
 >
-	<div class="ann-answer-body" bind:this={body}>
+	<div class="ann-answer-body" bind:this={body} onscroll={rememberScroll}>
 		{#each lines as line, i (i)}
 			<p
 				class="ann-answer-text"
@@ -298,7 +365,7 @@ corner, outside the text: save the quote as a flashcard. -->
 			{/if}
 		{/each}
 	</div>
-	{#if onReply}
+	{#if replying}
 		<!-- Argue with the answer: Enter sends, Shift+Enter breaks the
 		line. The thread stays in this card, never a second one. -->
 		<form
@@ -310,6 +377,7 @@ corner, outside the text: save the quote as a flashcard. -->
 			}}
 		>
 			<textarea
+				bind:this={field}
 				rows="1"
 				dir="auto"
 				placeholder={waiting ? "Answering…" : "Reply…"}
@@ -323,65 +391,118 @@ corner, outside the text: save the quote as a flashcard. -->
 				}}></textarea>
 		</form>
 	{/if}
-	{#if onToggleSave}
-		<!-- Save as a card: pinned on the card's corner, so it adds no
-		layout to the note (the phone's way in; desktop also gets it
-		on badge hover). -->
-		<button
-			type="button"
-			class="ann-answer-save"
-			class:saved
-			aria-label={saved ? "Remove from cards" : "Save as a card"}
-			title={saved ? "Saved as a card · click to remove" : "Save as a card"}
-			onmousedown={(e) => e.preventDefault()}
-			onclick={(e) => {
-				e.stopPropagation();
-				onToggleSave();
-			}}
+	{#if onToggleSave || onReply}
+		<!-- Save and Reply hang outside the card, on the side away from
+		the word, so they add no layout to the note. -->
+		<div
+			class="ann-answer-actions"
+			class:start={actionsStart}
+			bind:offsetHeight={actionsH}
+			bind:offsetWidth={actionsW}
 		>
-			<svg viewBox="0 0 16 16" aria-hidden="true"
-				><path d="M4.5 2.5h7v11L8 10.8l-3.5 2.7z" /></svg
-			>
-		</button>
+			{#if onToggleSave}
+				<button
+					type="button"
+					class="ann-answer-save"
+					class:on={saved}
+					aria-label={saved ? "Remove from cards" : "Save as a card"}
+					title={saved ? "Saved as a card · click to remove" : "Save as a card"}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={(e) => {
+						e.stopPropagation();
+						onToggleSave();
+					}}
+				>
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><path d="M4.5 2.5h7v11L8 10.8l-3.5 2.7z" /></svg
+					>{saved ? "Saved" : "Save"}
+				</button>
+			{/if}
+			{#if onReply}
+				<button
+					type="button"
+					class="ann-answer-reply"
+					class:on={replying}
+					aria-pressed={replying}
+					onclick={(e) => {
+						e.stopPropagation();
+						toggleReply();
+					}}
+				>
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><path d="M6.5 4 2.5 7.5l4 3.5M2.5 7.5h7a4 4 0 0 1 4 4v1" /></svg
+					>Reply
+				</button>
+			{/if}
+		</div>
 	{/if}
 </div>
 
 <style>
-	/* The save pin rides the card's top-right corner, sized off the
-	card's text so it keeps pace with the text size. */
-	.ann-answer-save {
+	/* The button row hangs under the card (over it when the card sits
+	above the word): right-aligned, sized off the card's text so it
+	keeps pace with the text size. The padding is the gap; only the
+	buttons take presses. */
+	.ann-answer-actions {
 		position: absolute;
-		top: -0.7em;
-		right: -0.7em;
-		width: 1.7em;
-		height: 1.7em;
-		min-width: 2rem;
-		min-height: 2rem;
-		display: grid;
-		place-items: center;
-		padding: 0;
-		border: 1px solid var(--line-soft);
-		border-radius: 50%;
-		background: var(--bg);
+		top: 100%;
+		right: 0;
+		display: flex;
+		gap: 0.4em;
+		width: max-content;
+		padding-top: 0.5em;
+		font-size: 0.86em;
+		white-space: nowrap;
+		pointer-events: none;
+	}
+	.ann-answer-actions.start {
+		right: auto;
+		left: 0;
+	}
+	.ann-answer.above .ann-answer-actions {
+		top: auto;
+		bottom: 100%;
+		padding-top: 0;
+		padding-bottom: 0.5em;
+	}
+	.ann-answer-actions button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35em;
+		min-height: 2.25rem;
+		padding: 0.3em 0.85em 0.3em 0.7em;
+		border: 1px solid var(--line-overlay);
+		border-radius: 999px;
+		background: var(--bg-overlay);
 		color: var(--muted);
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+		font: inherit;
+		line-height: 1.2;
 		cursor: pointer;
-		font-size: inherit;
+		pointer-events: auto;
+		transition: color 120ms ease;
 	}
-	.ann-answer-save:hover,
-	.ann-answer-save.saved {
+	.ann-answer-actions button:hover,
+	.ann-answer-actions button.on {
 		color: var(--accent);
 	}
-	.ann-answer-save svg {
-		width: 55%;
-		height: 55%;
+	.ann-answer-actions svg {
+		width: 1.05em;
+		height: 1.05em;
+		flex: none;
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 1.5;
+		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	.ann-answer-save.saved svg {
+	.ann-answer-save.on svg {
 		fill: currentColor;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.ann-answer-actions button {
+			transition: none;
+		}
 	}
 	/* Open: scale and fade out of the word (the origin rides the tail,
 	so the card grows from the word it explains). Close mirrors it. */
@@ -478,7 +599,8 @@ corner, outside the text: save the quote as a flashcard. -->
 	}
 	.ann-answer-body {
 		position: relative;
-		max-height: calc(var(--ann-max-h, 100vh) - var(--ann-reply-h, 0px));
+		box-sizing: border-box;
+		max-height: calc(var(--ann-max-h, 100vh) - var(--ann-chrome-h, 0px));
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		border-radius: inherit;

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The answer card: model output renders as text (never {@html}), the
- * reply takes the whole card (no tools, no close button: click-off or
- * Esc closes, E rewords), and its sizing rides the popup setting.
+ * The answer card: model output renders as text (never {@html}) and
+ * its sizing rides the popup setting. Its Save and Reply buttons are
+ * covered in e2e (save-card, annotation-answer).
  * Asserted on source: jsdom sees neither CSS nor the template's
  * {@html} choice.
  */
@@ -17,12 +17,6 @@ describe("annotation answer card", () => {
 		// Each answer line renders through a text binding.
 		expect(answerSource()).toContain("{line}");
 		expect(answerSource()).not.toContain("{@html");
-	});
-
-	it("carries no tools but the save pin on its corner: the reply takes the card", () => {
-		const buttons = answerSource().match(/<button/g) ?? [];
-		expect(buttons).toHaveLength(1);
-		expect(answerSource()).toContain('class="ann-answer-save"');
 	});
 
 	it("reads at message size with the popup-size setting on top", () => {

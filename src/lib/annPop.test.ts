@@ -337,6 +337,29 @@ describe("placeAnswerPopover", () => {
 		expect(low.side).toBe("below");
 		expect(low.y + low.maxHeight).toBe(800 - 8);
 	});
+	it("leaves room for the button row outside the far edge", () => {
+		const low = placeAnswerPopover({ ...base, cardHeight: 2000, outside: 40 });
+		expect(low.side).toBe("below");
+		expect(low.y + low.maxHeight).toBe(800 - 8 - 40);
+		const high = placeAnswerPopover({
+			...base,
+			cardHeight: 2000,
+			outside: 40,
+			anchor: { left: 400, top: 500, right: 460, bottom: 520 },
+			clearTop: 488
+		});
+		expect(high.side).toBe("above");
+		expect(high.y).toBe(8 + 40);
+		// A card that fits below only without its row flips above.
+		const tight = {
+			...base,
+			cardHeight: 150,
+			anchor: { left: 400, top: 600, right: 460, bottom: 620 },
+			clearTop: 588
+		};
+		expect(placeAnswerPopover(tight).side).toBe("below");
+		expect(placeAnswerPopover({ ...tight, outside: 40 }).side).toBe("above");
+	});
 	it("stays inside the viewport and keeps the tail on the word at edges", () => {
 		const left = placeAnswerPopover({
 			...base,

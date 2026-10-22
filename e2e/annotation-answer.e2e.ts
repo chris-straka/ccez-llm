@@ -1078,9 +1078,10 @@ test("Shift+Delete clears a message's annotations", async ({ page }) => {
 	await expect(page.locator(".toast")).toContainText("2 annotations deleted");
 });
 
-/** Arguing with an answer: a reply in the card joins a thread under
-the answer (never a second card), its answer lands there, and the
-thread survives a reload. Typing in the field never fires shortcuts. */
+/** Arguing with an answer: Reply opens the field, a reply joins a
+thread under the answer (never a second card), its answer lands there,
+and the thread survives a reload. Typing in the field never fires
+shortcuts. */
 test("replies thread under the answer in the same card", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
@@ -1111,7 +1112,19 @@ test("replies thread under the answer in the same card", async ({ page }) => {
 	const card = page.locator(".ann-answer");
 	await expect(card).toBeVisible({ timeout: 10_000 });
 	const field = card.getByRole("textbox", { name: "Reply to this answer" });
-	await field.click();
+	// The field waits for Reply, which hangs outside the card.
+	await expect(field).toHaveCount(0);
+	const replyBtn = card.getByRole("button", { name: "Reply" });
+	const below = await page.evaluate(() => {
+		const el = document.querySelector(".ann-answer")!.getBoundingClientRect();
+		const btn = document
+			.querySelector(".ann-answer-reply")!
+			.getBoundingClientRect();
+		return btn.top >= el.bottom || btn.bottom <= el.top;
+	});
+	expect(below).toBe(true);
+	await replyBtn.click();
+	await expect(field).toBeFocused();
 	// Letters that are shortcuts elsewhere (e edits, a annotates).
 	await page.keyboard.type("are you sure about that?");
 	await expect(field).toHaveValue("are you sure about that?");
@@ -1133,4 +1146,72 @@ test("replies thread under the answer in the same card", async ({ page }) => {
 	await expect(page.locator(".ann-answer .ann-thread-q")).toHaveText(
 		"are you sure about that?"
 	);
+});
+
+/** A long argument reopens where it was left: the body's scroll is
+remembered per note when the card closes. */
+test("the answer card reopens at its scroll position", async ({ page }) => {
+	await page.setViewportSize({ width: 900, height: 520 });
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.addInitScript(() => {
+		const key = "ccez-llm-annotations-v1";
+		if (localStorage.getItem(key)) return;
+		const long = Array.from(
+			{ length: 6 },
+			(_, i) => `Point ${i}: the bank is the edge of the river, not money.`
+		).join("\n");
+		localStorage.setItem(
+			key,
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-1",
+						messageId: "e2e-m0",
+						quote: "riverbank",
+						comment: "",
+						answer: "Riverbank.\nThe land along a river.",
+						thread: Array.from({ length: 5 }, (_, i) => ({
+							q: `but why ${i}?`,
+							a: long
+						}))
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 60_000 });
+	const open = async (): Promise<void> => {
+		await ready.focus();
+		await page.keyboard.press("Enter");
+		await expect(page.locator(".ann-answer.placed")).toBeVisible({
+			timeout: 10_000
+		});
+	};
+	const scrollTop = (): Promise<number> =>
+		page.evaluate(() => document.querySelector(".ann-answer-body")!.scrollTop);
+	await open();
+	expect(await scrollTop()).toBe(0);
+	// A capped card keeps its padding inside the cap: it and its
+	// buttons stay above the composer instead of running onto it.
+	const overrun = await page.evaluate(() => {
+		const row = document.querySelector(".ann-answer-actions")!;
+		const prompt = document.querySelector(".prompt")!;
+		return (
+			row.getBoundingClientRect().bottom - prompt.getBoundingClientRect().top
+		);
+	});
+	expect(overrun).toBeLessThanOrEqual(0);
+	await page.evaluate(() => {
+		const body = document.querySelector(".ann-answer-body")!;
+		body.scrollTop = 300;
+		body.dispatchEvent(new Event("scroll"));
+	});
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-answer")).toHaveCount(0);
+	await open();
+	await expect.poll(scrollTop).toBe(300);
 });

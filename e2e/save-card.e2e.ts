@@ -68,7 +68,7 @@ test("hovering a badge offers save as a card; a second click takes it back", asy
 	await expect(save).toHaveCount(0);
 });
 
-test("the answer card saves its quote as a card from its corner", async ({
+test("the answer card saves its quote as a card from its Save button", async ({
 	page
 }) => {
 	await seed(page);
