@@ -266,7 +266,7 @@
 		highlightSteady,
 		panelCenterMoved,
 		lineStartOffset,
-		clampDragAnchorToFocusLine,
+		offChatDragLineY,
 		menuBtnTouchAction,
 		selMenuDragTarget
 	} from "$lib/sel-geometry";
@@ -13071,6 +13071,83 @@
 				fieldLive
 			);
 		};
+		/** The caret at a screen point (WebKit and Chromium spell it
+		 * differently); null off text. */
+		const caretAt = (
+			x: number,
+			y: number
+		): { node: Node; offset: number } | null => {
+			const doc = document as Document & {
+				caretPositionFromPoint?: (
+					x: number,
+					y: number
+				) => { offsetNode: Node; offset: number } | null;
+			};
+			if (typeof doc.caretPositionFromPoint === "function") {
+				const pos = doc.caretPositionFromPoint(x, y);
+				return pos ? { node: pos.offsetNode, offset: pos.offset } : null;
+			}
+			const range = document.caretRangeFromPoint?.(x, y);
+			return range
+				? { node: range.startContainer, offset: range.startOffset }
+				: null;
+		};
+		/** The screen box of the line holding a caret (a collapsed
+		 * range has no box at some positions: measure a character). */
+		const caretLineBox = (node: Node, offset: number): DOMRect | null => {
+			const range = document.createRange();
+			try {
+				range.setStart(node, offset);
+				range.collapse(true);
+				const box = range.getClientRects()[0];
+				if (box && box.height > 0) return box;
+				const len = node instanceof Text ? node.length : node.childNodes.length;
+				if (offset < len) range.setEnd(node, offset + 1);
+				else if (offset > 0) range.setStart(node, offset - 1);
+				const near = range.getClientRects();
+				const pick = offset < len ? near[0] : near[near.length - 1];
+				return pick && pick.height > 0 ? pick : null;
+			} catch {
+				return null;
+			}
+		};
+		/**
+		 * Where an off-chat drag over this message's text starts: the
+		 * start of the visual line under the press (beside the text),
+		 * else of the cursor's own line. Measured from layout: wrapped
+		 * lines carry no newline. Null when layout can't say.
+		 */
+		const offChatLineStart = (
+			focusNode: Node,
+			focusOffset: number
+		): { node: Node; offset: number } | null => {
+			const focusEl =
+				focusNode instanceof Element ? focusNode : focusNode.parentElement;
+			const rendered = focusEl?.closest(".messages .rendered");
+			if (!rendered) return null;
+			const line = caretLineBox(focusNode, focusOffset);
+			if (!line) return null;
+			const text = rendered.getBoundingClientRect();
+			const y = offChatDragLineY(
+				downClient?.y ?? line.top,
+				text.top,
+				line.top,
+				line.bottom
+			);
+			const start = caretAt(text.left + 1, y);
+			return start && rendered.contains(start.node) ? start : null;
+		};
+		/** Document order of two carets: negative when `a` is first. */
+		const caretOrder = (
+			a: { node: Node; offset: number },
+			b: { node: Node; offset: number }
+		): number => {
+			const ra = document.createRange();
+			ra.setStart(a.node, a.offset);
+			const rb = document.createRange();
+			rb.setStart(b.node, b.offset);
+			return ra.compareBoundaryPoints(Range.START_TO_START, rb);
+		};
 		const clampOffChatDrag = (): void => {
 			if (!offChatDragArmed) return;
 			try {
@@ -13091,85 +13168,51 @@
 				if (!focusEl?.closest(".messages .rendered")) return;
 				// Anchors in the prompt or a control are their own
 				// gesture (editor selections, button presses) — never
-				// an off-chat message drag. An anchor stranded in
-				// ANOTHER message's prose (first contact grazed it on
-				// the way in) re-seats below instead of freezing: the
-				// highlight would span messages and mouseup's lock
-				// would quote text the pointer never settled on.
+				// an off-chat message drag.
 				if (anchorEl?.closest("input, textarea")) return;
-				if (
-					anchorEl?.closest(".messages .rendered") &&
+				const anchor = { node: anchorNode, offset: live.anchorOffset };
+				const focus = { node: focusNode, offset: live.focusOffset };
+				const sameArticle =
+					!!anchorEl?.closest(".messages .rendered") &&
 					annotateMode.articleOf(anchorNode) ===
-						annotateMode.articleOf(focusNode)
-				)
-					return;
-				// Only the upward side clamps: an anchor below the
-				// cursor highlights below it, which is allowed.
-				let anchorAbove: boolean;
-				if (anchorNode === focusNode)
-					anchorAbove = live.anchorOffset < live.focusOffset;
-				else {
-					anchorAbove = !!(
-						anchorNode.compareDocumentPosition(focusNode) &
-						Node.DOCUMENT_POSITION_FOLLOWING
-					);
-				}
-				if (!anchorAbove) {
-					// An anchor below the cursor is allowed — unless it
-					// sits in another message's prose, where mouseup's
-					// lock would quote text the pointer never settled
-					// on. Re-seat it to the focus line like the upward
-					// side; anchors below in non-message content still
-					// highlight below them untouched.
-					if (
-						anchorEl?.closest(".messages .rendered") &&
-						annotateMode.articleOf(anchorNode) !==
-							annotateMode.articleOf(focusNode) &&
-						focusNode instanceof Text
-					) {
-						containDragTo(annotateMode.articleOf(focusNode));
-						const text = focusNode.textContent ?? "";
-						const start = lineStartOffset(text, live.focusOffset);
-						live.setBaseAndExtent(
-							focusNode,
-							start,
-							focusNode,
-							live.focusOffset
-						);
-						trackDragSelection(live);
-					}
-					return;
-				}
+						annotateMode.articleOf(focusNode);
 				// First contact with message text anchors the drag: later
 				// moves into other articles clamp at this article's edge
 				// instead of flipping the anchor (see containDragTo).
 				containDragTo(annotateMode.articleOf(focusNode));
-				if (anchorNode instanceof Text && anchorNode === focusNode) {
-					const text = anchorNode.textContent ?? "";
-					const fixed = clampDragAnchorToFocusLine(
-						text,
-						live.anchorOffset,
-						live.focusOffset
-					);
-					if (fixed !== live.anchorOffset) {
+				// A margin press has no text under it, so the engine seats
+				// the anchor at some nearby selectable spot — often an
+				// earlier paragraph. The drag starts where the press was
+				// instead: the visual line beside it (or the cursor's
+				// line), never above. Anchors on or after that line in
+				// this message stay (a drag leftwards or down is real).
+				const start = offChatLineStart(focusNode, live.focusOffset);
+				if (start) {
+					const keep =
+						sameArticle &&
+						caretOrder(anchor, start) >= 0 &&
+						caretOrder(anchor, focus) <= 0;
+					if (!keep && caretOrder(start, focus) <= 0)
 						live.setBaseAndExtent(
-							anchorNode,
-							fixed,
+							start.node,
+							start.offset,
 							focusNode,
 							live.focusOffset
 						);
-					}
 					trackDragSelection(live);
 					return;
 				}
-				// Cross-node: the anchor sits in earlier (or foreign)
-				// content — pin it to the cursor line's start inside
-				// the focus node, so nothing above that line stays
-				// highlighted.
+				// No layout to read (text-only fallback): newline lines.
+				if (sameArticle) return;
 				if (focusNode instanceof Text) {
 					const text = focusNode.textContent ?? "";
-					const start = lineStartOffset(text, live.focusOffset);
-					live.setBaseAndExtent(focusNode, start, focusNode, live.focusOffset);
+					const lineStart = lineStartOffset(text, live.focusOffset);
+					live.setBaseAndExtent(
+						focusNode,
+						lineStart,
+						focusNode,
+						live.focusOffset
+					);
 				}
 				trackDragSelection(live);
 			} catch {

@@ -11,7 +11,7 @@ import {
 	highlightSteady,
 	panelCenterMoved,
 	lineStartOffset,
-	clampDragAnchorToFocusLine,
+	offChatDragLineY,
 	clampMenuDrag,
 	menuBtnTouchAction,
 	selMenuDragTarget,
@@ -410,14 +410,6 @@ describe("off-chat drag clamp", () => {
 		expect(lineStartOffset("single", 3)).toBe(0);
 		expect(lineStartOffset("single", 0)).toBe(0);
 	});
-
-	it("pins anchors above the cursor line, passes the rest through", () => {
-		// Focus on line 2 ("bc"), anchor up on line 1: pin to line 2's start.
-		expect(clampDragAnchorToFocusLine("a\nbc\ndef", 0, 4)).toBe(2);
-		// Anchor on the same line or below: untouched.
-		expect(clampDragAnchorToFocusLine("a\nbc\ndef", 2, 4)).toBe(2);
-		expect(clampDragAnchorToFocusLine("a\nbc\ndef", 6, 4)).toBe(6);
-	});
 });
 describe("clampMenuDrag", () => {
 	it("pins the dragged spot inside the viewport", () => {
@@ -554,5 +546,19 @@ describe("spreadPanelCenters", () => {
 				150
 			)
 		).toEqual([38, 104, 170]);
+	});
+});
+
+describe("offChatDragLineY", () => {
+	// Text from y=100; the cursor's line spans 160-180.
+	it("a margin press beside the text starts at the pressed line", () => {
+		expect(offChatDragLineY(130, 100, 160, 180)).toBe(130);
+		expect(offChatDragLineY(170, 100, 160, 180)).toBe(170);
+	});
+	it("a press above the message starts at the cursor's line", () => {
+		expect(offChatDragLineY(40, 100, 160, 180)).toBe(170);
+	});
+	it("a press below the cursor's line starts at the cursor's line", () => {
+		expect(offChatDragLineY(240, 100, 160, 180)).toBe(170);
 	});
 });

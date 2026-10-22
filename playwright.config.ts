@@ -46,7 +46,10 @@ export default defineConfig({
 				// per launch — dozens per session. The mock keychain
 				// silences it; automation never stores real secrets.
 				launchOptions: { args: ["--use-mock-keychain"] }
-			}
+			},
+			// Margin presses start no selection in Chromium at all: the
+			// margin-drag rules are the shell engine's (WebKit only).
+			testIgnore: ["**/margin-drag.e2e.ts"]
 		},
 		// Shell-engine coverage: the Tauri app is WebKit (WKWebView),
 		// which fires selectionchange on body swaps where Chromium stays
@@ -69,7 +72,8 @@ export default defineConfig({
 				"**/composer-tools.e2e.ts",
 				"**/paste-preview.e2e.ts",
 				"**/message-edit.e2e.ts",
-				"**/prompt-focus.e2e.ts"
+				"**/prompt-focus.e2e.ts",
+				"**/margin-drag.e2e.ts"
 			]
 		}
 	],

@@ -438,29 +438,32 @@ export function highlightSteady(
 }
 
 /**
- * Start offset of the visual line holding `offset`: the index just
- * past the nearest preceding newline (0 when none). Lines come from
- * text alone so the rule unit-tests without layout.
+ * Which line an off-chat drag starts from, in screen y: the line
+ * under the press when the press sits beside this message's text
+ * (a margin press reads as "from this line"), never below the
+ * cursor's own line; a press above the message (another message,
+ * the top bar, off-screen) starts at the cursor's line, so nothing
+ * above it highlights.
+ */
+export function offChatDragLineY(
+	pressY: number,
+	textTop: number,
+	focusLineTop: number,
+	focusLineBottom: number
+): number {
+	const focusMid = (focusLineTop + focusLineBottom) / 2;
+	if (pressY < textTop || pressY > focusLineBottom) return focusMid;
+	return pressY;
+}
+
+/**
+ * Start offset of the newline-delimited line holding `offset`: the
+ * index just past the nearest preceding newline (0 when none). The
+ * off-chat drag's fallback when layout can't place visual lines.
  */
 export function lineStartOffset(text: string, offset: number): number {
 	const at = Math.max(0, Math.min(offset, text.length));
 	return text.lastIndexOf("\n", at - 1) + 1;
-}
-
-/**
- * Clamp an off-chat drag's anchor end to the focus (cursor) line:
- * a selection whose anchor sits above the cursor's current line
- * pins back to that line's start, so drags starting off-chat (or
- * running off-screen) never highlight above it. Anchors at or below
- * the line pass through untouched.
- */
-export function clampDragAnchorToFocusLine(
-	text: string,
-	anchorOffset: number,
-	focusOffset: number
-): number {
-	const lineStart = lineStartOffset(text, focusOffset);
-	return anchorOffset < lineStart ? lineStart : anchorOffset;
 }
 
 /**
