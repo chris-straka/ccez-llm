@@ -165,9 +165,10 @@ where it was left. -->
 			.map((l) => l.trim())
 			.filter((l) => l.length > 0)
 	);
-	/** Headline only for a short first line in a multi-line note: an
-	old single-paragraph answer stays plain prose. */
-	const headed = $derived(lines.length > 1 && (lines[0]?.length ?? 0) <= 90);
+	/** A short first line is the gloss and reads bold as the note's
+	headline, alone or with a note under it; a long one (a clause
+	translated in full, an old single-paragraph answer) stays prose. */
+	const headed = $derived((lines[0]?.length ?? 0) <= 90);
 
 	/** The composer's top edge, when it floats over the thread below
 	the word: the card treats it as the floor, so a bottom note

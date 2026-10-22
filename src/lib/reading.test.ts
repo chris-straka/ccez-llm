@@ -25,6 +25,7 @@ import {
 	annotationAnswer,
 	buildAnnotationAnswerMessages,
 	tidyAnnotationAnswer,
+	splitGlossLine,
 	annotationGlossWords,
 	ANNOTATION_GLOSS_WORDS,
 	ANNOTATION_NOTE_WORDS,
@@ -1163,6 +1164,31 @@ describe("annotationAnswer", () => {
 			tidyAnnotationAnswer("Took (prendre).\nAlso: to catch (a train).", "prit")
 		).toBe("Took (prendre).\nAlso: to catch (a train).");
 		expect(tidyAnnotationAnswer('"prend"', "prend")).toBe('"prend"');
+	});
+
+	it("gives a gloss run into its note its own line", () => {
+		expect(
+			tidyAnnotationAnswer(
+				"Making ironic remarks about. present participle in -ant = verb-ing.",
+				"ironisant"
+			)
+		).toBe(
+			"Making ironic remarks about.\npresent participle in -ant = verb-ing."
+		);
+		expect(
+			splitGlossLine("Even if it means. quitte à + infinitive\nMore.")
+		).toBe("Even if it means.\nquitte à + infinitive\nMore.");
+		expect(
+			splitGlossLine("Crossed (franchir). passé composé of franchir.")
+		).toBe("Crossed (franchir).\npassé composé of franchir.");
+	});
+
+	it("leaves real sentences and abbreviations whole", () => {
+		expect(splitGlossLine("Pounds (e.g. sterling).")).toBe(
+			"Pounds (e.g. sterling)."
+		);
+		expect(splitGlossLine("He left. She stayed.")).toBe("He left. She stayed.");
+		expect(splitGlossLine("Unions.")).toBe("Unions.");
 	});
 
 	it("tidies the reply it files", async () => {

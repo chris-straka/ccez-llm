@@ -963,8 +963,9 @@ export function buildAnnotationAnswerMessages(
 				role: "system",
 				content:
 					`You answer a language learner's question about a quoted ` +
-					`word or phrase. ${gloss} Then answer the question directly ` +
-					`in plain connected sentences. No markdown. At most ` +
+					`word or phrase. ${gloss} Put it alone on the first line, ` +
+					`then answer the question directly on the lines below, in ` +
+					`plain connected sentences. No markdown. At most ` +
 					`${glossWords + ANNOTATION_QUESTION_WORDS} words.`
 			},
 			{ role: "user", content: `${user}\n\nQuestion: ${asked}` }
@@ -983,7 +984,8 @@ export function buildAnnotationAnswerMessages(
 				`idiom, a tense or mood, or a false friend. Give the pattern, ` +
 				`not a grammar lesson. When the equivalent already says it ` +
 				`all, as for a plain word, stop after it. Never a second note. ` +
-				`No markdown. At most ${glossWords + ANNOTATION_NOTE_WORDS} words.`
+				`Put the equivalent alone on the first line and the note on ` +
+				`the line below it. No markdown. At most ${glossWords + ANNOTATION_NOTE_WORDS} words.`
 		},
 		{ role: "user", content: user }
 	];
@@ -1094,11 +1096,13 @@ function sameForm(text: string): string {
  * ("\"s'en prend\"") goes, a leading restatement before a colon or
  * dash goes, and a parenthesized infinitive that is just the quote
  * with its ending changed ("Attacks (s'en prendre)." for "s'en
- * prend") goes. Differing infinitives ("Was (être).") stay. Pure.
+ * prend") goes. Differing infinitives ("Was (être).") stay. A gloss
+ * run into its note on one line gets its own line back (see
+ * splitGlossLine). Pure.
  */
 export function tidyAnnotationAnswer(answer: string, quote: string): string {
 	const q = sameForm(quote);
-	if (!q) return answer.trim();
+	if (!q) return splitGlossLine(answer.trim());
 	const esc = quote
 		.trim()
 		.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -1126,7 +1130,24 @@ export function tidyAnnotationAnswer(answer: string, quote: string): string {
 		.trim();
 	// Never tidy a reply away entirely: an answer that was nothing
 	// but the quote still shows as the model wrote it.
-	return tidy || answer.trim();
+	return splitGlossLine(tidy || answer.trim());
+}
+
+/**
+ * The gloss leads the card as its headline, so it needs a line of its
+ * own. Models often run it into the note ("Making ironic remarks
+ * about. present participle in -ant = verb-ing."): a short first
+ * sentence followed by one starting lowercase (a pattern, never a
+ * sentence) splits there. Abbreviations ("e.g. sterling") stay whole:
+ * the stop must close a word of two letters or a bracket. Pure.
+ */
+export function splitGlossLine(answer: string): string {
+	const nl = answer.indexOf("\n");
+	const first = nl === -1 ? answer : answer.slice(0, nl);
+	const rest = nl === -1 ? "" : answer.slice(nl);
+	const m = /^(.{1,80}?(?:\p{L}{2}|[)\]»"”'’])[.!?])\s+(?=\p{Ll})/u.exec(first);
+	if (!m?.[1]) return answer;
+	return `${m[1]}\n${first.slice(m[0].length)}${rest}`;
 }
 
 /**
