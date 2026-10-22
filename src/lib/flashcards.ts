@@ -1,11 +1,13 @@
 /**
- * Flashcards: spaced-repetition cards harvested from answered
- * annotations across every chat, plus an Anki export.
+ * Flashcards: spaced-repetition cards from the annotations the learner
+ * saved as cards (the save icon on a badge or its answer card), across
+ * every chat, plus an Anki export.
  *
  * Cards are derived, never stored: the annotations stay the source of
  * truth (drafts in localStorage, baked "Annotated selections:" blocks
  * in sent messages), and only the per-card schedule persists, keyed by
- * the normalized quote. Deleting a card writes a
+ * the normalized quote. Saving a card is giving it a schedule entry;
+ * unsaving drops the entry. Deleting a card from the deck writes a
  * `dismissed` entry and leaves the annotation alone, so the chat keeps
  * its badge and the card stays gone.
  *
@@ -243,6 +245,31 @@ export function dismissCard(
 	now: number
 ): CardSchedule {
 	return { ...(prev ?? { due: now, interval: 0, reps: 0 }), dismissed: true };
+}
+
+/** Saved as a card: it has a schedule entry and isn't deleted. */
+export function isSavedCard(schedule: ReviewSchedule, key: string): boolean {
+	const entry = schedule[key];
+	return entry !== undefined && entry.dismissed !== true;
+}
+
+/**
+ * Save or unsave a quote's card. Saving starts a new card (due now);
+ * a deleted one comes back fresh. Unsaving drops its schedule, so a
+ * later save starts over. Returns the same map when nothing changes.
+ */
+export function toggleSavedCard(
+	schedule: ReviewSchedule,
+	key: string,
+	now: number
+): ReviewSchedule {
+	if (!key) return schedule;
+	if (isSavedCard(schedule, key)) {
+		const next = { ...schedule };
+		delete next[key];
+		return next;
+	}
+	return { ...schedule, [key]: { due: now, interval: 0, reps: 0 } };
 }
 
 /** Rough "next in" copy for the grade buttons' titles. */

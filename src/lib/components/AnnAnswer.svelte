@@ -30,6 +30,11 @@ prompt approval the badge's plus/minus. -->
 		gap: number;
 		/** Badge whose word this note explains (pulses on open). */
 		badgeId: string;
+		/** The quote is saved as a card (the corner icon fills). */
+		saved?: boolean;
+		/** Save or unsave the quote as a card; absent hides the icon
+		 * (flashcards off). */
+		onToggleSave?: (() => void) | undefined;
 	}
 
 	let {
@@ -40,7 +45,9 @@ prompt approval the badge's plus/minus. -->
 		pointX,
 		maxWidth,
 		gap,
-		badgeId
+		badgeId,
+		saved = false,
+		onToggleSave
 	}: Props = $props();
 
 	/** Tail depth past the card edge: half the rotated square's diagonal. */
@@ -214,9 +221,66 @@ prompt approval the badge's plus/minus. -->
 			</p>
 		{/each}
 	</div>
+	{#if onToggleSave}
+		<!-- Save as a card: pinned on the card's corner, so it adds no
+		layout to the note (the phone's way in; desktop also gets it
+		on badge hover). -->
+		<button
+			type="button"
+			class="ann-answer-save"
+			class:saved
+			aria-label={saved ? "Remove from cards" : "Save as a card"}
+			title={saved ? "Saved as a card · click to remove" : "Save as a card"}
+			onmousedown={(e) => e.preventDefault()}
+			onclick={(e) => {
+				e.stopPropagation();
+				onToggleSave();
+			}}
+		>
+			<svg viewBox="0 0 16 16" aria-hidden="true"
+				><path d="M4.5 2.5h7v11L8 10.8l-3.5 2.7z" /></svg
+			>
+		</button>
+	{/if}
 </div>
 
 <style>
+	/* The save pin rides the card's top-right corner, sized off the
+	card's text so it keeps pace with the text size. */
+	.ann-answer-save {
+		position: absolute;
+		top: -0.7em;
+		right: -0.7em;
+		width: 1.7em;
+		height: 1.7em;
+		min-width: 2rem;
+		min-height: 2rem;
+		display: grid;
+		place-items: center;
+		padding: 0;
+		border: 1px solid var(--line-soft);
+		border-radius: 50%;
+		background: var(--bg);
+		color: var(--muted);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+		cursor: pointer;
+		font-size: inherit;
+	}
+	.ann-answer-save:hover,
+	.ann-answer-save.saved {
+		color: var(--accent);
+	}
+	.ann-answer-save svg {
+		width: 55%;
+		height: 55%;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
+		stroke-linejoin: round;
+	}
+	.ann-answer-save.saved svg {
+		fill: currentColor;
+	}
 	/* Open: scale and fade out of the word (the origin rides the tail,
 	so the card grows from the word it explains). Close mirrors it. */
 	@keyframes ann-answer-in {

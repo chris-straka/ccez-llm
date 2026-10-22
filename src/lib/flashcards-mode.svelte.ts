@@ -6,13 +6,16 @@ import {
 	currentCard,
 	deckKeyAction,
 	dueCards,
+	cardKey,
 	harvestCards,
 	isFlashcardsChord,
+	isSavedCard,
 	loadReviewSchedule,
 	nextDueAt,
 	saveReviewSchedule,
 	startSession,
 	stepSession,
+	toggleSavedCard,
 	type DeckAction,
 	type DeckKeyFacts,
 	type DeckSession,
@@ -94,9 +97,25 @@ export class FlashcardsMode {
 		return this.session !== null;
 	}
 
-	/** Every chat's answered annotations; the active chat reads live. */
+	/** Every chat's answered annotations saved as cards; the active
+	 * chat reads live. */
 	private harvest(): ReviewCard[] {
-		return harvestCards(this.deps.getChats(), this.deps.draftsFor);
+		return harvestCards(this.deps.getChats(), this.deps.draftsFor).filter((c) =>
+			isSavedCard(this.schedule, c.key)
+		);
+	}
+
+	/** This quote is saved as a card. */
+	isSaved(quote: string): boolean {
+		return isSavedCard(this.schedule, cardKey(quote));
+	}
+
+	/** Save the quote as a card, or take it back out of the deck. */
+	toggleSaved(quote: string): void {
+		const next = toggleSavedCard(this.schedule, cardKey(quote), Date.now());
+		if (next === this.schedule) return;
+		this.schedule = next;
+		saveReviewSchedule(next, this.deps.store);
 	}
 
 	open(): void {

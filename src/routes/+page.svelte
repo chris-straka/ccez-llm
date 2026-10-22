@@ -188,6 +188,7 @@
 	import { escapeHtml } from "$lib/render-math";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
+	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
 
@@ -15061,8 +15062,25 @@
 				maxWidth={pop.w}
 				gap={pop.gap}
 				badgeId={pop.id}
+				saved={flashcards.isSaved(answered.quote)}
+				onToggleSave={settings.flashcardsEnabled
+					? () => flashcards.toggleSaved(answered.quote)
+					: undefined}
 			/>
 		{/if}
+	{/if}
+	{#if settings.flashcardsEnabled && !androidUI}
+		<BadgeSave
+			badgeId={annotateMode.hoverBadgeId}
+			saved={(id) => {
+				const ann = drafts.list.find((a) => a.id === id);
+				return ann ? flashcards.isSaved(ann.quote) : false;
+			}}
+			toggle={(id) => {
+				const ann = drafts.list.find((a) => a.id === id);
+				if (ann) flashcards.toggleSaved(ann.quote);
+			}}
+		/>
 	{/if}
 
 	<!-- Settings drawer through `SettingsDrawer.svelte` (double-click

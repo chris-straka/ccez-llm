@@ -50,6 +50,8 @@ function harness(
 		phone?: boolean;
 		save?: FlashcardsModeDeps["saveText"];
 		copy?: FlashcardsModeDeps["copyText"];
+		/** Quotes saved as cards (default: both). */
+		saved?: string[];
 	} = {}
 ) {
 	const calls = {
@@ -106,10 +108,31 @@ function harness(
 		toastError: (m) => void calls.errors.push(m),
 		store
 	});
+	for (const quote of opts.saved ?? ["Bahnhof", "Haus"])
+		deck.toggleSaved(quote);
 	return { deck, calls, store };
 }
 
 describe("FlashcardsMode", () => {
+	it("only annotations saved as cards make the deck", () => {
+		const { deck } = harness({ saved: ["Haus"] });
+		expect(deck.due).toBe(1);
+		deck.open();
+		expect(deck.session?.queue.map((c) => c.quote)).toEqual(["Haus"]);
+		expect(deck.isSaved("haus")).toBe(true);
+		expect(deck.isSaved("Bahnhof")).toBe(false);
+	});
+
+	it("unsaving takes the card back out of the deck", () => {
+		const { deck } = harness();
+		expect(deck.due).toBe(2);
+		deck.toggleSaved("Bahnhof");
+		expect(deck.isSaved("Bahnhof")).toBe(false);
+		expect(deck.due).toBe(1);
+		deck.toggleSaved("Bahnhof");
+		expect(deck.due).toBe(2);
+	});
+
 	it("counts due cards only when enabled on an empty chat", () => {
 		expect(harness().deck.due).toBe(2);
 		expect(harness({ enabled: false }).deck.due).toBe(0);
@@ -130,14 +153,17 @@ describe("FlashcardsMode", () => {
 
 	it("flips before grading and persists the graded schedule", () => {
 		const { deck, store } = harness();
+		const stored = () => [...store.data.values()].join("");
+		const saved = stored();
 		deck.open();
 		deck.step("good");
 		expect(deck.session?.flipped).toBe(true);
-		expect(store.data.size).toBe(0);
+		// A flip persists nothing; the grade does.
+		expect(stored()).toBe(saved);
 		deck.step("good");
 		expect(deck.session?.index).toBe(1);
 		expect(deck.session?.reviewed).toBe(1);
-		expect(store.data.size).toBe(1);
+		expect(stored()).not.toBe(saved);
 		expect(deck.due).toBe(1);
 		expect(deck.nextDue).not.toBeNull();
 	});

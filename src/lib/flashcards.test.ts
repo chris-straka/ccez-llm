@@ -3,6 +3,8 @@ import type { Annotation, AnnotationId } from "./annotations";
 import { withAnnotations } from "./annotation-block";
 import type { ChatId, ChatMsgId } from "./chat";
 import {
+	isSavedCard,
+	toggleSavedCard,
 	RELEARN_MS,
 	ankiExport,
 	cardKey,
@@ -361,5 +363,23 @@ describe("deckKeyAction", () => {
 		expect(deckKeyAction(k("Tab", "Tab", { shiftKey: true }))).toBe("pass");
 		expect(deckKeyAction(k("Enter", "Enter", { onButton: true }))).toBe("pass");
 		expect(deckKeyAction(k(" ", "Space", { onButton: true }))).toBe("pass");
+	});
+});
+
+describe("saved cards", () => {
+	it("saving starts a new card due now; unsaving drops it", () => {
+		const saved = toggleSavedCard({}, "haus", 1000);
+		expect(saved).toEqual({ haus: { due: 1000, interval: 0, reps: 0 } });
+		expect(isSavedCard(saved, "haus")).toBe(true);
+		expect(toggleSavedCard(saved, "haus", 2000)).toEqual({});
+	});
+	it("a deleted card isn't saved, and saving brings it back fresh", () => {
+		const gone = {
+			haus: { due: 1, interval: 3, reps: 2, dismissed: true as const }
+		};
+		expect(isSavedCard(gone, "haus")).toBe(false);
+		expect(toggleSavedCard(gone, "haus", 5)).toEqual({
+			haus: { due: 5, interval: 0, reps: 0 }
+		});
 	});
 });
