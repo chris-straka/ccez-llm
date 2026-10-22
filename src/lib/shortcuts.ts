@@ -146,6 +146,7 @@ export function desktopShortcuts(
 	const chats = "Chats";
 	const prompt = "Prompt & model";
 	const reading = "Reading & study";
+	const drill = "Video drills";
 	const mouse = "Mouse & selection";
 	const scroll = "Scrolling";
 	const view = "Window & view";
@@ -248,13 +249,22 @@ export function desktopShortcuts(
 			name: "Flashcards",
 			keys: `${shiftMeta}R · Space flips · 1 / 2 grade`
 		},
-		{
-			group: reading,
-			name: "Listening drill",
-			keys: `Space plays · S slow · a next · A shows text · ${meta}Enter next · ${altm}+Space anywhere`
-		},
 		{ group: reading, name: "Capture window text", keys: `${shiftMeta}O` },
 		{ group: reading, name: "Set capture area", keys: `${shiftMeta}U` },
+		{
+			group: drill,
+			name: "Play / pause",
+			keys: `Space over the video · click the video · ${altm}+Space anywhere`
+		},
+		{ group: drill, name: "Stop playing", keys: "Space" },
+		{ group: drill, name: "Slow replay", keys: `S · ${altm}+S anywhere` },
+		{ group: drill, name: "Show the text", keys: "Shift+A" },
+		{ group: drill, name: "Next clip", keys: `a · ${meta}Enter` },
+		{
+			group: drill,
+			name: "Ask about the video",
+			keys: "Space, then type"
+		},
 		{ group: mouse, name: "Speak text aloud", keys: "Right-click" },
 		{
 			group: mouse,

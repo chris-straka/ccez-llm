@@ -38,6 +38,7 @@ test("list runs in sections, hovered-message keys first", async ({ page }) => {
 			"Chats",
 			"Prompt & model",
 			"Reading & study",
+			"Video drills",
 			"Mouse & selection",
 			"Scrolling",
 			"Window & view"

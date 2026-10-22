@@ -196,74 +196,73 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 		color: var(--muted);
 		font-size: 0.8rem;
 	}
-	/* Sections flow into two columns where the box is wide enough
-	and stack on phones (and under heavy interface zoom), never
-	splitting a section across columns. */
+	/* Sections are soft cards flowing into two columns where the box
+	is wide enough (stacked on phones and under heavy interface zoom),
+	never split across columns. Each heading wears the accent, the
+	selection's blue, so the eye lands on sections first. */
 	.keys {
-		columns: 2 17rem;
-		column-gap: 2rem;
+		columns: 2 18rem;
+		column-gap: 1rem;
+		margin-top: 0.6rem;
 	}
 	.keys-section {
 		break-inside: avoid;
-		margin-bottom: 0.9rem;
+		margin: 0 0 1rem;
+		padding: 0.7rem 0.9rem 0.5rem;
+		border-radius: 12px;
+		background: rgba(120, 120, 128, 0.06);
 	}
 	.keys-section h3 {
-		margin: 0 0 0.2rem;
-		font-size: 0.72rem;
+		margin: 0 0 0.35rem;
+		font-size: 0.82rem;
 		font-weight: 650;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: #6e6e73;
-		color: var(--dim);
+		letter-spacing: 0.01em;
+		color: var(--accent);
 	}
 	.keys dl {
 		margin: 0;
 	}
+	/* One row: the action on the left, its keys right-aligned. A long
+	name wraps in its own column; long key lists wrap in theirs. */
 	.keys dl div {
-		display: flex;
-		flex-wrap: wrap;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
 		align-items: baseline;
-		gap: 0.3rem 0.7rem;
-		padding: 0.26rem 0;
-		border-top: 1px solid #e5e5ea;
-		border-top-color: var(--line-soft);
-		font-size: 0.8rem;
+		gap: 0.75rem;
+		padding: 0.42rem 0;
+		border-top: 1px solid var(--line-soft);
+		font-size: 0.84rem;
+		line-height: 1.35;
 	}
 	.keys dl div:first-child {
 		border-top: 0;
 	}
 	.keys dt {
-		/* Shrinkable basis: at 100% the name column fits every row,
-		so nothing shrinks or wraps; under the interface zoom in a
-		capped box the fixed basis would hog the row and starve the
-		chord. The name wraps instead, and the chord drops below
-		when even that overflows. */
-		flex: 0 1 9rem;
 		min-width: 0;
-		color: #3a3a3c;
-		color: var(--focus);
+		color: var(--ink);
 	}
 	.keys dd {
 		margin: 0;
-		flex: 1 1 auto;
 		min-width: 0;
+		max-width: 15rem;
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.25rem;
-		font-family: ui-monospace, monospace;
-		font-size: 0.75rem;
-		color: #1c1c1e;
+		justify-content: flex-end;
+		gap: 0.3rem;
+		font-size: 0.78rem;
 		color: var(--ink);
-		overflow-wrap: anywhere;
 	}
 	/* Key chip: one alternative per box, so "⌘B", "⇧⌘H", and
-	"J / K walk" read as separate ways in instead of one run. */
+	"J / K walk" read as separate ways in instead of one run. The
+	interface font (not monospace) keeps phrases like "Space over the
+	video" readable; a slightly heavier bottom edge reads as a key. */
 	.chip {
-		padding: 0.05rem 0.4rem;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
+		padding: 0.08rem 0.45rem;
+		border: 1px solid var(--line-soft);
+		border-bottom-width: 2px;
 		border-radius: 6px;
-		background: rgba(120, 120, 128, 0.08);
+		background: var(--bg);
+		color: var(--focus);
 		white-space: nowrap;
 		max-width: 100%;
 		overflow-wrap: anywhere;
@@ -283,9 +282,16 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	:global(.app[data-android]) .keys {
 		columns: 1;
 	}
+	/* Gesture phrases run long: on a phone each row stacks, the
+	gesture under its action. */
+	:global(.app[data-android]) .keys dl div {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.3rem;
+	}
 	:global(.app[data-android]) .keys dd {
-		font-family: inherit;
 		font-size: 0.8rem;
+		max-width: none;
+		justify-content: flex-start;
 	}
 	:global(.app[data-android]) .chip {
 		white-space: normal;
