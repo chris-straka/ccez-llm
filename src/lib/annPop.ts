@@ -240,6 +240,10 @@ export function placeAnswerPopover(facts: {
 	/** Tail depth past the card edge (px). */
 	tail: number;
 	margin?: number;
+	/** The quote's article column: a card that fits stays inside it,
+	so a short last line near the column's edge never swings the card
+	out past the text. */
+	column?: NoteColumn;
 }): AnswerPlacement {
 	const m = facts.margin ?? 8;
 	const { anchor, cardWidth: w } = facts;
@@ -248,7 +252,17 @@ export function placeAnswerPopover(facts: {
 		wordWidth < w
 			? anchor.left + wordWidth / 2
 			: Math.min(Math.max(facts.pointX, anchor.left), anchor.right);
-	const x = Math.max(m, Math.min(target - w / 2, facts.viewportWidth - w - m));
+	let lo = m;
+	let hi = facts.viewportWidth - w - m;
+	if (facts.column) {
+		const cLo = Math.max(lo, facts.column.left);
+		const cHi = Math.min(hi, facts.column.right - w);
+		if (cHi >= cLo) {
+			lo = cLo;
+			hi = cHi;
+		}
+	}
+	const x = Math.max(lo, Math.min(target - w / 2, hi));
 	const tailInset = Math.min(18, w / 2);
 	const tailX = Math.min(Math.max(target - x, tailInset), w - tailInset);
 	const reach = facts.gap + facts.tail;

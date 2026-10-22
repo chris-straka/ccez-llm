@@ -359,6 +359,7 @@ describe("annotate", () => {
 			id: "dupe" as AnnotationId,
 			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
 			clearTop: 0,
+			column: { left: 0, right: 1000 },
 			pointX: 0,
 			w: 300,
 			gap: 3
@@ -435,6 +436,7 @@ describe("openBadge", () => {
 			id: "ann-1" as AnnotationId,
 			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
 			clearTop: 0,
+			column: { left: 0, right: 1000 },
 			pointX: 0,
 			w: 300,
 			gap: 3
@@ -468,6 +470,7 @@ describe("openBadge", () => {
 			id: "ann-1" as AnnotationId,
 			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
 			clearTop: 0,
+			column: { left: 0, right: 1000 },
 			pointX: 0,
 			w: 300,
 			gap: 3

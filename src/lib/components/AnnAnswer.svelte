@@ -13,7 +13,11 @@ in the card: clicking off closes it (Esc too); rewording is the E key,
 prompt approval the badge's plus/minus. The one exception rides the
 corner, outside the text: save the quote as a flashcard. -->
 <script lang="ts">
-	import { placeAnswerPopover, type AnchorRect } from "$lib/annPop";
+	import {
+		placeAnswerPopover,
+		type AnchorRect,
+		type NoteColumn
+	} from "$lib/annPop";
 
 	interface Props {
 		answer: string;
@@ -23,6 +27,8 @@ corner, outside the text: save the quote as a flashcard. -->
 		anchor: AnchorRect;
 		/** Top edge kept clear above the word (its badge). */
 		clearTop: number;
+		/** The quote's article column (the card stays inside it). */
+		column?: NoteColumn;
 		/** Pointer x of the opening press (wide quotes aim here). */
 		pointX: number;
 		/** Widest the card may run (px); prose caps it narrower. */
@@ -43,6 +49,7 @@ corner, outside the text: save the quote as a flashcard. -->
 		closing,
 		anchor,
 		clearTop,
+		column,
 		pointX,
 		maxWidth,
 		gap,
@@ -99,7 +106,8 @@ corner, outside the text: save the quote as a flashcard. -->
 					viewportWidth: vw,
 					viewportHeight: bottomEdge,
 					gap,
-					tail: TAIL
+					tail: TAIL,
+					...(column ? { column } : {})
 				})
 			: null
 	);

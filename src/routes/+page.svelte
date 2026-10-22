@@ -15075,6 +15075,7 @@
 				closing={annotateMode.answerClosing}
 				anchor={pop.anchor}
 				clearTop={pop.clearTop}
+				column={pop.column}
 				pointX={pop.pointX}
 				maxWidth={pop.w}
 				gap={pop.gap}

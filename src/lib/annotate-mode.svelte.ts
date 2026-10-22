@@ -27,7 +27,8 @@ import {
 	placeAnnComposer,
 	quoteAnchor,
 	type AnchorRect,
-	type NoteAnchor
+	type NoteAnchor,
+	type NoteColumn
 } from "./annPop";
 import { aidDisplayText } from "./reading";
 import { vibrateTick } from "./studyMedia";
@@ -69,6 +70,8 @@ export interface AnswerPopState {
 	w: number;
 	/** Word-to-tail breath (px). */
 	gap: number;
+	/** The quote's article column (the card stays inside it). */
+	column: NoteColumn;
 }
 
 /** Page-owned collaborators the annotate cluster calls back into. */
@@ -731,7 +734,7 @@ export class AnnotateMode {
 	answerAnchor(
 		ann: Annotation,
 		at: { x: number; y: number }
-	): { anchor: AnchorRect; clearTop: number } {
+	): { anchor: AnchorRect; clearTop: number; column: NoteColumn } {
 		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
 		const badgeTop = badge?.getBoundingClientRect().top ?? null;
 		const fallback = badge?.parentElement?.getBoundingClientRect() ?? {
@@ -740,13 +743,29 @@ export class AnnotateMode {
 			right: at.x + 1,
 			bottom: at.y + 1
 		};
-		return (
-			quoteAnchor(this.quoteRects(ann), badgeTop) ??
+		const placed = quoteAnchor(this.quoteRects(ann), badgeTop) ??
 			quoteAnchor([fallback], badgeTop) ?? {
 				anchor: fallback,
 				clearTop: fallback.top
-			}
-		);
+			};
+		return { ...placed, column: this.columnFor(ann) };
+	}
+
+	/** A quote's article column (viewport px): its message's article,
+	else the thread column, else the viewport inside a margin. */
+	private columnFor(ann: Annotation): NoteColumn {
+		const index = ann.messageId
+			? this.deps.getChatMessages().findIndex((m) => m.id === ann.messageId)
+			: -1;
+		const host =
+			(index >= 0 ? document.querySelector(`article#msg-${index}`) : null) ??
+			document.querySelector(".messages");
+		const box = host?.getBoundingClientRect();
+		const m = 8;
+		const vw = window.innerWidth;
+		const left = Math.max(m, box ? box.left : m);
+		const right = Math.min(vw - m, box ? box.right : vw - m);
+		return right - left > 0 ? { left, right } : { left: m, right: vw - m };
 	}
 
 	/**
@@ -763,21 +782,7 @@ export class AnnotateMode {
 				anchor: fallback,
 				clearTop: fallback.top
 			};
-		const index = ann.messageId
-			? this.deps.getChatMessages().findIndex((m) => m.id === ann.messageId)
-			: -1;
-		const host =
-			(index >= 0 ? document.querySelector(`article#msg-${index}`) : null) ??
-			document.querySelector(".messages");
-		const box = host?.getBoundingClientRect();
-		const m = 8;
-		const vw = window.innerWidth;
-		const left = Math.max(m, box ? box.left : m);
-		const right = Math.min(vw - m, box ? box.right : vw - m);
-		return {
-			...placed,
-			column: right - left > 0 ? { left, right } : { left: m, right: vw - m }
-		};
+		return { ...placed, column: this.columnFor(ann) };
 	}
 
 	/** Re-read an open answer card's anchor from the live layout (the
@@ -941,6 +946,7 @@ export class AnnotateMode {
 				id,
 				anchor: placedOn.anchor,
 				clearTop: placedOn.clearTop,
+				column: placedOn.column,
 				pointX: anchorAt.x,
 				w: width,
 				gap

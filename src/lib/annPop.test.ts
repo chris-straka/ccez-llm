@@ -293,6 +293,26 @@ describe("placeAnswerPopover", () => {
 			tailX: 150
 		});
 	});
+	it("stays inside the article column when a short line sits at its edge", () => {
+		// A short last line at the column's left edge: centered on it,
+		// the card would swing out past the text toward the window edge.
+		const p = placeAnswerPopover({
+			...base,
+			anchor: { left: 230, top: 300, right: 300, bottom: 320 },
+			pointX: 260,
+			column: { left: 230, right: 830 }
+		});
+		expect(p.x).toBe(230);
+		expect(p.tailX).toBe(35);
+	});
+	it("falls back to the viewport when the card is wider than the column", () => {
+		const p = placeAnswerPopover({
+			...base,
+			cardWidth: 700,
+			column: { left: 230, right: 830 }
+		});
+		expect(p.x).toBe(80);
+	});
 	it("flips above, clear of the badge, when the bottom has no room", () => {
 		const p = placeAnswerPopover({
 			...base,
