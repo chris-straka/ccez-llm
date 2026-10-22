@@ -627,8 +627,13 @@ for (const t of THEMES) {
 			"border-top-color",
 			L ? "rgb(229, 229, 234)" : "rgb(42, 42, 46)"
 		);
-		await expect(page.locator(".keys dt").first()).toHaveCSS("color", focus);
+		await expect(page.locator(".keys dt").first()).toHaveCSS("color", ink);
 		await expect(page.locator(".keys dd").first()).toHaveCSS("color", ink);
+		// Section headings wear the accent (the selection's blue).
+		await expect(page.locator(".keys h3").first()).toHaveCSS(
+			"color",
+			L ? "rgb(0, 122, 255)" : "rgb(10, 132, 255)"
+		);
 	});
 
 	test(`chrome paints ${t.name}`, async ({ page }) => {
