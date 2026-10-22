@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { flushSync, onMount, tick, untrack } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
+	import { autoFoldPlan } from "$lib/autoFold";
 
 	// Document theme tokens + print sheet: global CSS
 	// lives in src/app.css, imported here (single route).
@@ -321,7 +322,11 @@
 	import { shellBackend } from "$lib/listenBackend";
 	import { nativeRouteFor } from "$lib/turns";
 	import { drillStates } from "$lib/listenChat";
-	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
+	import {
+		parseNewsLaunch,
+		relevelNewsOpener,
+		type CefrLevel
+	} from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
 	/* decomposeTree + readingChips render in `InspectOverlay.svelte`. */
 	import {
@@ -916,6 +921,42 @@
 	While nonzero the paperclip dims and reports progress. */
 	let attachBusy = $state(0);
 	let foldedIds = new SvelteSet<string>();
+	/** Auto-fold bookkeeping (plain, never rendered): ids the rule has
+	handled, and the folds it made itself (given back when its role
+	switches off). */
+	let autoFoldSeen = new Set<string>();
+	const autoFolded = new SvelteSet<string>();
+	/** Settings' fold-older rule (autoFold.ts): the newest message of
+	each role stays open, older ones fold as newer ones arrive. */
+	$effect(() => {
+		const messages = activeChat(chatState).messages.map((m) => ({
+			id: m.id,
+			role: m.role,
+			selfFolded: m.role === "user" && parseNewsLaunch(m.content) !== null
+		}));
+		const roles = {
+			user: settings.autoFoldOwn,
+			assistant: settings.autoFoldAssistant
+		};
+		untrack(() => {
+			const plan = autoFoldPlan(
+				messages,
+				roles,
+				autoFoldSeen,
+				autoFolded,
+				foldedIds
+			);
+			autoFoldSeen = plan.seen;
+			for (const id of plan.fold) {
+				foldedIds.add(id);
+				autoFolded.add(id);
+			}
+			for (const id of plan.release) {
+				foldedIds.delete(id);
+				autoFolded.delete(id);
+			}
+		});
+	});
 	// Draft annotations for the active chat (filed list, edit stash,
 	// per-chat load/save, pins, filing, ask flow): state and verbs
 	// live in the module; effects, gestures, onKey, the send pipeline,

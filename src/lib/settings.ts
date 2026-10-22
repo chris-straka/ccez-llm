@@ -282,6 +282,10 @@ export interface AppSettings {
 	 * lives in Messages on phones.
 	 */
 	foldOnSwipe: boolean;
+	/** Fold each AI reply once a newer one exists (off by default). */
+	autoFoldAssistant: boolean;
+	/** Fold each of my messages once a newer one exists (off by default). */
+	autoFoldOwn: boolean;
 	/** Touch only: read a fresh text selection aloud on release. */
 	autoSpeakSelection: boolean;
 	/**
@@ -582,6 +586,8 @@ export function defaultSettings(): AppSettings {
 		hideMessages: false,
 		hideButtons: true,
 		foldOnSwipe: false,
+		autoFoldAssistant: false,
+		autoFoldOwn: false,
 		autoSpeakSelection: true,
 		hapticsEnabled: true,
 		replyNotifications: true,
@@ -864,6 +870,9 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (!validCaptureArea(merged.captureArea)) merged.captureArea = null;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = false;
+		if (typeof merged.autoFoldAssistant !== "boolean")
+			merged.autoFoldAssistant = false;
+		if (typeof merged.autoFoldOwn !== "boolean") merged.autoFoldOwn = false;
 		if (typeof merged.autoSpeakSelection !== "boolean")
 			merged.autoSpeakSelection = true;
 		// The disable-worded `hapticsDisabled` is renamed to the
