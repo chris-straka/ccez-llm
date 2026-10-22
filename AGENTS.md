@@ -43,7 +43,10 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - MCP driver sessions: `tauri-plugin-mcp-bridge` is debug-only,
   desktop-only, localhost-bound; it loads after a dev-shell relaunch.
 - `bun run test` (Vitest), `bun run check` (svelte-check strict),
-  `bun run lint`, `bun run build`.
+  `bun run lint`, `bun run build`; CI runs all four. Agent worktrees
+  under `.claude/` and `.muse/` are excluded from Vitest and ESLint
+  (stale repo copies: they tripled the suite and ran lint out of
+  memory).
 - `bun run format` (Prettier, then `cargo fmt`) before committing; CI
   runs `format:check`'s two halves. Generated, vendored, and captured
   files are listed in `.prettierignore`.

@@ -14676,7 +14676,7 @@
 				},
 				close: () => clearReplyLang(),
 				volume: settings.listenVolume,
-				setVolume: (volume) => {
+				setVolume: (volume: number) => {
 					settings.listenVolume = Math.min(2, Math.max(0, volume));
 					persistSettings();
 				}

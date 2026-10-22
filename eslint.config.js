@@ -5,11 +5,24 @@ import prettier from "eslint-config-prettier";
 import globals from "globals";
 
 export default [
-	// .muse/ holds retained agent worktrees (no node_modules of their
-	// own): linting them spews thousands of phantom errors, the same
-	// reason the vitest config excludes **/.muse/**.
+	// .muse/ and .claude/ hold retained agent worktrees (whole copies
+	// of the repo): linting them spews phantom errors and ran the heap
+	// out of memory, the same reason the vitest config excludes
+	// **/.muse/**. Test output and screenshots are never source.
 	{
-		ignores: ["build/", ".svelte-kit/", "dist/", "src-tauri/target/", ".muse/"]
+		ignores: [
+			"build/",
+			".svelte-kit/",
+			"dist/",
+			"src-tauri/target/",
+			"src-tauri/listen/target/",
+			"src-tauri/gen/",
+			".muse/",
+			".claude/",
+			".screenshots/",
+			"test-results/",
+			"playwright-report/"
+		]
 	},
 	js.configs.recommended,
 	// Type-checked rules (no-floating-promises, no-unsafe-*, ...) turn

@@ -41,6 +41,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx prettier --check .
       - run: bun run test
+      # svelte-check syncs .svelte-kit first, which type-aware lint reads.
+      - run: bun run check
+      - run: bun run lint
       - run: bun run build
 
   # The whole Playwright suite (Chromium plus the WebKit specs in

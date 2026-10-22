@@ -44,10 +44,10 @@ export default defineConfig(() => ({
 		exclude: ["lindera-wasm"]
 	},
 	test: {
-		// Isolated agent worktrees live under .muse/ inside the checkout:
-		// their checkouts lack node_modules, so their tests must never run
-		// as part of this tree's suite.
-		exclude: ["**/.muse/**", "**/node_modules/**"]
+		// Isolated agent worktrees live under .muse/ and .claude/ inside
+		// the checkout: stale copies of this tree, so their tests must
+		// never run as part of this suite.
+		exclude: ["**/.muse/**", "**/.claude/**", "**/node_modules/**"]
 	},
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//
