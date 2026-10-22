@@ -8,9 +8,10 @@ pointing back at the word. The quote itself never renders here (the
 highlighted word upstream is the title) — answer text renders as plain
 text, never HTML, so model output can't inject markup. Lines render
 as their own paragraphs; a short first line (the expression and its
-meaning) reads as the note's headline. No close button and no tools:
-clicking off the card closes it (Esc too); rewording is the E key,
-prompt approval the badge's plus/minus. -->
+meaning) reads as the note's headline. No close button and no tools
+in the card: clicking off closes it (Esc too); rewording is the E key,
+prompt approval the badge's plus/minus. The one exception rides the
+corner, outside the text: save the quote as a flashcard. -->
 <script lang="ts">
 	import { placeAnswerPopover, type AnchorRect } from "$lib/annPop";
 

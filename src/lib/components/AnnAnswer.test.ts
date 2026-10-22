@@ -19,8 +19,10 @@ describe("annotation answer card", () => {
 		expect(answerSource()).not.toContain("{@html");
 	});
 
-	it("carries no buttons: the reply takes the whole card", () => {
-		expect(answerSource()).not.toContain("<button");
+	it("carries no tools but the save pin on its corner: the reply takes the card", () => {
+		const buttons = answerSource().match(/<button/g) ?? [];
+		expect(buttons).toHaveLength(1);
+		expect(answerSource()).toContain('class="ann-answer-save"');
 	});
 
 	it("reads at message size with the popup-size setting on top", () => {
