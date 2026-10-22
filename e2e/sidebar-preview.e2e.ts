@@ -71,10 +71,14 @@ test("sidebar hover shows the chat counts tip", async ({ page }) => {
 	// Opacity, not visibility: the tip keeps its box while faded.
 	await expect(tip).toHaveCSS("opacity", "1", { timeout: 10_000 });
 	await expect(tip).toHaveText("1 message · you 0 · AI 1");
-	// The tip floats above the row, never below it.
+	// The tip takes the time line's place inside its own row, never
+	// over the row (or the search box) above.
 	const boxes = await Promise.all([tip.boundingBox(), row.boundingBox()]);
 	if (!boxes[0] || !boxes[1]) throw new Error("tip or row has no box");
-	expect(boxes[0].y + boxes[0].height).toBeLessThanOrEqual(boxes[1].y + 4);
+	expect(boxes[0].y).toBeGreaterThanOrEqual(boxes[1].y);
+	expect(boxes[0].y + boxes[0].height).toBeLessThanOrEqual(
+		boxes[1].y + boxes[1].height + 1
+	);
 	// Leaving drops hover; the row button also holds keyboard focus,
 	// so click out to clear focus-within too.
 	await page.mouse.move(600, 500);

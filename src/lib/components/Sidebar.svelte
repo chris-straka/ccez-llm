@@ -260,7 +260,9 @@ only this drawer through scoping. -->
 		aria-label="New chat"
 		onclick={actions.newChat}
 	>
-		+
+		<span class="new-plus" aria-hidden="true">+</span><span class="new-label"
+			>New chat</span
+		>
 	</button>
 	{#if android}
 		<!-- Touch settings entry: one-finger swipes never open
@@ -803,6 +805,101 @@ only this drawer through scoping. -->
 	}
 	:global(.app[data-android]) aside:not(.settings-panel).collapsed {
 		transform: translateX(-105%);
+	}
+	/* Phones keep the bare + at the thumb; the label is desktop's. */
+	:global(.app[data-android]) aside .new-label {
+		display: none;
+	}
+	/* Desktop drawer: sized for the display it sits on (wider and
+	larger type on big windows, never under 15rem), New chat first
+	under the search as a labelled row, rows with room to read, and
+	the time line in the text face. The count tip takes the time
+	line's place in its own row instead of floating over the row
+	above (it covered the search box on the first row). */
+	:global(.app:not([data-android])) aside {
+		width: clamp(15rem, 17vw, 21rem);
+		padding: 0.9rem 0.85rem;
+		gap: 0.55rem;
+		font-size: clamp(1rem, 0.85rem + 0.25vw, 1.12rem);
+	}
+	:global(.app:not([data-android])) aside .side-head {
+		order: 0;
+	}
+	:global(.app:not([data-android])) aside .side-search-wrap {
+		order: 1;
+		margin: 0.2rem 0 0;
+	}
+	:global(.app:not([data-android])) aside .new {
+		order: 2;
+	}
+	:global(.app:not([data-android])) aside ul {
+		order: 3;
+		gap: 0.15rem;
+	}
+	:global(.app:not([data-android])) aside button,
+	:global(.app:not([data-android])) aside .side-search,
+	:global(.app:not([data-android])) .side-rename {
+		font-size: 0.9em;
+	}
+	:global(.app:not([data-android])) aside .side-search {
+		padding: 0.5em 1.9em 0.5em 0.7em;
+		border-radius: 10px;
+	}
+	:global(.app:not([data-android])) aside .new {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		width: 100%;
+		padding: 0.5em 0.7em;
+		border-radius: 10px;
+		text-align: left;
+		color: var(--ink);
+	}
+	:global(.app:not([data-android])) aside .new-plus {
+		width: 1em;
+		text-align: center;
+		font-size: 1.15em;
+		line-height: 1;
+		color: var(--accent);
+	}
+	:global(.app:not([data-android])) aside ul button.side-chat {
+		padding: 0.5em 0.7em 0.5em 0.85em;
+		border-radius: 10px;
+	}
+	:global(.app:not([data-android])) aside button.active {
+		background: color-mix(in srgb, var(--hover-wash) 55%, transparent);
+		font-weight: 600;
+	}
+	:global(.app:not([data-android])) aside ul button:hover {
+		background: var(--hover-wash);
+	}
+	:global(.app:not([data-android])) .side-title {
+		font-weight: 500;
+	}
+	:global(.app:not([data-android])) aside button.active .side-title {
+		font-weight: 650;
+	}
+	:global(.app:not([data-android])) .side-time {
+		margin-top: 0.12em;
+		font-family: inherit;
+		font-variant-numeric: tabular-nums;
+		font-size: 0.8em;
+		color: var(--muted);
+	}
+	:global(.app:not([data-android])) aside .side-tip {
+		bottom: auto;
+		top: calc(50% + 0.1em);
+		left: 0.6em;
+		max-width: calc(100% - 7.2rem);
+		padding: 0 0.25em;
+		border: 0;
+		border-radius: 4px;
+		box-shadow: none;
+		background: var(--hover-wash);
+		color: var(--muted);
+		font-size: 0.72em;
+		font-weight: 500;
+		line-height: 1.6;
 	}
 	/* Close is a geometric X sized to the button's text: a text ×
 	sits low on its font bearings. */

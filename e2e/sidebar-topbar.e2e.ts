@@ -80,7 +80,7 @@ test("ctrl-shift-delete drops the current chat", async ({ page }) => {
 
 /** Row icons sit adjacent, export left of delete; on hover the row's
 text fades out beneath them (idle rows keep the full width), and the
-time line stays monospace so times align. */
+time line keeps tabular figures so times align. */
 test("row export sits by delete, title fades beneath", async ({ page }) => {
 	await openSidebar(page);
 	const row = page.locator("aside ul li").first();
@@ -96,13 +96,13 @@ test("row export sits by delete, title fades beneath", async ({ page }) => {
 		return {
 			gap: Math.round(del.left - exp.right),
 			mask: st.maskImage || st.webkitMaskImage,
-			mono: getComputedStyle(time).fontFamily
+			figures: getComputedStyle(time).fontVariantNumeric
 		};
 	});
 	expect(geom).not.toBeNull();
 	expect(geom!.gap).toBeLessThanOrEqual(8);
 	expect(geom!.mask).toContain("gradient");
-	expect(geom!.mono).toMatch(/monospace/i);
+	expect(geom!.figures).toContain("tabular-nums");
 });
 
 /** Clicking a chat closes the sidebar and lands on that chat. */
