@@ -1082,7 +1082,10 @@ describe("annotationAnswer", () => {
 				"Ce dernier a accepté de coopérer avec le gouvernement central malgré ses réserves."
 		};
 		const [system] = buildAnnotationAnswerMessages(sentence);
-		expect(system!.content).toContain("its natural translation in full");
+		expect(system!.content).toContain("close translation in full");
+		expect(system!.content).toContain(
+			"never a polished or reworded English version"
+		);
 		expect(system!.content).toContain(
 			`${annotationGlossWords(sentence.quote) + ANNOTATION_NOTE_WORDS} words`
 		);

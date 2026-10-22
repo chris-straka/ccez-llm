@@ -942,8 +942,11 @@ export function buildAnnotationAnswerMessages(
 			`with the English equivalent of the quote for the sense it has ` +
 			`in this passage, the word or short phrase a bilingual ` +
 			`dictionary lists for that sense ("Escalation.", "Pounds ` +
-			`(sterling).", "Unions."), or for a clause or sentence its ` +
-			`natural translation in full`;
+			`(sterling).", "Unions."), or for a clause or sentence a ` +
+			`close translation in full: keep the passage's word order and ` +
+			`word choices wherever English allows, so the learner can map ` +
+			`each piece back to the original; never a polished or ` +
+			`reworded English version`;
 	const gloss =
 		`The learner is reading the passage right now, so never retell ` +
 		`or explain it. ${equivalent}: never a definition, never a ` +
