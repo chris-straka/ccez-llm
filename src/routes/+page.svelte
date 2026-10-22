@@ -235,6 +235,7 @@
 		type SentTagAction
 	} from "$lib/attachments";
 	import {
+		BADGE_HOLD_DELETE_MS,
 		canHoldDeleteBadge,
 		buildMarksFor,
 		aidedTextForMsg,
@@ -10497,10 +10498,11 @@
 			},
 			{ passive: true }
 		);
-		// Orange-badge hold-to-delete (Android): a still 2s press on
-		// an answered badge deletes its annotation (the delete thumps
-		// like any other). Blue badges never arm — their tap only
-		// toasts Loading. Lift, travel, scroll, or a second finger
+		// Badge hold-to-delete (Android): a still press on any filed
+		// badge, blue (still loading) or orange, deletes its
+		// annotation (the delete thumps like any other); a blue
+		// badge's plain tap only toasts Loading. Lift, travel, scroll,
+		// or a second finger
 		// cancels; the fire re-checks the badge is still answered
 		// and the thread never scrolled (destructive, so strict).
 		// The fire stamps its id so the trailing compatibility mouse
@@ -10541,7 +10543,7 @@
 					if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id))) return;
 					annotateMode.removeAnnotation(id);
 					badgeHoldFired = { id, at: Date.now() };
-				}, 2000);
+				}, BADGE_HOLD_DELETE_MS);
 			},
 			{ passive: true }
 		);

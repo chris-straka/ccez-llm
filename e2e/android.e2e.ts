@@ -2147,6 +2147,65 @@ test.describe("touch", () => {
 			await expect(page.locator("article.user .ann-refs")).toHaveCount(0);
 		});
 
+		/** A loading (blue) badge holds to delete in well under a
+		second: its tap only toasts Loading, so a long wait read as
+		"can't delete". */
+		test("a short hold deletes a loading badge", async ({ page }) => {
+			await seedChat(page, [
+				{ role: "assistant", content: "alpha beta gamma delta" }
+			]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem("ccez-mock-chat-ms", "60000");
+				window.localStorage.setItem(
+					"ccez-llm-annotations-v1",
+					JSON.stringify({
+						"e2e-chat": [
+							{
+								id: "ann-1",
+								messageId: "e2e-m0",
+								quote: "beta",
+								comment: "first"
+							}
+						]
+					})
+				);
+			});
+			await page.goto("/");
+			const badge = page.locator("[data-ann-badge]").first();
+			await expect(badge).toHaveClass(/ans-waiting/, { timeout: 15_000 });
+			// Trusted touches can't hold in Playwright: a synthetic
+			// press on the badge reaches the window listener.
+			const pressed = await page.evaluate(() => {
+				const el = document.querySelector("[data-ann-badge]");
+				if (!el) return 0;
+				const r = el.getBoundingClientRect();
+				const touch = new Touch({
+					identifier: 1,
+					target: el,
+					clientX: r.left + r.width / 2,
+					clientY: r.top + r.height / 2
+				});
+				el.dispatchEvent(
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch],
+						changedTouches: [touch]
+					})
+				);
+				return performance.now();
+			});
+			await expect(page.locator("[data-ann-badge]")).toHaveCount(0, {
+				timeout: 1500
+			});
+			const elapsed = await page.evaluate(
+				(t) => performance.now() - t,
+				pressed
+			);
+			expect(elapsed).toBeLessThan(1500);
+		});
+
 		/** Answered badge taps land the card by its measured height:
 		with a keyboard-short viewport the card fits below the badge
 		instead of collapsing to the top, and a bottom badge earns

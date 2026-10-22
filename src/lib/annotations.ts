@@ -197,6 +197,10 @@ export function quoteDirection(quote: string): "rtl" | "ltr" | null {
  * waiting badge's delete attach to nothing (see
  * attachAnnotationAnswer), so deleting early is safe. Pure.
  */
+/** Hold-to-delete press length on phone badges: past a tap, well
+short of a deliberate wait (2s read as "can't delete"). */
+export const BADGE_HOLD_DELETE_MS = 600;
+
 export function canHoldDeleteBadge(ann: { id: string } | undefined): boolean {
 	return ann !== undefined;
 }
