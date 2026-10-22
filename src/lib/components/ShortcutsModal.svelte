@@ -73,6 +73,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	label={android ? "Touch gestures" : "Keyboard shortcuts"}
 	labelledby={android ? undefined : "shortcuts-heading"}
 	fadeScroll
+	cardClass={android ? "" : "shortcuts-modal"}
 	onVeilClick={veilClick}
 >
 	<div class="modal-head">
@@ -201,11 +202,18 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	never split across columns. Each heading wears the accent, the
 	selection's blue, so the eye lands on sections first. */
 	.keys {
-		columns: 2 18rem;
+		columns: 3 18rem;
 		column-gap: 1rem;
 		margin-top: 0.6rem;
 	}
+	/* Full-width inline blocks: a block's bottom margin at a column
+	break carried over to the next column's top (WebKit), so the right
+	column started lower than the left. A line box moves whole. */
 	.keys-section {
+		display: inline-block;
+		width: 100%;
+		box-sizing: border-box;
+		vertical-align: top;
 		break-inside: avoid;
 		margin: 0 0 1rem;
 		padding: 0.7rem 0.9rem 0.5rem;

@@ -143,6 +143,36 @@ move here verbatim. -->
 	.inspect-modal {
 		width: min(36rem, calc(100vw - 3rem));
 	}
+	/* Shortcuts sheet: grows with big windows (larger type through an
+	extra zoom step, up to three columns of sections) instead of
+	staying a laptop-sized box in the middle of a wide display. The
+	caps divide by the extra step so the zoomed box still fits. */
+	.shortcuts-modal {
+		--sheet-zoom: 1;
+		zoom: calc(var(--ui-scale, 1) * var(--sheet-zoom));
+		width: min(
+			64rem,
+			calc((100vw - 3rem) * var(--ui-scale-inv, 1) / var(--sheet-zoom))
+		);
+		max-width: min(
+			64rem,
+			calc((100vw - 3rem) * var(--ui-scale-inv, 1) / var(--sheet-zoom))
+		);
+		max-height: min(
+			46rem,
+			calc((100dvh - 3rem) * var(--ui-scale-inv, 1) / var(--sheet-zoom))
+		);
+	}
+	@media (min-width: 1500px) and (min-height: 850px) {
+		.shortcuts-modal {
+			--sheet-zoom: 1.2;
+		}
+	}
+	@media (min-width: 1900px) and (min-height: 1000px) {
+		.shortcuts-modal {
+			--sheet-zoom: 1.35;
+		}
+	}
 	/* Flashcards box: one card wide, sized like a real card. */
 	.flashcards-modal {
 		width: min(30rem, calc(100vw - 3rem));
