@@ -101,7 +101,13 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 .settings-inner section {
 	border-top: 1px solid #e5e5ea;
 	border-top: 1px solid var(--line-soft);
-	padding: 1.1rem 0;
+	padding: 1.1rem 0 2rem;
+}
+/* Every section ends the same way: its last control's own gap plus the
+	section's bottom padding, 3rem in all, a clear break before the
+	next group's divider. */
+.settings-inner section > :last-child {
+	margin-bottom: 1rem;
 }
 /* Touch gestures and Updates form a 2x2 grid: headings share the
 	top row, buttons share the row beneath. Sections go display:contents
