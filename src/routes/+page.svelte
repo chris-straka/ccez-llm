@@ -9195,10 +9195,11 @@
 	};
 
 	/** Send-button hold (touch or desktop mouse): a reply in flight
-	stops; otherwise, on an empty composer, stash the reply language
-	and drop to default, or restore the stash — the emoji vanishes
-	and returns. Haptic ticks on every
-	switch (phones); desktop toasts the swap like the menus do. */
+	stops; otherwise stash the reply language and drop to default, or
+	restore the stash — the emoji vanishes and returns. Typed text
+	stays put: the release after a fired hold never sends. Haptic
+	ticks on every switch (phones); desktop toasts the swap like the
+	menus do. */
 	const SEND_HOLD_MS = 500;
 	const replyLangStash = new SvelteMap<ChatId, string>();
 	/** Send-button box for the prompt-level hold zone below. */
@@ -9213,18 +9214,19 @@
 		return pointInRect(x, y, sendBtnEl?.getBoundingClientRect());
 	}
 	let sendHoldTimer: ReturnType<typeof setTimeout> | null = null;
+	/** A hold fired on this press: the button's trailing click is the
+	release, not a send. Cleared by that click or the next press. */
+	let sendHoldSwallowClick = false;
 
 	function sendHoldStart(): void {
 		// In-prompt note edits own the arrow (tap files, even empty):
-		// never arm a hold underneath them. Staged annotations ride
-		// the send either way, so they never block the language
-		// hold — only text and attachments disarm it. A reply in
-		// flight turns the hold into a stop instead.
+		// never arm a hold underneath them. A reply in flight turns
+		// the hold into a stop instead.
+		sendHoldSwallowClick = false;
 		const id = chatState.activeChatId;
 		const action = sendHoldAction({
 			timerRunning: sendHoldTimer !== null,
 			promptNoteEditing: !!promptAnnEdit,
-			composerEmpty: composerText() === "" && attachments.length === 0,
 			replyLive:
 				isSending(chatState, id) ||
 				nativeTurns.live.has(id) ||
@@ -9233,6 +9235,7 @@
 		if (action === null) return;
 		sendHoldTimer = setTimeout(() => {
 			sendHoldTimer = null;
+			sendHoldSwallowClick = true;
 			if (action === "swap-lang") {
 				swapReplyLangHold();
 				return;
@@ -14900,7 +14903,13 @@
 					buzzTap();
 				},
 				correctionToggle: () => toggleCorrection(),
-				submit: (alt: boolean) => onSubmit(alt ? "stage" : "send"),
+				submit: (alt: boolean) => {
+					if (sendHoldSwallowClick) {
+						sendHoldSwallowClick = false;
+						return;
+					}
+					onSubmit(alt ? "stage" : "send");
+				},
 				menuPress: noteMenuPress,
 				menuTouch: noteMenuBtnTouch,
 				annotateTouch,

@@ -95,20 +95,18 @@ export function pointInRect(
 
 /**
  * What a send-button hold does. A reply in flight in this chat makes
- * the hold a stop, whatever the composer holds (unsent text stays).
- * Otherwise an empty composer (no text, pills, or annotations) swaps
- * the reply language. Nothing arms with a timer already running or
- * an in-prompt note edit owning the gesture.
+ * the hold a stop; otherwise it swaps the reply language. Either way
+ * the composer keeps what it holds (the release never sends). Nothing
+ * arms with a timer already running or an in-prompt note edit owning
+ * the gesture.
  */
 export function sendHoldAction(facts: {
 	timerRunning: boolean;
 	promptNoteEditing: boolean;
-	composerEmpty: boolean;
 	replyLive: boolean;
 }): "stop-reply" | "swap-lang" | null {
 	if (facts.timerRunning || facts.promptNoteEditing) return null;
-	if (facts.replyLive) return "stop-reply";
-	return facts.composerEmpty ? "swap-lang" : null;
+	return facts.replyLive ? "stop-reply" : "swap-lang";
 }
 
 /**

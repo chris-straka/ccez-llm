@@ -630,6 +630,41 @@ test("desktop send-hold stashes and restores the reply language", async ({
 	});
 });
 
+/** Send-hold swaps the reply language over typed text too, and the
+release never sends it: the text waits in the composer. */
+test("send-hold clears the reply language over typed text", async ({
+	page
+}) => {
+	await seedChat(
+		page,
+		[{ role: "assistant", content: "alpha beta gamma delta" }],
+		"fr"
+	);
+	await page.goto("/");
+	await expect(page.locator("article.assistant .rendered")).toBeVisible({
+		timeout: 60_000
+	});
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("pas encore", { delay: 0 });
+	const send = page.locator(".send-btn");
+	const box = await send.boundingBox();
+	if (!box) throw new Error("no send button box");
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.waitForTimeout(700);
+	await page.mouse.up();
+	await expect(page.locator(".toast").first()).toContainText("Effacé", {
+		timeout: 10_000
+	});
+	await expect(page.locator(".ta-input")).toHaveValue("pas encore");
+	await expect(page.locator("article.user")).toHaveCount(0);
+	// A plain click afterwards sends as usual.
+	await send.click();
+	await expect(page.locator("article.user")).toHaveCount(1, {
+		timeout: 10_000
+	});
+});
+
 /** Send-hold still swaps the reply language with a filed
 annotation on the thread: filing must not disarm the hold. (The
 hero language menu only renders on empty chats, so the reply

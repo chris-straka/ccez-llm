@@ -215,8 +215,8 @@ stop, so both rules below stay suppressed. -->
 	ontouchcancel={actions.holdEnd}
 	onmousedown={(e) => {
 		// Desktop mirrors the touch swap (primary button over
-		// send only); the post-swap click lands on an empty
-		// composer, so it stays silent like touch.
+		// send only); the page swallows the post-hold click, so
+		// typed text never sends on release.
 		if (!android && e.button === 0) actions.holdStart(e.clientX, e.clientY);
 	}}
 	onmouseup={actions.holdEnd}
