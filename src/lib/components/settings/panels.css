@@ -746,7 +746,12 @@ a hollow dot (no color). */
 .settings-inner fieldset {
 	border: 0;
 	padding: 0;
-	margin: 0 0 0.9rem;
+	margin: 0 0 1rem;
+}
+/* A group's pills end the group: the fieldset's own margin is the
+	gap below, never stacked on the pills' (30px against 16 elsewhere). */
+.settings-inner fieldset > .segmented:last-child {
+	margin-bottom: 0;
 }
 /* The voice engine block carries the tallest stack (segmented + note
 	+ picker): a breath more room before Voice language. */
@@ -1031,9 +1036,10 @@ just below it. */
 }
 /* One setting per row. Steppers sit right of their name; sliders
 put name and value on one line over a full-width track. Rows are
-tall enough to hit with a thumb. */
+tall enough to hit with a thumb. Every row leaves the same 1rem of
+visible space below it (see the slider's hit row). */
 .settings-inner .setting {
-	margin: 0 0 0.75rem;
+	margin: 0 0 1rem;
 }
 .settings-inner .setting-name {
 	display: flex;
@@ -1149,6 +1155,9 @@ strokes stay page scrolls on touch. */
 	align-items: center;
 	height: 2.75rem;
 	padding: 0 0.8rem;
+	/* The hit row runs 10px past the thumb's bottom edge: tuck it
+	under the row below, so the visible gap matches the steppers'. */
+	margin-bottom: -0.625rem;
 	touch-action: pan-y;
 }
 .settings-inner .slider-track {
