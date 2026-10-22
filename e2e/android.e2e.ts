@@ -1954,6 +1954,9 @@ test.describe("touch", () => {
 				timeout: 15_000
 			});
 			await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
+			// Filing dismisses the prompt: focus (and the keyboard)
+			// leaves the composer.
+			await expect(composer).not.toBeFocused();
 		});
 
 		/** An in-prompt note files mid-stream: the send arrow commits

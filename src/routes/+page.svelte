@@ -6112,7 +6112,9 @@
 
 	/** Send-arrow commit for an in-prompt note create (see doSend):
 	files the pending annotation and fires its own request at once
-	(blue while it waits, orange when the reply lands). */
+	(blue while it waits, orange when the reply lands). The composer
+	steps back afterwards (keyboard down): the reader returns to the
+	thread to watch the badge, and a tap brings the prompt back. */
 	function commitPromptAnnEdit(): void {
 		if (!promptAnnEdit) return;
 		buzzBeat("send");
@@ -6123,7 +6125,7 @@
 		exitPromptAnnEdit();
 		// Brisk confirmation tick, not the standard read-timed hold.
 		flashToast(annEditCommitToast(true), undefined, 1500);
-		void tick().then(() => editor?.focus());
+		void tick().then(() => editor?.blur());
 	}
 
 	/** Tapping out drops an in-prompt note create: a pending filing
@@ -6138,7 +6140,7 @@
 
 	/** Leave in-prompt edit mode and give the composer back its
 	drafted chat text. Focus stays where it is (the commit path
-	re-focuses explicitly; a tap-out cancel must not steal it back). */
+	blurs explicitly; a tap-out cancel must not steal focus back). */
 	function exitPromptAnnEdit(): void {
 		promptAnnEdit = null;
 		editor?.setText(promptAnnStash);
