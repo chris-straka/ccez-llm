@@ -157,10 +157,19 @@ corner, outside the text: save the quote as a flashcard. -->
 		badge.animate(
 			[
 				{ boxShadow: `${ink}0 0 0 0 ${fill}` },
-				{ boxShadow: `${ink}0 0 0 7px transparent` }
+				{ boxShadow: `${ink}0 0 0 12px transparent` }
 			],
-			{ duration: 420, easing: "ease-out" }
+			{ duration: 650, easing: "cubic-bezier(0.2, 0.6, 0.3, 1)" }
 		);
+	});
+	// The open card's badge rides above its scrim (see .card-open in
+	// app.css): undimmed, it reads as the note this card belongs to,
+	// and the pulse plays at full strength.
+	$effect(() => {
+		const badge = document.querySelector(`[data-ann-badge="${badgeId}"]`);
+		if (!(badge instanceof HTMLElement)) return;
+		badge.classList.add("card-open");
+		return () => badge.classList.remove("card-open");
 	});
 
 	// Smooth reposition: when the card's own size moves it (content

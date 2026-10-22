@@ -823,6 +823,12 @@ the mount fade (see below). */
 	background: #ff9f0a;
 	background: var(--ans-ready);
 }
+/* The badge of an open answer card rides above the card's scrim
+(z-60, see AnnAnswer): it stays lit beside its card. */
+.rendered button.ccez-ann-badge.card-open,
+.news-card-title button.ccez-ann-badge.card-open {
+	z-index: 61;
+}
 /* Ringed in its quote's underline ink (data-ink, see MessageBody),
 so a badge and its quote read as one pair among several. */
 .rendered button.ccez-ann-badge[data-ink="0"] {

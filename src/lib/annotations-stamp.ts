@@ -1179,7 +1179,10 @@ function paintBadgeClasses(
 	settled: Set<string>
 ): void {
 	const wasWaiting = badge.classList.contains("ans-waiting");
+	// An open answer card's lift (AnnAnswer) outlives re-stamps.
+	const cardOpen = badge.classList.contains("card-open");
 	badge.className = `ccez-ann-badge${badgeAnswerClass(answer)}`;
+	if (cardOpen) badge.classList.add("card-open");
 	if (!settled.has(id)) badge.classList.add("fresh");
 	else badge.classList.remove("fresh");
 	if (wasWaiting && settled.has(id) && badge.classList.contains("ans-ready")) {
