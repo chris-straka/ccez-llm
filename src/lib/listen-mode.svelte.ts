@@ -126,6 +126,8 @@ export class ListenMode {
 	/** The playhead (media seconds) of the clip playing or paused:
 	 * the scrubber's thumb. Null once a clip plays to its end. */
 	position = $state<{ i: number; t: number } | null>(null);
+	/** The clip whose player the pointer is over (Space plays it). */
+	hoveredPlayer = $state<number | null>(null);
 	/** The drill's audio: loading or failed. */
 	audioStatus = $state<"idle" | "loading" | "ready" | "error">("idle");
 	/** The drill video's picture (a blob URL), once it has downloaded;
@@ -709,6 +711,12 @@ export class ListenMode {
 		this.queued = null;
 		this.paused = { i, slow };
 		this.position = { i, t: at };
+	}
+
+	/** The pointer entered (or left) clip `i`'s player. */
+	hoverPlayer(i: number | null, over: boolean): void {
+		if (over) this.hoveredPlayer = i;
+		else if (this.hoveredPlayer === i) this.hoveredPlayer = null;
 	}
 
 	/** Space: play, pause, or resume the clip waiting for a guess. */

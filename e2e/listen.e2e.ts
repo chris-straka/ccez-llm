@@ -4,7 +4,7 @@ import { seedChat, toggleSidebar } from "./helpers";
 /**
  * Listening drills through the app's backend (the `listen_*`
  * commands, stubbed on a mock shell): browse the learner's channel,
- * start a video, guess clip 1 and land on clip 2 at once, reveal with
+ * start a video, move past clip 1 and land on clip 2 at once, reveal with
  * ⌘Enter, reach the tally. Grading goes to a stub provider whose replies
  * the spec serves, so translations land on the clips.
  */
@@ -199,9 +199,7 @@ test("News and Listen stay hidden until a language is picked", async ({
 	await expect(page.getByRole("tab", { name: "Listen" })).toBeVisible();
 });
 
-test("a drill runs: guess, next clip at once, reveal, tally", async ({
-	page
-}) => {
+test("a drill runs: show text, next clip at once, tally", async ({ page }) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	const panel = page.locator(".listen-panel");
 	await expect(panel).toContainText("Learner Channel");
@@ -209,46 +207,43 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({
 	await expect(row).toContainText("French auto-dub");
 	await row.click();
 
-	// Clip 1 waits; guessing is optional, in the clip's own field.
+	// Clip 1 waits under its steps: Show text and Next, no guess field.
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
 	await expect(clips.first()).toContainText("1 / 3");
-	const guess = (n: number) =>
-		clips.nth(n).getByRole("textbox", { name: "Type what you hear" });
-	await expect(guess(0)).toBeVisible();
+	const step = (n: number, name: string) =>
+		page.locator(`#msg-${n}`).getByRole("button", { name });
+	await expect(step(0, "Show text")).toBeVisible();
+	await expect(
+		page.getByRole("textbox", { name: /what you hear/ })
+	).toHaveCount(0);
 	// The drill grabs no focus: single-letter keys stay free.
-	await expect(guess(0)).not.toBeFocused();
+	await expect(step(0, "Next clip")).not.toBeFocused();
 
-	// A partly right guess: clip 2 shows at once, clip 1 is marked.
-	await guess(0).fill("bonjour a tous bienvenue");
-	await guess(0).press("Enter");
+	// Next reveals clip 1 and shows clip 2 at once.
+	await step(0, "Next clip").click();
 	await expect(clips).toHaveCount(2);
 	await expect(clips.nth(1)).toContainText("2 / 3");
-	// "a" for "à" counts as heard, spelled differently.
-	await expect(clips.first().locator(".w.ok")).toHaveCount(3);
-	await expect(clips.first().locator(".w.near")).toHaveText(["a"]);
-	await expect(clips.first().locator(".w.missed")).toHaveText(["et"]);
-	await expect(clips.first()).toContainText("4 of 5 words");
 	await expect(page.locator(".messages")).toContainText(
 		"Bonjour à tous et bienvenue."
 	);
+	// Only the waiting clip has steps.
+	await expect(step(0, "Next clip")).toHaveCount(0);
 
 	// Show text puts clip 2's words up while it still waits; Next moves on.
-	await clips.nth(1).getByRole("button", { name: "Show text" }).click();
+	await step(1, "Show text").click();
 	await expect(page.locator(".messages")).toContainText(
 		"Nous parlons de la peste."
 	);
+	await expect(step(1, "Show text")).toHaveCount(0);
 	await expect(clips).toHaveCount(2);
-	await clips.nth(1).getByRole("button", { name: "Next ›" }).click();
+	await step(1, "Next clip").click();
 	await expect(clips).toHaveCount(3);
-	await expect(clips.nth(1)).toContainText("Revealed");
 
-	// The last guess ends the video: the tally, with the missed clip.
-	await guess(2).fill("merci de votre attention");
-	await guess(2).press("Enter");
+	// The last Next ends the video: the tally.
+	await step(2, "Next clip").click();
 	const end = page.locator(".end");
 	await expect(end).toContainText("End of the video");
-	await expect(end).toContainText("Nous parlons de la peste.");
 	await expect(
 		end.getByRole("button", { name: "Another video" })
 	).toBeVisible();
@@ -296,7 +291,7 @@ test("the search box searches on a typing pause; emptying it drops the results",
 	await expect(panel).toContainText("Learner Channel");
 });
 
-test("Space pauses and resumes mid-clip; answering lets the clip finish first", async ({
+test("Space stops what plays from anywhere, plays the clip under the pointer, and Next lets a clip finish first", async ({
 	page
 }) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
@@ -312,7 +307,8 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 		.poll(async () => Number(await scrub.inputValue()))
 		.toBeGreaterThan(0.3);
 
-	// Space pauses where it is; the playhead holds.
+	// Space pauses where it is, the pointer nowhere near the video.
+	await page.mouse.move(2, 2);
 	const box = page.locator(".prompt textarea").first();
 	await box.press("Space");
 	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
@@ -321,22 +317,54 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 	expect(Number(await scrub.inputValue())).toBe(held);
 	await expect(box).toHaveValue("");
 
-	// Space again resumes from there, not from the top.
+	// Over the player, Space resumes from there, not from the top.
+	await first.locator(".controls").hover();
 	await box.press("Space");
 	await expect(pause).toBeVisible();
 	expect(Number(await scrub.inputValue())).toBeGreaterThanOrEqual(held);
 
-	// A guess while it plays: clip 2 shows, clip 1 keeps playing, then
+	// Next while it plays: clip 2 shows, clip 1 keeps playing, then
 	// clip 2 follows on its own.
-	const guess = first.getByRole("textbox", { name: "Type what you hear" });
-	await guess.fill("bonjour");
-	await guess.press("Enter");
+	await page
+		.locator("#msg-0")
+		.getByRole("button", { name: "Next clip" })
+		.click();
 	await expect(clips).toHaveCount(2);
 	await expect(pause).toBeVisible();
 	await expect(clips.nth(1).getByRole("button", { name: "Pause" })).toBeVisible(
 		{ timeout: 6_000 }
 	);
 	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
+});
+
+test("clicking the picture plays and pauses; restart plays from the top", async ({
+	page
+}) => {
+	await page.evaluate(() => {
+		(window as unknown as { __withVideo: boolean }).__withVideo = true;
+	});
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const first = page.locator(".clip").first();
+	const screen = first.locator("button.screen");
+	await expect(screen).toBeVisible({ timeout: 10_000 });
+	const scrub = first.getByRole("slider", { name: "Position in the clip" });
+	await expect(
+		first.getByRole("button", { name: "Pause" }).first()
+	).toBeVisible();
+	await screen.click();
+	await expect(first.locator(".controls button.play")).toHaveAttribute(
+		"aria-label",
+		"Play clip"
+	);
+	const held = Number(await scrub.inputValue());
+	expect(held).toBeGreaterThan(0);
+	await first.getByRole("button", { name: "Play from the start" }).click();
+	await expect(first.locator(".controls button.play")).toHaveAttribute(
+		"aria-label",
+		"Pause"
+	);
+	expect(Number(await scrub.inputValue())).toBeLessThan(held);
 });
 
 test("keys: S slows the hovered clip, A shows the text, a moves on", async ({
@@ -346,15 +374,12 @@ test("keys: S slows the hovered clip, A shows the text, a moves on", async ({
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
-	const guess = clips
-		.first()
-		.getByRole("textbox", { name: "Type what you hear" });
-	await guess.fill("bonjour");
-	await guess.press("Enter");
-	await expect(clips).toHaveCount(2);
 	await page.evaluate(() =>
 		(document.activeElement as HTMLElement | null)?.blur()
 	);
+	await page.mouse.move(2, 2);
+	await page.keyboard.press("a");
+	await expect(clips).toHaveCount(2);
 
 	await page.locator("#msg-0").hover();
 	await page.keyboard.press("s");
@@ -369,7 +394,6 @@ test("keys: S slows the hovered clip, A shows the text, a moves on", async ({
 	await expect(clips).toHaveCount(2);
 	await page.keyboard.press("a");
 	await expect(clips).toHaveCount(3);
-	await expect(clips.nth(1)).toContainText("Revealed");
 });
 
 test("the composer is a chat: a question reads against the heard clips", async ({
@@ -384,11 +408,10 @@ test("the composer is a chat: a question reads against the heard clips", async (
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
-	const guess = clips
-		.first()
-		.getByRole("textbox", { name: "Type what you hear" });
-	await guess.fill("bonjour");
-	await guess.press("Enter");
+	await page
+		.locator("#msg-0")
+		.getByRole("button", { name: "Next clip" })
+		.click();
 	await expect(clips).toHaveCount(2);
 	const box = page.locator(".prompt textarea").first();
 	await box.fill("what does bienvenue mean?");
@@ -398,7 +421,7 @@ test("the composer is a chat: a question reads against the heard clips", async (
 		"what does bienvenue mean?"
 	);
 	await expect(
-		clips.nth(1).getByRole("button", { name: "Next ›" })
+		page.locator("#msg-1").getByRole("button", { name: "Next clip" })
 	).toBeVisible();
 	await expect
 		.poll(() => bodies.find((b) => b.includes("Listening drill on the video")))
@@ -442,17 +465,17 @@ test("annotating while a clip plays never reads the quote over it", async ({
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
-	const guess = clips
-		.first()
-		.getByRole("textbox", { name: "Type what you hear" });
-	await guess.fill("bonjour");
-	await guess.press("Enter");
+	await page
+		.locator("#msg-0")
+		.getByRole("button", { name: "Next clip" })
+		.click();
 	await expect(clips).toHaveCount(2);
 	// Clip 1 is still playing (clip 2 waits for it).
 	await expect(
 		clips.first().getByRole("button", { name: "Pause" })
 	).toBeVisible();
 	const body = page.locator("#msg-0 .rendered");
+	await body.scrollIntoViewIfNeeded();
 	const rect = await body.boundingBox();
 	if (!rect) throw new Error("clip body has no box");
 	await page.mouse.dblclick(rect.x + 20, rect.y + rect.height / 2);
@@ -540,22 +563,27 @@ test("the clip in play shows the video, centered; others keep a still", async ({
 	]);
 	const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
 	expect(Math.abs(mid(clipBox!) - mid(screenBox!))).toBeLessThan(2);
-	// One player card: the controls sit under the picture, and the
-	// card plus the guess row fit the window; the field fits a line.
+	// One player card the width of the column (unless the window is
+	// too short for that): the controls sit under the picture, and the
+	// picture leaves room for the steps above the composer.
 	const fit = await page.evaluate(() => {
 		const clip = document.querySelector(".clip.open")!;
+		const column = clip.getBoundingClientRect();
 		const screen = clip.querySelector(".screen")!.getBoundingClientRect();
 		const bar = clip.querySelector(".controls")!.getBoundingClientRect();
-		const box = clip.querySelector(".guess-box")!.getBoundingClientRect();
+		const capped = screen.height >= window.innerHeight * 0.6 - 1;
 		return {
 			joined: Math.abs(bar.top - screen.bottom) < 1,
-			tall: screen.height <= window.innerHeight * 0.45 + 1,
-			field: box.width <= 20 * 16 + 1
+			tall: screen.height <= window.innerHeight * 0.6 + 1,
+			wide: capped || Math.abs(screen.width - column.width) < 1
 		};
 	});
-	expect(fit).toEqual({ joined: true, tall: true, field: true });
+	expect(fit).toEqual({ joined: true, tall: true, wide: true });
 	// Moving on: the new clip carries the picture, the answered one not.
-	await clips.first().getByRole("button", { name: "Next ›" }).click();
+	await page
+		.locator("#msg-0")
+		.getByRole("button", { name: "Next clip" })
+		.click();
 	await expect(clips).toHaveCount(2);
 	await expect(clips.nth(1).locator(".screen video")).toBeVisible();
 	await expect(clips.first().locator(".screen")).toHaveCount(0, {

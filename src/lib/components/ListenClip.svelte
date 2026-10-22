@@ -1,10 +1,10 @@
-<!-- One drill clip, above its message body: play / slow replay, where
-it sits in the video (with the source link), and once answered the
-guess marked against what was said. The clip waiting to be answered
-offers an optional guess field (Enter grades it), Show text (A), and
-Next (a); guessing is never required. The transcript is the message
-body itself (annotatable like any reply); the translation and notes
-fold under it (`ListenGloss`). -->
+<!-- One drill clip, above its message body: the player (picture,
+play / restart / slow replay, scrubber, volume, where it sits in the
+video with the source link). The clip waiting to be answered hosts
+the picture as a card the width of the column; its Show text and Next
+steps sit under the text (`ListenSteps`). The transcript is the
+message body itself (annotatable like any reply); the translation and
+notes fold under it (`ListenGloss`). -->
 <script lang="ts">
 	import {
 		storyboardFrame,
@@ -30,16 +30,18 @@ fold under it (`ListenGloss`). -->
 		anyOpen: boolean;
 		/** This clip's words with their track times (empty: unknown). */
 		timed: readonly Token[];
+		/** The drill audio's volume, 0-2 (1 = as recorded). */
+		volume: number;
 		actions: {
+			/** Play / pause at a speed (resumes where it paused). */
 			play: (slow: boolean) => void;
+			/** Play from the clip's start. */
+			restart: () => void;
 			seek: (t: number) => void;
 			openSource: (url: string) => void;
-			/** Grade a typed guess (the next clip follows). */
-			guess: (text: string) => void;
-			/** Show this clip's text while it still waits. */
-			peek: () => void;
-			/** Reveal this clip and move on. */
-			next: () => void;
+			setVolume: (volume: number) => void;
+			/** The pointer is over this clip's player (Space plays it). */
+			hover: (over: boolean) => void;
 		};
 	}
 
@@ -53,6 +55,7 @@ fold under it (`ListenGloss`). -->
 		videoUrl,
 		anyOpen,
 		timed,
+		volume,
 		actions
 	}: Props = $props();
 
@@ -63,12 +66,14 @@ fold under it (`ListenGloss`). -->
 	 * or paused mid-way. */
 	const at = $derived(position?.i === clip.i ? position.t : null);
 	const scrub = $derived(Boolean(span) && (open || at !== null));
-	/** One moving picture in the thread: on the clip waiting to be
+	/** One picture card in the thread: on the clip waiting to be
 	 * answered, or (once every clip is answered) on the clip playing
-	 * or paused mid-way. Others keep their still frame. */
-	const screen = $derived(
-		Boolean(videoUrl && span) && (open || (!anyOpen && at !== null))
-	);
+	 * or paused mid-way. Others keep a small still frame. The card
+	 * holds its 16:9 box from the first paint (the still frame, then
+	 * the video once it lands), so nothing moves when the video does. */
+	const screen = $derived(Boolean(span) && (open || (!anyOpen && at !== null)));
+	/** Volume before a mute, so unmuting goes back to it. */
+	let unmuted = $state(1);
 	let video = $state<HTMLVideoElement | null>(null);
 	// The picture follows the sound: muted, same playhead, same speed,
 	// whichever clip is sounding (an answered clip finishing its line
@@ -158,6 +163,7 @@ fold under it (`ListenGloss`). -->
 	const heardWords = $derived(
 		clip.ops?.filter((o) => o.kind === "ok" || o.kind === "near").length ?? 0
 	);
+	const playOn = $derived(here && !playing?.slow);
 </script>
 
 <div
@@ -168,25 +174,56 @@ fold under it (`ListenGloss`). -->
 	bind:this={row}
 >
 	<!-- The player: picture on top, its controls joined underneath as
-	one card, sized so both always fit above the composer. Without a
-	picture the controls are a plain row. -->
-	<div class="player">
+	one card. Without a picture the controls are a plain row. -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="player"
+		onpointerenter={(e) => {
+			if (e.pointerType === "mouse") actions.hover(true);
+		}}
+		onpointerleave={() => actions.hover(false)}
+	>
 		{#if screen}
-			<div class="screen">
-				<video
-					bind:this={video}
-					src={videoUrl}
-					muted
-					playsinline
-					preload="auto"
-					disablepictureinpicture
-					aria-label="The clip's video"
-					onloadedmetadata={(e) => {
-						// A seek before metadata is dropped: land on the clip now.
-						if (span) e.currentTarget.currentTime = position?.t ?? span.start;
-					}}
-				></video>
-			</div>
+			<!-- The picture is the big play button: a click plays or
+			pauses (Space does the same while the pointer is here). -->
+			<button
+				type="button"
+				class="screen"
+				aria-label="The clip's video"
+				title={playOn ? "Pause" : "Play"}
+				disabled={audioStatus === "error"}
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.play(false);
+				}}
+			>
+				{#if videoUrl}
+					<video
+						bind:this={video}
+						src={videoUrl}
+						muted
+						playsinline
+						preload="auto"
+						disablepictureinpicture
+						aria-hidden="true"
+						onloadedmetadata={(e) => {
+							// A seek before metadata is dropped: land on the clip now.
+							if (span) e.currentTarget.currentTime = position?.t ?? span.start;
+						}}
+					></video>
+				{:else if frame && frameState === "ok"}
+					<span class="poster" style={frameStyle} aria-hidden="true"></span>
+				{/if}
+				{#if !playOn}
+					<span class="big-play" aria-hidden="true">
+						<svg viewBox="0 0 16 16"
+							><path
+								d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z"
+							/></svg
+						>
+					</span>
+				{/if}
+			</button>
 		{/if}
 		<div class="controls">
 			{#if !screen && frame && frameState !== "error"}
@@ -200,16 +237,16 @@ fold under it (`ListenGloss`). -->
 			<button
 				type="button"
 				class="play"
-				class:on={here && !playing?.slow}
-				aria-label={here && !playing?.slow ? "Pause" : "Play clip"}
-				title="Play (Space)"
+				class:on={playOn}
+				aria-label={playOn ? "Pause" : "Play clip"}
+				title="Play · Space over the video"
 				disabled={audioStatus === "error"}
 				onclick={(e) => {
 					e.stopPropagation();
 					actions.play(false);
 				}}
 			>
-				{#if here && !playing?.slow}
+				{#if playOn}
 					<svg viewBox="0 0 16 16" aria-hidden="true"
 						><rect x="4" y="3.5" width="2.8" height="9" rx="1" /><rect
 							x="9.2"
@@ -226,6 +263,23 @@ fold under it (`ListenGloss`). -->
 						/></svg
 					>
 				{/if}
+			</button>
+			<button
+				type="button"
+				class="icon restart"
+				aria-label="Play from the start"
+				title="Play from the start"
+				disabled={audioStatus === "error"}
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.restart();
+				}}
+			>
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><path d="M3.5 8a4.5 4.5 0 1 0 1.4-3.3" /><path
+						d="M3.2 2.6v2.6h2.6"
+					/></svg
+				>
 			</button>
 			<button
 				type="button"
@@ -264,6 +318,48 @@ fold under it (`ListenGloss`). -->
 					· audio didn't load
 				{/if}
 			</span>
+			{#if screen}
+				<!-- Volume: the icon mutes; hovering (or focusing) it
+				slides out the level, up to 200%. -->
+				<span class="volume">
+					<button
+						type="button"
+						class="icon"
+						aria-label={volume === 0 ? "Unmute" : "Mute"}
+						title={`Volume ${Math.round(volume * 100)}%`}
+						onclick={(e) => {
+							e.stopPropagation();
+							if (volume > 0) {
+								unmuted = volume;
+								actions.setVolume(0);
+							} else actions.setVolume(unmuted || 1);
+						}}
+					>
+						<svg viewBox="0 0 16 16" aria-hidden="true"
+							><path class="fill" d="M2.5 6h2.2L8 3.3v9.4L4.7 10H2.5z" />
+							{#if volume === 0}
+								<path d="M10.5 6.2l3.4 3.6M13.9 6.2l-3.4 3.6" />
+							{:else}
+								<path d="M10.4 6.1a2.6 2.6 0 0 1 0 3.8" />
+								{#if volume > 0.6}<path d="M12.2 4.4a5 5 0 0 1 0 7.2" />{/if}
+							{/if}</svg
+						>
+					</button>
+					<input
+						class="level"
+						type="range"
+						min="0"
+						max="2"
+						step="0.05"
+						value={volume}
+						aria-label="Volume"
+						style="--fill: {(volume / 2) * 100}%"
+						oninput={(e) => actions.setVolume(Number(e.currentTarget.value))}
+						onchange={(e) => e.currentTarget.blur()}
+						onclick={(e) => e.stopPropagation()}
+					/>
+				</span>
+			{/if}
 			<button
 				type="button"
 				class="source"
@@ -275,78 +371,30 @@ fold under it (`ListenGloss`). -->
 			>
 		</div>
 	</div>
-	{#if open}
-		<div class="ask">
-			<input
-				class="guess-box"
-				type="text"
-				lang={session.lang}
-				autocomplete="off"
-				spellcheck="false"
-				placeholder="Type what you hear (optional)"
-				aria-label="Type what you hear"
-				onkeydown={(e) => {
-					if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
-						e.preventDefault();
-						const text = e.currentTarget.value.trim();
-						if (!text) return;
-						e.currentTarget.value = "";
-						actions.guess(text);
-					} else if (e.key === "Enter") {
-						e.preventDefault();
-						actions.next();
-					} else if (e.key === "Escape") {
-						e.currentTarget.blur();
-					}
-				}}
-			/>
-			<button
-				type="button"
-				class="step"
-				title="Show the text, stay on this clip (A)"
-				disabled={clip.peeked}
-				onclick={(e) => {
-					e.stopPropagation();
-					actions.peek();
-				}}>Show text</button
-			>
-			<button
-				type="button"
-				class="step next"
-				title="Reveal and play the next clip (a)"
-				onclick={(e) => {
-					e.stopPropagation();
-					actions.next();
-				}}>Next ›</button
-			>
-		</div>
-	{:else if answered}
-		{#if clip.skipped}
-			<p class="verdict">Revealed</p>
-		{:else}
-			<p class="guess" aria-label="Your guess, marked">
-				{#each clip.ops ?? [] as op, k (k)}
-					{#if op.kind === "ok"}
-						<span class="w ok">{op.guess}</span>
-					{:else if op.kind === "near"}
-						<span class="w near" title="Heard right; spelled {op.ref}"
-							>{op.guess}</span
-						>
-					{:else if op.kind === "wrong"}
-						<span class="w wrong"
-							><s>{op.guess}</s> <span class="fix">{op.ref}</span></span
-						>
-					{:else if op.kind === "missed"}
-						<span class="w missed" title="Missed">{op.ref}</span>
-					{:else}
-						<span class="w extra"><s>{op.guess}</s></span>
-					{/if}
-				{/each}
-			</p>
-			<p class="verdict">
-				{heardWords === words ? "All of it" : `${heardWords} of ${words} words`}
-			</p>
-		{/if}
+	{#if answered && !clip.skipped && (clip.ops?.length ?? 0) > 0}
+		<!-- A guess typed before guessing left the drill, marked. -->
+		<p class="guess" aria-label="Your guess, marked">
+			{#each clip.ops ?? [] as op, k (k)}
+				{#if op.kind === "ok"}
+					<span class="w ok">{op.guess}</span>
+				{:else if op.kind === "near"}
+					<span class="w near" title="Heard right; spelled {op.ref}"
+						>{op.guess}</span
+					>
+				{:else if op.kind === "wrong"}
+					<span class="w wrong"
+						><s>{op.guess}</s> <span class="fix">{op.ref}</span></span
+					>
+				{:else if op.kind === "missed"}
+					<span class="w missed" title="Missed">{op.ref}</span>
+				{:else}
+					<span class="w extra"><s>{op.guess}</s></span>
+				{/if}
+			{/each}
+		</p>
+		<p class="verdict">
+			{heardWords === words ? "All of it" : `${heardWords} of ${words} words`}
+		</p>
 	{/if}
 </div>
 
@@ -577,82 +625,162 @@ fold under it (`ListenGloss`). -->
 		opacity: 0.4;
 		cursor: default;
 	}
-	/* The waiting clip's row: an optional guess field and two quiet
-	steps. Nothing here takes focus by itself, so the drill's single-
-	letter keys keep working until the field is clicked. */
-	.ask {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-	/* A clip's line is a sentence: the field fits one, not the whole
-	column. Under a picture the row lines up with the player. */
-	.guess-box {
-		flex: 1 1 10rem;
-		box-sizing: border-box;
-		max-width: 20rem;
-		min-width: 0;
-		font: inherit;
-		font-size: 0.9rem;
-		padding: 0.35rem 0.6rem;
-		border: 1px solid var(--line-soft);
-		border-radius: 0.5rem;
-		background: transparent;
-		color: var(--ink);
-	}
-	.guess-box:focus {
-		outline: none;
-		border-color: var(--focus);
-	}
-	.step {
+	/* Round icon buttons (restart, volume): the slow pill's outline,
+	no label. */
+	.icon {
 		flex: 0 0 auto;
-		font: inherit;
-		font-size: 0.8rem;
-		padding: 0.3rem 0.7rem;
+		width: 2rem;
+		height: 2rem;
+		display: grid;
+		place-items: center;
 		border: 1px solid var(--line-soft);
-		border-radius: 999px;
+		border-radius: 50%;
 		background: transparent;
 		color: var(--muted);
 		cursor: pointer;
+		padding: 0;
 	}
-	.step:hover:not(:disabled) {
+	.icon:hover:not(:disabled) {
 		color: var(--ink);
 		border-color: var(--line-hover);
 	}
-	.step:disabled {
-		opacity: 0.45;
+	.icon:disabled {
+		opacity: 0.4;
 		cursor: default;
 	}
-	.step.next {
-		color: var(--accent);
+	.icon svg {
+		width: 0.95rem;
+		height: 0.95rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
-	/* The clip in play shows its picture as one centered card with
-	its controls joined underneath, like any player. The card's width
-	also respects the window's height (the picture never passes ~45%
-	of it), so the controls and the guess row below always fit above
-	the composer without scrolling. */
-	.clip.has-screen .player,
-	.clip.has-screen .ask {
+	.icon svg .fill {
+		fill: currentColor;
+		stroke: none;
+	}
+	/* The level slides out of the volume icon on hover or focus. */
+	.volume {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+	.level {
+		width: 0;
+		opacity: 0;
+		margin: 0;
+		height: 1rem;
+		background: transparent;
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+		transition:
+			width 0.2s ease,
+			opacity 0.2s ease;
+	}
+	.volume:hover .level,
+	.volume:focus-within .level {
+		width: 4.5rem;
+		opacity: 1;
+	}
+	.level::-webkit-slider-runnable-track {
+		height: 3px;
+		border-radius: 999px;
+		background: linear-gradient(
+			to right,
+			var(--accent) var(--fill),
+			rgba(242, 242, 247, 0.3) var(--fill)
+		);
+	}
+	.level::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		width: 0.7rem;
+		height: 0.7rem;
+		margin-top: calc(1.5px - 0.35rem);
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.level::-moz-range-track {
+		height: 3px;
+		border-radius: 999px;
+		background: rgba(242, 242, 247, 0.3);
+	}
+	.level::-moz-range-thumb {
+		width: 0.7rem;
+		height: 0.7rem;
+		border: none;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	/* The clip in play shows its picture as one card the width of the
+	column with its controls joined underneath, like any player. The
+	picture never passes ~60% of the window's height, so the controls
+	and the steps under the text still fit above the composer. */
+	.clip.has-screen .player {
 		align-self: center;
 		box-sizing: border-box;
-		width: min(100%, 36rem, calc(45dvh * 16 / 9));
-	}
-	.clip.has-screen .player {
+		width: min(100%, calc(60dvh * 16 / 9));
 		border-radius: 0.7rem;
 		overflow: hidden;
 		background: #000;
 		animation: screen-in 0.25s ease;
 	}
 	.screen {
+		position: relative;
+		display: block;
+		width: 100%;
 		aspect-ratio: 16 / 9;
+		padding: 0;
+		border: none;
 		background: #000;
+		cursor: pointer;
 	}
-	.screen video {
+	.screen:disabled {
+		cursor: default;
+	}
+	.screen video,
+	.screen .poster {
+		position: absolute;
+		inset: 0;
 		display: block;
 		width: 100%;
 		height: 100%;
 		object-fit: contain;
+	}
+	.screen .poster {
+		background-repeat: no-repeat;
+		/* The storyboard cell is tiny: soften it while the video loads. */
+		filter: blur(2px);
+	}
+	/* Paused or waiting: a quiet play mark over the picture. */
+	.big-play {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		width: 4rem;
+		height: 4rem;
+		margin: -2rem 0 0 -2rem;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		background: rgba(0, 0, 0, 0.45);
+		color: #fff;
+		opacity: 0.85;
+		transition:
+			opacity 0.15s ease,
+			transform 0.15s ease;
+	}
+	.screen:hover .big-play {
+		opacity: 1;
+		transform: scale(1.05);
+	}
+	.big-play svg {
+		width: 1.8rem;
+		height: 1.8rem;
+		fill: currentColor;
+		margin-left: 0.2rem;
 	}
 	.clip.has-screen .controls {
 		padding: 0.4rem 0.6rem;
@@ -666,12 +794,14 @@ fold under it (`ListenGloss`). -->
 	.clip.has-screen .source:hover {
 		color: #fff;
 	}
-	.clip.has-screen .slow {
+	.clip.has-screen .slow,
+	.clip.has-screen .icon {
 		color: rgba(242, 242, 247, 0.8);
 		border-color: rgba(242, 242, 247, 0.28);
 	}
 	.clip.has-screen .slow.on,
-	.clip.has-screen .slow:hover {
+	.clip.has-screen .slow:hover,
+	.clip.has-screen .icon:hover:not(:disabled) {
 		color: #fff;
 		border-color: rgba(242, 242, 247, 0.6);
 	}
@@ -698,8 +828,11 @@ fold under it (`ListenGloss`). -->
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.clip.has-screen .player {
+		.clip.has-screen .player,
+		.level,
+		.big-play {
 			animation: none;
+			transition: none;
 		}
 	}
 </style>

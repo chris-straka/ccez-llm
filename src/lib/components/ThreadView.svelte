@@ -33,6 +33,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	import MessageArticle from "./MessageArticle.svelte";
 	import ListenClip from "./ListenClip.svelte";
 	import ListenGloss from "./ListenGloss.svelte";
+	import ListenSteps from "./ListenSteps.svelte";
 	import ListenEnd from "./ListenEnd.svelte";
 	import ListenPanel from "./ListenPanel.svelte";
 	import type { DrillSummary, ListenChannel, ListenSession } from "$lib/listen";
@@ -185,6 +186,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			showListen: () => void;
 			/** × on the listen panel: back to the welcome screen. */
 			close: () => void;
+			/** The drill audio's volume (0-2) and its setter. */
+			volume: number;
+			setVolume: (volume: number) => void;
 		};
 		/** Flashcards due now (0 hides the hero's entry). */
 		flashcardsDue: number;
@@ -383,20 +387,27 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					videoUrl={listen.mode.videoUrl}
 					anyOpen={clipOpen}
 					timed={listen.mode.clipWords(msg.clip.i)}
+					volume={listen.volume}
 					audioStatus={listen.mode.audioStatus}
 					actions={{
 						play: (slow: boolean) => {
 							const c = msg.clip;
 							if (c) listen.mode.toggle(c.i, slow);
 						},
+						restart: () => {
+							const c = msg.clip;
+							if (c) listen.mode.play(c.i, false);
+						},
 						seek: (t: number) => {
 							const c = msg.clip;
 							if (c) listen.mode.seek(c.i, t);
 						},
 						openSource: (url: string) => listen.mode.openSource(url),
-						guess: (text: string) => void listen.mode.submit(text),
-						peek: () => void listen.mode.peek(),
-						next: () => void listen.mode.submit(null)
+						setVolume: listen.setVolume,
+						hover: (over: boolean) => {
+							const c = msg.clip;
+							listen.mode.hoverPlayer(c ? c.i : null, over);
+						}
 					}}
 				/>
 			{:else if listen.session && listen.summary && msg.drillEnd}
@@ -412,6 +423,13 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			{/if}
 		{/snippet}
 		{#snippet clipFooter()}
+			{#if msg.clip && msg.clip.heard === undefined}
+				<ListenSteps
+					peeked={msg.clip.peeked === true}
+					peek={() => void listen.mode.peek()}
+					next={() => void listen.mode.submit(null)}
+				/>
+			{/if}
 			{#if msg.clip}
 				<ListenGloss
 					clip={msg.clip}

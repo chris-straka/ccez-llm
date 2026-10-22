@@ -197,12 +197,28 @@ describe("listenKeyAction", () => {
 		inComposer: true,
 		inOtherField: false,
 		hovered: false,
-		selection: false
+		selection: false,
+		playing: false,
+		overPlayer: true
 	};
-	it("Space plays only while the composer is empty; ? types", () => {
+	it("Space plays the clip under the pointer; ? types", () => {
 		expect(listenKeyAction(base)).toBe("play");
 		expect(listenKeyAction({ ...base, composerEmpty: false })).toBe("pass");
 		expect(listenKeyAction({ ...base, key: "?", code: "Slash" })).toBe("pass");
+	});
+	it("Space stops a clip sounding wherever the pointer is", () => {
+		const away = { ...base, overPlayer: false, playing: true };
+		expect(listenKeyAction(away)).toBe("stop");
+		expect(listenKeyAction({ ...away, inComposer: false })).toBe("stop");
+		expect(listenKeyAction({ ...base, playing: true })).toBe("stop");
+		// A question being typed keeps its spaces.
+		expect(listenKeyAction({ ...away, composerEmpty: false })).toBe("pass");
+	});
+	it("Space away from the player with nothing sounding is the page's (the prompt)", () => {
+		expect(listenKeyAction({ ...base, overPlayer: false })).toBe("pass");
+		expect(
+			listenKeyAction({ ...base, overPlayer: false, inComposer: false })
+		).toBe("pass");
 	});
 	it("⌘Enter / Ctrl+Enter reveals only over an empty composer (a typed question sends)", () => {
 		const enter = { ...base, key: "Enter", code: "Enter" };

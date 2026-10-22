@@ -359,19 +359,26 @@ export interface ListenKeyFacts {
 	hovered: boolean;
 	/** Text is selected (Select + A annotates it). */
 	selection: boolean;
+	/** A clip is sounding. */
+	playing: boolean;
+	/** The pointer is over a clip's player. */
+	overPlayer: boolean;
 }
 
-export type ListenKeyAction = "play" | "slow" | "reveal" | "peek" | "pass";
+export type ListenKeyAction =
+	"play" | "stop" | "slow" | "reveal" | "peek" | "pass";
 
 /**
  * Drill keys. The composer is a normal chat in a drill (questions
- * about the clips), so typing there stays typing: Space plays and
- * ⌘Enter / Ctrl+Enter reveals only while it is empty. Outside it, S
- * replays slowly, a reveals the waiting clip and moves on, and A shows
- * its text without moving on; a and A yield to a hovered message or a
- * selection, where they annotate. The page aims S at a hovered clip.
- * ⌥Space / ⌥S work anywhere. Matched on `code` where ⌥ rewrites the
- * character (⌥S types ß).
+ * about the clips), so typing there stays typing. Space stops a clip
+ * that is sounding, plays the clip whose player the pointer is over,
+ * and otherwise is the page's own Space (it brings up the prompt, as
+ * in any chat). ⌘Enter / Ctrl+Enter reveals while the composer is
+ * empty. Outside it, S replays slowly, a reveals the waiting clip and
+ * moves on, and A shows its text without moving on; a and A yield to
+ * a hovered message or a selection, where they annotate. The page
+ * aims S at a hovered clip. ⌥Space / ⌥S work anywhere. Matched on
+ * `code` where ⌥ rewrites the character (⌥S types ß).
  */
 export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 	if (!f.inDrill || f.inOtherField) return "pass";
@@ -382,7 +389,11 @@ export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 		if (f.code === "KeyS") return "slow";
 		return "pass";
 	}
-	if (f.code === "Space" && f.composerEmpty) return "play";
+	if (f.code === "Space") {
+		if (f.inComposer && !f.composerEmpty) return "pass";
+		if (f.playing) return "stop";
+		return f.overPlayer ? "play" : "pass";
+	}
 	if (f.inComposer || f.hovered || f.selection) {
 		if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
 		return "pass";

@@ -11363,10 +11363,10 @@
 				else if (readerKey !== "swallow") stepReader(readerKey);
 				return;
 			}
-			// Listening drill keys: Space plays, S slows (the hovered
-			// clip, else the newest), ⌘Enter, ? or A reveals (decided in
-			// listenKeyAction; typing a guess stays typing). A reveal
-			// drops a half-typed guess.
+			// Listening drill keys: Space stops what sounds or plays the
+			// clip under the pointer (else it's the page's Space: the
+			// prompt), S slows (the hovered clip, else the newest),
+			// ⌘Enter or a reveals, A shows the text (listenKeyAction).
 			const listenKey = listenKeyAction({
 				key: event.key,
 				code: event.code,
@@ -11384,7 +11384,9 @@
 						event.target instanceof HTMLInputElement ||
 						event.target instanceof HTMLTextAreaElement),
 				hovered: hoveredIdx >= 0,
-				selection: window.getSelection()?.isCollapsed === false
+				selection: window.getSelection()?.isCollapsed === false,
+				playing: listenMode.playing !== null,
+				overPlayer: listenMode.hoveredPlayer !== null
 			});
 			if (listenKey !== "pass" && !event.repeat) {
 				consumeEvent(event);
@@ -11392,6 +11394,9 @@
 				const hoveredClip = chat.messages[hoveredIdx]?.clip?.i;
 				if (listenKey === "reveal") listenMode.submit(null);
 				else if (listenKey === "peek") listenMode.peek();
+				else if (listenKey === "stop") listenMode.pause();
+				else if (listenKey === "play" && listenMode.hoveredPlayer !== null)
+					listenMode.toggle(listenMode.hoveredPlayer, false);
 				else if (listenKey === "slow" && hoveredClip !== undefined)
 					listenMode.toggle(hoveredClip, true);
 				else listenMode.replay(listenKey === "slow");
@@ -14671,7 +14676,12 @@
 					settings.emptyChatMode = "listen";
 					if (activeReplyCode) listenMode.enter(activeReplyCode);
 				},
-				close: () => clearReplyLang()
+				close: () => clearReplyLang(),
+				volume: settings.listenVolume,
+				setVolume: (volume) => {
+					settings.listenVolume = Math.min(2, Math.max(0, volume));
+					persistSettings();
+				}
 			}}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}
