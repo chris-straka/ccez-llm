@@ -157,6 +157,27 @@ element ride bindables so the page's save/focus paths keep working. -->
 					0
 				);
 		};
+		// The canvas measure can run narrower than the field's own
+		// layout (font fallback, kerning): widen in half-em steps until
+		// the note sits on as many lines as it has newlines, so typing
+		// never wraps a line and then unwraps it. Stops at the cap,
+		// where wrapping is the point.
+		const unwrap = (style: CSSStyleDeclaration, cap: number): void => {
+			if (!card) return;
+			const fontPx = parseFloat(style.fontSize);
+			const lineH = parseFloat(style.lineHeight) || fontPx * 1.5;
+			const pad =
+				parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+			const lines = node.value.split("\n").length;
+			const prior = node.style.height;
+			if (!cssOwnsHeight) node.style.height = "auto";
+			for (let i = 0; i < 40 && widest < cap; i++) {
+				if (node.scrollHeight - pad <= lines * lineH + 1) break;
+				widest = Math.min(cap, widest + fontPx / 2);
+				card.style.width = `${widest}px`;
+			}
+			if (!cssOwnsHeight) node.style.height = prior;
+		};
 		const fit = () => {
 			const style = getComputedStyle(node);
 			const fontPx = parseFloat(style.fontSize);
@@ -173,17 +194,19 @@ element ride bindables so the page's save/focus paths keep working. -->
 				const chromeWidth =
 					card.getBoundingClientRect().width -
 					node.getBoundingClientRect().width;
+				const columnWidth = Math.min(
+					note.column.right - note.column.left,
+					window.innerWidth - 16
+				);
 				widest = noteEditorWidth({
 					fontPx,
-					columnWidth: Math.min(
-						note.column.right - note.column.left,
-						window.innerWidth - 16
-					),
-					contentWidth: measureText(style) + fontPx,
+					columnWidth,
+					contentWidth: measureText(style) + fontPx / 2,
 					chromeWidth,
 					previousWidth: widest
 				});
 				card.style.width = `${widest}px`;
+				unwrap(style, Math.floor(columnWidth));
 				if (!cssOwnsHeight) {
 					node.style.height = "auto";
 					node.style.height = `${node.scrollHeight}px`;
@@ -206,12 +229,14 @@ element ride bindables so the page's save/focus paths keep working. -->
 				widest = annComposerWidth({
 					fontPx,
 					viewportWidth: window.innerWidth,
-					contentWidth: contentWidth + fontPx,
+					contentWidth: contentWidth + fontPx / 2,
 					chromeWidth,
 					previousWidth: widest,
 					android
 				});
 				card.style.width = `${widest}px`;
+				if (!android)
+					unwrap(style, Math.min(window.innerWidth - 16, 30 * fontPx));
 				// Only shift left when growth would cross the screen edge.
 				card.style.left = `${Math.max(8, Math.min(anchorX, window.innerWidth - widest - 8))}px`;
 			} else if (card && !pop.fresh) {
@@ -561,15 +586,13 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		background: var(--accent);
 		color: #fff;
 	}
-	/* Fresh pill keeps the mic mounted and cross-fades it, so the
-	textarea never reflows when typing starts. Faded buttons are out of
-	the pointer and tab order. */
-	.ann-pop .ann-tool {
-		transition: opacity 0.2s ease;
-	}
+	/* The mic shows only while the note is empty (or dictating). Once
+	typing starts it leaves the row entirely: kept as an invisible
+	slot it padded the right edge well past the left. The box never
+	narrows while typing (growPill keeps its widest width), so the
+	freed room is slack, never a reflow. */
 	.ann-pop .gone {
-		opacity: 0;
-		pointer-events: none;
+		display: none;
 	}
 	/* Fresh annotation: the compact pill (textarea + mic) rather than
 	the edit card. Enter files it; clicking off cancels an empty draft. */
