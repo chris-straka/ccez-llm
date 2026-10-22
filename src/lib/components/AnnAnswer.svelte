@@ -135,17 +135,24 @@ corner, outside the text: save the quote as a flashcard. -->
 		return () => ro.disconnect();
 	});
 
-	// Word pulse on open: the badge pops once (the individual `scale`
-	// property composes with its own translate, so geometry holds).
+	// Open pulse: one ring in the badge's own colour spreads and fades.
+	// The badge never scales: its tail grew and swung off the word it
+	// points at. The ring rides over any ink outline the badge wears.
 	$effect(() => {
 		if (reducedMotion()) return;
 		const badge = document.querySelector(`[data-ann-badge="${badgeId}"]`);
 		if (!(badge instanceof HTMLElement) || typeof badge.animate !== "function")
 			return;
-		badge.animate([{ scale: "1" }, { scale: "1.28" }, { scale: "1" }], {
-			duration: 320,
-			easing: "cubic-bezier(0.3, 0.7, 0.4, 1)"
-		});
+		const style = getComputedStyle(badge);
+		const ink = style.boxShadow === "none" ? "" : `${style.boxShadow}, `;
+		const fill = style.backgroundColor;
+		badge.animate(
+			[
+				{ boxShadow: `${ink}0 0 0 0 ${fill}` },
+				{ boxShadow: `${ink}0 0 0 7px transparent` }
+			],
+			{ duration: 420, easing: "ease-out" }
+		);
 	});
 
 	// Smooth reposition: when the card's own size moves it (content
