@@ -2,9 +2,9 @@ import { expect, test, type Page } from "./fixtures";
 import { toggleSidebar } from "./helpers";
 
 /**
- * Flashcards: answered annotations from other chats surface as a quiet
- * "N flashcards due" entry on an empty chat; the deck flips, grades,
- * deletes, and keeps English quotes out.
+ * Flashcards: answered annotations saved as cards, from other chats,
+ * surface as a quiet "N flashcards due" entry on an empty chat; the
+ * deck flips, grades, deletes, and keeps English quotes out.
  */
 async function seedDeck(page: Page): Promise<void> {
 	await page.addInitScript(() => {
@@ -64,6 +64,17 @@ async function seedDeck(page: Page): Promise<void> {
 						answer: "an English aside"
 					}
 				]
+			})
+		);
+		// All three saved as cards (new, due now): the English one
+		// still never makes the deck.
+		const fresh = { due: 0, interval: 0, reps: 0 };
+		window.localStorage.setItem(
+			"ccez-llm-flashcards-v1",
+			JSON.stringify({
+				"ganz in der nähe": fresh,
+				"gehen sie geradeaus": fresh,
+				"what is the point of this?": fresh
 			})
 		);
 	});
