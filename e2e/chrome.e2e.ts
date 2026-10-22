@@ -1411,6 +1411,9 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Bulgarian")').click();
 	await expect(send).toContainText("🇧🇬", { timeout: 10_000 });
+	// A desktop pick only sets the language; News opens the panel.
+	await expect(panel).toHaveCount(0);
+	await page.locator('.study-modes button:has-text("News")').click();
 	await expect(panel).toContainText("Български", { timeout: 10_000 });
 	expect(await focusedComposer()).toBe(false);
 	// Re-pick without ever touching the prompt: the badge swaps at once.
@@ -1458,5 +1461,5 @@ test("language menu: popular first, typing jumps, Enter picks", async ({
 	await page.keyboard.press("ArrowUp");
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".lang-list")).toHaveCount(0);
-	await expect(page.locator(".news-meta")).toContainText("Polski");
+	await expect(page.locator(".send-btn")).toContainText("🇵🇱");
 });

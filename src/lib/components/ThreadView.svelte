@@ -179,6 +179,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			channels: ListenChannel[];
 			/** The app's backend exists (not the plain web build). */
 			available: boolean;
+			/** The News | Listen switch shows on the empty chat (desktop:
+			always, the way into both; phones: once a language is picked). */
+			modes: boolean;
 			summary: DrillSummary | null;
 			another: () => void;
 			/** The News | Listen switch (remembers its side). */
@@ -293,7 +296,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 						: `${flashcardsDue} flashcards due`}
 				</button>
 			{/if}
-			{#if activeReplyCode && listen.available && !previewing}
+			{#if listen.modes && !previewing}
 				<!-- One language, two ways in: read its news or listen
 				to videos in it. -->
 				<div class="study-modes" role="tablist" aria-label="Study with">
@@ -301,14 +304,24 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 						type="button"
 						role="tab"
 						aria-selected={newsPanel !== null && !listen.mode.open}
-						onclick={listen.showNews}>News</button
+						onclick={(e) => {
+							// Focus never parks on the switch: bare keys
+							// (i summons the prompt) keep working.
+							e.currentTarget.blur();
+							listen.showNews();
+						}}>News</button
 					>
-					<button
-						type="button"
-						role="tab"
-						aria-selected={listen.mode.open}
-						onclick={listen.showListen}>Listen</button
-					>
+					{#if listen.available}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={listen.mode.open}
+							onclick={(e) => {
+								e.currentTarget.blur();
+								listen.showListen();
+							}}>Listen</button
+						>
+					{/if}
 				</div>
 			{/if}
 			{#if listen.mode.open && listen.mode.lang}

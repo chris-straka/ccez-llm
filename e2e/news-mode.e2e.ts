@@ -9,7 +9,8 @@ import {
 } from "./mock-shell";
 
 /**
- * Learner news mode: on an empty chat, picking a reply language
+ * Learner news mode: on an empty chat, the News button (after a
+ * language pick, which on desktop only sets the reply language)
  * trades the welcome text for story cards under the pill rail. The
  * browser preview has no shell transport, so the first strand pins
  * entry, the honest needs-shell state, and the exit — while the
@@ -23,13 +24,15 @@ test.beforeEach(async ({ page }) => {
 	});
 });
 
-test("empty-chat language pick opens news, close returns to welcome", async ({
+test("empty-chat News opens the picked language's news, close returns to welcome", async ({
 	page
 }) => {
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	const list = page.locator(".lang-list");
 	await expect(list).toBeVisible();
 	await list.getByRole("menuitem", { name: "French" }).click();
+	// A desktop pick only sets the language; News opens the panel.
+	await page.locator('.study-modes button:has-text("News")').click();
 	// Welcome text goes away, the panel rails under the pills.
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
@@ -48,6 +51,8 @@ test("fallback language never shows English headlines", async ({ page }) => {
 	const list = page.locator(".lang-list");
 	await expect(list).toBeVisible();
 	await list.getByRole("menuitem", { name: "Danish" }).click();
+	// A desktop pick only sets the language; News opens the panel.
+	await page.locator('.study-modes button:has-text("News")').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	// Fallback regions translate; the English note is gone. No
@@ -66,6 +71,7 @@ test("news mode lists from the top: uncentered pane, strip clearance, tail room"
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
+	await page.locator('.study-modes button:has-text("News")').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	// The thread stops being a centered hero: full-height list.
@@ -115,6 +121,7 @@ test("picking a second language switches the panel over", async ({ page }) => {
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
+	await page.locator('.study-modes button:has-text("News")').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toContainText("français", { timeout: 10_000 });
 	await page.locator('.lang-menu button:has-text("Asia")').click();
@@ -133,6 +140,7 @@ test("headlines park the composer; summon brings it back over them", async ({
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
+	await page.locator('.study-modes button:has-text("News")').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	const prompt = page.locator(".prompt");
@@ -172,6 +180,7 @@ test.describe("mock shell feed", () => {
 			.locator(".lang-list")
 			.getByRole("menuitem", { name: "French" })
 			.click();
+		await page.locator('.study-modes button:has-text("News")').click();
 	}
 
 	test("headlines render from the mock feed", async ({ page }) => {

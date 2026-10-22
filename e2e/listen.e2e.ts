@@ -177,7 +177,7 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.locator(".empty-state")).toBeVisible({ timeout: 60_000 });
 });
 
-test("News and Listen stay hidden until a language is picked", async ({
+test("News and Listen show on a new chat; with no language they ask for one", async ({
 	page
 }) => {
 	// Same shell and channels, but a chat with no language yet.
@@ -188,15 +188,23 @@ test("News and Listen stay hidden until a language is picked", async ({
 	await expect(page.locator(".empty-state h1")).toBeVisible({
 		timeout: 60_000
 	});
-	await expect(page.getByRole("tab", { name: "Listen" })).toHaveCount(0);
-	await expect(page.getByRole("tab", { name: "News" })).toHaveCount(0);
+	// Desktop: both ways in show before any pick.
+	await expect(page.getByRole("tab", { name: "News" })).toBeVisible();
+	await expect(page.getByRole("tab", { name: "Listen" })).toBeVisible();
+	await page.getByRole("tab", { name: "News" }).click();
+	await expect(page.locator(".toast").first()).toContainText(
+		"Pick a language first"
+	);
+	await expect(page.locator(".news-panel")).toHaveCount(0);
+	// A pick only sets the language; Listen then opens in it.
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	await page
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
-	await expect(page.getByRole("tab", { name: "News" })).toBeVisible();
-	await expect(page.getByRole("tab", { name: "Listen" })).toBeVisible();
+	await expect(page.locator(".listen-panel")).toHaveCount(0);
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await expect(page.locator(".listen-panel")).toContainText("Learner Channel");
 });
 
 test("a drill runs: show text, next clip at once, tally", async ({ page }) => {

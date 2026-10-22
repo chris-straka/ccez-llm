@@ -9102,11 +9102,22 @@
 		if (!replyLanguageFor(code)) return;
 		setChatReplyLang(chatState, chatState.activeChatId, code);
 		openLangMenu = null;
-		// Empty chats open learner news for the picked language (the
-		// submenu and ⌘number share this funnel); anywhere else the
-		// pick just switches and any open panel goes away.
-		// The News | Listen switch remembers its side.
 		const empty = activeChat(chatState).messages.length === 0;
+		// Desktop: a pick only sets the reply language (the send
+		// button). News and Listen open from their own buttons on the
+		// empty chat; one already open follows the new language.
+		if (!androidUI) {
+			if (!empty) newsMode.news = null;
+			else if (listenMode.open) listenMode.enter(code);
+			else if (newsMode.news) newsMode.enterNewsMode(code);
+			// Warm News for its button.
+			else newsMode.prefetch(code);
+			return;
+		}
+		// Phones: empty chats open learner news for the picked
+		// language (the submenu and the number keys share this
+		// funnel); anywhere else the pick just switches and any open
+		// panel goes away. The News | Listen switch remembers its side.
 		const wantsListen =
 			listenMode.open ||
 			(settings.emptyChatMode === "listen" && listenBackend() !== null);
@@ -9144,6 +9155,19 @@
 			restoreChatMessages(chatState, chatId, before);
 		});
 	}
+	/** The language News and Listen open in: the chat's pick, else the
+	default reply language (which becomes the chat's pick). Neither:
+	a toast asks for one. */
+	function studyLangCode(): string | null {
+		if (activeReplyCode) return activeReplyCode;
+		const fallback = settings.replyLang;
+		if (fallback && replyLanguageFor(fallback)) {
+			setChatReplyLang(chatState, chatState.activeChatId, fallback);
+			return fallback;
+		}
+		flashToast("Pick a language first");
+		return null;
+	}
 	function clearReplyLang(): void {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
@@ -9161,8 +9185,9 @@
 	const langMenusActions = {
 		toggle: (id: LanguageMenu["id"], el: HTMLElement) => toggleLangMenu(id, el),
 		hover: (lang: ReplyLanguage) => {
-			// Only empty chats open news on a pick, so only they warm it.
-			if (activeChat(chatState).messages.length === 0)
+			// Only phone picks on empty chats open news, so only they
+			// warm it on hover (desktop warms on the pick itself).
+			if (androidUI && activeChat(chatState).messages.length === 0)
 				newsMode.prefetch(lang.code);
 		},
 		pick: (lang: ReplyLanguage) => {
@@ -14732,20 +14757,25 @@
 					"",
 				channels: settings.listenChannels,
 				available: listenBackend() !== null,
+				modes:
+					!androidUI || (activeReplyCode !== null && listenBackend() !== null),
 				summary:
 					chat.listen && chat.messages.some((m) => m.drillEnd)
 						? summarizeDrill(drillStates(chat))
 						: null,
 				another: anotherDrill,
 				showNews: () => {
+					const code = studyLangCode();
+					if (!code) return;
 					settings.emptyChatMode = "news";
 					listenMode.close();
-					if (!newsMode.news && activeReplyCode)
-						newsMode.enterNewsMode(activeReplyCode);
+					if (!newsMode.news) newsMode.enterNewsMode(code);
 				},
 				showListen: () => {
+					const code = studyLangCode();
+					if (!code) return;
 					settings.emptyChatMode = "listen";
-					if (activeReplyCode) listenMode.enter(activeReplyCode);
+					listenMode.enter(code);
 				},
 				close: () => clearReplyLang(),
 				volume: settings.listenVolume,

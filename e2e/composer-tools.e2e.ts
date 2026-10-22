@@ -601,15 +601,8 @@ test("desktop send-hold stashes and restores the reply language", async ({
 	await page
 		.locator('.lang-list [role="menuitem"]', { hasText: "French" })
 		.click();
-	// The news panel's header names the pick (no toast over the pills).
-	await expect(page.locator(".news-meta")).toContainText("français 🇫🇷");
-	// Picking on an empty chat opens learner news, which parks the
-	// composer on desktop: summon it back (bare i, the real user
-	// flow) before holding — a parked send eats no presses.
-	await page.keyboard.press("i");
-	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, {
-		timeout: 10_000
-	});
+	// A desktop pick only sets the language: the send button wears it.
+	await expect(page.locator(".send-btn")).toContainText("🇫🇷");
 	// Hold the empty send: pill stashes, toast names the cleared word.
 	const send = page.locator(".send-btn");
 	const box = await send.boundingBox();
