@@ -11,7 +11,8 @@ import {
 } from "./annotation-drafts-store";
 import type { ChatId, ChatMsgId } from "./chat";
 import type { ChatProvider } from "./providers/types";
-import type { AnnotationQuestion } from "./reading";
+import type { AnnotationQuestion, AnnotationReply } from "./reading";
+import type { WordCard } from "./word-card";
 
 function note(over: Partial<Annotation> = {}): Annotation {
 	return {
@@ -33,7 +34,11 @@ function harness(
 		phone?: boolean;
 		storyOpen?: boolean;
 		provider?: ChatProvider | null;
-		answer?: (q: AnnotationQuestion, signal: AbortSignal) => Promise<string>;
+		answer?: (
+			q: AnnotationQuestion,
+			signal: AbortSignal
+		) => Promise<string | AnnotationReply>;
+		lang?: string;
 		followUp?: (reply: string) => Promise<string>;
 	} = {}
 ): {
@@ -79,6 +84,7 @@ function harness(
 			return answer(q, signal);
 		},
 		answerContextFor: () => "ctx",
+		langFor: () => opts.lang ?? null,
 		answerFollowUp: (provider, q, answer, thread, reply) => {
 			void provider;
 			calls.followUps.push({ answer, thread: [...thread], reply });
@@ -209,7 +215,7 @@ describe("ask flow", () => {
 		expect(calls.cleared).toBe(1);
 		expect(calls.banners).toEqual([]);
 		expect(calls.answers).toEqual([
-			{ quote: "quote", question: "why?", context: "ctx" }
+			{ quote: "quote", question: "why?", context: "ctx", lang: null }
 		]);
 	});
 
@@ -540,6 +546,42 @@ describe("background interruptions", () => {
 		d.settle[0]?.reject(new Error("boom"));
 		await asked;
 		expect(calls.errors).toEqual(["boom"]);
+	});
+});
+
+describe("word cards", () => {
+	const card: WordCard = {
+		meaning: "crossed",
+		parts: [
+			{ text: "franch", label: "franchir", kind: "core" },
+			{ text: "i", label: "past participle", kind: "tense" }
+		],
+		facts: [],
+		lang: "fr"
+	};
+
+	it("a card lands beside its answer and survives a reload", async () => {
+		const { drafts, calls } = harness({
+			lang: "fr",
+			answer: async () => ({ answer: "crossed", card })
+		});
+		const q = note({ quote: "franchi" });
+		drafts.setList([q]);
+		await drafts.ask(q);
+		expect(calls.answers[0]?.lang).toBe("fr");
+		expect(drafts.list[0]?.answer).toBe("crossed");
+		expect(drafts.list[0]?.card).toEqual(card);
+		drafts.fileChat("c1" as ChatId);
+		expect(loadDraftAnnotations("c1")[0]?.card).toEqual(card);
+	});
+
+	it("a plain answer drops a stale card", async () => {
+		const { drafts } = harness({ answer: async () => "prose" });
+		const q = note({ quote: "franchi", answer: "crossed", card });
+		drafts.setList([q]);
+		await drafts.ask(q);
+		expect(drafts.list[0]?.answer).toBe("prose");
+		expect(drafts.list[0]?.card).toBeUndefined();
 	});
 });
 

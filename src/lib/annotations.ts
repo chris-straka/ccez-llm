@@ -8,6 +8,7 @@
  */
 import type { ChatMsgId } from "./chat";
 import type { AnnotationRef } from "./annotation-block";
+import type { WordCard } from "./word-card";
 
 /** Opaque annotation identifier (see ChatId/ChatMsgId in chat.ts). */
 export type AnnotationId = string & { readonly kind: "annotation" };
@@ -57,6 +58,12 @@ export interface Annotation {
 	 * Persisted with drafts; never baked into message text.
 	 */
 	thread?: AnnotationFollowUp[];
+	/**
+	 * The word card the answer was rendered from, when the quote was
+	 * one word (see word-card.ts); `answer` holds its text. Persisted
+	 * with drafts; never baked into message text.
+	 */
+	card?: WordCard;
 }
 
 /** One reply in an answer card's thread. */
@@ -218,20 +225,24 @@ export function canHoldDeleteBadge(ann: { id: string } | undefined): boolean {
 }
 
 /** Ask one annotation right away (every filing asks its own
-separate request): attach a fresh reply as its answer. A blank reply
-attaches nothing — the annotation stays blue. Returns the list
-unchanged when nothing attaches. */
+separate request): attach a fresh reply as its answer, with its word
+card when it has one (an answer without one drops a stale card). A
+blank reply attaches nothing — the annotation stays blue. Returns the
+list unchanged when nothing attaches. */
 export function attachAnnotationAnswer(
 	list: Annotation[],
 	id: AnnotationId,
-	reply: string
+	reply: string,
+	card?: WordCard
 ): Annotation[] {
 	if (!reply.trim()) return list;
 	let touched = false;
 	const next = list.map((a) => {
-		if (a.id !== id || a.answer === reply) return a;
+		if (a.id !== id || (a.answer === reply && a.card === card)) return a;
 		touched = true;
-		return { ...a, answer: reply };
+		const { card: _stale, ...rest } = a;
+		void _stale;
+		return { ...rest, answer: reply, ...(card ? { card } : {}) };
 	});
 	return touched ? next : list;
 }

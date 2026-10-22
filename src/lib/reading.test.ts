@@ -1203,7 +1203,7 @@ describe("annotationAnswer", () => {
 		} as unknown as ChatProvider;
 		await expect(
 			annotationAnswer(provider, { ...q, quote: "s'en prend" })
-		).resolves.toBe("Attacks.");
+		).resolves.toEqual({ answer: "Attacks." });
 	});
 
 	it("asks once per filing, rejecting blanks and empties", async () => {
@@ -1216,7 +1216,9 @@ describe("annotationAnswer", () => {
 			chat,
 			stream: chat
 		} as unknown as ChatProvider;
-		await expect(annotationAnswer(provider, q)).resolves.toBe("short answer");
+		await expect(annotationAnswer(provider, q)).resolves.toEqual({
+			answer: "short answer"
+		});
 		await expect(
 			annotationAnswer(provider, { ...q, quote: "  " })
 		).rejects.toThrow("Nothing to answer about");

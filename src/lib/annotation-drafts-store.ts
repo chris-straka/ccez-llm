@@ -7,6 +7,7 @@ import type {
 	AnnotationFollowUp,
 	StoryAnchor
 } from "./annotations";
+import { cleanWordCard } from "./word-card";
 
 /**
  * Draft annotations persist per chat across restarts (live extras, not
@@ -47,6 +48,18 @@ function cleanThread(raw: unknown): { thread: AnnotationFollowUp[] } | null {
 	return thread.length > 0 ? { thread } : null;
 }
 
+/** A stored word card, shape-checked like the rest (only beside an
+answer: the card is how that answer renders). */
+function cleanCard(
+	raw: unknown,
+	quote: string,
+	answer: unknown
+): Pick<Annotation, "card"> {
+	if (typeof answer !== "string" || !answer) return {};
+	const card = cleanWordCard(raw, quote);
+	return card ? { card } : {};
+}
+
 function cleanDraftList(raw: unknown): Annotation[] {
 	if (!Array.isArray(raw)) return [];
 	const out: Annotation[] = [];
@@ -68,7 +81,8 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			// Answers persist with drafts like the comment: a reload
 			// must not un-ask an answered annotation back to blue.
 			...(typeof a.answer === "string" && a.answer ? { answer: a.answer } : {}),
-			...(cleanThread(a.thread) ?? {})
+			...(cleanThread(a.thread) ?? {}),
+			...cleanCard(a.card, a.quote, a.answer)
 		});
 	}
 	return out;

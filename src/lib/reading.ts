@@ -2,6 +2,15 @@ import type { ChatProvider } from "./providers/types";
 import { annRefsFor } from "./annotation-block";
 import { escapeHtml } from "./render-math";
 import { partialReading } from "./kanjiSplit";
+import {
+	buildWordCardMessages,
+	isWordQuote,
+	looksLikeJson,
+	parseWordCard,
+	wordCardLang,
+	wordCardText,
+	type WordCard
+} from "./word-card";
 
 /**
  * Reading aids + speech, generalized across languages (A6).
@@ -913,6 +922,8 @@ export interface AnnotationQuestion {
 	quote: string;
 	question: string;
 	context: string;
+	/** The passage's language, when the chat or story knows it. */
+	lang?: string | null;
 }
 
 /**
@@ -1055,18 +1066,48 @@ export async function annotationFollowUp(
 	return text;
 }
 
+/** An annotation's answer: the note's text, plus the word card it
+was rendered from when the quote was one word. */
+export interface AnnotationReply {
+	answer: string;
+	card?: WordCard;
+}
+
 /**
  * Ask the model one annotation question: a separate request, never
  * linked to the main prompt or chat history. No cache — every filing
- * asks fresh (14 small questions stay current).
+ * asks fresh (14 small questions stay current). One word with no
+ * question asks for a word card (see word-card.ts); a reply that
+ * isn't a card but reads as prose still files, and broken JSON falls
+ * back to the prose ask. `lang` is the passage's language when the
+ * chat or story knows it.
  */
 export async function annotationAnswer(
 	provider: ChatProvider,
 	q: AnnotationQuestion,
 	signal?: AbortSignal,
-	opts: { inPassageLang?: boolean } = {}
-): Promise<string> {
+	opts: { inPassageLang?: boolean; lang?: string | null } = {}
+): Promise<AnnotationReply> {
 	if (!q.quote.trim()) throw new Error("Nothing to answer about.");
+	if (!q.question.trim() && isWordQuote(q.quote)) {
+		const lang = wordCardLang(q.quote, opts.lang);
+		const reply = await provider.chat(
+			buildWordCardMessages(q, lang, opts) as Array<{
+				role: "system" | "user" | "assistant";
+				content: string;
+			}>,
+			{ signal }
+		);
+		const parsed = parseWordCard(reply.content, q.quote);
+		if (parsed) {
+			const card = lang ? { ...parsed, lang } : parsed;
+			return { answer: wordCardText(card), card };
+		}
+		if (!looksLikeJson(reply.content)) {
+			const answer = tidyAnnotationAnswer(reply.content, q.quote);
+			if (answer) return { answer };
+		}
+	}
 	const result = await provider.chat(
 		buildAnnotationAnswerMessages(q, opts) as Array<{
 			role: "system" | "user" | "assistant";
@@ -1076,7 +1117,7 @@ export async function annotationAnswer(
 	);
 	const answer = tidyAnnotationAnswer(result.content, q.quote);
 	if (!answer) throw new Error("Empty annotation answer.");
-	return answer;
+	return { answer };
 }
 
 /** Compare forms: case, curly apostrophes, quote marks and edge

@@ -17,7 +17,8 @@ import {
 } from "./annotation-drafts-store";
 import type { ChatId } from "./chat";
 import type { ChatProvider } from "./providers/types";
-import type { AnnotationQuestion } from "./reading";
+import type { AnnotationQuestion, AnnotationReply } from "./reading";
+import type { WordCard } from "./word-card";
 
 /** How long a request that rode out a trip to the background gets,
 once the app is back, before it is restarted as hung. */
@@ -32,8 +33,11 @@ export interface AnnotationDraftsDeps {
 		provider: ChatProvider,
 		q: AnnotationQuestion,
 		signal: AbortSignal
-	) => Promise<string>;
+	) => Promise<string | AnnotationReply>;
 	answerContextFor: (ann: Annotation) => string;
+	/** The passage's language for a note (its story's, else its
+	chat's reply language); absent leaves it to the quote's script. */
+	langFor?: (ann: Annotation) => string | null;
 	/** One follow-up in an answer card's thread (see
 	annotationFollowUp in reading.ts). */
 	answerFollowUp: (
@@ -301,16 +305,19 @@ export class AnnotationDrafts {
 				return;
 			}
 			this.deps.clearBanner();
-			const answer = await this.deps.answerQuestion(
+			const reply = await this.deps.answerQuestion(
 				provider,
 				{
 					quote: ann.quote,
 					question: ann.comment,
-					context: this.deps.answerContextFor(ann)
+					context: this.deps.answerContextFor(ann),
+					lang: this.deps.langFor?.(ann) ?? null
 				},
 				controller.signal
 			);
-			this.attachAnswer(chatId, ann.id, answer);
+			const { answer, card } =
+				typeof reply === "string" ? { answer: reply, card: undefined } : reply;
+			this.attachAnswer(chatId, ann.id, answer, card);
 			// Story notes have no badge to turn orange: an answered
 			// one opens its card while the story is still on screen
 			// (resume scans for long-closed panels attach silently).
@@ -384,20 +391,35 @@ export class AnnotationDrafts {
 	 * the next restore shows the badge orange. A chat dropped
 	 * meanwhile keeps nothing (the save prunes unknown ids).
 	 */
-	private attachAnswer(chatId: ChatId, id: AnnotationId, answer: string): void {
+	private attachAnswer(
+		chatId: ChatId,
+		id: AnnotationId,
+		answer: string,
+		card?: WordCard
+	): void {
 		if (chatId === this.deps.getActiveChatId()) {
-			this.list = attachAnnotationAnswer(this.list, id, answer);
+			this.list = attachAnnotationAnswer(this.list, id, answer, card);
 			if (this.stash && this.stash.chatId === chatId)
-				this.stash.list = attachAnnotationAnswer(this.stash.list, id, answer);
+				this.stash.list = attachAnnotationAnswer(
+					this.stash.list,
+					id,
+					answer,
+					card
+				);
 			return;
 		}
 		if (this.stash && this.stash.chatId === chatId)
-			this.stash.list = attachAnnotationAnswer(this.stash.list, id, answer);
+			this.stash.list = attachAnnotationAnswer(
+				this.stash.list,
+				id,
+				answer,
+				card
+			);
 		const stored = loadDraftAnnotations(chatId);
 		if (!stored.some((a) => a.id === id)) return;
 		saveDraftAnnotations(
 			chatId,
-			attachAnnotationAnswer(stored, id, answer),
+			attachAnnotationAnswer(stored, id, answer, card),
 			this.deps.getChatIds()
 		);
 	}

@@ -971,8 +971,13 @@
 		resolveProvider: () => providerKeys.resolveActive(),
 		answerQuestion: (provider, q, signal) =>
 			annotationAnswer(provider, q, signal, {
-				inPassageLang: settings.annotationAnswersInPassageLang
+				inPassageLang: settings.annotationAnswersInPassageLang,
+				lang: q.lang ?? null
 			}),
+		langFor: (ann) =>
+			ann.story?.lang ??
+			chatState.chats.find((c) => c.id === chatState.activeChatId)?.replyLang ??
+			null,
 		answerContextFor: (ann) =>
 			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
 		answerFollowUp: (provider, q, answer, thread, reply) =>
@@ -5192,14 +5197,17 @@
 		try {
 			const provider = await providerKeys.resolveActive();
 			if (provider) {
-				const answer = await annotationAnswer(
+				const { answer, card } = await annotationAnswer(
 					provider,
 					{ quote, question: file.comment.trim(), context: line },
 					undefined,
-					{ inPassageLang: settings.annotationAnswersInPassageLang }
+					{
+						inPassageLang: settings.annotationAnswersInPassageLang,
+						lang: game.replyLang
+					}
 				);
 				const added = list[list.length - 1];
-				if (added) list = attachAnnotationAnswer(list, added.id, answer);
+				if (added) list = attachAnnotationAnswer(list, added.id, answer, card);
 			}
 		} catch {
 			saveDraftAnnotations(
@@ -15162,6 +15170,7 @@
 					? () => flashcards.toggleSaved(answered.quote)
 					: undefined}
 				thread={answered.thread ?? []}
+				wordCard={answered.card}
 				onReply={(text: string) => drafts.askFollowUp(answered.id, text)}
 			/>
 		{/if}

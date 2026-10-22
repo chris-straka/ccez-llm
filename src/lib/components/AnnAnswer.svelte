@@ -29,6 +29,7 @@ where it was left. -->
 		type NoteColumn
 	} from "$lib/annPop";
 	import type { AnnotationFollowUp } from "$lib/annotations";
+	import { wordCardDir, type WordCard } from "$lib/word-card";
 
 	interface Props {
 		answer: string;
@@ -55,6 +56,9 @@ where it was left. -->
 		onToggleSave?: (() => void) | undefined;
 		/** Replies argued under the answer, oldest first. */
 		thread?: AnnotationFollowUp[];
+		/** The one-word answer as a word card; renders in place of the
+		answer's lines. */
+		wordCard?: WordCard | undefined;
 		/** Send a reply; resolves false when it failed (the text comes
 		back to the field). Absent hides the reply field. */
 		onReply?: ((text: string) => Promise<boolean>) | undefined;
@@ -73,8 +77,19 @@ where it was left. -->
 		saved = false,
 		onToggleSave,
 		thread = [],
+		wordCard,
 		onReply
 	}: Props = $props();
+
+	/** The split row shows when there is a split, or a base form for
+	a word with none. */
+	const cardWord = $derived(
+		wordCard &&
+			(wordCard.parts.length > 1 || (wordCard.parts[0]?.label ?? "") !== "")
+			? wordCard.parts
+			: []
+	);
+	const cardReadings = $derived(cardWord.some((p) => p.reading));
 
 	/** The reply field's text, and its height (re-measures the card
 	when it changes). The field shows only after Reply is pressed,
@@ -237,6 +252,7 @@ where it was left. -->
 	// change (E rewords) so new paragraphs are observed too.
 	$effect(() => {
 		void lines;
+		void wordCard;
 		void thread.length;
 		void thread.at(-1)?.a;
 		void fieldH;
@@ -342,15 +358,70 @@ where it was left. -->
 	aria-label="Annotation answer"
 >
 	<div class="ann-answer-body" bind:this={body} onscroll={rememberScroll}>
-		{#each lines as line, i (i)}
-			<p
-				class="ann-answer-text"
-				class:ann-answer-head={headed && i === 0}
-				dir="auto"
-			>
-				{line}
-			</p>
-		{/each}
+		{#if wordCard}
+			<!-- Word card: the literal meaning leads; the sentence's
+			sense shows only when it differs. The word splits into its
+			colored pieces, each labeled under it (readings above where
+			the script hides the sound). -->
+			<div class="wc">
+				<p class="ann-answer-text ann-answer-head" dir="auto">
+					{wordCard.meaning}
+				</p>
+				{#if wordCard.inSentence}
+					<p class="wc-line" dir="auto">
+						<span class="wc-key">In this sentence:</span>
+						{wordCard.inSentence}
+					</p>
+				{/if}
+				{#if cardWord.length > 0}
+					<div class="wc-word" dir={wordCardDir(wordCard.lang)}>
+						{#each cardWord as part, i (i)}
+							<div class="wc-part k-{part.kind}">
+								{#if cardReadings}
+									<span class="wc-read" dir="auto">{part.reading ?? ""}</span>
+								{/if}
+								<span class="wc-piece" lang={wordCard.lang}>{part.text}</span>
+								{#if part.label}
+									<span class="wc-label" dir="auto">{part.label}</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
+				{#if wordCard.facts.length > 0}
+					<div class="wc-facts">
+						{#each wordCard.facts as fact, i (i)}
+							<span class="wc-fact k-{fact.kind}" dir="auto">{fact.text}</span>
+						{/each}
+					</div>
+				{/if}
+				{#if wordCard.base}
+					<p class="wc-line" dir="auto">{wordCard.base}</p>
+				{/if}
+				{#if wordCard.here}
+					<p class="wc-line" dir="auto">
+						<span class="wc-key">Here:</span>
+						{wordCard.here}
+					</p>
+				{/if}
+				{#if wordCard.watch}
+					<p class="wc-line" dir="auto">
+						<span class="wc-key wc-watch">Watch:</span>
+						{wordCard.watch}
+					</p>
+				{/if}
+			</div>
+		{:else}
+			{#each lines as line, i (i)}
+				<p
+					class="ann-answer-text"
+					class:ann-answer-head={headed && i === 0}
+					dir="auto"
+				>
+					{line}
+				</p>
+			{/each}
+		{/if}
 		{#each thread as turn, t (t)}
 			<!-- A reply and its answer: the learner's words set off to
 			the right, the model's below in the card's own voice. -->
@@ -620,6 +691,117 @@ where it was left. -->
 	}
 	.ann-answer-head {
 		font-weight: 600;
+	}
+	/* Word card. Each piece's kind has one hue in every language,
+	mixed into the card's own surface and ink so it reads in light
+	and dark themes alike. */
+	.wc {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55em;
+	}
+	.wc .ann-answer-text {
+		margin: 0;
+	}
+	.wc-line {
+		margin: 0;
+		color: color-mix(in srgb, currentColor 85%, transparent);
+		overflow-wrap: break-word;
+	}
+	.wc-key {
+		color: var(--muted);
+	}
+	.wc-watch {
+		color: color-mix(in srgb, #e8930c 75%, var(--ink));
+	}
+	.wc-word {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		row-gap: 0.4em;
+	}
+	.wc-part {
+		--hue: var(--ink);
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		min-width: 0;
+	}
+	.wc-part.k-tense,
+	.wc-fact.k-tense {
+		--hue: #3b82f6;
+	}
+	.wc-part.k-voice,
+	.wc-fact.k-voice {
+		--hue: #8b5cf6;
+	}
+	.wc-part.k-role,
+	.wc-fact.k-role {
+		--hue: #22a35a;
+	}
+	.wc-part.k-agree,
+	.wc-fact.k-agree {
+		--hue: #0fa89a;
+	}
+	.wc-part.k-derive,
+	.wc-fact.k-derive {
+		--hue: #e8930c;
+	}
+	.wc-piece {
+		padding: 0.1em 0.5em;
+		font-size: 1.2em;
+		text-align: center;
+		white-space: nowrap;
+		background: color-mix(in srgb, var(--hue) 22%, var(--bg-overlay));
+		color: color-mix(in srgb, var(--hue) 45%, var(--ink));
+	}
+	.wc-part.k-core .wc-piece {
+		background: color-mix(in srgb, var(--ink) 12%, var(--bg-overlay));
+		color: var(--ink);
+	}
+	.wc-part + .wc-part .wc-piece {
+		border-inline-start: 1px solid var(--bg-overlay);
+	}
+	.wc-part:first-child .wc-piece {
+		border-start-start-radius: 0.4em;
+		border-end-start-radius: 0.4em;
+	}
+	.wc-part:last-child .wc-piece {
+		border-start-end-radius: 0.4em;
+		border-end-end-radius: 0.4em;
+	}
+	.wc-read {
+		min-height: 1.3em;
+		padding-bottom: 0.1em;
+		font-size: 0.72em;
+		line-height: 1.3;
+		text-align: center;
+		color: var(--muted);
+	}
+	.wc-label {
+		max-width: 10ch;
+		margin: 0 auto;
+		padding: 0.25em 0.2em 0;
+		font-size: 0.78em;
+		line-height: 1.25;
+		text-align: center;
+		color: color-mix(in srgb, var(--hue) 60%, var(--muted));
+	}
+	.wc-part.k-core .wc-label {
+		color: var(--muted);
+	}
+	.wc-facts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35em;
+	}
+	.wc-fact {
+		--hue: var(--ink);
+		padding: 0.05em 0.6em;
+		border-radius: 999px;
+		font-size: 0.82em;
+		background: color-mix(in srgb, var(--hue) 18%, var(--bg-overlay));
+		color: color-mix(in srgb, var(--hue) 45%, var(--ink));
 	}
 	/* The learner's reply: set off right in the muted ink, like the
 	chat's own messages, with room above it to start a new turn. */
