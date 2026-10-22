@@ -78,9 +78,7 @@ describe("android service observability", () => {
 describe("android background silence", () => {
 	it("returns from the hidden branch with no haptic", () => {
 		const body = onVisibleBody();
-		expect(body).toContain(
-			'if (document.visibilityState !== "visible") return;'
-		);
+		expect(body).toContain('if (document.visibilityState !== "visible") {');
 		expect(body).not.toContain("hapticBeatAsync");
 		expect(body).not.toContain("buzzBeat");
 		expect(body).not.toContain("buzzTap");

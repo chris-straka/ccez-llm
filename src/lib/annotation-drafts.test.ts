@@ -33,7 +33,7 @@ function harness(
 		phone?: boolean;
 		storyOpen?: boolean;
 		provider?: ChatProvider | null;
-		answer?: (q: AnnotationQuestion) => Promise<string>;
+		answer?: (q: AnnotationQuestion, signal: AbortSignal) => Promise<string>;
 	} = {}
 ): {
 	drafts: AnnotationDrafts;
@@ -62,10 +62,10 @@ function harness(
 		getChatIds: () => chats,
 		resolveProvider: async () =>
 			opts.provider === undefined ? PROVIDER : opts.provider,
-		answerQuestion: (provider, q) => {
+		answerQuestion: (provider, q, signal) => {
 			void provider;
 			calls.answers.push(q);
-			return answer(q);
+			return answer(q, signal);
 		},
 		answerContextFor: () => "ctx",
 		notifyBanner: (message) => {
@@ -393,5 +393,136 @@ describe("deleting", () => {
 		]);
 		drafts.deleteById("a");
 		expect(drafts.list.map((a) => a.id)).toEqual(["b"]);
+	});
+});
+
+describe("background interruptions", () => {
+	/** A request the test settles by hand. */
+	function deferred(): {
+		answer: (q: AnnotationQuestion, signal: AbortSignal) => Promise<string>;
+		settle: { resolve: (v: string) => void; reject: (e: Error) => void }[];
+		signals: AbortSignal[];
+	} {
+		const settle: {
+			resolve: (v: string) => void;
+			reject: (e: Error) => void;
+		}[] = [];
+		const signals: AbortSignal[] = [];
+		return {
+			settle,
+			signals,
+			answer: (_q, signal) =>
+				new Promise<string>((resolve, reject) => {
+					settle.push({ resolve, reject });
+					signals.push(signal);
+					signal.addEventListener("abort", () => reject(new Error("aborted")));
+				})
+		};
+	}
+
+	it("a request cut while away re-asks on return, silently", async () => {
+		const d = deferred();
+		const { drafts, calls } = harness({ phone: true, answer: d.answer });
+		const q = note({ comment: "why?" });
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(d.settle).toHaveLength(1));
+		drafts.suspend();
+		d.settle[0]?.reject(new Error("Muse Spark: network error"));
+		await asked;
+		expect(calls.banners).toEqual([]);
+		expect(calls.errors).toEqual([]);
+		expect(calls.answers).toHaveLength(1);
+		drafts.resume();
+		await vi.waitFor(() => expect(d.settle).toHaveLength(2));
+		d.settle[1]?.resolve("réponse");
+		await vi.waitFor(() => expect(drafts.list[0]?.answer).toBe("réponse"));
+		expect(calls.errors).toEqual([]);
+	});
+
+	it("a failure landing just after return re-asks at once", async () => {
+		const d = deferred();
+		const { drafts, calls } = harness({ phone: true, answer: d.answer });
+		const q = note();
+		drafts.setList([q]);
+		void drafts.ask(q);
+		await vi.waitFor(() => expect(d.settle).toHaveLength(1));
+		drafts.suspend();
+		drafts.resume();
+		d.settle[0]?.reject(new Error("Failed to fetch"));
+		await vi.waitFor(() => expect(d.settle).toHaveLength(2));
+		expect(calls.errors).toEqual([]);
+	});
+
+	it("a request hung across the trip restarts after the grace", async () => {
+		vi.useFakeTimers();
+		try {
+			const d = deferred();
+			const { drafts, calls } = harness({ answer: d.answer });
+			const q = note();
+			drafts.setList([q]);
+			void drafts.ask(q);
+			await vi.waitFor(() => expect(d.settle).toHaveLength(1));
+			drafts.suspend();
+			drafts.resume(1000);
+			await vi.advanceTimersByTimeAsync(999);
+			expect(d.signals[0]?.aborted).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(d.signals[0]?.aborted).toBe(true);
+			await vi.waitFor(() => expect(d.settle).toHaveLength(2));
+			expect(calls.banners).toEqual([]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("a request that lands within the grace is kept", async () => {
+		vi.useFakeTimers();
+		try {
+			const d = deferred();
+			const { drafts } = harness({ answer: d.answer });
+			const q = note();
+			drafts.setList([q]);
+			const asked = drafts.ask(q);
+			await vi.waitFor(() => expect(d.settle).toHaveLength(1));
+			drafts.suspend();
+			drafts.resume(1000);
+			d.settle[0]?.resolve("réponse");
+			await asked;
+			await vi.advanceTimersByTimeAsync(2000);
+			expect(d.signals[0]?.aborted).toBe(false);
+			expect(d.settle).toHaveLength(1);
+			expect(drafts.list[0]?.answer).toBe("réponse");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("a note deleted while away is never re-asked", async () => {
+		const d = deferred();
+		const { drafts } = harness({ answer: d.answer });
+		const q = note();
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(d.settle).toHaveLength(1));
+		drafts.suspend();
+		d.settle[0]?.reject(new Error("network error"));
+		await asked;
+		drafts.deleteById(q.id);
+		drafts.resume();
+		await new Promise((r) => setTimeout(r, 10));
+		expect(d.settle).toHaveLength(1);
+	});
+
+	it("failures in the foreground still banner", async () => {
+		const d = deferred();
+		const { drafts, calls } = harness({ phone: true, answer: d.answer });
+		const q = note();
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(d.settle).toHaveLength(1));
+		d.settle[0]?.reject(new Error("boom"));
+		await asked;
+		expect(calls.errors).toEqual(["boom"]);
 	});
 });

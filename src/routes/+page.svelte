@@ -926,8 +926,8 @@
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),
 		resolveProvider: () => providerKeys.resolveActive(),
-		answerQuestion: (provider, q) =>
-			annotationAnswer(provider, q, undefined, {
+		answerQuestion: (provider, q, signal) =>
+			annotationAnswer(provider, q, signal, {
 				inPassageLang: settings.annotationAnswersInPassageLang
 			}),
 		answerContextFor: (ann) =>
@@ -1421,7 +1421,11 @@
 			// says the reply keeps working, and the ready ping owns
 			// the background — no haptic here, the service claim
 			// needs none.
-			if (document.visibilityState !== "visible") return;
+			if (document.visibilityState !== "visible") {
+				drafts.suspend();
+				return;
+			}
+			drafts.resume();
 			clearStudyBadge();
 			void dismissReplyNotificationAsync({
 				shell: tauriBackendAvailable()

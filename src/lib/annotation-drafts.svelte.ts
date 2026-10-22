@@ -1,4 +1,4 @@
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import {
 	annotationsAfterEdit,
 	attachAnnotationAnswer,
@@ -16,6 +16,10 @@ import type { ChatId } from "./chat";
 import type { ChatProvider } from "./providers/types";
 import type { AnnotationQuestion } from "./reading";
 
+/** How long a request that rode out a trip to the background gets,
+once the app is back, before it is restarted as hung. */
+export const RESUME_GRACE_MS = 15_000;
+
 /** Page-owned collaborators the drafts controller calls back into. */
 export interface AnnotationDraftsDeps {
 	getActiveChatId: () => ChatId;
@@ -23,7 +27,8 @@ export interface AnnotationDraftsDeps {
 	resolveProvider: () => Promise<ChatProvider | null>;
 	answerQuestion: (
 		provider: ChatProvider,
-		q: AnnotationQuestion
+		q: AnnotationQuestion,
+		signal: AbortSignal
 	) => Promise<string>;
 	answerContextFor: (ann: Annotation) => string;
 	notifyBanner: (message: string) => void;
@@ -71,6 +76,16 @@ export class AnnotationDrafts {
 	must never banner-fail the same note on every visit). A restart
 	starts empty, so last session's failures still resume. */
 	private failed = new SvelteSet<string>();
+	/** In-flight requests' aborts, keyed by annotation id. */
+	private controllers = new SvelteMap<string, AbortController>();
+	/** Requests that were in flight while the app sat in the
+	background: phones freeze the webview and cut its sockets, so
+	their failures are the OS's, never the provider's. They re-ask
+	quietly instead of bannering and stranding the badge blue. */
+	private interrupted = new SvelteSet<string>();
+	/** Requests that died in the background, re-asked on return. */
+	private retryOnReturn = new SvelteSet<string>();
+	private away = false;
 
 	constructor(deps: AnnotationDraftsDeps) {
 		this.deps = deps;
@@ -207,6 +222,9 @@ export class AnnotationDrafts {
 		// (its reply still lands on the same id).
 		if (this.asking.has(ann.id)) return;
 		this.asking.add(ann.id);
+		const controller = new AbortController();
+		this.controllers.set(ann.id, controller);
+		let lostToBackground = false;
 		// The chat the ask fired from: the reply may land after a
 		// switch, and it belongs to that chat's drafts, never the
 		// one on screen.
@@ -224,11 +242,15 @@ export class AnnotationDrafts {
 				return;
 			}
 			this.deps.clearBanner();
-			const answer = await this.deps.answerQuestion(provider, {
-				quote: ann.quote,
-				question: ann.comment,
-				context: this.deps.answerContextFor(ann)
-			});
+			const answer = await this.deps.answerQuestion(
+				provider,
+				{
+					quote: ann.quote,
+					question: ann.comment,
+					context: this.deps.answerContextFor(ann)
+				},
+				controller.signal
+			);
 			this.attachAnswer(chatId, ann.id, answer);
 			// Story notes have no badge to turn orange: an answered
 			// one opens its card while the story is still on screen
@@ -241,12 +263,58 @@ export class AnnotationDrafts {
 			)
 				this.deps.openBadge(ann.id);
 		} catch (error) {
-			this.failed.add(ann.id);
-			const message = error instanceof Error ? error.message : String(error);
-			this.deps.notifyBanner(message);
-			if (this.deps.isPhone()) this.deps.toastError(message);
+			lostToBackground = this.interrupted.has(ann.id);
+			if (!lostToBackground) {
+				this.failed.add(ann.id);
+				const message = error instanceof Error ? error.message : String(error);
+				this.deps.notifyBanner(message);
+				if (this.deps.isPhone()) this.deps.toastError(message);
+			}
 		} finally {
 			this.asking.delete(ann.id);
+			this.controllers.delete(ann.id);
+			this.interrupted.delete(ann.id);
+		}
+		if (lostToBackground) this.reaskLost(ann.id);
+	}
+
+	/** A request the background killed: re-ask now when the app is
+	back (the latest copy of the note, if it still exists), or on
+	return while it's still away. */
+	private reaskLost(id: string): void {
+		if (this.away) {
+			this.retryOnReturn.add(id);
+			return;
+		}
+		const current = this.list.find((a) => a.id === id);
+		if (current && current.answer === undefined) void this.ask(current);
+	}
+
+	/** The app left the foreground: everything in flight is at the
+	OS's mercy until it comes back. */
+	suspend(): void {
+		this.away = true;
+		for (const id of this.asking) this.interrupted.add(id);
+	}
+
+	/**
+	 * The app came back: re-ask what died while away, and give what
+	 * is still in flight a grace period before restarting it — a
+	 * frozen socket can hang without ever failing, which left the
+	 * badge breathing blue forever.
+	 */
+	resume(graceMs = RESUME_GRACE_MS): void {
+		this.away = false;
+		const lost = [...this.retryOnReturn];
+		this.retryOnReturn.clear();
+		for (const id of lost) this.reaskLost(id);
+		for (const id of this.interrupted) {
+			const controller = this.controllers.get(id);
+			if (!controller) continue;
+			setTimeout(() => {
+				if (this.controllers.get(id) === controller && !this.away)
+					controller.abort();
+			}, graceMs);
 		}
 	}
 
