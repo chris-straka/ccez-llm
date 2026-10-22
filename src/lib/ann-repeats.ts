@@ -37,6 +37,16 @@ function repeatKey(quote: string): string {
 	return quote.replace(/\s+/g, "").toLowerCase();
 }
 
+/** The ink an annotated quote wears here (its badge takes it too, so
+ * badge and underline read as one), or null when it has none. */
+export function inkForQuote(
+	repeats: readonly RepeatInk[],
+	quote: string
+): number | null {
+	const key = repeatKey(quote);
+	return repeats.find((r) => repeatKey(r.quote) === key)?.ink ?? null;
+}
+
 /**
  * Inks per message for a chat. The first annotation of each distinct
  * quote (chat order, then filing order) picks the next ink; later

@@ -774,7 +774,10 @@ readings instead of shoving them: zero layout in every mode. */
 	position: absolute;
 	bottom: 100%;
 	left: 100%;
-	transform: translate(-40%, 10%);
+	/* Straddle the top of the quote's own line (half the badge below
+	its top edge) rather than sitting a full badge above it: floated
+	higher, a badge sat in the line above and read as that line's. */
+	transform: translate(-20%, 38%);
 	/* Below the composer card (z-30): scrolled-under badges take
 	no hits — the chrome owns those pixels. The edit card (z-60)
 	and refs popover (z-40) still open above everything, so a
@@ -820,6 +823,17 @@ the mount fade (see below). */
 	background: #ff9f0a;
 	background: var(--ans-ready);
 }
+/* Ringed in its quote's underline ink (data-ink, see MessageBody),
+so a badge and its quote read as one pair among several. */
+.rendered button.ccez-ann-badge[data-ink="0"] {
+	box-shadow: 0 0 0 2px var(--rep-ink0);
+}
+.rendered button.ccez-ann-badge[data-ink="1"] {
+	box-shadow: 0 0 0 2px var(--rep-ink1);
+}
+.rendered button.ccez-ann-badge[data-ink="2"] {
+	box-shadow: 0 0 0 2px var(--rep-ink2);
+}
 /* Speech-bubble tail: a slash leaning down-left toward the quote
 it annotates — tip at the bottom-left corner, wide top tucked 5px
 under the badge (same color, so the join can never gap — the circle
@@ -847,7 +861,7 @@ down-right at it. */
 .news-card-title button.ccez-ann-badge.rtl {
 	left: auto;
 	right: 100%;
-	transform: translate(40%, 10%);
+	transform: translate(20%, 38%);
 }
 .rendered button.ccez-ann-badge.rtl::after,
 .news-card-title button.ccez-ann-badge.rtl::after {

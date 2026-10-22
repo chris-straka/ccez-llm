@@ -304,7 +304,10 @@ export function quoteFragmentText(frag: DocumentFragment): string {
 				" .ccez-math-tex, .ccez-math-copy, .ccez-math-foldedlabel, .ccez-code-foldedlabel," +
 				// Folded-away bodies quote nothing: their text is hidden.
 				' .ccez-math[data-folded="1"] .ccez-math-body,' +
-				` .ccez-math[data-folded="1"] .ccez-math-raw, .ccez-code[data-folded="1"] pre`
+				` .ccez-math[data-folded="1"] .ccez-math-raw, .ccez-code[data-folded="1"] pre,` +
+				// The correction diff under a user's message repeats its
+				// words: chrome, never the message's own text.
+				" .correction"
 		)
 		.forEach((el) => el.remove());
 	return frag.textContent?.trim() ?? "";
@@ -448,11 +451,13 @@ export function quoteTextNodes(root: Node): Text[] {
 		// neither is message text. A reading left in the haystack
 		// mis-anchors badges (or wraps the reading itself and corrupts
 		// the ruby), so both stay out. Math `$`/copy buttons are the
-		// same kind of chrome (their `$` text is never quotable).
+		// same kind of chrome (their `$` text is never quotable), and
+		// so is the correction diff under a user's message (its words
+		// doubled the haystack: notes and repeats landed in the diff).
 		if (
 			parent instanceof Element &&
 			parent.closest(
-				"[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy"
+				"[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy, .correction"
 			)
 		)
 			continue;
@@ -503,11 +508,21 @@ export function saveSelection(root: Node): SavedSelection | null {
 		) {
 			return null;
 		}
+		// Offsets count message text only (quoteTextNodes): badge
+		// digits and ruby readings come and go across a re-stamp, and
+		// counting them slid the restored highlight by a character
+		// or two whenever a badge filed or left before it.
+		const nodes = quoteTextNodes(root);
 		const toOffset = (node: Node, offset: number): number => {
-			const probe = document.createRange();
-			probe.selectNodeContents(root);
-			probe.setEnd(node, offset);
-			return probe.toString().length;
+			const boundary = document.createRange();
+			boundary.setStart(node, offset);
+			let chars = 0;
+			for (const text of nodes) {
+				if (text === node) return chars + offset;
+				if (boundary.comparePoint(text, text.length) > 0) break;
+				chars += text.length;
+			}
+			return chars;
 		};
 		const start = toOffset(anchorNode, sel.anchorOffset);
 		const end = toOffset(focusNode, sel.focusOffset);
@@ -521,12 +536,9 @@ function nodeAtOffset(
 	root: Node,
 	target: number
 ): { node: Text; offset: number } | null {
-	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	let chars = 0;
 	let last: Text | null = null;
-	while (walker.nextNode()) {
-		const text = walker.currentNode;
-		if (!(text instanceof Text)) continue;
+	for (const text of quoteTextNodes(root)) {
 		last = text;
 		const length = text.textContent?.length ?? 0;
 		if (chars + length >= target)

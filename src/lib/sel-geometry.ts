@@ -44,20 +44,17 @@ export function splitSafeOffset(nodeText: string, offset: number): number {
 }
 
 /**
- * Offset (0..text.length) of the word gap nearest the middle of `text`:
- * a position touching a word character where words split (an edge or a
+ * Offset (0..text.length) of the last word gap in `text`: a position
+ * touching a word character where words split (an edge or a
  * word/non-word transition), never beside a combining mark or a
- * surrogate half. Ties prefer the later gap, so a lone word parks
- * after itself with its tail pointing back at it. Null when no gap
- * qualifies (spaceless scripts, empty input). Pure and unit-tested.
+ * surrogate half. The latest wins, so a badge trails its quote like a
+ * footnote ("…moment" then the badge, ahead of a final period) instead
+ * of floating mid-quote. Null when no gap qualifies (spaceless
+ * scripts, empty input). Pure and unit-tested.
  */
 export function gapOffsetForAnchor(text: string): number | null {
 	const len = text.length;
-	if (len === 0) return null;
-	const mid = len / 2;
-	let best: number | null = null;
-	let bestDist = Infinity;
-	for (let k = 0; k <= len; k++) {
+	for (let k = len; k >= 0; k--) {
 		const left = k > 0 ? (text[k - 1] ?? "") : "";
 		const right = k < len ? (text[k] ?? "") : "";
 		const touchesWord =
@@ -67,31 +64,23 @@ export function gapOffsetForAnchor(text: string): number | null {
 		if (!touchesWord || !splitsWords) continue;
 		if (COMBINING_RE.test(left) || COMBINING_RE.test(right)) continue;
 		if (SURROGATE_RE.test(left) || SURROGATE_RE.test(right)) continue;
-		const dist = Math.abs(k - mid);
-		if (dist < bestDist || (dist === bestDist && (best === null || k > best))) {
-			best = k;
-			bestDist = dist;
-		}
+		return k;
 	}
-	return best;
+	return null;
 }
 
 /**
  * Fallback gap for spaceless scripts (CJK): word gaps don't exist,
  * but a letter-wrap paints one fragment short (the seam), so the
- * anchor still holds no text. Punctuation-adjacent boundaries nearest
- * the middle win (a fence beside 。、never splits a pick); otherwise
- * the quote's own end edge, so lone quotes park after themselves like
- * spaced words do. Combining marks and surrogate halves never border
- * the gap. Null when nothing qualifies. Pure and unit-tested.
+ * anchor still holds no text. The quote's own end edge wins, then the
+ * latest punctuation-adjacent boundary (a fence beside 。、never
+ * splits a pick), so badges trail their quotes as in spaced scripts.
+ * Combining marks and surrogate halves never border the gap. Null
+ * when nothing qualifies. Pure and unit-tested.
  */
 export function edgeOffsetForAnchor(text: string): number | null {
 	const len = text.length;
-	if (len === 0) return null;
-	const mid = len / 2;
-	let best: number | null = null;
-	let bestDist = Infinity;
-	for (let k = 0; k <= len; k++) {
+	for (let k = len; k >= 0; k--) {
 		const left = k > 0 ? (text[k - 1] ?? "") : "";
 		const right = k < len ? (text[k] ?? "") : "";
 		const touchesContent =
@@ -101,13 +90,9 @@ export function edgeOffsetForAnchor(text: string): number | null {
 		if (k !== 0 && k !== len && !punct) continue;
 		if (COMBINING_RE.test(left) || COMBINING_RE.test(right)) continue;
 		if (SURROGATE_RE.test(left) || SURROGATE_RE.test(right)) continue;
-		const dist = Math.abs(k - mid);
-		if (dist < bestDist || (dist === bestDist && (best === null || k > best))) {
-			best = k;
-			bestDist = dist;
-		}
+		return k;
 	}
-	return best;
+	return null;
 }
 
 /**

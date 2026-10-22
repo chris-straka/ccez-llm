@@ -5649,6 +5649,12 @@
 		return !selection.isCollapsed;
 	}
 
+	/** When a badge was last pressed: a click run that began on a
+	 * badge is badge presses, never a sentence or paragraph pick (a
+	 * third click slipping off the small badge onto text would select
+	 * the sentence under it). */
+	let badgePressAt = 0;
+	const MULTI_CLICK_BADGE_MS = 1000;
 	function onSelectEnd(event: MouseEvent, cursorX?: number): void {
 		if (event.altKey) return; // Option-click folds; never a menu.
 		const live = window.getSelection();
@@ -5667,7 +5673,11 @@
 		// A false return keeps the native range: the override never
 		// fires blind. Runs before the message lock so the span
 		// resolves in the untouched DOM.
-		if (!androidUI && event.detail >= 3) {
+		if (
+			!androidUI &&
+			event.detail >= 3 &&
+			Date.now() - badgePressAt > MULTI_CLICK_BADGE_MS
+		) {
 			const picked =
 				event.detail === 3
 					? selectSentenceAtPoint(event.clientX, event.clientY)
@@ -12619,6 +12629,7 @@
 			const target = event.target instanceof Element ? event.target : null;
 			const badge = target?.closest<HTMLElement>("[data-ann-badge]");
 			if (!badge) return;
+			badgePressAt = Date.now();
 			const id = (badge.dataset.annBadge ?? "") as AnnotationId;
 			// A hold-delete just fired for this badge (Android): the
 			// trailing compatibility press is the gesture's end,
@@ -12633,7 +12644,13 @@
 			event.preventDefault();
 			// A re-press toggles closed (cancel): saving first would
 			// restart the fade the toggle is about to cancel.
-			if (!(annPop && !annPopClosing && annPop.id === id)) saveAnnPop();
+			// Another badge is a click away from the box: an empty
+			// draft cancels (no ghost note filed and asked), a typed
+			// one saves — never silently dropped.
+			if (!(annPop && !annPopClosing && annPop.id === id)) {
+				if (annPopBlurAction(annDraft) === "cancel") cancelAnnPop();
+				else saveAnnPop();
+			}
 			// Same boundary as MessageBody's badge click: stamped ids.
 			// The press point anchors the desktop edit menu; phones
 			// edit in the composer and ignore it.

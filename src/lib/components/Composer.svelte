@@ -155,6 +155,16 @@ card through the `tray` snippet. -->
 	const dockItems = $derived(
 		openAnnotation && reviewOpen ? [openAnnotation] : []
 	);
+	/** A note's badge number: its place among its message's (or
+	 * story's) notes in filing order, as the badges count. */
+	function badgeNumber(ann: Annotation): number {
+		const mine = annotations.filter((a) =>
+			ann.story
+				? a.story?.link === ann.story.link
+				: a.messageId === ann.messageId
+		);
+		return mine.findIndex((a) => a.id === ann.id) + 1 || 1;
+	}
 	/** Hands-free toggle copy: idle invites, live names the phase. */
 	const converseLive = $derived(conversePhase !== "idle");
 	const converseTitle = $derived(
@@ -287,6 +297,7 @@ stop, so both rules below stay suppressed. -->
 				open={reviewOpen}
 				bind:highlightId
 				bind:pillEl
+				numberOf={badgeNumber}
 				actions={actions.review}
 			/>
 		{/if}

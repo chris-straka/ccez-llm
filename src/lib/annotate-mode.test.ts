@@ -30,7 +30,9 @@ function stubWindow(selection: unknown): void {
 }
 
 /** Stub deps with call counters; DOM legs run against jsdom. */
-function harness(opts: { phone?: boolean; quoteOffers?: boolean } = {}): {
+function harness(
+	opts: { phone?: boolean; quoteOffers?: boolean; messages?: ChatMsg[] } = {}
+): {
 	mode: AnnotateMode;
 	calls: {
 		asks: string[];
@@ -105,7 +107,7 @@ function harness(opts: { phone?: boolean; quoteOffers?: boolean } = {}): {
 		setReviewOpen: (open) => {
 			calls.review.push(open);
 		},
-		getChatMessages: () => [] as ChatMsg[],
+		getChatMessages: () => opts.messages ?? ([] as ChatMsg[]),
 		getViewMessages: () => [] as ChatMsg[],
 		getMessageContent: () => null,
 		isAidPinned: () => false,
@@ -373,7 +375,7 @@ describe("annotate", () => {
 		expect(calls.promptEdits).toEqual([""]);
 	});
 
-	it("A over a note still on the wire does nothing", () => {
+	it("A over a note still on the wire files nothing, and says so", () => {
 		const { mode, calls, getAnnotations, getPending, setAnnotations } = harness(
 			{ phone: true }
 		);
@@ -391,6 +393,7 @@ describe("annotate", () => {
 		expect(mode.selMenu).toBeNull();
 		expect(calls.filed).toEqual([]);
 		expect(calls.promptEdits).toEqual([]);
+		expect(calls.toasts).toEqual(["Already asking"]);
 	});
 
 	it("a blank quote just clears", () => {
@@ -455,6 +458,26 @@ describe("openBadge", () => {
 		]);
 	});
 
+	it("a waiting badge closes another note's open card, so only its quote lights", () => {
+		const { mode, calls, getHighlight, setAnnotations } = harness();
+		setAnnotations([
+			note({ answer: "yes" }),
+			note({ id: "ann-2" as AnnotationId, quote: "réplique" })
+		]);
+		mode.answerPop = {
+			id: "ann-1" as AnnotationId,
+			anchor: { left: 0, top: 0, right: 1, bottom: 1 },
+			clearTop: 0,
+			pointX: 0,
+			w: 300,
+			gap: 3
+		};
+		mode.openBadge("ann-2" as AnnotationId, { x: 5, y: 5 });
+		expect(mode.answerClosing).toBe(true);
+		expect(getHighlight()).toBe("ann-2");
+		expect(calls.review).toEqual([true]);
+	});
+
 	it("android toasts Loading on a blue badge", () => {
 		const { mode, calls, setAnnotations } = harness({ phone: true });
 		setAnnotations([note()]);
@@ -470,5 +493,30 @@ describe("openBadge", () => {
 		expect(mode.answerPop).toBeNull();
 		expect(calls.review).toEqual([]);
 		expect(calls.speak).toEqual([]);
+	});
+});
+
+describe("occurrenceFromSelection", () => {
+	afterEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("reads the menu's stored range when the live selection has collapsed", () => {
+		document.body.innerHTML =
+			'<article id="msg-0"><div class="rendered"><p>en ce lieu, en ce cas</p></div></article>';
+		const text = document.querySelector("p")?.firstChild as Text;
+		const second = document.createRange();
+		second.setStart(text, 12);
+		second.setEnd(text, 14);
+		expect(second.toString()).toBe("en");
+		// The live selection is a caret by Annotate time.
+		stubWindow({ rangeCount: 1, isCollapsed: true, getRangeAt: () => second });
+		const { mode } = harness({
+			messages: [{ id: "m1" } as unknown as ChatMsg]
+		});
+		const id = "m1" as ChatMsgId;
+		expect(mode.occurrenceFromSelection(id, "en", second)).toBe(1);
+		// A collapsed live caret alone says nothing: first match.
+		expect(mode.occurrenceFromSelection(id, "en")).toBe(0);
 	});
 });

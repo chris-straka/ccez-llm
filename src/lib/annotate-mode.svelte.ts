@@ -345,23 +345,40 @@ export class AnnotateMode {
 	}
 
 	/**
-	 * Which repeat of a quote the live selection starts in: resolves the
-	 * range start against the message's rendered text nodes and counts
-	 * the stripped occurrence holding it. Never throws — selection APIs
-	 * disagree across engines, and anything odd keeps 0 (first match).
+	 * Which repeat of a quote a selection starts in: resolves the range
+	 * start against the message's rendered text nodes and counts the
+	 * stripped occurrence holding it. The range stored when the menu
+	 * opened wins (by Annotate time the live selection may have
+	 * collapsed or moved: WebKit empties it when the pointer crosses
+	 * onto the menu); the live one is the fallback. Never throws —
+	 * selection APIs disagree across engines, and anything odd keeps
+	 * 0 (first match).
 	 */
-	occurrenceFromSelection(messageId: ChatMsgId, quote: string): number {
+	occurrenceFromSelection(
+		messageId: ChatMsgId,
+		quote: string,
+		stored: Range | null = null
+	): number {
 		try {
-			const selection = window.getSelection();
-			if (!selection || selection.rangeCount === 0) return 0;
-			const range = selection.getRangeAt(0);
+			let range: Range | null =
+				stored && !stored.collapsed && stored.startContainer.isConnected
+					? stored
+					: null;
+			if (!range) {
+				const selection = window.getSelection();
+				if (!selection || selection.rangeCount === 0) return 0;
+				if (selection.isCollapsed) return 0;
+				range = selection.getRangeAt(0);
+			}
 			let node: Node | null = range.startContainer;
 			let offset = range.startOffset;
-			// Whole-node starts (triple-click paragraphs) resolve to
-			// their first text: the occurrence holding the span's start.
+			// Element starts point between children: the child at the
+			// offset holds the span's first text (triple-click
+			// paragraphs start on their block).
 			if (!(node instanceof Text)) {
-				const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-				const firstText = walker.nextNode();
+				const child = node.childNodes[offset] ?? node;
+				const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
+				const firstText = child instanceof Text ? child : walker.nextNode();
 				if (!(firstText instanceof Text)) return 0;
 				node = firstText;
 				offset = 0;
@@ -529,13 +546,13 @@ export class AnnotateMode {
 		// hands the draft back before the new annotation takes over.
 		if (this.deps.hasPromptEdit()) this.deps.commitPromptEdit();
 		const quote = menu.quote.trim();
-		// Repeats disambiguate here, from the live selection: the
-		// last "c" in "ccc" records occurrence 2, so its badge
-		// lands where the highlight was. Anything unresolvable
+		// Repeats disambiguate here, from the menu's own range (the
+		// live selection as fallback): the last "c" in "ccc" records
+		// occurrence 2, so its badge lands where the highlight was. Anything unresolvable
 		// keeps 0 (first match, the old behavior) — headlines
 		// always keep 0 (no message row to locate in).
 		const at = menu.messageId
-			? this.occurrenceFromSelection(menu.messageId, quote)
+			? this.occurrenceFromSelection(menu.messageId, quote, menu.range)
 			: 0;
 		// A quote picked from vocalized (tashkeel) text locates against
 		// that text only: its badge shows while the aid is on, never on
@@ -566,7 +583,10 @@ export class AnnotateMode {
 		if (dupe) {
 			const existing = this.deps.getAnnotations().find((a) => a.id === dupe);
 			if (existing && existing.answer === undefined) {
+				// Say so: a silent no-op on an already-blue word
+				// reads as a broken key.
 				this.selMenu = null;
+				this.deps.toast("Already asking");
 				return;
 			}
 			if (this.answerPop?.id === dupe) {
@@ -968,6 +988,10 @@ export class AnnotateMode {
 		// panel goes with the press (it no longer clears above).
 		this.deps.stopPillMic();
 		this.deps.dismissSelPanels();
+		// Another note's answer card owns the wash while it stays
+		// open: it closes, or its quote keeps lighting while the dock
+		// shows this one (a different sentence lit up on press).
+		if (this.answerPop && this.answerPop.id !== id) this.closeAnswerPop();
 		this.deps.speak(
 			current.quote,
 			this.deps.annSpeakKey(current),

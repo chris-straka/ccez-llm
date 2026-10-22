@@ -28,6 +28,9 @@ card, which rewords and re-asks at once. -->
 		highlightId?: AnnotationId | null;
 		/** Pill button (the page parks focus here after actions). */
 		pillEl?: HTMLButtonElement | null;
+		/** The number its badge shows (per message, filing order), so
+		 * the row reads the same as the badge that opened it. */
+		numberOf?: (ann: Annotation) => number;
 		actions: ReviewDockActions;
 	}
 
@@ -36,6 +39,7 @@ card, which rewords and re-asks at once. -->
 		open,
 		highlightId = $bindable(null),
 		pillEl = $bindable(null),
+		numberOf,
 		actions
 	}: Props = $props();
 </script>
@@ -57,7 +61,8 @@ answer. -->
 		{annotationCountLabel(items.length)}
 	</button>
 	<div class="review" role="dialog" aria-label="Annotations" data-fade-scroll>
-		{#each items as ann, n (ann.id)}
+		{#each items as ann, i (ann.id)}
+			{@const n = (numberOf?.(ann) ?? i + 1) - 1}
 			<!-- Only the quote navigates: one jump per
 			annotation, on the text itself. The note stays
 			selectable, buttons keep their clicks (see

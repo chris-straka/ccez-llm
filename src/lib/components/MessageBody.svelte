@@ -28,7 +28,7 @@
 	import { type AnnotationMark, type AnnotationId } from "$lib/annotations";
 	import { annRefsFor } from "$lib/annotation-block";
 	import { applyMarks } from "$lib/annotations-stamp";
-	import type { RepeatInk } from "$lib/ann-repeats";
+	import { inkForQuote, type RepeatInk } from "$lib/ann-repeats";
 	import { clearRepeatInks, paintRepeatInks } from "$lib/ann-repeat-paint";
 
 	interface Props {
@@ -345,11 +345,17 @@
 				if (!bodyEl) return;
 				applyMarks(bodyEl, items, skipMarks, wash);
 				// Fresh text nodes need fresh ink ranges.
-				paintRepeatInks(
-					bodyEl,
-					skipMarks ? [] : untrack(() => repeats),
-					skipMarks ? [] : items
-				);
+				const inks = skipMarks ? [] : untrack(() => repeats);
+				paintRepeatInks(bodyEl, inks, skipMarks ? [] : items);
+				// Each badge rings in its quote's ink: badge and
+				// underline read as one pair.
+				for (const badge of bodyEl.querySelectorAll("[data-ann-badge]")) {
+					if (!(badge instanceof HTMLElement)) continue;
+					const item = items.find((m) => m.id === badge.dataset.annBadge);
+					const ink = item ? inkForQuote(inks, item.quote) : null;
+					if (ink === null) delete badge.dataset.ink;
+					else badge.dataset.ink = String(ink);
+				}
 				stampRunOutputs();
 				for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
 					if (!(wrap instanceof HTMLElement)) continue;

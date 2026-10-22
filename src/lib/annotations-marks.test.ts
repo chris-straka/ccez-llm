@@ -338,9 +338,11 @@ describe("applyMarks badges over reading overlays", () => {
 });
 
 describe("gapOffsetForAnchor", () => {
-	it("picks the word gap nearest the middle", () => {
-		expect(gapOffsetForAnchor("hello world")).toBe(6);
-		expect(gapOffsetForAnchor("hi to you")).toBe(5);
+	it("trails the quote: the last word gap", () => {
+		expect(gapOffsetForAnchor("hello world")).toBe(11);
+		expect(gapOffsetForAnchor("hi to you")).toBe(9);
+		// A final period stays after the badge: the gap closes the word.
+		expect(gapOffsetForAnchor("en ce moment.")).toBe(12);
 	});
 
 	it("parks a lone word after itself", () => {
@@ -349,9 +351,9 @@ describe("gapOffsetForAnchor", () => {
 	});
 
 	it("never borders a combining mark", () => {
-		// a + combining acute + b, then a spaced word: the only
-		// nearby clean gap is the space, not either side of the mark.
-		expect(gapOffsetForAnchor("áb c")).toBe(3);
+		// "c" + combining acute closes the quote: the gap can't sit
+		// between the letter and its mark, so it backs up to the space.
+		expect(gapOffsetForAnchor("ab c\u0301")).toBe(3);
 	});
 
 	it("finds no gap in spaceless or empty text", () => {
@@ -366,8 +368,8 @@ describe("edgeOffsetForAnchor", () => {
 		expect(edgeOffsetForAnchor("漢字を読む")).toBe(5);
 	});
 
-	it("prefers punctuation nearest the middle", () => {
-		expect(edgeOffsetForAnchor("一年の中でも、この短い")).toBe(6);
+	it("trails the quote at its own end edge", () => {
+		expect(edgeOffsetForAnchor("一年の中でも、この短い")).toBe(11);
 	});
 
 	it("never borders a combining mark", () => {
@@ -575,6 +577,47 @@ describe("applyMarks wash over paragraphs", () => {
 			root.remove();
 			document.getSelection()?.removeAllRanges();
 		}
+	});
+
+	it("keeps a held highlight on its words when a badge files before it", () => {
+		const root = rootWith("alpha and beta here");
+		document.body.append(root);
+		try {
+			const sel = document.getSelection();
+			if (!sel) throw new Error("no selection");
+			const text = root.firstChild;
+			if (!(text instanceof Text)) throw new Error("no text");
+			sel.setBaseAndExtent(text, 10, text, 14);
+			expect(sel.toString()).toBe("beta");
+			// A note on "alpha" files: its badge (digits) lands before
+			// the held highlight on the re-stamp.
+			applyMarks(
+				root,
+				[{ id: "a1" as AnnotationId, number: 12, quote: "alpha" }],
+				false,
+				null
+			);
+			expect(root.querySelector("[data-ann-badge]")).not.toBeNull();
+			expect(sel.toString()).toBe("beta");
+		} finally {
+			root.remove();
+			document.getSelection()?.removeAllRanges();
+		}
+	});
+
+	it("never anchors in the correction diff under a message", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<p>je suis allé</p><div class="correction"><del>allé</del> <ins>allée</ins></div>';
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "allé", at: 1 }],
+			false,
+			null
+		);
+		// Only one "allé" is the message's own: the second repeat
+		// doesn't exist, so no badge lands in the diff.
+		expect(root.querySelector(".correction [data-ann-badge]")).toBeNull();
 	});
 
 	it("reuses badge buttons across re-stamps", () => {
