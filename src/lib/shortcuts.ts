@@ -217,7 +217,7 @@ export function desktopShortcuts(
 		{
 			group: chats,
 			name: "Chat position",
-			keys: `Hold Shift, or ${shiftMeta.replace(/\+$/, "")} in the prompt`
+			keys: `Hold ${shiftMeta.replace(/\+$/, "")}`
 		},
 		{ group: prompt, name: "Edit newest message", keys: `${meta}E` },
 		{ group: prompt, name: "Stop the reply", keys: "Hold the send button" },

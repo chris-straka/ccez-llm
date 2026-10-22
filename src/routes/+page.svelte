@@ -13796,15 +13796,13 @@
 		const onAlt = (event: KeyboardEvent) => {
 			if (event.key === "Alt") altHeld = event.type === "keydown";
 		};
-		// Holding Shift outside the prompt, or ⇧⌘ anywhere, peeks the
-		// chat counter after a short hold; it stays up until Shift is
-		// released.
+		// Holding ⇧⌘ anywhere peeks the chat counter after a short
+		// hold; it stays up until either key is released.
 		const onShiftPeek = (event: KeyboardEvent) => {
 			const step = counterPeekStep({
 				...keyFacts(event),
 				type: event.type === "keyup" ? "keyup" : "keydown",
-				repeat: event.repeat,
-				inEditable: isEditableTarget(event.target)
+				repeat: event.repeat
 			});
 			if (step === null) return;
 			if (counterPeekTimer !== null) clearTimeout(counterPeekTimer);

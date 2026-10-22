@@ -1755,33 +1755,28 @@ describe("counterPeekStep", () => {
 		metaKey: false,
 		ctrlKey: false,
 		altKey: false,
-		shiftKey: true,
-		inEditable: false
+		shiftKey: true
 	};
 
-	it("arms on a lone Shift outside text fields", () => {
-		expect(counterPeekStep(shift)).toBe("arm");
-		expect(counterPeekStep({ ...shift, repeat: true })).toBeNull();
+	it("Shift alone never arms", () => {
+		expect(counterPeekStep(shift)).toBe("hide");
+		expect(counterPeekStep({ ...shift, type: "keyup" })).toBe("hide");
 	});
 
-	it("never arms on a lone Shift while typing, or with Option", () => {
-		expect(counterPeekStep({ ...shift, inEditable: true })).toBe("hide");
-		expect(counterPeekStep({ ...shift, altKey: true })).toBe("hide");
-	});
-
-	it("arms on ⇧⌘ in either order, the prompt included", () => {
+	it("arms on ⇧⌘ or ⇧Ctrl in either order, never with Option", () => {
 		expect(counterPeekStep({ ...shift, metaKey: true })).toBe("arm");
-		expect(
-			counterPeekStep({
-				...shift,
-				key: "Meta",
-				metaKey: true,
-				inEditable: true
-			})
-		).toBe("arm");
+		expect(counterPeekStep({ ...shift, key: "Meta", metaKey: true })).toBe(
+			"arm"
+		);
 		expect(counterPeekStep({ ...shift, key: "Control", ctrlKey: true })).toBe(
 			"arm"
 		);
+		expect(counterPeekStep({ ...shift, metaKey: true, altKey: true })).toBe(
+			"hide"
+		);
+		expect(
+			counterPeekStep({ ...shift, metaKey: true, repeat: true })
+		).toBeNull();
 	});
 
 	it("⌘ alone never arms", () => {
@@ -1790,30 +1785,21 @@ describe("counterPeekStep", () => {
 		).toBe("hide");
 	});
 
-	it("letting go of ⌘ keeps it only where Shift alone would", () => {
-		const cmdUp = { ...shift, type: "keyup" as const, key: "Meta" };
-		expect(counterPeekStep(cmdUp)).toBeNull();
-		expect(counterPeekStep({ ...cmdUp, inEditable: true })).toBe("hide");
-		expect(counterPeekStep({ ...cmdUp, shiftKey: false })).toBe("hide");
+	it("letting go of either key hides it", () => {
+		const up = { ...shift, type: "keyup" as const, metaKey: true };
+		expect(counterPeekStep(up)).toBe("hide");
+		expect(counterPeekStep({ ...up, key: "Meta" })).toBe("hide");
 	});
 
 	it("stays up through ⇧⌘J/K steps", () => {
+		expect(counterPeekStep({ ...shift, key: "J", metaKey: true })).toBeNull();
 		expect(
-			counterPeekStep({ ...shift, key: "J", metaKey: true, inEditable: true })
+			counterPeekStep({ ...shift, type: "keyup", key: "J", metaKey: true })
 		).toBeNull();
 	});
 
-	it("hides only on Shift's release", () => {
-		expect(counterPeekStep({ ...shift, type: "keyup" })).toBe("hide");
-	});
-
-	it("stays up through Shift chords", () => {
-		expect(counterPeekStep({ ...shift, key: "D" })).toBeNull();
-		expect(counterPeekStep({ ...shift, key: "D", metaKey: true })).toBeNull();
-		expect(counterPeekStep({ ...shift, type: "keyup", key: "D" })).toBeNull();
-	});
-
-	it("hides when a key arrives without Shift (missed release)", () => {
+	it("hides when a key arrives without the pair (missed release)", () => {
+		expect(counterPeekStep({ ...shift, key: "D" })).toBe("hide");
 		expect(counterPeekStep({ ...shift, key: "d", shiftKey: false })).toBe(
 			"hide"
 		);

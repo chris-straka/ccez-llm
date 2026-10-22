@@ -606,9 +606,11 @@ test("shift-cmd-j onto an empty chat focuses the prompt", async ({ page }) => {
 		.toBe(true);
 });
 
-/** Shift held on its own outside the prompt peeks the chat counter in
-the top-right corner; typing a capital in the prompt never does. */
-test("holding Shift peeks the chat counter", async ({ page }) => {
+/** Shift on its own never peeks the chat counter (it flashed up on
+every capital and Shift chord); ⇧⌘ held outside the prompt does. */
+test("Shift alone never peeks the chat counter; Shift+Cmd does", async ({
+	page
+}) => {
 	await seedThinkingPair(page);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toContainText(
@@ -618,13 +620,12 @@ test("holding Shift peeks the chat counter", async ({ page }) => {
 	const counter = page.locator(".chat-counter");
 	await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 	await page.keyboard.down("Shift");
+	await page.waitForTimeout(500);
+	await expect(counter).not.toHaveClass(/shown/);
+	await page.keyboard.down("Meta");
 	await expect(counter).toHaveClass(/shown/);
 	await expect(counter).toHaveText("1 / 2");
-	await page.keyboard.up("Shift");
-	await expect(counter).not.toHaveClass(/shown/);
-	await page.locator(".ta-input").click();
-	await page.keyboard.down("Shift");
-	await page.waitForTimeout(500);
+	await page.keyboard.up("Meta");
 	await expect(counter).not.toHaveClass(/shown/);
 	await page.keyboard.up("Shift");
 });
@@ -658,10 +659,12 @@ test("holding Shift+Cmd in the prompt peeks the chat counter", async ({
 	await page.keyboard.up("Shift");
 });
 
-/** The peek is quick and sticky: it lands within ~150 ms of Shift
-going down with a ~100 ms fade, and Shift chords keep it up until
-Shift itself is released (or the window blurs). Timed in the page. */
-test("Shift peek shows fast and survives Shift chords", async ({ page }) => {
+/** The peek is quick and sticky: it lands within ~150 ms of ⇧⌘ going
+down with a ~100 ms fade, and ⇧⌘ chords keep it up until a key is
+released (or the window blurs). Timed in the page. */
+test("Shift+Cmd peek shows fast and survives the chat steps", async ({
+	page
+}) => {
 	await seedThinkingPair(page);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toContainText(
@@ -676,7 +679,7 @@ test("Shift peek shows fast and survives Shift chords", async ({ page }) => {
 		window.addEventListener(
 			"keydown",
 			(e) => {
-				if (e.key === "Shift" && !e.repeat) w["__shiftAt"] = performance.now();
+				if (e.key === "Meta" && !e.repeat) w["__shiftAt"] = performance.now();
 			},
 			true
 		);
@@ -693,6 +696,7 @@ test("Shift peek shows fast and survives Shift chords", async ({ page }) => {
 		await counter.evaluate((el) => getComputedStyle(el).transitionDuration)
 	).toBe("0.1s");
 	await page.keyboard.down("Shift");
+	await page.keyboard.down("Meta");
 	await expect(counter).toHaveClass(/shown/);
 	await expect
 		.poll(() =>
@@ -710,17 +714,18 @@ test("Shift peek shows fast and survives Shift chords", async ({ page }) => {
 	});
 	expect(t.shown).toBeLessThan(200);
 	expect(t.opaque).toBeLessThan(350);
-	// Shift chords keep it up.
-	await page.keyboard.press("KeyD");
-	await page.keyboard.press("ArrowDown");
+	// Chat steps keep it up, and it follows them.
+	await page.keyboard.press("KeyJ");
 	await page.waitForTimeout(300);
 	await expect(counter).toHaveClass(/shown/);
-	await page.keyboard.up("Shift");
+	await expect(counter).toHaveText("2 / 2");
+	await page.keyboard.up("Meta");
 	await expect(counter).not.toHaveClass(/shown/);
-	// Window blur hides it while Shift is still down.
-	await page.keyboard.down("Shift");
+	// Window blur hides it while the keys are still down.
+	await page.keyboard.down("Meta");
 	await expect(counter).toHaveClass(/shown/);
 	await page.evaluate(() => window.dispatchEvent(new Event("blur")));
 	await expect(counter).not.toHaveClass(/shown/);
+	await page.keyboard.up("Meta");
 	await page.keyboard.up("Shift");
 });

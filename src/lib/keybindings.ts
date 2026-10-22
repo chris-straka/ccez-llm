@@ -1220,38 +1220,32 @@ export function deleteScope(facts: DeleteKeyFacts): DeleteScope | null {
 	return "message";
 }
 
-/** Facts the Shift chat-counter peek reads (keydown and keyup alike). */
+/** Facts the chat-counter peek reads (keydown and keyup alike). */
 export interface CounterPeekFacts extends KeyModifiers {
 	type: "keydown" | "keyup";
 	key: string;
 	repeat: boolean;
-	/** Typing target (the prompt, a field): Shift there is a capital. */
-	inEditable: boolean;
 }
 
 /**
- * Shift held on its own outside any text field peeks the chat counter
- * ("2 / 5", top right), and so does ⇧⌘ (⇧Ctrl) anywhere, the prompt
- * included: that pair is the chat-stepping chord's base, so holding it
- * shows where ⇧⌘J/K will move you. "arm" starts the short hold before
- * it shows; Shift's release hides it, and so does ⌘'s inside a field
- * (Shift alone there is a capital). Other keys pressed with Shift held
- * leave it up (a Shift chord keeps telling you where you are); a key
- * arriving without Shift means the release was missed (an OS shortcut
- * swallowed it), so that hides too. Null leaves it as it is.
+ * Holding ⇧⌘ (⇧Ctrl) peeks the chat counter ("2 / 5", top right),
+ * anywhere, the prompt included: that pair is the chat-stepping
+ * chord's base, so holding it shows where ⇧⌘J/K will move you. Shift
+ * alone never does (it flashed up on every capital and Shift chord).
+ * "arm" starts the short hold before it shows; letting go of either
+ * key hides it. Keys pressed with both held leave it up (it follows
+ * each step); a key arriving without them means a release was missed
+ * (an OS shortcut swallowed it), so that hides too. Null leaves it as
+ * it is.
  */
 export function counterPeekStep(
 	facts: CounterPeekFacts
 ): "arm" | "hide" | null {
-	const cmdKey = facts.key === "Meta" || facts.key === "Control";
-	if (facts.key !== "Shift" && !cmdKey)
-		return facts.type === "keydown" && !facts.shiftKey ? "hide" : null;
-	if (facts.type === "keyup") {
-		if (!cmdKey) return "hide";
-		return facts.shiftKey && !facts.inEditable ? null : "hide";
-	}
+	const held = facts.shiftKey && (facts.metaKey || facts.ctrlKey);
+	const chordKey =
+		facts.key === "Shift" || facts.key === "Meta" || facts.key === "Control";
+	if (!chordKey) return facts.type === "keydown" && !held ? "hide" : null;
+	if (facts.type === "keyup") return "hide";
 	if (facts.repeat) return null;
-	if (facts.altKey || !facts.shiftKey) return "hide";
-	if (facts.metaKey || facts.ctrlKey) return "arm";
-	return facts.inEditable ? "hide" : "arm";
+	return held && !facts.altKey ? "arm" : "hide";
 }
