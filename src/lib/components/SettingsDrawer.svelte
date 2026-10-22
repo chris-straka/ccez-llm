@@ -118,7 +118,8 @@ bookkeeping reads it). -->
 		box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
 		border-left: 1px solid #e5e5ea;
 		border-left-color: var(--line-soft);
-		padding: 1.2rem 0.7rem 2rem;
+		/* Even gutters both sides: the inner fills the content box. */
+		padding: 1.2rem 1.2rem 2rem;
 		overflow-y: auto;
 		overflow-x: hidden;
 		background: #fff;
@@ -138,7 +139,7 @@ bookkeeping reads it). -->
 		inner widths are definite, so inline-size containment changes
 		nothing except enabling the query. */
 		container-type: inline-size;
-		width: calc(var(--settings-w) - 1.4rem);
+		width: var(--settings-w);
 		flex-shrink: 0;
 		/* Right-docked panels clip from the left: the header (the close
 		target) stays put while collapsing, so it lands back under the cursor. */

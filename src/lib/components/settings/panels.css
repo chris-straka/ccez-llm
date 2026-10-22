@@ -14,13 +14,13 @@
 	and the gap down to the divider is padding (clickable, part of
 	the header) rather than margin (clicks would fall through to
 	the aside and drag nothing). Values mirror .settings-panel
-	padding in +page.svelte. */
+	padding in SettingsDrawer.svelte. */
 .settings-inner .panel-head {
 	display: flex;
 	align-items: center;
 	gap: 1rem;
-	margin: -1.2rem -0.7rem 0;
-	padding: 1.2rem 0.7rem 0.5rem;
+	margin: -1.2rem -1.2rem 0;
+	padding: 1.2rem 1.2rem 0.5rem;
 	/* Default arrow like the main chat top bar: the whole strip
 		closes on click, so no pointer finger. Buttons keep their own. */
 	cursor: default;
@@ -120,11 +120,11 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 }
 .settings-inner .keys-updates > section:first-of-type > h2 {
 	grid-area: 1 / 1;
-	justify-self: center;
+	justify-self: start;
 }
 .settings-inner .keys-updates > section:first-of-type > button {
 	grid-area: 2 / 1;
-	justify-self: center;
+	justify-self: start;
 	/* Short label now: never wrap onto a second line. */
 	white-space: nowrap;
 }
@@ -136,14 +136,14 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 	> section[aria-labelledby="updates-heading"]
 	> h2 {
 	grid-area: 1 / 2;
-	justify-self: center;
+	justify-self: start;
 }
 .settings-inner
 	.keys-updates
 	> section[aria-labelledby="updates-heading"]
 	> button {
 	grid-area: 2 / 2;
-	justify-self: center;
+	justify-self: start;
 }
 .settings-inner .keys-updates h2 {
 	margin: 0;
@@ -980,8 +980,8 @@ scroll beneath it; one row that scrolls sideways on a narrow sheet. */
 	gap: 0.35rem;
 	overflow-x: auto;
 	scrollbar-width: none;
-	margin: 0 -0.7rem;
-	padding: 0.6rem 0.7rem;
+	margin: 0 -1.2rem;
+	padding: 0.6rem 1.2rem;
 	background: var(--bg-chrome);
 	border-bottom: 1px solid var(--line-soft);
 }

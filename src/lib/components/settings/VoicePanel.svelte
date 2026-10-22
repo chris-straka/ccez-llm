@@ -444,7 +444,7 @@
 			voices themselves.
 			{#if isMacBrowser}
 				To download more voices on your Mac: System Settings → Accessibility →
-				Spoken Content → System Voice → Manage voices, then reload this page.
+				Read &amp; Speak → System Voice → Manage Voices, then reload this page.
 			{:else if isWindowsBrowser}
 				To add voices on Windows: Settings → Time &amp; language → Speech →
 				Manage voices → Add voices, then reload this page so the browser picks
