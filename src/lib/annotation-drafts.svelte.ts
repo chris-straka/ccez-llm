@@ -1,8 +1,11 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import {
+	addFollowUp,
 	annotationsAfterEdit,
 	attachAnnotationAnswer,
+	attachFollowUpAnswer,
 	deleteAnnotation,
+	dropFollowUp,
 	filePendingAnnotation,
 	unansweredAnnotations,
 	type Annotation,
@@ -31,6 +34,15 @@ export interface AnnotationDraftsDeps {
 		signal: AbortSignal
 	) => Promise<string>;
 	answerContextFor: (ann: Annotation) => string;
+	/** One follow-up in an answer card's thread (see
+	annotationFollowUp in reading.ts). */
+	answerFollowUp: (
+		provider: ChatProvider,
+		q: AnnotationQuestion,
+		answer: string,
+		thread: ReadonlyArray<{ q: string; a?: string }>,
+		reply: string
+	) => Promise<string>;
 	notifyBanner: (message: string) => void;
 	clearBanner: () => void;
 	toastError: (message: string) => void;
@@ -196,12 +208,59 @@ export class AnnotationDrafts {
 		// rule cancel already follows. A deleted-while-editing
 		// note just closes.
 		if (target && target.answer !== undefined && draft.trim()) {
-			const edited = { ...target, comment: draft };
+			// A reworded question gets a fresh answer: the old card's
+			// thread argued with the old one.
+			const { thread: _stale, ...rest } = target;
+			void _stale;
+			const edited = { ...rest, comment: draft };
 			this.list = this.list.map((a) => (a.id === id ? edited : a));
 			void this.ask(edited);
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Send a reply from an answer card: it joins the note's thread at
+	 * once (waiting), and the model's answer lands on it. The thread
+	 * lives with the note's chat, like its answer. False when nothing
+	 * was sent or the request failed: the reply leaves the thread and
+	 * the card puts the text back in its field.
+	 */
+	async askFollowUp(id: string, reply: string): Promise<boolean> {
+		const text = reply.trim();
+		const ann = this.list.find((a) => a.id === id);
+		if (!text || !ann || ann.answer === undefined) return false;
+		const prior = ann.thread ?? [];
+		if (prior.some((t) => t.a === undefined)) return false;
+		const index = prior.length;
+		const chatId = this.deps.getActiveChatId();
+		this.list = addFollowUp(this.list, id, text);
+		try {
+			const provider = await this.deps.resolveProvider();
+			if (!provider) throw new Error("Set an API key first — open Settings.");
+			const answer = await this.deps.answerFollowUp(
+				provider,
+				{
+					quote: ann.quote,
+					question: ann.comment,
+					context: this.deps.answerContextFor(ann)
+				},
+				ann.answer,
+				prior,
+				text
+			);
+			if (chatId === this.deps.getActiveChatId())
+				this.list = attachFollowUpAnswer(this.list, id, index, answer);
+			return true;
+		} catch (error) {
+			if (chatId === this.deps.getActiveChatId())
+				this.list = dropFollowUp(this.list, id, index);
+			const message = error instanceof Error ? error.message : String(error);
+			this.deps.notifyBanner(message);
+			if (this.deps.isPhone()) this.deps.toastError(message);
+			return false;
+		}
 	}
 
 	/** Delete one filed note by id (pill-cancel fresh path). */

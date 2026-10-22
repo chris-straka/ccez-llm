@@ -989,6 +989,70 @@ export function buildAnnotationAnswerMessages(
 	];
 }
 
+/** Room for a follow-up answer in the card's thread. */
+export const ANNOTATION_FOLLOW_UP_WORDS = 90;
+
+/**
+ * Messages for a follow-up in an answer card's thread: the original
+ * ask and answer replayed, then each earlier reply and its answer, then
+ * the new reply. The learner is often pushing back on the answer, so
+ * the model weighs the objection against the passage, explains how its
+ * words build the meaning, and says so plainly when the learner is
+ * right. Pure.
+ */
+export function buildAnnotationFollowUpMessages(
+	q: AnnotationQuestion,
+	answer: string,
+	thread: ReadonlyArray<{ q: string; a?: string }>,
+	reply: string,
+	opts: { inPassageLang?: boolean } = {}
+): Array<{ role: string; content: string }> {
+	const [system, user] = buildAnnotationAnswerMessages(q, opts);
+	const followUp =
+		`The learner may reply to your answer, often to push back. Weigh ` +
+		`the reply against the passage itself: walk through how its words ` +
+		`build the meaning, piece by piece, closely rather than smoothly, ` +
+		`and if the learner is right, say so plainly and correct yourself. ` +
+		`Plain connected sentences, no markdown, at most ` +
+		`${ANNOTATION_FOLLOW_UP_WORDS} words per reply.`;
+	const out: Array<{ role: string; content: string }> = [
+		{ role: "system", content: `${system?.content ?? ""} ${followUp}` },
+		...(user ? [user] : []),
+		{ role: "assistant", content: answer }
+	];
+	for (const turn of thread) {
+		if (!turn.a) continue;
+		out.push({ role: "user", content: turn.q });
+		out.push({ role: "assistant", content: turn.a });
+	}
+	out.push({ role: "user", content: reply.trim() });
+	return out;
+}
+
+/** Ask one follow-up in an answer card's thread (see
+buildAnnotationFollowUpMessages). Never linked to the chat. */
+export async function annotationFollowUp(
+	provider: ChatProvider,
+	q: AnnotationQuestion,
+	answer: string,
+	thread: ReadonlyArray<{ q: string; a?: string }>,
+	reply: string,
+	signal?: AbortSignal,
+	opts: { inPassageLang?: boolean } = {}
+): Promise<string> {
+	if (!reply.trim()) throw new Error("Nothing to reply.");
+	const result = await provider.chat(
+		buildAnnotationFollowUpMessages(q, answer, thread, reply, opts) as Array<{
+			role: "system" | "user" | "assistant";
+			content: string;
+		}>,
+		{ signal }
+	);
+	const text = result.content.trim();
+	if (!text) throw new Error("Empty reply.");
+	return text;
+}
+
 /**
  * Ask the model one annotation question: a separate request, never
  * linked to the main prompt or chat history. No cache — every filing

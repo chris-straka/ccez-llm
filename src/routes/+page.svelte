@@ -466,6 +466,7 @@
 		messageAidKinds,
 		readingsOnly,
 		annotationAnswer,
+		annotationFollowUp,
 		tidyAnnotationAnswer,
 		annotatedRunsWithOffsets,
 		sliceRunsForQuote,
@@ -974,6 +975,10 @@
 			}),
 		answerContextFor: (ann) =>
 			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
+		answerFollowUp: (provider, q, answer, thread, reply) =>
+			annotationFollowUp(provider, q, answer, thread, reply, undefined, {
+				inPassageLang: settings.annotationAnswersInPassageLang
+			}),
 		notifyBanner: (message) => showNotice(notices, "banner", message),
 		clearBanner: () => clearNotice(notices, "banner"),
 		toastError: (message) => flashErrorToast(message),
@@ -15156,6 +15161,8 @@
 				onToggleSave={settings.flashcardsEnabled
 					? () => flashcards.toggleSaved(answered.quote)
 					: undefined}
+				thread={answered.thread ?? []}
+				onReply={(text: string) => drafts.askFollowUp(answered.id, text)}
 			/>
 		{/if}
 	{/if}

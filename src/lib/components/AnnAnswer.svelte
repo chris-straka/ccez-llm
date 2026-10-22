@@ -18,6 +18,7 @@ corner, outside the text: save the quote as a flashcard. -->
 		type AnchorRect,
 		type NoteColumn
 	} from "$lib/annPop";
+	import type { AnnotationFollowUp } from "$lib/annotations";
 
 	interface Props {
 		answer: string;
@@ -42,6 +43,11 @@ corner, outside the text: save the quote as a flashcard. -->
 		/** Save or unsave the quote as a card; absent hides the icon
 		 * (flashcards off). */
 		onToggleSave?: (() => void) | undefined;
+		/** Replies argued under the answer, oldest first. */
+		thread?: AnnotationFollowUp[];
+		/** Send a reply; resolves false when it failed (the text comes
+		back to the field). Absent hides the reply field. */
+		onReply?: ((text: string) => Promise<boolean>) | undefined;
 	}
 
 	let {
@@ -55,8 +61,36 @@ corner, outside the text: save the quote as a flashcard. -->
 		gap,
 		badgeId,
 		saved = false,
-		onToggleSave
+		onToggleSave,
+		thread = [],
+		onReply
 	}: Props = $props();
+
+	/** The reply field's text, and its height (the body's scroll cap
+	leaves room for it). */
+	let reply = $state("");
+	let replyH = $state(0);
+	const waiting = $derived(thread.some((t) => t.a === undefined));
+	const splitLines = (text: string): string[] =>
+		text
+			.split(/\n+/)
+			.map((l) => l.trim())
+			.filter((l) => l.length > 0);
+
+	async function sendReply(): Promise<void> {
+		const text = reply.trim();
+		if (!text || waiting || !onReply) return;
+		reply = "";
+		const ok = await onReply(text);
+		if (!ok && reply === "") reply = text;
+	}
+
+	// A new reply or answer scrolls the thread to its end.
+	$effect(() => {
+		void thread.length;
+		void thread.at(-1)?.a;
+		if (body) body.scrollTop = body.scrollHeight;
+	});
 
 	/** Tail depth past the card edge: half the rotated square's diagonal. */
 	const TAIL = 9;
@@ -135,6 +169,9 @@ corner, outside the text: save the quote as a flashcard. -->
 	// change (E rewords) so new paragraphs are observed too.
 	$effect(() => {
 		void lines;
+		void thread.length;
+		void thread.at(-1)?.a;
+		void replyH;
 		if (!card || !body) return;
 		measure();
 		if (typeof ResizeObserver === "undefined") return;
@@ -232,6 +269,7 @@ corner, outside the text: save the quote as a flashcard. -->
 	style:--ann-max-w="{maxWidth}px"
 	style:--ann-max-h={place ? `${place.maxHeight}px` : "none"}
 	style:--ann-tail-x="{place?.tailX ?? 24}px"
+	style:--ann-reply-h="{replyH}px"
 	role="dialog"
 	aria-label="Annotation answer"
 >
@@ -245,7 +283,46 @@ corner, outside the text: save the quote as a flashcard. -->
 				{line}
 			</p>
 		{/each}
+		{#each thread as turn, t (t)}
+			<!-- A reply and its answer: the learner's words set off to
+			the right, the model's below in the card's own voice. -->
+			<p class="ann-thread-q" dir="auto">{turn.q}</p>
+			{#if turn.a}
+				{#each splitLines(turn.a) as line, i (i)}
+					<p class="ann-answer-text ann-thread-a" dir="auto">{line}</p>
+				{/each}
+			{:else}
+				<p class="ann-thread-wait" aria-label="Answering">
+					<span></span><span></span><span></span>
+				</p>
+			{/if}
+		{/each}
 	</div>
+	{#if onReply}
+		<!-- Argue with the answer: Enter sends, Shift+Enter breaks the
+		line. The thread stays in this card, never a second one. -->
+		<form
+			class="ann-reply"
+			bind:clientHeight={replyH}
+			onsubmit={(e) => {
+				e.preventDefault();
+				void sendReply();
+			}}
+		>
+			<textarea
+				rows="1"
+				dir="auto"
+				placeholder={waiting ? "Answering…" : "Reply…"}
+				aria-label="Reply to this answer"
+				bind:value={reply}
+				onkeydown={(e) => {
+					if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+						e.preventDefault();
+						void sendReply();
+					}
+				}}></textarea>
+		</form>
+	{/if}
 	{#if onToggleSave}
 		<!-- Save as a card: pinned on the card's corner, so it adds no
 		layout to the note (the phone's way in; desktop also gets it
@@ -401,7 +478,7 @@ corner, outside the text: save the quote as a flashcard. -->
 	}
 	.ann-answer-body {
 		position: relative;
-		max-height: var(--ann-max-h, none);
+		max-height: calc(var(--ann-max-h, 100vh) - var(--ann-reply-h, 0px));
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		border-radius: inherit;
@@ -420,6 +497,77 @@ corner, outside the text: save the quote as a flashcard. -->
 	}
 	.ann-answer-head {
 		font-weight: 600;
+	}
+	/* The learner's reply: set off right in the muted ink, like the
+	chat's own messages, with room above it to start a new turn. */
+	.ann-thread-q {
+		margin: 0.8em 0 0.35em 15%;
+		text-align: end;
+		color: var(--muted);
+		overflow-wrap: break-word;
+	}
+	.ann-answer-text.ann-thread-a {
+		color: inherit;
+	}
+	.ann-thread-a + .ann-thread-a {
+		margin-top: 0.35em;
+	}
+	/* Waiting on the model: three breathing dots. */
+	.ann-thread-wait {
+		display: flex;
+		gap: 0.3em;
+		margin: 0.2em 0 0;
+		height: 1.2em;
+		align-items: center;
+	}
+	.ann-thread-wait span {
+		width: 0.35em;
+		height: 0.35em;
+		border-radius: 50%;
+		background: currentColor;
+		opacity: 0.35;
+		animation: ann-thread-dot 1.1s ease-in-out infinite;
+	}
+	.ann-thread-wait span:nth-child(2) {
+		animation-delay: 0.15s;
+	}
+	.ann-thread-wait span:nth-child(3) {
+		animation-delay: 0.3s;
+	}
+	@keyframes ann-thread-dot {
+		50% {
+			opacity: 0.9;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.ann-thread-wait span {
+			animation-duration: 2.2s;
+		}
+	}
+	.ann-reply {
+		margin: 0;
+		padding: 0 0.7em 0.7em;
+	}
+	.ann-reply textarea {
+		display: block;
+		box-sizing: border-box;
+		width: 100%;
+		field-sizing: content;
+		min-height: 2.2em;
+		max-height: 6.5em;
+		resize: none;
+		margin: 0;
+		padding: 0.4em 0.65em;
+		border: 1px solid var(--line-soft);
+		border-radius: 10px;
+		background: var(--bg);
+		color: inherit;
+		font: inherit;
+		line-height: 1.4;
+	}
+	.ann-reply textarea:focus {
+		outline: none;
+		border-color: var(--accent);
 	}
 	.ann-answer-head + .ann-answer-text {
 		margin-top: 0.3em;

@@ -2,7 +2,11 @@
  * Draft annotation storage: per-chat localStorage load/save with
  * shape validation. Split out of annotations.ts (section C).
  */
-import type { Annotation, StoryAnchor } from "./annotations";
+import type {
+	Annotation,
+	AnnotationFollowUp,
+	StoryAnchor
+} from "./annotations";
 
 /**
  * Draft annotations persist per chat across restarts (live extras, not
@@ -28,6 +32,21 @@ function validStoryAnchor(raw: unknown): StoryAnchor | undefined {
 	return { link: s.link, title: s.title, outlet: s.outlet, lang: s.lang };
 }
 
+/** A stored follow-up thread, answered replies only: one still on
+the wire when the app closed has nothing to show (its text is lost
+with the request, like a pending note). */
+function cleanThread(raw: unknown): { thread: AnnotationFollowUp[] } | null {
+	if (!Array.isArray(raw)) return null;
+	const thread: AnnotationFollowUp[] = [];
+	for (const item of raw) {
+		if (!item || typeof item !== "object") continue;
+		const f = item as Partial<AnnotationFollowUp>;
+		if (typeof f.q !== "string" || typeof f.a !== "string" || !f.a) continue;
+		thread.push({ q: f.q, a: f.a });
+	}
+	return thread.length > 0 ? { thread } : null;
+}
+
 function cleanDraftList(raw: unknown): Annotation[] {
 	if (!Array.isArray(raw)) return [];
 	const out: Annotation[] = [];
@@ -48,7 +67,8 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			at: typeof a.at === "number" ? a.at : 0,
 			// Answers persist with drafts like the comment: a reload
 			// must not un-ask an answered annotation back to blue.
-			...(typeof a.answer === "string" && a.answer ? { answer: a.answer } : {})
+			...(typeof a.answer === "string" && a.answer ? { answer: a.answer } : {}),
+			...(cleanThread(a.thread) ?? {})
 		});
 	}
 	return out;

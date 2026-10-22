@@ -34,6 +34,7 @@ function harness(
 		storyOpen?: boolean;
 		provider?: ChatProvider | null;
 		answer?: (q: AnnotationQuestion, signal: AbortSignal) => Promise<string>;
+		followUp?: (reply: string) => Promise<string>;
 	} = {}
 ): {
 	drafts: AnnotationDrafts;
@@ -43,6 +44,11 @@ function harness(
 		cleared: number;
 		errors: string[];
 		badges: string[];
+		followUps: {
+			answer: string;
+			thread: { q: string; a?: string }[];
+			reply: string;
+		}[];
 	};
 	setActive: (id: string) => void;
 	setChats: (ids: string[]) => void;
@@ -52,7 +58,12 @@ function harness(
 		banners: [] as string[],
 		cleared: 0,
 		errors: [] as string[],
-		badges: [] as string[]
+		badges: [] as string[],
+		followUps: [] as {
+			answer: string;
+			thread: { q: string; a?: string }[];
+			reply: string;
+		}[]
 	};
 	let active = (opts.active ?? "c1") as ChatId;
 	let chats = (opts.chats ?? ["c1"]).map((c) => c as ChatId);
@@ -68,6 +79,11 @@ function harness(
 			return answer(q, signal);
 		},
 		answerContextFor: () => "ctx",
+		answerFollowUp: (provider, q, answer, thread, reply) => {
+			void provider;
+			calls.followUps.push({ answer, thread: [...thread], reply });
+			return (opts.followUp ?? (async () => "suite"))(reply);
+		},
 		notifyBanner: (message) => {
 			calls.banners.push(message);
 		},
@@ -524,5 +540,61 @@ describe("background interruptions", () => {
 		d.settle[0]?.reject(new Error("boom"));
 		await asked;
 		expect(calls.errors).toEqual(["boom"]);
+	});
+});
+
+describe("follow-up thread", () => {
+	it("a reply joins the thread and its answer lands on it", async () => {
+		const { drafts, calls } = harness();
+		const q = note({ answer: "first" });
+		drafts.setList([q]);
+		const sent = drafts.askFollowUp(q.id, "  not quite?  ");
+		expect(drafts.list[0]?.thread).toEqual([{ q: "not quite?" }]);
+		expect(await sent).toBe(true);
+		expect(drafts.list[0]?.thread).toEqual([{ q: "not quite?", a: "suite" }]);
+		expect(calls.followUps[0]).toEqual({
+			answer: "first",
+			thread: [],
+			reply: "not quite?"
+		});
+	});
+
+	it("later replies carry the earlier turns", async () => {
+		const { drafts, calls } = harness();
+		const q = note({ answer: "first", thread: [{ q: "why?", a: "because" }] });
+		drafts.setList([q]);
+		await drafts.askFollowUp(q.id, "and then?");
+		expect(calls.followUps[0]?.thread).toEqual([{ q: "why?", a: "because" }]);
+		expect(drafts.list[0]?.thread).toHaveLength(2);
+	});
+
+	it("a failed reply leaves the thread and reports", async () => {
+		const { drafts, calls } = harness({
+			phone: true,
+			followUp: async () => {
+				throw new Error("boom");
+			}
+		});
+		const q = note({ answer: "first" });
+		drafts.setList([q]);
+		expect(await drafts.askFollowUp(q.id, "hm")).toBe(false);
+		expect(drafts.list[0]?.thread ?? []).toEqual([]);
+		expect(calls.errors).toEqual(["boom"]);
+	});
+
+	it("unanswered notes and blank replies send nothing", async () => {
+		const { drafts, calls } = harness();
+		drafts.setList([note()]);
+		expect(await drafts.askFollowUp("ann-1", "hm")).toBe(false);
+		drafts.setList([note({ answer: "a" })]);
+		expect(await drafts.askFollowUp("ann-1", "   ")).toBe(false);
+		expect(calls.followUps).toEqual([]);
+	});
+
+	it("rewording the question drops the old thread", () => {
+		const { drafts } = harness();
+		drafts.setList([note({ answer: "a", thread: [{ q: "x", a: "y" }] })]);
+		drafts.commitCommentEdit("ann-1", "new question");
+		expect(drafts.list[0]?.thread).toBeUndefined();
 	});
 });

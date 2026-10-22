@@ -51,6 +51,18 @@ export interface Annotation {
 	 * comment. Absent means unanswered — badges stay neutral.
 	 */
 	answer?: string;
+	/**
+	 * Follow-ups argued in the answer card, in order: the learner's
+	 * reply and the model's answer (absent while it is on the wire).
+	 * Persisted with drafts; never baked into message text.
+	 */
+	thread?: AnnotationFollowUp[];
+}
+
+/** One reply in an answer card's thread. */
+export interface AnnotationFollowUp {
+	q: string;
+	a?: string;
 }
 
 export function newAnnotationId(): AnnotationId {
@@ -222,6 +234,56 @@ export function attachAnnotationAnswer(
 		return { ...a, answer: reply };
 	});
 	return touched ? next : list;
+}
+
+/** Append a follow-up question to an annotation's thread (its answer
+lands later through attachFollowUpAnswer). Blank text adds nothing. */
+export function addFollowUp(
+	list: Annotation[],
+	id: string,
+	q: string
+): Annotation[] {
+	const text = q.trim();
+	if (!text) return list;
+	return list.map((a) =>
+		a.id === id ? { ...a, thread: [...(a.thread ?? []), { q: text }] } : a
+	);
+}
+
+/** Land the answer to the follow-up at `index` (unchanged when the
+note or that reply is gone, or the answer is blank). */
+export function attachFollowUpAnswer(
+	list: Annotation[],
+	id: string,
+	index: number,
+	a: string
+): Annotation[] {
+	const text = a.trim();
+	if (!text) return list;
+	let touched = false;
+	const next = list.map((ann) => {
+		const entry = ann.id === id ? ann.thread?.[index] : undefined;
+		if (!entry) return ann;
+		touched = true;
+		const thread = [...(ann.thread ?? [])];
+		thread[index] = { ...entry, a: text };
+		return { ...ann, thread };
+	});
+	return touched ? next : list;
+}
+
+/** Drop the follow-up at `index` (its request failed: the text goes
+back to the reply field instead). */
+export function dropFollowUp(
+	list: Annotation[],
+	id: string,
+	index: number
+): Annotation[] {
+	return list.map((ann) =>
+		ann.id === id && ann.thread?.[index]
+			? { ...ann, thread: ann.thread.filter((_, i) => i !== index) }
+			: ann
+	);
 }
 
 /**

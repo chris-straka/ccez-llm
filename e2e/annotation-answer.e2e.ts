@@ -1077,3 +1077,60 @@ test("Shift+Delete clears a message's annotations", async ({ page }) => {
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
 	await expect(page.locator(".toast")).toContainText("2 annotations deleted");
 });
+
+/** Arguing with an answer: a reply in the card joins a thread under
+the answer (never a second card), its answer lands there, and the
+thread survives a reload. Typing in the field never fires shortcuts. */
+test("replies thread under the answer in the same card", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.addInitScript(() => {
+		const key = "ccez-llm-annotations-v1";
+		if (localStorage.getItem(key)) return;
+		localStorage.setItem(
+			key,
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-1",
+						messageId: "e2e-m0",
+						quote: "riverbank",
+						comment: "",
+						answer: "Riverbank."
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 60_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	const field = card.getByRole("textbox", { name: "Reply to this answer" });
+	await field.click();
+	// Letters that are shortcuts elsewhere (e edits, a annotates).
+	await page.keyboard.type("are you sure about that?");
+	await expect(field).toHaveValue("are you sure about that?");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toHaveCount(1);
+	await expect(card.locator(".ann-thread-q")).toHaveText(
+		"are you sure about that?"
+	);
+	await expect(card.locator(".ann-thread-a").first()).toContainText(
+		"Mock reply",
+		{ timeout: 15_000 }
+	);
+	await expect(field).toHaveValue("");
+	// The thread is saved with the note.
+	await page.reload();
+	await expect(ready).toBeVisible({ timeout: 60_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer .ann-thread-q")).toHaveText(
+		"are you sure about that?"
+	);
+});
