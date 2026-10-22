@@ -387,6 +387,26 @@ impl Listen {
         Ok(path)
     }
 
+    /// The fetched track's loudness envelope (`envelope`), worked out
+    /// once and cached beside the audio.
+    pub async fn envelope(&self, id: &str, lang: &str) -> Result<Vec<u8>> {
+        let fetched = self.fetch(id, lang).await?;
+        let path = self.media_dir(id, lang).join("envelope.u8");
+        let lock = video_lock(&format!("{id}/{}/envelope", base_lang(lang)));
+        let _guard = lock.lock().await;
+        if let Ok(bytes) = std::fs::read(&path) {
+            if !bytes.is_empty() {
+                return Ok(bytes);
+            }
+        }
+        let audio = fetched.audio_path;
+        let bytes = tokio::task::spawn_blocking(move || crate::envelope::envelope(&audio))
+            .await
+            .map_err(|e| e.to_string())??;
+        write_atomic(&path, &bytes)?;
+        Ok(bytes)
+    }
+
     /// Where a fetched track's audio sits (call after `fetch`).
     pub async fn audio_path(&self, id: &str, lang: &str) -> Result<PathBuf> {
         Ok(self.fetch(id, lang).await?.audio_path)

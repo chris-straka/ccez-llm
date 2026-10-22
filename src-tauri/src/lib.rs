@@ -387,6 +387,7 @@ pub fn run() {
             listen::listen_fetch,
             listen::listen_video,
             listen::listen_audio,
+            listen::listen_envelope,
             listen_grade::listen_grade_start,
             listen_grade::listen_grade_results,
             listen_grade::listen_grade_forget,

@@ -4,6 +4,7 @@
 
 mod api;
 mod client;
+pub mod envelope;
 pub mod fmp4;
 pub mod youtube;
 

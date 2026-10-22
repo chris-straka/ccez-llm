@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+	alignTokens,
 	DEFAULT_SEGMENT,
+	ENVELOPE_FPS,
+	findPauses,
 	joinTokens,
 	parseJson3,
+	retimeClips,
 	segmentClips,
 	type Token
 } from "./listenClips";
@@ -279,5 +283,95 @@ describe("segmentClips", () => {
 
 	it("returns nothing for nothing", () => {
 		expect(segmentClips([])).toEqual([]);
+	});
+});
+
+/** An envelope (50 frames/s) of speech at -20 dB with quiet runs
+ * (-60 dB) at the given [start, end) seconds. */
+function envelope(seconds: number, quiet: [number, number][]): Uint8Array {
+	const env = new Uint8Array(seconds * ENVELOPE_FPS).fill(80);
+	for (const [a, b] of quiet)
+		env.fill(40, Math.round(a * ENVELOPE_FPS), Math.round(b * ENVELOPE_FPS));
+	return env;
+}
+
+/** Words at the given caption times, `.` ending each sentence. */
+function timedWords(spec: [string, number][]): Token[] {
+	return spec.map(([text, start], k) => ({
+		text,
+		start,
+		end: spec[k + 1]?.[1] ?? start + 0.4,
+		space: k > 0
+	}));
+}
+
+describe("findPauses", () => {
+	it("finds the quiet between sentences, not between words", () => {
+		const env = envelope(10, [
+			[3, 3.5],
+			[6, 6.04]
+		]);
+		const pauses = findPauses(env);
+		expect(pauses).toHaveLength(1);
+		expect(pauses[0]?.start).toBeCloseTo(3);
+		expect(pauses[0]?.end).toBeCloseTo(3.5);
+	});
+
+	it("a track with no quiet has no pauses", () => {
+		expect(findPauses(envelope(10, []))).toEqual([]);
+	});
+});
+
+describe("alignTokens", () => {
+	// Captions run 1.5 s late: the track pauses at 2.5-3 s and
+	// 5.5-6 s, the captions put the sentence ends at 4 s and 7 s.
+	const late = timedWords([
+		["Parlons", 1.5],
+		["de", 2],
+		["la", 2.5],
+		["peste.", 3.5],
+		["Nous", 4.5],
+		["couvrons", 5],
+		["ce", 5.5],
+		["sujet.", 6.5],
+		["Voilà.", 7.5]
+	]);
+	const env = envelope(10, [
+		[2.5, 3],
+		[5.5, 6]
+	]);
+
+	it("moves sentence ends into the track's pauses", () => {
+		const aligned = alignTokens(late, findPauses(env));
+		expect(aligned).not.toBeNull();
+		const at = (text: string) => aligned?.find((t) => t.text === text);
+		expect(at("peste.")?.end).toBeCloseTo(2.5);
+		expect(at("Nous")?.start).toBeCloseTo(3);
+		expect(at("sujet.")?.end).toBeCloseTo(5.5);
+		expect(at("Voilà.")?.start).toBeCloseTo(6);
+	});
+
+	it("leaves the captions alone when the track has no pauses", () => {
+		expect(alignTokens(late, [])).toBeNull();
+	});
+
+	it("aligned clips end in the pause, and old clips follow", () => {
+		const aligned = alignTokens(late, findPauses(env)) ?? [];
+		const opts = { ...DEFAULT_SEGMENT, minSec: 0.3 };
+		const clips = segmentClips(aligned, { ...opts, aligned: true });
+		expect(clips.map((c) => c.text)).toEqual([
+			"Parlons de la peste.",
+			"Nous couvrons ce sujet.",
+			"Voilà."
+		]);
+		expect(clips[0]?.end).toBeGreaterThanOrEqual(2.5);
+		expect(clips[0]?.end).toBeLessThanOrEqual(3);
+		expect(clips[1]?.start).toBeGreaterThanOrEqual(2.5);
+
+		const old = segmentClips(late, opts);
+		const moved = retimeClips(old, late, aligned);
+		expect(moved?.map((c) => c.text)).toEqual(old.map((c) => c.text));
+		expect(moved?.[1]?.start).toBeCloseTo(clips[1]?.start ?? NaN);
+		expect(moved?.[1]?.end).toBeCloseTo(clips[1]?.end ?? NaN);
 	});
 });

@@ -68,3 +68,15 @@ pub async fn listen_video(app: AppHandle, id: String) -> Result<tauri::ipc::Resp
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     Ok(tauri::ipc::Response::new(bytes))
 }
+
+/// The fetched track's loudness envelope (one byte per 20 ms), raw:
+/// the app lines the captions up with the audio's pauses from it.
+#[tauri::command]
+pub async fn listen_envelope(
+    app: AppHandle,
+    id: String,
+    lang: String,
+) -> Result<tauri::ipc::Response, String> {
+    let bytes = listen(&app)?.envelope(&id, &lang).await?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
