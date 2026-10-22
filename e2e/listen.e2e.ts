@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /**
  * Listening drills through the app's backend (the `listen_*`
@@ -96,7 +96,19 @@ async function mockListenShell(page: Page): Promise<void> {
 						};
 					if (cmd === "listen_videos") return [seed.info];
 					if (cmd === "listen_search") return [row];
-					if (cmd === "listen_fetch")
+					if (cmd === "listen_fetch") {
+						// A spec can hold the video's fetch to catch it loading.
+						const w = window as unknown as {
+							__holdFetch?: boolean;
+							__releaseFetch?: () => void;
+						};
+						if (w.__holdFetch)
+							await new Promise<void>((resolve) => {
+								w.__releaseFetch = () => {
+									w.__holdFetch = false;
+									resolve();
+								};
+							});
 						return {
 							info: seed.info,
 							audio_mime: "audio/wav",
@@ -104,6 +116,7 @@ async function mockListenShell(page: Page): Promise<void> {
 							caption_kind: "asr",
 							storyboard: null
 						};
+					}
 					if (cmd === "listen_audio") return silentWav(12);
 					if (cmd === "listen_video") {
 						if (!(window as unknown as { __withVideo?: boolean }).__withVideo)
@@ -548,4 +561,71 @@ test("the clip in play shows the video, centered; others keep a still", async ({
 	await expect(clips.first().locator(".screen")).toHaveCount(0, {
 		timeout: 10_000
 	});
+});
+
+test("a video loads in the background: a new chat meanwhile is free, and the drill lands in its own chat", async ({
+	page
+}) => {
+	await page.evaluate(() => {
+		(window as unknown as { __holdFetch: boolean }).__holdFetch = true;
+	});
+
+	await page.getByRole("tab", { name: "Listen" }).click();
+	const row = page.locator(".listen-panel .video", { hasText: info.title });
+	await row.click();
+	await expect(row).toContainText("Loading…");
+
+	await page.keyboard.press("Control+Alt+KeyN");
+	// The new chat has no language: no browse screen, nothing loading.
+	await expect(page.locator(".listen-panel")).toHaveCount(0);
+	// The fetch is held once the mock has it; then let it through.
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					typeof (window as unknown as { __releaseFetch?: () => void })
+						.__releaseFetch
+			)
+		)
+		.toBe("function");
+	await page.evaluate(() =>
+		(window as unknown as { __releaseFetch: () => void }).__releaseFetch()
+	);
+	// The drill lands in the chat it was started from, named for its video.
+	await expect(
+		page.locator("aside:not(.settings-panel)").getByText(info.title)
+	).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator(".clip")).toHaveCount(0);
+	await toggleSidebar(page);
+	await page
+		.locator("aside:not(.settings-panel)")
+		.getByText(info.title)
+		.click();
+	await expect(page.locator(".clip")).toHaveCount(1);
+});
+
+test("the shown text marks the word sounding as the clip plays", async ({
+	page
+}) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	await page.mouse.move(2, 2);
+	await page.keyboard.press("Shift+A");
+	await expect(page.locator(".messages")).toContainText("Bonjour à tous");
+	// Clip 1 played on arrival; once it's done, play it again from 0 s
+	// (its words start every 0.6 s).
+	const play = clips.first().getByRole("button", { name: "Play clip" });
+	await expect(play).toBeVisible({ timeout: 10_000 });
+	await play.click();
+	const marked = () =>
+		page.evaluate(() => {
+			const h = CSS.highlights.get("clip-word");
+			const range = h ? [...h][0] : undefined;
+			return range instanceof Range ? range.toString() : null;
+		});
+	const often = { timeout: 5_000, intervals: [50] };
+	await expect.poll(marked, often).toBe("tous");
+	await expect.poll(marked, often).toBe("bienvenue.");
 });

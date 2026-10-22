@@ -11,6 +11,8 @@ fold under it (`ListenGloss`). -->
 		type ClipState,
 		type ListenSession
 	} from "$lib/listen";
+	import type { Token } from "$lib/listenClips";
+	import { markWord, wordAt, wordRanges } from "$lib/listenHighlight";
 
 	interface Props {
 		session: ListenSession;
@@ -26,6 +28,8 @@ fold under it (`ListenGloss`). -->
 		/** Some clip still waits to be answered: that one hosts the
 		 * picture, whichever clip is playing. */
 		anyOpen: boolean;
+		/** This clip's words with their track times (empty: unknown). */
+		timed: readonly Token[];
 		actions: {
 			play: (slow: boolean) => void;
 			seek: (t: number) => void;
@@ -48,6 +52,7 @@ fold under it (`ListenGloss`). -->
 		audioStatus,
 		videoUrl,
 		anyOpen,
+		timed,
 		actions
 	}: Props = $props();
 
@@ -80,6 +85,25 @@ fold under it (`ListenGloss`). -->
 		if (playing) {
 			if (v.paused) v.play().catch(() => {});
 		} else if (!v.paused) v.pause();
+	});
+	let row = $state<HTMLDivElement | null>(null);
+	// Once the text shows, the word sounding is marked on it as the
+	// clip plays (and stays on the word a pause stopped at).
+	$effect(() => {
+		const shown = clip.heard !== undefined || clip.peeked === true;
+		const t = position?.i === clip.i ? position.t : null;
+		const body = row?.closest("article")?.querySelector(".rendered");
+		if (!shown || t === null || timed.length === 0 || !body) return;
+		const k = wordAt(
+			timed.map((w) => w.start),
+			t
+		);
+		const ranges = wordRanges(
+			body,
+			timed.map((w) => w.text)
+		);
+		markWord(ranges[k] ?? null);
+		return () => markWord(null);
 	});
 	const source = $derived(
 		`https://www.youtube.com/watch?v=${session.videoId}&t=${Math.floor(span?.start ?? 0)}s`
@@ -136,7 +160,13 @@ fold under it (`ListenGloss`). -->
 	);
 </script>
 
-<div class="clip" class:open class:answered class:has-screen={screen}>
+<div
+	class="clip"
+	class:open
+	class:answered
+	class:has-screen={screen}
+	bind:this={row}
+>
 	<!-- The player: picture on top, its controls joined underneath as
 	one card, sized so both always fit above the composer. Without a
 	picture the controls are a plain row. -->

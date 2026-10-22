@@ -26,11 +26,21 @@ import {
 	clipBefore,
 	landGrade,
 	markGrading,
+	retimeDrill,
 	peekDrillClip,
 	openClip,
 	startDrill
 } from "./listenChat";
-import { parseJson3, segmentClips, type ClipSpan } from "./listenClips";
+import {
+	alignTokens,
+	DEFAULT_SEGMENT,
+	findPauses,
+	parseJson3,
+	retimeClips,
+	segmentClips,
+	type ClipSpan,
+	type Token
+} from "./listenClips";
 import type { ChatProvider } from "./providers/types";
 
 export interface ListenModeDeps {
@@ -105,8 +115,9 @@ export class ListenMode {
 	probing = new SvelteMap<string, true>();
 	/** The channel row under the pointer (hover + F folds it). */
 	hoveredChannel = $state<string | null>(null);
-	/** A video being fetched to start (its id). */
-	starting = $state<string | null>(null);
+	/** Videos being fetched to start a drill, by the chat each lands
+	 * in: switching chats never drops one. */
+	private starts = new SvelteMap<ChatId, string>();
 	error = $state("");
 	/** The clip playing (index), and whether slowly. */
 	playing = $state<{ i: number; slow: boolean } | null>(null);
@@ -157,6 +168,11 @@ export class ListenMode {
 		return this.lang !== null;
 	}
 
+	/** The video starting a drill in the active chat (its id). */
+	get starting(): string | null {
+		return this.starts.get(activeChat(this.deps.getChatState()).id) ?? null;
+	}
+
 	videoInfo(id: string, lang: string): ListenVideo | undefined {
 		return this.info.get(infoKey(id, lang));
 	}
@@ -171,10 +187,12 @@ export class ListenMode {
 		if (this.query.trim()) void this.search();
 	}
 
+	/** Close the browse screen; a drill still loading for this chat
+	 * is dropped (one loading for another chat carries on). */
 	close(): void {
 		this.lang = null;
 		this.browseSeq++;
-		this.starting = null;
+		this.starts.delete(activeChat(this.deps.getChatState()).id);
 	}
 
 	private needBackend(): ListenBackend {
@@ -339,20 +357,36 @@ export class ListenMode {
 		);
 	}
 
-	/** Start a drill on `videoId` in the active (empty) chat. */
+	/** Start a drill on `videoId` in the active (empty) chat. It
+	 * loads in the background: switching chats meanwhile is fine, and
+	 * the drill lands in the chat it was started from. */
 	async start(videoId: string): Promise<void> {
 		const lang = this.lang;
-		if (!lang || this.starting) return;
 		const state = this.deps.getChatState();
 		const chatId = activeChat(state).id;
-		this.starting = videoId;
+		if (!lang || this.starts.has(chatId)) return;
+		this.starts.set(chatId, videoId);
 		this.error = "";
+		const here = (): boolean => activeChat(state).id === chatId;
 		try {
 			const backend = this.needBackend();
 			const fetched = await backend.fetch(videoId, lang);
-			const clips = segmentClips(parseJson3(fetched.captions));
+			const tokens = parseJson3(fetched.captions);
+			const aligned = await this.alignedTokens(videoId, lang, tokens);
+			const clips = segmentClips(aligned ?? tokens, {
+				...DEFAULT_SEGMENT,
+				aligned: aligned !== null
+			});
 			if (clips.length === 0) throw new Error("listen-no-captions");
-			if (this.starting !== videoId || activeChat(state).id !== chatId) return;
+			// Dropped (× on the browse screen), or the chat was used or
+			// deleted while the video loaded.
+			const chat = state.chats.find((c) => c.id === chatId);
+			if (
+				this.starts.get(chatId) !== videoId ||
+				!chat ||
+				chat.messages.length > 0
+			)
+				return;
 			const info = fetched.info;
 			const session: ListenSession = {
 				videoId,
@@ -363,19 +397,93 @@ export class ListenMode {
 				thumbnail: info.thumbnail,
 				audio: info.audio?.kind ?? "dub",
 				clips,
-				storyboard: fetched.storyboard ?? null
+				storyboard: fetched.storyboard ?? null,
+				...(aligned ? { aligned: true } : {})
 			};
+			startDrill(state, chatId, session);
+			// Landed in the background: its first clip plays when opened.
+			if (!here()) return;
 			// Audio loads alongside; the first clip plays once it lands.
 			const audioReady = this.loadAudio(session);
-			startDrill(state, chatId, session);
 			this.close();
 			this.deps.reveal();
-			if (await audioReady) this.play(0, false);
+			if ((await audioReady) && here()) this.play(0, false);
 		} catch (error) {
-			this.error = listenErrorCopy(error, this.deps.langName(lang));
+			const copy = listenErrorCopy(error, this.deps.langName(lang));
+			if (here()) this.error = copy;
+			else this.deps.toast(copy);
 		} finally {
-			if (this.starting === videoId) this.starting = null;
+			if (this.starts.get(chatId) === videoId) this.starts.delete(chatId);
 		}
+	}
+
+	/** Caption tokens moved onto the track's own pauses, or null when
+	 * the track can't say (no envelope, no pauses to match). */
+	private async alignedTokens(
+		videoId: string,
+		lang: string,
+		tokens: Token[]
+	): Promise<Token[] | null> {
+		try {
+			const env = new Uint8Array(
+				await this.needBackend().envelope(videoId, lang)
+			);
+			return alignTokens(tokens, findPauses(env));
+		} catch {
+			return null;
+		}
+	}
+
+	/** The active drill's words with their track times (for the word
+	 * that is sounding), once its captions are read. */
+	private wordTimes = $state.raw<{ key: string; tokens: Token[] } | null>(null);
+
+	/** Clip `i`'s words in the active drill, timed; empty until known. */
+	clipWords(i: number): Token[] {
+		const session = activeChat(this.deps.getChatState()).listen;
+		const clip = session?.clips[i];
+		const words = this.wordTimes;
+		if (
+			!session ||
+			!clip ||
+			words?.key !== infoKey(session.videoId, session.lang)
+		)
+			return [];
+		const next = session.clips[i + 1];
+		const until = next ? next.start : Infinity;
+		return words.tokens.filter(
+			(t) => t.start >= clip.start - 0.01 && t.start < Math.min(clip.end, until)
+		);
+	}
+
+	/** Time the active drill's words, and move a drill cut before
+	 * clips followed the audio onto its pauses (same clips, same
+	 * text, better start and end). */
+	private async timeWords(
+		chatId: ChatId,
+		session: ListenSession,
+		captions: string
+	): Promise<void> {
+		const key = infoKey(session.videoId, session.lang);
+		const tokens = parseJson3(captions);
+		const aligned = await this.alignedTokens(
+			session.videoId,
+			session.lang,
+			tokens
+		);
+		if (this.audioFor !== key) return;
+		if (!session.aligned && aligned) {
+			const clips = retimeClips(session.clips, tokens, aligned);
+			if (clips) {
+				retimeDrill(this.deps.getChatState(), chatId, clips);
+				this.wordTimes = { key, tokens: aligned };
+				return;
+			}
+		}
+		this.wordTimes = {
+			key,
+			tokens: session.aligned ? (aligned ?? tokens) : tokens
+		};
 	}
 
 	/** Fetch the drill's track once per video (blob URL, so every clip
@@ -388,6 +496,7 @@ export class ListenMode {
 		this.audio = null;
 		this.audioUrl = null;
 		this.audioFor = key;
+		this.wordTimes = null;
 		this.audioStatus = "loading";
 		this.audioLoad = (async () => {
 			try {
@@ -397,6 +506,8 @@ export class ListenMode {
 				const fetched = await backend.fetch(session.videoId, session.lang);
 				const bytes = await backend.audio(session.videoId, session.lang);
 				if (this.audioFor !== key) return false;
+				const chatId = activeChat(this.deps.getChatState()).id;
+				void this.timeWords(chatId, session, fetched.captions);
 				const url = URL.createObjectURL(
 					new Blob([bytes], { type: fetched.audio_mime })
 				);
@@ -522,8 +633,10 @@ export class ListenMode {
 		el.playbackRate = slow ? SLOW_RATE : 1;
 		el.preservesPitch = true;
 		// Caption end times run late: stop a touch early so the next
-		// sentence's first sound never leaks in.
-		this.stopAt = Math.max(clip.start + MIN_CLIP_SEC, clip.end - END_TRIM_SEC);
+		// sentence's first sound never leaks in. Clips cut on the
+		// track's own pauses already end in the quiet.
+		const trim = session.aligned ? 0 : END_TRIM_SEC;
+		this.stopAt = Math.max(clip.start + MIN_CLIP_SEC, clip.end - trim);
 		const at =
 			from !== undefined && from >= clip.start && from < this.stopAt
 				? from

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { activeChat, createChatState } from "./chat";
-import type { ListenEntry, ListenSession } from "./listen";
+import { activeChat, createChatState, newChat } from "./chat";
+import type { ListenEntry, ListenFetched, ListenSession } from "./listen";
 import type { ListenBackend } from "./listenBackend";
 import {
 	ListenMode,
@@ -165,6 +165,7 @@ describe("search box", () => {
 			videos: () => Promise.resolve([]),
 			fetch: () => new Promise<never>(() => {}),
 			audio: () => new Promise<never>(() => {}),
+			envelope: () => new Promise<never>(() => {}),
 			video: () => new Promise<never>(() => {})
 		} satisfies ListenBackend;
 		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
@@ -231,5 +232,100 @@ describe("search box", () => {
 		await done;
 		expect(mode.results).toBeNull();
 		expect(mode.searching).toBe(false);
+	});
+});
+
+describe("starting a drill", () => {
+	const captions = JSON.stringify({
+		events: [
+			{
+				tStartMs: 0,
+				dDurationMs: 4000,
+				segs: [
+					{ utf8: "Parlons" },
+					{ utf8: " de", tOffsetMs: 800 },
+					{ utf8: " la", tOffsetMs: 1100 },
+					{ utf8: " peste", tOffsetMs: 1500 },
+					{ utf8: ".", tOffsetMs: 2400 }
+				]
+			}
+		]
+	});
+
+	/** A browse screen whose video fetch resolves when `land` is called. */
+	function starter() {
+		let land: () => void = () => {};
+		const backend = {
+			search: () => Promise.resolve([]),
+			channel: () => new Promise<never>(() => {}),
+			videos: () => Promise.resolve([]),
+			fetch: () =>
+				new Promise<ListenFetched>((resolve) => {
+					land = () =>
+						resolve({
+							info: {
+								id: "ujQZH4qyEgQ",
+								title: "La peste",
+								channel: "David Pakman",
+								channel_url: "",
+								duration: 60,
+								thumbnail: "",
+								original_lang: "en",
+								audio: null,
+								captions: null
+							},
+							audio_mime: "audio/mp4",
+							captions,
+							caption_kind: "asr"
+						});
+				}),
+			audio: () => new Promise<never>(() => {}),
+			envelope: () => Promise.reject(new Error("none")),
+			video: () => new Promise<never>(() => {})
+		} satisfies ListenBackend;
+		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
+		const state = createChatState(store);
+		const toasts: string[] = [];
+		const mode = new ListenMode({
+			getChatState: () => state,
+			backend: () => backend,
+			langName: () => "French",
+			getChannels: () => [],
+			setChannels: () => {},
+			resolveProvider: () => Promise.resolve(null),
+			toast: (m) => void toasts.push(m),
+			reveal: () => {},
+			openUrl: () => Promise.resolve(),
+			nativeGrader: () => null
+		});
+		mode.enter("fr");
+		return { mode, state, land: () => land(), toasts };
+	}
+
+	it("lands in its own chat when another chat opened meanwhile", async () => {
+		const { mode, state, land } = starter();
+		const from = activeChat(state).id;
+		const started = mode.start("ujQZH4qyEgQ");
+		expect(mode.starting).toBe("ujQZH4qyEgQ");
+		newChat(state);
+		// The new chat isn't waiting on anything: its own rows are free.
+		expect(mode.starting).toBeNull();
+		land();
+		await started;
+		const drill = state.chats.find((c) => c.id === from);
+		expect(drill?.listen?.title).toBe("La peste");
+		expect(drill?.messages).toHaveLength(1);
+		expect(activeChat(state).messages).toHaveLength(0);
+		expect(activeChat(state).listen).toBeUndefined();
+	});
+
+	it("closing the browse screen drops the video loading for that chat", async () => {
+		const { mode, state, land } = starter();
+		const started = mode.start("ujQZH4qyEgQ");
+		mode.close();
+		land();
+		await started;
+		expect(activeChat(state).listen).toBeUndefined();
+		expect(activeChat(state).messages).toHaveLength(0);
 	});
 });

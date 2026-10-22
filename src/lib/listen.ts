@@ -117,6 +117,9 @@ export interface ListenSession {
 	clips: ClipSpan[];
 	/** Still frames, when YouTube has them. */
 	storyboard?: ListenStoryboard | null;
+	/** Clips cut on the track's own pauses (drills from before that
+	 * are moved onto them once their audio loads). */
+	aligned?: boolean;
 }
 
 export interface ClipNote {

@@ -20,6 +20,7 @@ import {
 	type ClipState,
 	type ListenSession
 } from "./listen";
+import type { ClipSpan } from "./listenClips";
 import type { KeyValueStore } from "./settings";
 
 function chatById(state: ChatState, id: ChatId): Chat | undefined {
@@ -54,6 +55,19 @@ export function startDrill(
 	chat.messages = [first];
 	persistChats(state, store);
 	return first.id;
+}
+
+/** Move a drill's clips onto new times (same clips, same text). */
+export function retimeDrill(
+	state: ChatState,
+	chatId: ChatId,
+	clips: ClipSpan[],
+	store?: KeyValueStore
+): void {
+	const chat = chatById(state, chatId);
+	if (!chat?.listen || chat.listen.clips.length !== clips.length) return;
+	chat.listen = { ...chat.listen, clips, aligned: true };
+	persistChats(state, store);
 }
 
 /** The clip waiting for a guess (the newest unanswered one). */

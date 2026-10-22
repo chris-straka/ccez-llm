@@ -1003,3 +1003,10 @@ html[data-theme="dark"] article.landed {
 		animation: none;
 	}
 }
+/* The word sounding in a drill clip (`listenHighlight.ts`): the
+selection tint, so it reads as "here" without competing with
+annotation washes. Highlight API only: engines without it show none. */
+::highlight(clip-word) {
+	background-color: var(--sel-tint);
+	color: inherit;
+}

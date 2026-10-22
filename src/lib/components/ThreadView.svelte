@@ -382,6 +382,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					position={listen.mode.position}
 					videoUrl={listen.mode.videoUrl}
 					anyOpen={clipOpen}
+					timed={listen.mode.clipWords(msg.clip.i)}
 					audioStatus={listen.mode.audioStatus}
 					actions={{
 						play: (slow: boolean) => {

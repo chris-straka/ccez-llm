@@ -2402,17 +2402,22 @@
 		listenMode.setVolume(settings.listenVolume);
 	});
 	// Leaving a drill chat stops its sound; a chat with messages never
-	// shows the browse screen. The effect also reruns as messages land,
+	// shows the browse screen, nor does one in another language (a new
+	// chat leaves the browse screen behind; a video still loading there
+	// lands in its own chat). The effect also reruns as messages land,
 	// so only an actual chat switch stops the sound: a new clip row must
 	// not cut off the one still playing.
 	let soundChatId: ChatId | null = null;
 	$effect(() => {
 		const id = chatState.activeChatId;
 		const empty = chat.messages.length === 0;
+		const lang = chat.replyLang;
 		untrack(() => {
-			if (id !== soundChatId) listenMode.leave();
+			const switched = id !== soundChatId;
+			if (switched) listenMode.leave();
 			soundChatId = id;
-			if (!empty && listenMode.open) listenMode.close();
+			if (listenMode.open && (!empty || (switched && lang !== listenMode.lang)))
+				listenMode.close();
 		});
 	});
 
