@@ -21,7 +21,7 @@ import {
 } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import {
-	addKaikkiFormOf,
+	addKaikkiFormsOf,
 	addKaikkiRecord,
 	PackBuilder,
 	parseJmdictEntry,
@@ -152,7 +152,7 @@ async function buildKaikki(
 					senses: later.senses ?? []
 				});
 		}
-	for (const r of formOnly) addKaikkiFormOf(b, r, lemmas);
+	addKaikkiFormsOf(b, formOnly, lemmas);
 	return { b, header: { lang, version: today(), sources: [WIKTIONARY] } };
 }
 

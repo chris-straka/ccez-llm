@@ -294,9 +294,12 @@ function isDated(s: KaikkiSense): boolean {
 
 const SKIP_POS = new Set(["name", "proverb", "phrase", "symbol", "character"]);
 
-/** Chinese files everyday words like 中國 (China) as names. */
+/** Chinese files everyday words like 中國 (China) as names, and
+single-character words like 我 (I) as characters. */
 function keepsPos(pos: string, lang: string): boolean {
-	return pos === "name" && (lang === "zh" || lang === "yue");
+	return (
+		(pos === "name" || pos === "character") && (lang === "zh" || lang === "yue")
+	);
 }
 
 function cleanGloss(g: string): string {
@@ -397,20 +400,68 @@ export function addKaikkiRecord(
 	return null;
 }
 
-/** Second pass: a form-only record points at its lemmas' entries. */
-export function addKaikkiFormOf(
+/** A form-of target's entries: by its headword, else its first word
+(wiktextract can run on: "avere and"), else through a form already
+linked (मेरे → मेरा → मैं). */
+function targetIds(
+	target: string,
+	lang: string,
+	lemmas: Map<string, number[]>,
+	reached: Map<string, number[]>
+): number[] | undefined {
+	const first = target.split(" ")[0]!;
+	for (const map of [lemmas, reached])
+		for (const word of first === target ? [target] : [target, first])
+			for (const key of lemmaKeys(word, lang)) {
+				const ids = map.get(key);
+				if (ids) return ids;
+			}
+	return undefined;
+}
+
+/** Points a form-only record at its targets' entries; false when none exist. */
+function linkFormOf(
 	b: PackBuilder,
 	r: KaikkiRecord,
-	lemmas: Map<string, number[]>
-): void {
+	lemmas: Map<string, number[]>,
+	reached: Map<string, number[]>
+): boolean {
+	const linked = new Set<number>();
 	for (const s of r.senses ?? []) {
 		const tags = (s.tags ?? []).filter((t) => !NOISE_TAGS.has(t)).join(" ");
-		for (const target of s.form_of ?? []) {
-			const ids = lemmaKeys(target.word, b.lang)
-				.map((k) => lemmas.get(k))
-				.find((found) => found !== undefined);
-			for (const id of ids ?? []) b.addForm(r.word, id, tags);
-		}
+		for (const target of s.form_of ?? [])
+			for (const id of targetIds(target.word, b.lang, lemmas, reached) ?? []) {
+				b.addForm(r.word, id, tags);
+				linked.add(id);
+			}
+	}
+	if (linked.size === 0) return false;
+	for (const key of lemmaKeys(r.word, b.lang))
+		reached.set(key, [...(reached.get(key) ?? []), ...linked]);
+	return true;
+}
+
+/**
+ * Second pass: form-only records point at their lemmas' entries. A
+ * record whose lemma has no entry (Wiktionary lacks the page, or it
+ * is itself a form) gets one more try once the rest are linked, then
+ * keeps its own glosses: всичко still reads "everything, all".
+ */
+export function addKaikkiFormsOf(
+	b: PackBuilder,
+	records: KaikkiRecord[],
+	lemmas: Map<string, number[]>
+): void {
+	const reached = new Map<string, number[]>();
+	const orphans = records.filter((r) => !linkFormOf(b, r, lemmas, reached));
+	for (const r of orphans) {
+		if (linkFormOf(b, r, lemmas, reached)) continue;
+		const senses = (r.senses ?? [])
+			.filter((s) => s.glosses?.length)
+			.slice(0, 5)
+			.map((s) => cleanGloss(s.glosses![s.glosses!.length - 1]!));
+		if (senses.length === 0) continue;
+		b.addForm(r.word, b.addEntry({ w: r.word, p: r.pos, s: senses }));
 	}
 }
 

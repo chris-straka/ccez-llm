@@ -326,13 +326,16 @@ const VOWEL = "aeiouyæœøɛɔаеёиоуыэюяіїєαεηιουω";
 
 /**
  * Marks dictionaries print and ordinary text leaves out, per language:
- * stress in Russian (говорю́), length in Latin (amō), tone in
- * Serbo-Croatian (kùća), vowel points in Arabic and Hebrew. `onVowel`
- * marks only count on a vowel (and syllabic r), so ć and й stay.
+ * stress in Russian (говорю́) and ё's dots (пришёл, written пришел),
+ * length in Latin (amō), tone in Serbo-Croatian (kùća), Greek accents
+ * (είναι, typed ειναι), vowel points in Arabic and Hebrew. `onVowel`
+ * marks only count on a vowel (and syllabic r), so ć, й and ї stay.
  */
 const OPTIONAL_MARKS: Record<string, { marks: RegExp; onVowel: boolean }> = {};
 for (const [langs, marks, onVowel] of [
-	[["ru", "uk", "bg"], /[\u0300\u0301]/gu, true],
+	[["ru"], /[\u0300\u0301\u0308]/gu, true],
+	[["uk", "bg"], /[\u0300\u0301]/gu, true],
+	[["el"], /[\u0301]/gu, true],
 	[["sr"], /[\u0300-\u0302\u0304\u030f\u0311]/gu, true],
 	[["la", "grc"], /[\u0304\u0306]/gu, true],
 	[["ang"], /[\u0304\u0307]/gu, false],
@@ -362,10 +365,116 @@ export function plainSpelling(form: string, lang: string): string | null {
 	return plain === form.normalize("NFC") ? null : plain;
 }
 
+/** Letters ordinary text swaps for the ones dictionaries print. */
+const SPELLINGS: Record<string, (word: string) => string> = {
+	// Dotted capital İ lowercases to i plus a dot; dotless I is ı.
+	tr: (w) => w.replace(/İ/g, "i").replace(/I/g, "ı"),
+	// Cedilla ş ţ from older keyboards for comma-below ș ț.
+	ro: (w) =>
+		w
+			.replace(/ş/g, "ș")
+			.replace(/Ş/g, "Ș")
+			.replace(/ţ/g, "ț")
+			.replace(/Ţ/g, "Ț"),
+	// Arabic yeh and kaf for the Persian letters.
+	fa: (w) => w.replace(/ي/g, "ی").replace(/ك/g, "ک"),
+	ur: (w) => w.replace(/ي/g, "ی").replace(/ك/g, "ک")
+};
+
+const KO_PARTICLES = [
+	"에서",
+	"에게",
+	"한테",
+	"까지",
+	"부터",
+	"으로",
+	"이랑",
+	"하고",
+	"처럼",
+	"보다",
+	"이",
+	"가",
+	"은",
+	"는",
+	"을",
+	"를",
+	"도",
+	"에",
+	"의",
+	"와",
+	"과",
+	"로",
+	"만"
+];
+
+/** Korean pronouns that fuse with their particle (제가 is 저 + 가). */
+const KO_FUSED: Record<string, string> = {
+	제가: "저",
+	내가: "나",
+	네가: "너",
+	그건: "그것",
+	이건: "이것",
+	저건: "저것",
+	그걸: "그것",
+	이걸: "이것"
+};
+
+/**
+ * The bare word inside a form that carries grammar a dictionary
+ * doesn't list: clitics (avez-vous, deixa-me), Czech and Slovak ne-,
+ * Hebrew and Arabic prefixes (ואני, بهذا), Korean particles (우리가),
+ * Malay and Indonesian suffixes (padaku), the Tagalog linker (akong).
+ */
+const BARE: Record<string, (word: string) => string[]> = {};
+const hyphenClitic = (w: string): string[] => {
+	const head = /^(\p{L}+)-\p{L}/u.exec(w)?.[1];
+	return head ? [head] : [];
+};
+for (const lang of ["fr", "pt", "ro"]) BARE[lang] = hyphenClitic;
+for (const lang of ["cs", "sk"])
+	BARE[lang] = (w) => {
+		const rest = /^ne(\p{L}{3,})$/iu.exec(w)?.[1];
+		return rest ? [rest] : [];
+	};
+BARE.he = (w) =>
+	[1, 2]
+		.filter(
+			(n) =>
+				w.length - n >= 2 &&
+				[...w.slice(0, n)].every((c) => "ושהבלמכ".includes(c))
+		)
+		.map((n) => w.slice(n));
+BARE.ar = (w) => {
+	const m = /^[وف]?([بلك]?)((?:ال)?)(.{2,})$/u.exec(w);
+	if (!m) return [];
+	const [, prep = "", art = "", stem = ""] = m;
+	return [prep + art + stem, art + stem, stem].filter(
+		(f, i, all) => f !== w && all.indexOf(f) === i
+	);
+};
+BARE.ko = (w) => {
+	if (KO_FUSED[w]) return [KO_FUSED[w]];
+	const p = KO_PARTICLES.find((x) => w.endsWith(x) && w.length > x.length);
+	return p ? [w.slice(0, -p.length)] : [];
+};
+for (const lang of ["id", "ms"])
+	BARE[lang] = (w) => {
+		const rest = /^(\p{L}{3,}?)(nya|ku|mu|lah|kah|pun)$/u.exec(w)?.[1];
+		return rest ? [rest] : [];
+	};
+BARE.tl = (w) => {
+	if (!w.endsWith("ng") || w.length < 4) return [];
+	return /[aeiou]ng$/.test(w)
+		? [w.slice(0, -2), w.slice(0, -1)]
+		: [w.slice(0, -1)];
+};
+
 /**
  * Forms to look a quote up by: the word without edge punctuation, for
  * elided articles and pronouns (l'homme, qu'il, dell'acqua) the word
- * after the apostrophe too, then each without its optional marks.
+ * after the apostrophe too, the spelling dictionaries print, each
+ * without its optional marks, and last the bare word inside a form
+ * with clitics, prefixes or particles. The first form with hits wins.
  */
 export function lookupForms(quote: string, lang = ""): string[] {
 	const word = quote
@@ -373,12 +482,15 @@ export function lookupForms(quote: string, lang = ""): string[] {
 		.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, "");
 	if (!word) return [];
 	const forms = [word];
+	const add = (f: string | null | undefined) => {
+		if (f && !forms.includes(f)) forms.push(f);
+	};
 	const elided = /^\p{L}{1,4}['’](\p{L}.+)$/u.exec(word);
-	if (elided?.[1]) forms.push(elided[1]);
-	for (const f of [...forms]) {
-		const plain = plainSpelling(f, lang);
-		if (plain) forms.push(plain);
-	}
+	add(elided?.[1]);
+	for (const f of [...forms]) add(SPELLINGS[lang]?.(f));
+	for (const f of [...forms]) add(plainSpelling(f, lang));
+	for (const f of [...forms])
+		for (const bare of BARE[lang]?.(f) ?? []) add(bare);
 	return forms;
 }
 

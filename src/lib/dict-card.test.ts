@@ -189,12 +189,15 @@ describe("plainSpelling", () => {
 		expect(plainSpelling("kùća", "sr")).toBe("kuća");
 		expect(plainSpelling("كَتَبَ", "ar")).toBe("كتب");
 		expect(plainSpelling("שָׁלוֹם", "he")).toBe("שלום");
+		// Russian prints ё and writes е; Greek is typed without accents.
+		expect(plainSpelling("пришёл", "ru")).toBe("пришел");
+		expect(plainSpelling("είναι", "el")).toBe("ειναι");
 	});
 
 	it("keeps letters that only look marked", () => {
 		expect(plainSpelling("ćao", "sr")).toBeNull();
 		expect(plainSpelling("йод", "ru")).toBeNull();
-		expect(plainSpelling("ёлка", "ru")).toBeNull();
+		expect(plainSpelling("її", "uk")).toBeNull();
 		expect(plainSpelling("été", "fr")).toBeNull();
 	});
 });
@@ -209,6 +212,28 @@ describe("lookups", () => {
 		expect(lookupForms("l'homme")).toEqual(["l'homme", "homme"]);
 		expect(lookupForms("qu’il")).toEqual(["qu’il", "il"]);
 		expect(lookupForms("...")).toEqual([]);
+	});
+
+	it("try the spelling dictionaries print", () => {
+		expect(lookupForms("İyi", "tr")).toEqual(["İyi", "iyi"]);
+		expect(lookupForms("ştiu", "ro")).toEqual(["ştiu", "știu"]);
+		expect(lookupForms("خيلي", "fa")).toEqual(["خيلي", "خیلی"]);
+	});
+
+	it("try the bare word last, inside clitics, prefixes and particles", () => {
+		expect(lookupForms("avez-vous", "fr")).toEqual(["avez-vous", "avez"]);
+		expect(lookupForms("deixa-me", "pt")).toEqual(["deixa-me", "deixa"]);
+		expect(lookupForms("nechci", "cs")).toEqual(["nechci", "chci"]);
+		// Too short to be a negated word: není is not ní.
+		expect(lookupForms("není", "cs")).toEqual(["není"]);
+		expect(lookupForms("ואני", "he")).toEqual(["ואני", "אני"]);
+		expect(lookupForms("بالطبع", "ar")).toEqual(["بالطبع", "الطبع", "طبع"]);
+		expect(lookupForms("우리가", "ko")).toEqual(["우리가", "우리"]);
+		expect(lookupForms("제가", "ko")).toEqual(["제가", "저"]);
+		expect(lookupForms("padaku", "id")).toEqual(["padaku", "pada"]);
+		expect(lookupForms("akong", "tl")).toEqual(["akong", "ako", "akon"]);
+		// Other languages keep the word whole.
+		expect(lookupForms("E-Mail", "de")).toEqual(["E-Mail"]);
 	});
 
 	it("take the first form that hits", () => {

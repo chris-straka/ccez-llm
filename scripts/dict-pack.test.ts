@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	addKaikkiFormOf,
+	addKaikkiFormsOf,
 	addKaikkiRecord,
 	lookupPack,
 	PackBuilder,
@@ -18,7 +18,7 @@ function build(records: KaikkiRecord[], lang = ""): Uint8Array {
 		const form = addKaikkiRecord(b, r, lemmas);
 		if (form) later.push(form);
 	}
-	for (const r of later) addKaikkiFormOf(b, r, lemmas);
+	addKaikkiFormsOf(b, later, lemmas);
 	return b.encode(header);
 }
 
@@ -178,6 +178,52 @@ describe("dictionary packs", () => {
 		const name: KaikkiRecord = { ...record, pos: "name" };
 		expect(lookupPack(build([name], "zh"), "中國")).toHaveLength(1);
 		expect(lookupPack(build([name], "fr"), "中國")).toEqual([]);
+		// Single-character words file as characters: 我 is "I".
+		const char: KaikkiRecord = {
+			word: "我",
+			pos: "character",
+			senses: [{ glosses: ["I; me; my"] }]
+		};
+		expect(lookupPack(build([char], "zh"), "我")[0]?.entry.s).toEqual([
+			"I; me; my"
+		]);
+		expect(lookupPack(build([char], "fr"), "我")).toEqual([]);
+	});
+
+	it("links forms whose lemma is garbled, a form, or missing", () => {
+		const formOf = (word: string, target: string, tags: string[]) => ({
+			word,
+			pos: "verb",
+			senses: [
+				{
+					glosses: [`${tags.join(" ")} of ${target}`],
+					tags: ["form-of", ...tags],
+					form_of: [{ word: target }]
+				}
+			]
+		});
+		const pack = build([
+			// Chained first, so the chain resolves on the second try.
+			formOf("mere", "mera", ["plural"]),
+			{ word: "avere", pos: "verb", senses: [{ glosses: ["to have"] }] },
+			formOf("ho", "avere and", ["first-person"]),
+			{ word: "mai", pos: "pron", senses: [{ glosses: ["I"] }] },
+			formOf("mera", "mai", ["genitive"]),
+			formOf("vsichko", "vsichak", ["neuter"])
+		]);
+		expect(lookupPack(pack, "ho")[0]).toMatchObject({
+			tags: "first-person",
+			entry: { w: "avere" }
+		});
+		expect(lookupPack(pack, "mere")[0]).toMatchObject({
+			tags: "plural",
+			entry: { w: "mai" }
+		});
+		// No lemma anywhere: the form keeps its own gloss.
+		expect(lookupPack(pack, "vsichko")[0]).toMatchObject({
+			tags: "",
+			entry: { w: "vsichko", s: ["neuter of vsichak"] }
+		});
 	});
 
 	it("reads JMdict entries", () => {
