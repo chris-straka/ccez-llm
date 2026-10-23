@@ -30,6 +30,7 @@
 	import { applyMarks } from "$lib/annotations-stamp";
 	import { inkForQuote, type RepeatInk } from "$lib/ann-repeats";
 	import { clearRepeatInks, paintRepeatInks } from "$lib/ann-repeat-paint";
+	import { stackBadges } from "$lib/badge-stack";
 
 	interface Props {
 		message: ChatMsg;
@@ -257,6 +258,16 @@
 			if (el) clearRepeatInks(el);
 		};
 	});
+	// A rewrap can bring badges together (or apart): re-measure them.
+	$effect(() => {
+		const el = bodyEl;
+		if (!el || typeof ResizeObserver !== "function") return;
+		const observer = new ResizeObserver(() =>
+			stackBadges([...el.querySelectorAll<HTMLElement>("[data-ann-badge]")])
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	});
 
 	$effect(() => {
 		// Paste folds splice before render (reading aids keep full text).
@@ -349,13 +360,17 @@
 				paintRepeatInks(bodyEl, inks, skipMarks ? [] : items);
 				// Each badge rings in its quote's ink: badge and
 				// underline read as one pair.
+				const badges: HTMLElement[] = [];
 				for (const badge of bodyEl.querySelectorAll("[data-ann-badge]")) {
 					if (!(badge instanceof HTMLElement)) continue;
+					badges.push(badge);
 					const item = items.find((m) => m.id === badge.dataset.annBadge);
 					const ink = item ? inkForQuote(inks, item.quote) : null;
 					if (ink === null) delete badge.dataset.ink;
 					else badge.dataset.ink = String(ink);
 				}
+				// Quotes ending together never stack their badges.
+				stackBadges(badges);
 				stampRunOutputs();
 				for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
 					if (!(wrap instanceof HTMLElement)) continue;

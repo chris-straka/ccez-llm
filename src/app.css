@@ -776,8 +776,10 @@ readings instead of shoving them: zero layout in every mode. */
 	left: 100%;
 	/* Straddle the top of the quote's own line (half the badge below
 	its top edge) rather than sitting a full badge above it: floated
-	higher, a badge sat in the line above and read as that line's. */
-	transform: translate(-20%, 38%);
+	higher, a badge sat in the line above and read as that line's.
+	A badge landing on an earlier one steps aside by its own width
+	per step (badge-stack.ts). */
+	transform: translate(calc(-20% + var(--ann-badge-step, 0) * 100%), 38%);
 	/* Below the composer card (z-30): scrolled-under badges take
 	no hits — the chrome owns those pixels. The edit card (z-60)
 	and refs popover (z-40) still open above everything, so a
@@ -867,7 +869,7 @@ down-right at it. */
 .news-card-title button.ccez-ann-badge.rtl {
 	left: auto;
 	right: 100%;
-	transform: translate(20%, 38%);
+	transform: translate(calc(20% - var(--ann-badge-step, 0) * 100%), 38%);
 }
 .rendered button.ccez-ann-badge.rtl::after,
 .news-card-title button.ccez-ann-badge.rtl::after {
