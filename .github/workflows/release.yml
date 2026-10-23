@@ -453,7 +453,7 @@ jobs:
           test "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" = "false"
 
   # Tidiness automation: once the release above is verified, delete every
-  # older release except the newest previous one (kept as a rollback
+  # older app release (v* tags) except the newest previous one (kept as a rollback
   # fallback). Runs last so it can never endanger the current artifacts;
   # a prune failure goes red without touching the verified release.
   prune-old-releases:
@@ -478,7 +478,10 @@ jobs:
               capture_output=True, text=True, check=True,
           )
           older = sorted(
-              (r for r in json.loads(out.stdout) if r["tagName"] != cur),
+              # App versions only: the `dictionaries` release is data
+              # the app downloads, never an old version.
+              (r for r in json.loads(out.stdout)
+               if r["tagName"] != cur and r["tagName"].startswith("v")),
               key=lambda r: r["createdAt"], reverse=True,
           )
           for r in older[1:]:

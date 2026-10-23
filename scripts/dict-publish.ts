@@ -60,6 +60,8 @@ if (!exists)
 		TAG,
 		"--title",
 		"Dictionaries",
+		"--target",
+		"main",
 		"--notes",
 		notes,
 		"--prerelease",
