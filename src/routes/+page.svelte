@@ -90,6 +90,7 @@
 		type AppSettings
 	} from "$lib/settings";
 	import { onSaveFailure, SAVE_FAILURE_COPY } from "$lib/save-failure";
+	import { createSleepClaim } from "$lib/sleep-claim";
 	import { cycleThinkingId } from "$lib/providers/thinking";
 	import {
 		QUICK_LANG_CODES,
@@ -3962,27 +3963,12 @@
 	 * resolve after stop releases instead of holding. Outside the
 	 * shell the call resolves null — never a toast, never a throw.
 	 */
-	let sleepClaim: number | null = null;
-	let sleepWanted = false;
+	const setSleepClaim = createSleepClaim(
+		() => desktopSleepBlock("Ccez Studio speech or reply streaming"),
+		(id) => void desktopSleepUnblock(id)
+	);
 	$effect(() => {
-		const active = speakingId !== null || chatState.sending;
-		if (active) {
-			sleepWanted = true;
-			void desktopSleepBlock("Ccez Studio speech or reply streaming").then(
-				(id) => {
-					if (id === null) return;
-					if (sleepWanted) sleepClaim = id;
-					else void desktopSleepUnblock(id);
-				}
-			);
-		} else {
-			sleepWanted = false;
-			if (sleepClaim !== null) {
-				const id = sleepClaim;
-				sleepClaim = null;
-				void desktopSleepUnblock(id);
-			}
-		}
+		setSleepClaim(speakingId !== null || chatState.sending);
 	});
 	/** UI text scale in 10% steps (50–2000% everywhere). */
 	function adjustFontScale(delta: number, quiet = false): void {
@@ -8128,6 +8114,10 @@
 	}
 
 	function rerunFrom(index: number) {
+		// Mid-reply a rerun would cut the reply out from under its
+		// still-running stream and then refuse to resend: same no-op
+		// as the R key until the reply lands or is stopped.
+		if (isSending(chatState)) return;
 		truncateToMessage(chatState, index);
 		void resend();
 	}
