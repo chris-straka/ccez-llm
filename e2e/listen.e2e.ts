@@ -205,7 +205,7 @@ async function nextClip(page: Page): Promise<void> {
 	await page.keyboard.press("a");
 }
 
-test("News and Listen show on a new chat; with no language they ask for one", async ({
+test("News and Listen wait for a language, then open in it", async ({
 	page
 }) => {
 	// Same shell and channels, but a chat with no language yet.
@@ -216,14 +216,9 @@ test("News and Listen show on a new chat; with no language they ask for one", as
 	await expect(page.locator(".empty-state h1")).toBeVisible({
 		timeout: 60_000
 	});
-	// Desktop: both ways in show before any pick.
-	await expect(page.getByRole("tab", { name: "News" })).toBeVisible();
-	await expect(page.getByRole("tab", { name: "Listen" })).toBeVisible();
-	await page.getByRole("tab", { name: "News" }).click();
-	await expect(page.locator(".toast").first()).toContainText(
-		"Pick a language first"
-	);
-	await expect(page.locator(".news-panel")).toHaveCount(0);
+	// No language yet: no switch to press.
+	await expect(page.getByRole("tab", { name: "News" })).toHaveCount(0);
+	await expect(page.getByRole("tab", { name: "Listen" })).toHaveCount(0);
 	// A pick only sets the language; Listen then opens in it.
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	await page

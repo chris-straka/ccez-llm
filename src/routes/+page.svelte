@@ -9219,7 +9219,7 @@
 	}
 	/** The language News and Listen open in: the chat's pick, else the
 	default reply language (which becomes the chat's pick). Neither:
-	a toast asks for one. */
+	the switch stays hidden. */
 	function studyLangCode(): string | null {
 		if (activeReplyCode) return activeReplyCode;
 		const fallback = settings.replyLang;
@@ -9227,9 +9227,12 @@
 			setChatReplyLang(chatState, chatState.activeChatId, fallback);
 			return fallback;
 		}
-		flashToast("Pick a language first");
 		return null;
 	}
+	const hasStudyLang = $derived(
+		activeReplyCode !== null ||
+			(!!settings.replyLang && !!replyLanguageFor(settings.replyLang))
+	);
 	function clearReplyLang(): void {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
@@ -14829,8 +14832,7 @@
 				channels: settings.listenChannels,
 				available: listenBackend() !== null,
 				touch: androidUI,
-				modes:
-					!androidUI || (activeReplyCode !== null && listenBackend() !== null),
+				modes: hasStudyLang && (!androidUI || listenBackend() !== null),
 				summary:
 					chat.listen && chat.messages.some((m) => m.drillEnd)
 						? summarizeDrill(drillStates(chat))

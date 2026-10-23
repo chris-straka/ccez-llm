@@ -179,8 +179,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			channels: ListenChannel[];
 			/** The app's backend exists (not the plain web build). */
 			available: boolean;
-			/** The News | Listen switch shows on the empty chat (desktop:
-			always, the way into both; phones: once a language is picked). */
+			/** The News | Listen switch shows on the empty chat once there
+			is a language to study (the chat's pick or the default). */
 			modes: boolean;
 			summary: DrillSummary | null;
 			another: () => void;
