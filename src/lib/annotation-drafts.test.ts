@@ -654,6 +654,32 @@ describe("word cards", () => {
 });
 
 describe("follow-up thread", () => {
+	it("a reply answered after a chat switch is kept with its chat", async () => {
+		let finish: (a: string) => void = () => undefined;
+		const { drafts, setActive, calls } = harness({
+			active: "c1",
+			chats: ["c1", "c2"],
+			followUp: () =>
+				new Promise<string>((resolve) => {
+					finish = resolve;
+				})
+		});
+		const q = note({ answer: "first", thread: [{ q: "earlier", a: "yes" }] });
+		drafts.setList([q]);
+		const sent = drafts.askFollowUp(q.id, "and then?");
+		drafts.fileChat("c1" as ChatId);
+		setActive("c2");
+		drafts.restoreChat("c2");
+		await vi.waitFor(() => expect(calls.followUps).toHaveLength(1));
+		finish("this");
+		expect(await sent).toBe(true);
+		expect(loadDraftAnnotations("c1")[0]?.thread).toEqual([
+			{ q: "earlier", a: "yes" },
+			{ q: "and then?", a: "this" }
+		]);
+		expect(drafts.list).toEqual([]);
+	});
+
 	it("a reply joins the thread and its answer lands on it", async () => {
 		const { drafts, calls } = harness();
 		const q = note({ answer: "first" });

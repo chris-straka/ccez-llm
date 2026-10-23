@@ -259,12 +259,23 @@ export class AnnotationDrafts {
 				prior,
 				text
 			);
-			if (chatId === this.deps.getActiveChatId())
-				this.list = attachFollowUpAnswer(this.list, id, index, answer);
+			// Stored drafts keep answered replies only: after a chat
+			// switch the reply goes back in beside its answer.
+			this.landInChat(chatId, (list) =>
+				attachFollowUpAnswer(
+					list.map((a) =>
+						a.id === id && (a.thread ?? []).length === index
+							? { ...a, thread: [...(a.thread ?? []), { q: text }] }
+							: a
+					),
+					id,
+					index,
+					answer
+				)
+			);
 			return true;
 		} catch (error) {
-			if (chatId === this.deps.getActiveChatId())
-				this.list = dropFollowUp(this.list, id, index);
+			this.landInChat(chatId, (list) => dropFollowUp(list, id, index));
 			const message = error instanceof Error ? error.message : String(error);
 			this.deps.notifyBanner(message);
 			if (this.deps.isPhone()) this.deps.toastError(message);
@@ -283,6 +294,26 @@ export class AnnotationDrafts {
 		this.controllers.delete(id);
 		this.asking.delete(id);
 		this.interrupted.delete(id);
+	}
+
+	/**
+	 * Apply a late change to a chat's notes: the live list while that
+	 * chat is open (and its stash mid-edit), else its stored drafts,
+	 * so a reply that lands after a chat switch is kept.
+	 */
+	private landInChat(
+		chatId: ChatId,
+		change: (list: Annotation[]) => Annotation[]
+	): void {
+		if (this.stash && this.stash.chatId === chatId)
+			this.stash.list = change(this.stash.list);
+		if (chatId === this.deps.getActiveChatId()) {
+			this.list = change(this.list);
+			return;
+		}
+		const stored = loadDraftAnnotations(chatId);
+		if (stored.length === 0) return;
+		saveDraftAnnotations(chatId, change(stored), this.deps.getChatIds());
 	}
 
 	/** Delete one filed note by id (pill-cancel fresh path). */
