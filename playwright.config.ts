@@ -45,7 +45,8 @@ export default defineConfig({
 				// keychain ("Safe Storage") and pops a password prompt
 				// per launch — dozens per session. The mock keychain
 				// silences it; automation never stores real secrets.
-				launchOptions: { args: ["--use-mock-keychain"] }
+				// --mute-audio: clips and media play, but silently.
+				launchOptions: { args: ["--use-mock-keychain", "--mute-audio"] }
 			},
 			// Margin presses start no selection in Chromium at all: the
 			// margin-drag rules are the shell engine's (WebKit only).
@@ -73,7 +74,8 @@ export default defineConfig({
 				"**/paste-preview.e2e.ts",
 				"**/message-edit.e2e.ts",
 				"**/prompt-focus.e2e.ts",
-				"**/margin-drag.e2e.ts"
+				"**/margin-drag.e2e.ts",
+				"**/badge-open.e2e.ts"
 			]
 		}
 	],
