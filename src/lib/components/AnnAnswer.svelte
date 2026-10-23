@@ -541,7 +541,7 @@ where it was left. -->
 		gap: 0.4em;
 		width: max-content;
 		padding-top: 0.5em;
-		font-size: 0.86em;
+		font-size: max(0.86rem, 0.5em);
 		white-space: nowrap;
 		pointer-events: none;
 	}
@@ -630,9 +630,13 @@ where it was left. -->
 		is narrower. */
 		width: max-content;
 		max-width: min(var(--ann-max-w, 32rem), 30em);
-		/* Same type as the message beside it (see MessageBody's
-		.rendered); the popup-size setting rides on top. */
-		font-size: calc(0.92rem * var(--font-scale, 1) * var(--annpop-scale, 1));
+		/* The message's type (see MessageBody's .rendered) at 1x, growing
+		at 60% of its pace past that: a card floats in what room the
+		window has, and at giant text the message's own size left room
+		for one line. The popup-size setting rides on top. */
+		font-size: calc(
+			0.92rem * (1 + (var(--font-scale, 1) - 1) * 0.6) * var(--annpop-scale, 1)
+		);
 		line-height: var(--msg-line-height, 1.5);
 		border-radius: 14px;
 		/* Opaque overlay surface: any see-through let the covered
@@ -820,7 +824,9 @@ where it was left. -->
 	.wc-fact {
 		--hue: var(--ink);
 		padding: 0.05em 0.6em;
-		border-radius: 999px;
+		/* A full pill at one line; a fact that wraps keeps rounded
+		corners instead of ballooning into an oval. */
+		border-radius: 0.75em;
 		font-size: 0.82em;
 		background: color-mix(in srgb, var(--hue) 18%, var(--bg-overlay));
 		color: color-mix(in srgb, var(--hue) 45%, var(--ink));
