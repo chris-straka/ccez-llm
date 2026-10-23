@@ -272,6 +272,49 @@ describe("stream", () => {
 		expect(body.tools?.[0]?.function?.name).toBe("fetch_url");
 	});
 
+	it("keeps index-less parallel calls apart, in arrival order", async () => {
+		const piece = (id: string, args: string) =>
+			`data: ${JSON.stringify({
+				choices: [
+					{
+						delta: {
+							tool_calls: [
+								{
+									...(id ? { id } : {}),
+									function: { name: id ? "fetch_url" : "", arguments: args }
+								}
+							]
+						}
+					}
+				]
+			})}\n\n`;
+		const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as { stream?: boolean };
+			if (fetchMock.mock.calls.length === 1)
+				return sseResponse([
+					piece("call_2", JSON.stringify({ url: "https://b.test/" })),
+					piece("call_10", ""),
+					piece("", JSON.stringify({ url: "https://a.test/" })),
+					"data: [DONE]\n\n"
+				]);
+			if (body.stream === false)
+				return jsonResponse({ choices: [{ message: { content: "" } }] });
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async (url: string) => `text of ${url}`);
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => undefined
+		});
+		expect(fetchPage.mock.calls.map((c) => c[0])).toEqual([
+			"https://b.test/",
+			"https://a.test/"
+		]);
+	});
+
 	it("assembles fragmented tool calls, fetches, then streams the answer", async () => {
 		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
 			const body = JSON.parse(init.body as string) as { stream?: boolean };

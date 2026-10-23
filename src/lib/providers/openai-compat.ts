@@ -277,6 +277,20 @@ export class OpenAICompatProvider implements ChatProvider {
 			number,
 			{ id: string; name: string; args: string }
 		>();
+		// Some compatible servers omit each call's index: a new id
+		// opens a new call, a fragment without one continues the last
+		// (same rule as turn.rs, so parallel calls never merge).
+		let lastSlot = -1;
+		const placeFragment = (
+			slots: Map<number, { id: string }>,
+			id: string | undefined
+		): number => {
+			const last = slots.get(lastSlot);
+			if (!last) return 0;
+			return id && last.id && id !== last.id
+				? Math.max(...slots.keys()) + 1
+				: lastSlot;
+		};
 		// Mid-stream failures translate like fetch-level ones: a cut
 		// connection reads as a network error, a user stop as stopped
 		// (never the raw "This operation was aborted").
@@ -308,7 +322,8 @@ export class OpenAICompatProvider implements ChatProvider {
 					callbacks.onToken(token);
 				}
 				for (const call of delta?.tool_calls ?? []) {
-					const index = call.index ?? 0;
+					const index = call.index ?? placeFragment(fragments, call.id);
+					lastSlot = index;
 					const slot = fragments.get(index) ?? { id: "", name: "", args: "" };
 					if (call.id) slot.id = call.id;
 					if (call.function?.name) slot.name += call.function.name;

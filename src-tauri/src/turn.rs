@@ -247,6 +247,29 @@ struct ToolFrag {
     args: String,
 }
 
+/// A fragment that came without an `index` (some compatible servers
+/// omit it); [`place_frag`] gives it one.
+const NO_INDEX: usize = usize::MAX;
+
+/// Slot for an index-less fragment: a new id opens a new call, a
+/// fragment without one continues the last. Mirrors the TypeScript
+/// engine's rule, so two parallel calls never merge into one.
+fn place_frag(frags: &[ToolFrag], id: &str) -> usize {
+    let Some(last) = frags.last() else {
+        return 0;
+    };
+    let last_id = frags
+        .iter()
+        .rev()
+        .find(|f| f.index == last.index && !f.id.is_empty())
+        .map_or("", |f| f.id.as_str());
+    if !id.is_empty() && !last_id.is_empty() && id != last_id {
+        frags.iter().map(|f| f.index).max().unwrap_or(0) + 1
+    } else {
+        last.index
+    }
+}
+
 /// Content text plus tool-call fragments from one SSE data payload.
 /// Unknown shapes read as empty (a skipped delta, never a failed turn).
 fn delta_from_payload(payload: &str) -> (String, Vec<ToolFrag>) {
@@ -260,7 +283,9 @@ fn delta_from_payload(payload: &str) -> (String, Vec<ToolFrag>) {
     if let Some(calls) = delta["tool_calls"].as_array() {
         for call in calls {
             frags.push(ToolFrag {
-                index: call["index"].as_u64().unwrap_or(0) as usize,
+                index: call["index"]
+                    .as_u64()
+                    .map_or(NO_INDEX, |index| index as usize),
                 id: call["id"].as_str().unwrap_or("").to_string(),
                 name: call["function"]["name"].as_str().unwrap_or("").to_string(),
                 args: call["function"]["arguments"]
@@ -429,8 +454,12 @@ fn join_calls(frags: &[ToolFrag]) -> Vec<ExecCall> {
         slot.name.push_str(&frag.name);
         slot.args.push_str(&frag.args);
     }
-    let mut out: Vec<ExecCall> = slots
-        .into_values()
+    // Arrival (index) order, as the TypeScript engine keeps them:
+    // the per-round cap must drop the same calls in both.
+    let mut slots: Vec<ToolFrag> = slots.into_values().collect();
+    slots.sort_by_key(|slot| slot.index);
+    slots
+        .into_iter()
         .map(|slot| {
             let url = serde_json::from_str::<serde_json::Value>(&slot.args)
                 .ok()
@@ -446,9 +475,7 @@ fn join_calls(frags: &[ToolFrag]) -> Vec<ExecCall> {
         // Unknown tools, id-less fragments, and empty URLs never
         // execute — same filter the TypeScript engine applies.
         .filter(|call| !call.id.is_empty() && call.name == "fetch_url" && !call.url.is_empty())
-        .collect();
-    out.sort_by(|a, b| a.id.cmp(&b.id));
-    out
+        .collect()
 }
 
 fn raw_tool_call(call: &ExecCall) -> serde_json::Value {
@@ -572,7 +599,12 @@ fn take_payloads(
             content.push_str(&token);
             (ev.on_token)(token);
         }
-        frags.extend(frag);
+        for mut piece in frag {
+            if piece.index == NO_INDEX {
+                piece.index = place_frag(frags, &piece.id);
+            }
+            frags.push(piece);
+        }
     }
 }
 
@@ -1681,6 +1713,33 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].id, "c1");
         assert_eq!(calls[0].url, "https://a.test/");
+    }
+
+    #[test]
+    fn index_less_calls_stay_apart_and_keep_their_order() {
+        let call = |id: &str, name: &str, args: &str| {
+            serde_json::json!({ "choices": [{ "delta": { "tool_calls": [
+                { "id": id, "function": { "name": name, "arguments": args } }
+            ] } }] })
+            .to_string()
+        };
+        let payloads = vec![
+            call("call_2", "fetch_url", r#"{"url":"https://b.test/"}"#),
+            call("call_10", "fetch_url", ""),
+            call("", "", r#"{"url":"https://a.test/"}"#),
+        ];
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let mut ev = test_events(&rec);
+        let (mut content, mut frags, mut usage) = (String::new(), Vec::new(), None);
+        take_payloads(payloads, &mut content, &mut frags, &mut usage, &mut ev);
+        let calls = join_calls(&frags);
+        let urls: Vec<&str> = calls.iter().map(|c| c.url.as_str()).collect();
+        assert_eq!(urls, vec!["https://b.test/", "https://a.test/"]);
     }
 
     #[test]
