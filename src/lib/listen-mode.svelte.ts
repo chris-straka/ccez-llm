@@ -153,6 +153,8 @@ export class ListenMode {
 	 * no AudioContext: the element's volume then caps at 1. */
 	private audioCtx: AudioContext | null = null;
 	private gain: GainNode | null = null;
+	/** The current element's feed into the gain (one per element). */
+	private source: MediaElementAudioSourceNode | null = null;
 	private browseSeq = 0;
 	private typingTimer: ReturnType<typeof setTimeout> | null = null;
 	/** The search last sent (`lang|kind|query`). */
@@ -561,24 +563,41 @@ export class ListenMode {
 		this.applyVolume(this.audio);
 	}
 
-	/** Route a fresh track through the shared gain node (once per
-	 * element: a media element feeds one source node for life). */
+	/** Route a fresh element through the shared gain node, unhooking
+	 * the one before (a media element feeds one source node for life). */
 	private wireGain(el: HTMLAudioElement): void {
-		this.gain = null;
+		this.source?.disconnect();
+		this.source = null;
 		try {
 			if (typeof AudioContext === "function") {
 				this.audioCtx ??= new AudioContext();
-				const gain = this.audioCtx.createGain();
-				this.audioCtx
-					.createMediaElementSource(el)
-					.connect(gain)
-					.connect(this.audioCtx.destination);
-				this.gain = gain;
+				if (!this.gain) {
+					this.gain = this.audioCtx.createGain();
+					this.gain.connect(this.audioCtx.destination);
+				}
+				this.source = this.audioCtx.createMediaElementSource(el);
+				this.source.connect(this.gain);
 			}
 		} catch {
-			this.gain = null;
+			this.source = null;
 		}
 		this.applyVolume(el);
+	}
+
+	/** A new element on the drill's track for each play. WebKit (the Mac
+	 * shell) lands a seek on an element that has already played 0.1-2 s
+	 * off and can sound a moment of the old spot first; a fresh element
+	 * starts on the sample asked for (measured against the decoded
+	 * track: within 40 ms, where the reused one strayed up to 2 s). */
+	private freshTrack(old: HTMLAudioElement): HTMLAudioElement {
+		if (!this.audioUrl || old.played.length === 0) return old;
+		old.pause();
+		const el = new Audio();
+		el.preload = "auto";
+		this.wireGain(el);
+		el.src = this.audioUrl;
+		this.audio = el;
+		return el;
 	}
 
 	private applyVolume(el: HTMLAudioElement | null): void {
@@ -626,8 +645,8 @@ export class ListenMode {
 			});
 			return;
 		}
-		const el = this.audio;
 		this.halt();
+		const el = this.freshTrack(this.audio);
 		this.queued = null;
 		this.paused = null;
 		// A context made before any click starts suspended.
@@ -643,24 +662,40 @@ export class ListenMode {
 			from !== undefined && from >= clip.start && from < this.stopAt
 				? from
 				: clip.start;
-		el.currentTime = at;
 		this.position = { i, t: at };
 		this.playing = { i, slow };
 		// A rejection from an earlier play() (interrupted by this one's
 		// pause) must not clear this one.
 		const run = ++this.playRun;
-		el.play().catch(() => {
-			if (run === this.playRun) this.halt();
-		});
-		// timeupdate fires every ~250 ms; a tight poll stops on the word.
-		this.stopTimer = setInterval(() => {
-			if (el.paused) {
-				this.halt();
-				return;
-			}
-			this.position = { i, t: el.currentTime };
-			if (el.currentTime >= this.stopAt) this.finish();
-		}, 30);
+		const go = (): void => {
+			if (run !== this.playRun || this.audio !== el) return;
+			el.play().catch(() => {
+				if (run === this.playRun) this.halt();
+			});
+			// timeupdate fires every ~250 ms; a tight poll stops on the word.
+			this.stopTimer = setInterval(() => {
+				if (el.paused) {
+					this.halt();
+					return;
+				}
+				this.position = { i, t: el.currentTime };
+				if (el.currentTime >= this.stopAt) this.finish();
+			}, 30);
+		};
+		// Sound starts once the seek has landed: playing first lets the
+		// old spot through.
+		if (Math.abs(el.currentTime - at) < 0.001 && !el.seeking) go();
+		else {
+			el.addEventListener("seeked", go, { once: true });
+			el.addEventListener(
+				"error",
+				() => {
+					if (run === this.playRun) this.halt();
+				},
+				{ once: true }
+			);
+			el.currentTime = at;
+		}
 	}
 
 	/** The clip played to its end: the queued one (if any) goes next. */
@@ -701,9 +736,9 @@ export class ListenMode {
 		const clip = this.span(i);
 		if (!clip) return;
 		const at = Math.min(Math.max(t, clip.start), clip.end);
-		if (this.playing?.i === i && this.audio) {
-			this.audio.currentTime = at;
-			this.position = { i, t: at };
+		const p = this.playing;
+		if (p?.i === i) {
+			this.play(i, p.slow, at);
 			return;
 		}
 		const slow = this.paused?.i === i ? this.paused.slow : false;

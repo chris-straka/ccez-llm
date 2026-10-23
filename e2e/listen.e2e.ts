@@ -151,13 +151,18 @@ let graded = 0;
 test.beforeEach(async ({ page }) => {
 	await mockListenShell(page);
 	graded = 0;
-	await page.route("http://grade.test/v1/chat/completions", (route) => {
+	// The whole stub host answers, the model list included: WebKit
+	// reports an unanswered cross-origin fetch as a page error.
+	await page.route("http://grade.test/**", (route) => {
+		const headers = {
+			"access-control-allow-origin": "*",
+			"access-control-allow-headers": "*"
+		};
+		if (!route.request().url().endsWith("/chat/completions"))
+			return route.fulfill({ headers, json: { data: [] } });
 		if (route.request().method() === "POST") graded++;
 		return route.fulfill({
-			headers: {
-				"access-control-allow-origin": "*",
-				"access-control-allow-headers": "*"
-			},
+			headers,
 			json: { choices: [{ message: { content: JSON.stringify(GRADE) } }] }
 		});
 	});
@@ -375,6 +380,10 @@ test("clicking the picture plays and pauses; restart plays from the top", async 
 	await expect(
 		first.getByRole("button", { name: "Pause" }).first()
 	).toBeVisible();
+	// Sound starts once the seek lands (later in WebKit): pause after.
+	await expect
+		.poll(async () => Number(await scrub.inputValue()))
+		.toBeGreaterThan(0.3);
 	await screen.click();
 	await expect(first.locator(".controls button.play")).toHaveAttribute(
 		"aria-label",

@@ -75,7 +75,10 @@ export default defineConfig({
 				"**/message-edit.e2e.ts",
 				"**/prompt-focus.e2e.ts",
 				"**/margin-drag.e2e.ts",
-				"**/badge-open.e2e.ts"
+				"**/badge-open.e2e.ts",
+				// Drill playback: the shell's media element seeks unlike
+				// Chromium's (listen-mode's freshTrack).
+				"**/listen.e2e.ts"
 			]
 		}
 	],
