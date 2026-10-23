@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { readFile } from "node:fs/promises";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
 	getSecret,
 	setSecret,
@@ -18,6 +18,7 @@ import {
 	resetSecretCacheForTests
 } from "./secrets";
 import { defaultSettings } from "./settings";
+import { KEY_SAVE_FAILURE_COPY, onSaveFailure } from "./save-failure";
 
 beforeEach(() => {
 	localStorage.clear();
@@ -213,5 +214,31 @@ describe("secrets fallback (no Tauri shell)", () => {
 		expect(decodeSecretBundle("not json")).toEqual({});
 		expect(decodeSecretBundle("[1,2]")).toEqual({});
 		expect(decodeSecretBundle('{"a":1,"b":"","c":"x"}')).toEqual({ c: "x" });
+	});
+});
+
+describe("persistSecrets when storage refuses the key", () => {
+	it("warns and tries again on the next save instead of reading as saved", async () => {
+		const warned: string[] = [];
+		onSaveFailure((copy) => warned.push(copy));
+		const settings = defaultSettings();
+		for (const conf of Object.values(settings.providers)) conf.apiKey = "";
+		const first = Object.keys(settings.providers)[0]!;
+		settings.providers[first]!.apiKey = "sk-full";
+		const full = vi
+			.spyOn(Storage.prototype, "setItem")
+			.mockImplementation(() => {
+				throw new DOMException("full", "QuotaExceededError");
+			});
+		try {
+			await persistSecrets(settings);
+		} finally {
+			full.mockRestore();
+			onSaveFailure(null);
+		}
+		expect(warned).toEqual([KEY_SAVE_FAILURE_COPY]);
+		await persistSecrets(settings);
+		const stored = await getSecret(SECRET_BUNDLE_ACCOUNT);
+		expect(decodeSecretBundle(stored ?? "")[first]).toBe("sk-full");
 	});
 });

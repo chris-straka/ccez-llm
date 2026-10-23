@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppSettings } from "./settings";
+import { KEY_SAVE_FAILURE_COPY, reportSaveFailure } from "./save-failure";
 
 /**
  * Secret storage (Stage 7). Inside the Tauri shell, API keys live in the
@@ -315,11 +316,8 @@ async function fallbackSet(account: string, secret: string): Promise<void> {
 			value = secret;
 		}
 	}
-	try {
-		store.setItem(FALLBACK_PREFIX + account, value);
-	} catch {
-		// Private-mode storage failure: keys stay session-only.
-	}
+	// A full or private-mode store throws: the caller decides.
+	store.setItem(FALLBACK_PREFIX + account, value);
 }
 
 /** Like getSecret, but a failed shell read (locked or denied Keychain,
@@ -350,19 +348,25 @@ export async function secretsSurviveReload(): Promise<boolean> {
 	return key === null || webKeyDurable;
 }
 
+/** Store a secret; throws when the store refused it (locked keychain,
+full or private-mode storage). */
+async function writeSecret(account: string, secret: string): Promise<void> {
+	if (tauriBackendAvailable()) {
+		await invoke("keychain_set", { account, secret });
+		return;
+	}
+	await fallbackSet(account, secret);
+}
+
 export async function setSecret(
 	account: string,
 	secret: string
 ): Promise<void> {
-	if (tauriBackendAvailable()) {
-		try {
-			await invoke("keychain_set", { account, secret });
-		} catch {
-			// Locked keychain: the key stays session-only, like its siblings.
-		}
-		return;
+	try {
+		await writeSecret(account, secret);
+	} catch {
+		// Locked keychain or full storage: the key stays session-only.
 	}
-	await fallbackSet(account, secret);
 }
 
 export async function deleteSecret(account: string): Promise<void> {
@@ -499,11 +503,13 @@ export async function persistSecrets(settings: AppSettings): Promise<void> {
 		}
 	}
 	try {
-		await setSecret(SECRET_BUNDLE_ACCOUNT, encoded);
+		await writeSecret(SECRET_BUNDLE_ACCOUNT, encoded);
 		lastKnownBundle = encoded;
 	} catch {
-		// Keychain locked: nothing is stored, and the blanked settings
-		// save below drops it — the key stays session-only.
+		// Keychain locked or storage full: nothing is stored, and the
+		// blanked settings save below drops it. The cache stays as it
+		// was, so the next save tries again, and the page warns.
+		reportSaveFailure(KEY_SAVE_FAILURE_COPY);
 	}
 }
 

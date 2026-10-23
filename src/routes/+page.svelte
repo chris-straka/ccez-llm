@@ -89,7 +89,7 @@
 		PROMPT_IDLE_NEVER,
 		type AppSettings
 	} from "$lib/settings";
-	import { onSaveFailure, SAVE_FAILURE_COPY } from "$lib/save-failure";
+	import { onSaveFailure } from "$lib/save-failure";
 	import { createSleepClaim } from "$lib/sleep-claim";
 	import { cycleThinkingId } from "$lib/providers/thinking";
 	import {
@@ -9731,13 +9731,13 @@
 	}
 
 	onMount(() => {
-		// A full store keeps working in memory: say so once, before
-		// a relaunch loses what didn't save.
-		let saveWarned = false;
-		onSaveFailure(() => {
-			if (saveWarned) return;
-			saveWarned = true;
-			flashErrorToast(SAVE_FAILURE_COPY);
+		// A failed save keeps working in memory: say so once per
+		// kind, before a relaunch loses what didn't save.
+		const saveWarned = new Set<string>();
+		onSaveFailure((copy) => {
+			if (saveWarned.has(copy)) return;
+			saveWarned.add(copy);
+			flashErrorToast(copy);
 		});
 		try {
 			// iOS rides the same phone UI (touch composer, no hover,
