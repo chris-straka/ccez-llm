@@ -61,7 +61,26 @@ const CASES = [
 	"ablative",
 	"vocative",
 	"partitive",
-	"prepositional"
+	"prepositional",
+	"inessive",
+	"elative",
+	"illative",
+	"adessive",
+	"allative",
+	"essive",
+	"translative",
+	"abessive",
+	"comitative",
+	"instructive",
+	"sublative",
+	"delative",
+	"superessive",
+	"terminative",
+	"causal-final",
+	"ergative",
+	"absolutive",
+	"oblique",
+	"construct"
 ];
 const GENDERS = ["masculine", "feminine", "neuter"];
 const PERSONS = ["first-person", "second-person", "third-person"];
@@ -102,10 +121,17 @@ function endingKind(tags: string): WordPartKind {
 	return "agree";
 }
 
+/** The first sense up to its first semicolon outside brackets. */
 function firstSense(entry: DictEntry): string {
 	const s = entry.s[0] ?? "";
-	const cut = s.split(";")[0] ?? s;
-	return cut.trim();
+	let depth = 0;
+	for (let i = 0; i < s.length; i++) {
+		const c = s[i];
+		if (c === "(" || c === "[") depth++;
+		else if ((c === ")" || c === "]") && depth > 0) depth--;
+		else if (c === ";" && depth === 0) return s.slice(0, i).trim();
+	}
+	return s.trim();
 }
 
 function baseLine(entry: DictEntry): string {
@@ -295,17 +321,64 @@ export function dictionaryPromptLines(quote: string, hits: DictHit[]): string {
 		.join("\n");
 }
 
+/** Vowels a stress or length mark sits on (Latin, Cyrillic, Greek). */
+const VOWEL = "aeiouyæœøɛɔаеёиоуыэюяіїєαεηιουω";
+
 /**
- * Forms to look a quote up by: the word without edge punctuation, and
- * for elided articles and pronouns (l'homme, qu'il, dell'acqua) the
- * word after the apostrophe too.
+ * Marks dictionaries print and ordinary text leaves out, per language:
+ * stress in Russian (говорю́), length in Latin (amō), tone in
+ * Serbo-Croatian (kùća), vowel points in Arabic and Hebrew. `onVowel`
+ * marks only count on a vowel (and syllabic r), so ć and й stay.
  */
-export function lookupForms(quote: string): string[] {
-	const word = quote.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, "");
+const OPTIONAL_MARKS: Record<string, { marks: RegExp; onVowel: boolean }> = {};
+for (const [langs, marks, onVowel] of [
+	[["ru", "uk", "bg"], /[\u0300\u0301]/gu, true],
+	[["sr"], /[\u0300-\u0302\u0304\u030f\u0311]/gu, true],
+	[["la", "grc"], /[\u0304\u0306]/gu, true],
+	[["ang"], /[\u0304\u0307]/gu, false],
+	[["ar", "fa", "ur"], /[\u0610-\u061a\u064b-\u065f\u0670\u0640]/gu, false],
+	[["he"], /[\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/gu, false]
+] as const)
+	for (const lang of langs) OPTIONAL_MARKS[lang] = { marks, onVowel };
+
+/**
+ * A form without the marks its language leaves out of ordinary text,
+ * or null when it has none: говорю́ is говорю, amō is amo.
+ */
+export function plainSpelling(form: string, lang: string): string | null {
+	const rule = OPTIONAL_MARKS[lang];
+	if (!rule) return null;
+	const nfd = form.normalize("NFD");
+	const plain = (
+		rule.onVowel
+			? nfd.replace(/(\p{L})(\p{M}+)/gu, (_, base: string, ms: string) =>
+					VOWEL.includes(base.toLowerCase()) ||
+					(lang === "sr" && /[rр]/i.test(base))
+						? base + ms.replace(rule.marks, "")
+						: base + ms
+				)
+			: nfd.replace(rule.marks, "")
+	).normalize("NFC");
+	return plain === form.normalize("NFC") ? null : plain;
+}
+
+/**
+ * Forms to look a quote up by: the word without edge punctuation, for
+ * elided articles and pronouns (l'homme, qu'il, dell'acqua) the word
+ * after the apostrophe too, then each without its optional marks.
+ */
+export function lookupForms(quote: string, lang = ""): string[] {
+	const word = quote
+		.normalize("NFC")
+		.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, "");
 	if (!word) return [];
 	const forms = [word];
 	const elided = /^\p{L}{1,4}['’](\p{L}.+)$/u.exec(word);
 	if (elided?.[1]) forms.push(elided[1]);
+	for (const f of [...forms]) {
+		const plain = plainSpelling(f, lang);
+		if (plain) forms.push(plain);
+	}
 	return forms;
 }
 

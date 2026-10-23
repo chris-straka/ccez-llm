@@ -10,8 +10,8 @@ import {
 
 const header = { lang: "fr", version: "test", sources: [] };
 
-function build(records: KaikkiRecord[]): Uint8Array {
-	const b = new PackBuilder();
+function build(records: KaikkiRecord[], lang = ""): Uint8Array {
+	const b = new PackBuilder(lang);
 	const lemmas = new Map<string, number[]>();
 	const later: KaikkiRecord[] = [];
 	for (const r of records) {
@@ -76,6 +76,108 @@ describe("dictionary packs", () => {
 		expect(lookupPack(pack, "paris")).toEqual([]);
 		expect(lookupPack(pack, "fr-conj-auto")).toEqual([]);
 		expect(lookupPack(pack, "avoir + past participle")).toEqual([]);
+	});
+
+	it("reaches marked forms by their plain spelling too", () => {
+		const latin = build(
+			[
+				{
+					word: "amo",
+					pos: "verb",
+					senses: [{ glosses: ["to love"] }],
+					forms: [{ form: "amō", tags: ["canonical"] }]
+				},
+				{
+					word: "amat",
+					pos: "verb",
+					senses: [
+						{
+							glosses: ["third-person singular of amō"],
+							tags: ["form-of", "third-person", "singular"],
+							form_of: [{ word: "amō" }]
+						}
+					]
+				}
+			],
+			"la"
+		);
+		expect(lookupPack(latin, "amō")[0]?.entry.w).toBe("amo");
+		expect(lookupPack(latin, "amat")[0]).toMatchObject({
+			tags: "third-person singular",
+			entry: { w: "amo" }
+		});
+		const russian = build(
+			[
+				{
+					word: "говорить",
+					pos: "verb",
+					senses: [{ glosses: ["to speak"] }],
+					forms: [{ form: "говорю́", tags: ["first-person", "singular"] }]
+				}
+			],
+			"ru"
+		);
+		expect(lookupPack(russian, "говорю")[0]?.entry.w).toBe("говорить");
+	});
+
+	it("lists a word's current senses before its dated ones", () => {
+		const pack = build([
+			{
+				word: "中國",
+				pos: "noun",
+				senses: [
+					{ glosses: ["royal court"], tags: ["historical"] },
+					{ glosses: ["China"] }
+				]
+			}
+		]);
+		expect(lookupPack(pack, "中國")[0]?.entry.s).toEqual([
+			"China",
+			"royal court"
+		]);
+	});
+
+	it("leaves out Finnish possessive forms", () => {
+		const finnish = build(
+			[
+				{
+					word: "talo",
+					pos: "noun",
+					senses: [{ glosses: ["house"] }],
+					forms: [
+						{ form: "talossa", tags: ["inessive", "singular"] },
+						{
+							form: "talossani",
+							tags: ["first-person", "inessive", "possessive", "singular"]
+						}
+					]
+				}
+			],
+			"fi"
+		);
+		expect(lookupPack(finnish, "talossa")[0]?.entry.w).toBe("talo");
+		expect(lookupPack(finnish, "talossani")).toEqual([]);
+	});
+
+	it("keeps a Chinese word's pinyin, or jyutping for Cantonese", () => {
+		const record: KaikkiRecord = {
+			word: "中國",
+			pos: "noun",
+			senses: [{ glosses: ["China"] }],
+			sounds: [
+				{ tags: ["Cantonese", "Jyutping"], zh_pron: "zung¹ gwok³" },
+				{ tags: ["Mandarin", "Pinyin"], zh_pron: "Zhōngguó" }
+			]
+		};
+		expect(lookupPack(build([record], "zh"), "中國")[0]?.entry.r).toBe(
+			"Zhōngguó"
+		);
+		expect(lookupPack(build([record], "yue"), "中國")[0]?.entry.r).toBe(
+			"zung¹ gwok³"
+		);
+		const name: KaikkiRecord = { ...record, pos: "name" };
+		expect(lookupPack(build([name], "zh"), "中國")).toHaveLength(1);
+		expect(lookupPack(build([name], "fr"), "中國")).toEqual([]);
 	});
 
 	it("reads JMdict entries", () => {

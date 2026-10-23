@@ -16,6 +16,8 @@
  * entry is JSON `{w, p, g?, r?, s}`.
  */
 
+import { plainSpelling } from "../src/lib/dict-card";
+
 export const PACK_MAGIC = "CCEZDIC1";
 
 export interface PackEntry {
@@ -25,7 +27,7 @@ export interface PackEntry {
 	p: string;
 	/** Gender (masculine, feminine, neuter), when the word has one. */
 	g?: string;
-	/** Reading (Japanese kana). */
+	/** Reading (Japanese kana, Mandarin pinyin, Cantonese jyutping). */
 	r?: string;
 	/** Senses, most common first, each one short gloss line. */
 	s: string[];
@@ -52,6 +54,9 @@ export class PackBuilder {
 	readonly entries: PackEntry[] = [];
 	private readonly keys = new Map<string, Array<[number, string]>>();
 
+	/** With a language, every form is also reached by its plain spelling. */
+	constructor(readonly lang = "") {}
+
 	addEntry(entry: PackEntry): number {
 		this.entries.push(entry);
 		return this.entries.length - 1;
@@ -59,6 +64,12 @@ export class PackBuilder {
 
 	/** Point a form at an entry, with the form's grammar tags. */
 	addForm(form: string, entry: number, tags = ""): void {
+		const plain = plainSpelling(form, this.lang);
+		if (plain) this.addKey(plain, entry, tags);
+		this.addKey(form, entry, tags);
+	}
+
+	private addKey(form: string, entry: number, tags: string): void {
 		const key = packKey(form);
 		if (!key || key.length > 64) return;
 		let hits = this.keys.get(key);
@@ -235,6 +246,7 @@ export interface KaikkiRecord {
 	pos: string;
 	senses?: KaikkiSense[];
 	forms?: Array<{ form: string; tags?: string[] }>;
+	sounds?: Array<{ tags?: string[]; zh_pron?: string }>;
 	head_templates?: Array<{ args?: Record<string, string> }>;
 }
 
@@ -248,6 +260,14 @@ const SKIP_FORM_TAGS = new Set([
 	"auxiliary"
 ]);
 
+/**
+ * Forms left out per language: Finnish tables cross every case with
+ * every possessive ending, five times the rest of the pack.
+ */
+const SKIP_FORMS_IN: Record<string, (tags: string[]) => boolean> = {
+	fi: (tags) => tags.some((t) => t.endsWith("possessive"))
+};
+
 /** Tags kept on a form: what it is, not where it came from. */
 const NOISE_TAGS = new Set([
 	"form-of",
@@ -256,7 +276,28 @@ const NOISE_TAGS = new Set([
 	"error-unknown-tag"
 ]);
 
+/** Senses a reader meets today only in old texts: listed last. */
+const DATED_TAGS = new Set([
+	"archaic",
+	"obsolete",
+	"historical",
+	"dated",
+	"rare",
+	"Classical",
+	"Classical-Chinese",
+	"literary"
+]);
+
+function isDated(s: KaikkiSense): boolean {
+	return (s.tags ?? []).some((t) => DATED_TAGS.has(t));
+}
+
 const SKIP_POS = new Set(["name", "proverb", "phrase", "symbol", "character"]);
+
+/** Chinese files everyday words like 中國 (China) as names. */
+function keepsPos(pos: string, lang: string): boolean {
+	return pos === "name" && (lang === "zh" || lang === "yue");
+}
 
 function cleanGloss(g: string): string {
 	const t = g.replace(/\s+/g, " ").trim();
@@ -287,6 +328,21 @@ function genderOf(r: KaikkiRecord): string | undefined {
 	return undefined;
 }
 
+/** The romanization a Chinese entry reads by: pinyin, or jyutping for Cantonese. */
+function readingOf(r: KaikkiRecord, lang: string): string | undefined {
+	const want = lang === "yue" ? "Jyutping" : "Pinyin";
+	const variety = lang === "yue" ? "Cantonese" : "Mandarin";
+	if (lang !== "zh" && lang !== "yue") return undefined;
+	return r.sounds?.find((s) => s.tags?.[0] === variety && s.tags.includes(want))
+		?.zh_pron;
+}
+
+/** Lemma map keys for a headword: as written and its plain spelling. */
+function lemmaKeys(word: string, lang: string): string[] {
+	const plain = plainSpelling(word, lang);
+	return plain ? [packKey(word), packKey(plain)] : [packKey(word)];
+}
+
 /** True when every sense only points at another word (an inflected form). */
 export function isFormOnly(r: KaikkiRecord): boolean {
 	const senses = r.senses ?? [];
@@ -308,30 +364,34 @@ export function addKaikkiRecord(
 	r: KaikkiRecord,
 	lemmas: Map<string, number[]>
 ): KaikkiRecord | null {
-	if (SKIP_POS.has(r.pos) || !r.word) return null;
+	if (!r.word || (SKIP_POS.has(r.pos) && !keepsPos(r.pos, b.lang))) return null;
 	if (isFormOnly(r)) return r;
-	const senses: string[] = [];
-	for (const s of r.senses ?? []) {
-		if ((s.tags ?? []).includes("form-of")) continue;
-		const g = s.glosses?.[s.glosses.length - 1];
-		if (g) senses.push(cleanGloss(g));
-		if (senses.length === 5) break;
-	}
+	const own = (r.senses ?? []).filter(
+		(s) => !(s.tags ?? []).includes("form-of") && s.glosses?.length
+	);
+	// Stable sort: today's senses first, in Wiktionary's order.
+	own.sort((a, b) => Number(isDated(a)) - Number(isDated(b)));
+	const senses = own
+		.slice(0, 5)
+		.map((s) => cleanGloss(s.glosses![s.glosses!.length - 1]!));
 	if (senses.length === 0) return null;
 	const gender = genderOf(r);
+	const reading = readingOf(r, b.lang);
 	const id = b.addEntry({
 		w: r.word,
 		p: r.pos,
 		...(gender ? { g: gender } : {}),
+		...(reading ? { r: reading } : {}),
 		s: senses
 	});
 	b.addForm(r.word, id);
-	const key = packKey(r.word);
-	lemmas.set(key, [...(lemmas.get(key) ?? []), id]);
+	for (const key of lemmaKeys(r.word, b.lang))
+		lemmas.set(key, [...(lemmas.get(key) ?? []), id]);
 	for (const f of r.forms ?? []) {
 		const tags = f.tags ?? [];
 		if (!f.form || f.form.includes(" ") || f.form.includes("+")) continue;
 		if (tags.some((t) => SKIP_FORM_TAGS.has(t))) continue;
+		if (SKIP_FORMS_IN[b.lang]?.(tags)) continue;
 		b.addForm(f.form, id, tags.filter((t) => !NOISE_TAGS.has(t)).join(" "));
 	}
 	return null;
@@ -346,8 +406,10 @@ export function addKaikkiFormOf(
 	for (const s of r.senses ?? []) {
 		const tags = (s.tags ?? []).filter((t) => !NOISE_TAGS.has(t)).join(" ");
 		for (const target of s.form_of ?? []) {
-			for (const id of lemmas.get(packKey(target.word)) ?? [])
-				b.addForm(r.word, id, tags);
+			const ids = lemmaKeys(target.word, b.lang)
+				.map((k) => lemmas.get(k))
+				.find((found) => found !== undefined);
+			for (const id of ids ?? []) b.addForm(r.word, id, tags);
 		}
 	}
 }

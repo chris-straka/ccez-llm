@@ -30,7 +30,7 @@ where it was left. -->
 	} from "$lib/annPop";
 	import type { AnnotationFollowUp } from "$lib/annotations";
 	import { WORD_PROFILES, wordCardDir, type WordCard } from "$lib/word-card";
-	import { dictDownloads } from "$lib/dictionary.svelte";
+	import { dictDownloads, dictPack } from "$lib/dictionary.svelte";
 
 	interface Props {
 		answer: string;
@@ -92,9 +92,10 @@ where it was left. -->
 	);
 	const cardReadings = $derived(cardWord.some((p) => p.reading));
 	/** The card's language pack downloading right now (0 to 1). */
-	const downloading = $derived(
-		wordCard?.lang !== undefined ? dictDownloads[wordCard.lang] : undefined
-	);
+	const downloading = $derived.by(() => {
+		const pack = wordCard?.lang ? dictPack(wordCard.lang) : null;
+		return pack ? dictDownloads[pack] : undefined;
+	});
 
 	/** The reply field's text, and its height (re-measures the card
 	when it changes). The field shows only after Reply is pressed,
