@@ -89,6 +89,7 @@
 		PROMPT_IDLE_NEVER,
 		type AppSettings
 	} from "$lib/settings";
+	import { onSaveFailure, SAVE_FAILURE_COPY } from "$lib/save-failure";
 	import { cycleThinkingId } from "$lib/providers/thinking";
 	import {
 		QUICK_LANG_CODES,
@@ -9740,6 +9741,14 @@
 	}
 
 	onMount(() => {
+		// A full store keeps working in memory: say so once, before
+		// a relaunch loses what didn't save.
+		let saveWarned = false;
+		onSaveFailure(() => {
+			if (saveWarned) return;
+			saveWarned = true;
+			flashErrorToast(SAVE_FAILURE_COPY);
+		});
 		try {
 			// iOS rides the same phone UI (touch composer, no hover,
 			// native voice picker): the name is historical. Touch

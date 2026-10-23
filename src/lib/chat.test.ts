@@ -2081,3 +2081,23 @@ describe("chat titles", () => {
 		expect(activeChat(state).title).toBe("Mine");
 	});
 });
+
+describe("loading chats", () => {
+	it("a damaged chat is skipped, never every chat", () => {
+		const saved = JSON.stringify([
+			{ id: "bad", createdAt: 1, listen: { clips: [] } },
+			{
+				id: "good",
+				createdAt: 2,
+				messages: [{ id: "m", role: "user", content: "keep me" }]
+			}
+		]);
+		const store = {
+			getItem: (k: string) => (k === "ccez-llm-chats-v1" ? saved : null),
+			setItem: () => undefined,
+			removeItem: () => undefined
+		};
+		const state = createChatState(store);
+		expect(state.chats.map((c) => c.id)).toEqual(["good"]);
+	});
+});

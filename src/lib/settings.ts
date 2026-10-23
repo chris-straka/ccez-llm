@@ -13,6 +13,7 @@ import {
 	resolveThinkingId,
 	type ThinkingSupport
 } from "./providers/thinking";
+import { reportSaveFailure } from "./save-failure";
 
 export type VoiceEngine = "web" | "native";
 
@@ -1022,7 +1023,11 @@ export function saveSettings(
 	store?: KeyValueStore
 ): void {
 	const backend = store ?? browserStore() ?? memoryStore;
-	backend.setItem(STORAGE_KEY, JSON.stringify(settings));
+	try {
+		backend.setItem(STORAGE_KEY, JSON.stringify(settings));
+	} catch {
+		reportSaveFailure();
+	}
 }
 
 /** Masked display for a stored key: bullets plus the last 4 characters. */

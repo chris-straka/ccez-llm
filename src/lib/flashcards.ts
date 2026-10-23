@@ -24,6 +24,7 @@ import { findQuotedMessage, paragraphForQuote } from "./quote-match";
 import { annRefsFor } from "./annotation-block";
 import type { ChatId, ChatMsgId } from "./chat";
 import { identifyLangShort } from "./langId";
+import { reportSaveFailure } from "./save-failure";
 
 export interface ReviewCard {
 	/** Normalized quote: one card per phrase however often it was annotated. */
@@ -380,6 +381,7 @@ export function saveReviewSchedule(
 		store?.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
 	} catch {
 		// Storage full or blocked: the schedule stays memory-only.
+		reportSaveFailure();
 	}
 }
 

@@ -8,6 +8,7 @@ import type {
 	StoryAnchor
 } from "./annotations";
 import { cleanWordCard } from "./word-card";
+import { reportSaveFailure } from "./save-failure";
 
 /**
  * Draft annotations persist per chat across restarts (live extras, not
@@ -126,5 +127,6 @@ export function saveDraftAnnotations(
 		localStorage.setItem(DRAFT_KEY, JSON.stringify(record));
 	} catch {
 		// Storage full or blocked: drafts stay memory-only.
+		reportSaveFailure();
 	}
 }

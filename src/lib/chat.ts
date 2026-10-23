@@ -12,6 +12,7 @@ import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
 import { memoryStore } from "./settings";
 import { replyLanguageFor } from "./languages";
+import { reportSaveFailure } from "./save-failure";
 
 /**
  * Opaque identifiers: still plain strings at runtime (comparisons,
@@ -1678,7 +1679,9 @@ export function persistChats(state: ChatState, store?: KeyValueStore): void {
 			JSON.stringify(state.chats)
 		);
 	} catch {
-		// Storage full or unavailable — chat still works in memory.
+		// Storage full or unavailable — chat still works in memory,
+		// and the page warns that it won't outlive a relaunch.
+		reportSaveFailure();
 	}
 }
 
@@ -1694,7 +1697,11 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 		const parsed = JSON.parse(raw) as Array<Chat & { pins?: unknown }>;
 		if (Array.isArray(parsed)) {
 			state.chats = parsed
-				.filter((c) => c && typeof c.id === "string")
+				// One damaged chat is skipped, never the reason every
+				// chat loads empty (the next save would write that).
+				.filter(
+					(c) => c && typeof c.id === "string" && Array.isArray(c.messages)
+				)
 				.map((c) => {
 					// The old pins array is gone; top-posted messages replaced it.
 					delete c.pins;
