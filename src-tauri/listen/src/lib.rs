@@ -6,9 +6,11 @@ mod api;
 mod client;
 pub mod envelope;
 pub mod fmp4;
+pub mod heard;
 pub mod youtube;
 
 pub use api::{Fetched, Listen};
+pub use heard::{HeardChunk, HeardWord};
 pub use youtube::{
     AudioKind, AudioPick, CaptionKind, CaptionPick, ChannelPage, Entry, Sheet, Storyboard,
     VideoInfo,

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Embedded in debug binaries only (build.rs): `tauri dev` runs
+	unbundled, and asking for speech recognition without this key kills
+	the process. Bundles merge Info.plist instead.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ccez LLM times the words in your listening drills.</string>
+</dict>
+</plist>

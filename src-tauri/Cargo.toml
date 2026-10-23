@@ -93,6 +93,8 @@ block2 = "0.6"
 # Pure-Rust bindings through objc2 — no Objective-C is written anywhere
 # in this project, same rule as the TTS bridge in tts.rs.
 objc2-vision = "0.3"
+# Word timings for listening drills (heard_macos.rs).
+objc2-speech = "0.3"
 
 # Global summon chord (desktop only — the plugin crate is
 # `#![cfg(not(mobile))]` upstream and does not compile for

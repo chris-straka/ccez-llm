@@ -80,3 +80,22 @@ pub async fn listen_envelope(
     let bytes = listen(&app)?.envelope(&id, &lang).await?;
     Ok(tauri::ipc::Response::new(bytes))
 }
+
+/// Piece `n` of what the speech recognizer hears in the track, with
+/// its words timed (`ccez_listen::heard`): the app moves the captions
+/// onto those times. Mac only for now; elsewhere
+/// `listen-heard-unsupported`.
+#[tauri::command]
+pub async fn listen_heard(
+    app: AppHandle,
+    id: String,
+    lang: String,
+    n: usize,
+) -> Result<ccez_listen::HeardChunk, String> {
+    let speech_lang = lang.clone();
+    listen(&app)?
+        .heard(&id, &lang, n, move |audio, start, end| {
+            crate::heard_macos::recognize(audio, &speech_lang, start, end)
+        })
+        .await
+}

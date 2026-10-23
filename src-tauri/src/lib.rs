@@ -21,6 +21,7 @@ mod dictate_macos;
 mod dictate_windows;
 mod dictation;
 mod fetch;
+mod heard_macos;
 mod keyboard;
 mod langid;
 mod listen;
@@ -393,6 +394,7 @@ pub fn run() {
             listen::listen_video,
             listen::listen_audio,
             listen::listen_envelope,
+            listen::listen_heard,
             listen_grade::listen_grade_start,
             listen_grade::listen_grade_results,
             listen_grade::listen_grade_forget,

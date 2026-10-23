@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::client::Yt;
+use crate::heard::{chunk_bounds, HeardChunk, HeardWord};
 use crate::youtube::{
     audio_source, base_lang, caption_url, channel_id_of, channel_page, channel_url,
     playability_error, search_entries, storyboard, valid_video_id, video_info, video_source,
@@ -60,6 +61,11 @@ fn fresh(path: &Path, ttl: Duration) -> bool {
         .ok()
         .and_then(|t| SystemTime::now().duration_since(t).ok())
         .is_some_and(|age| age < ttl)
+}
+
+/// Seconds to the millisecond (what the cache keeps, exactly).
+fn ms(sec: f64) -> f64 {
+    (sec * 1000.0).round() / 1000.0
 }
 
 fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
@@ -405,6 +411,48 @@ impl Listen {
             .map_err(|e| e.to_string())??;
         write_atomic(&path, &bytes)?;
         Ok(bytes)
+    }
+
+    /// Piece `n` of what a speech recognizer hears in the track
+    /// (`heard::chunk_bounds`), recognized once by `recognize(audio,
+    /// start, end)`, which answers in seconds from `start`, then
+    /// cached beside the audio.
+    pub async fn heard<F>(&self, id: &str, lang: &str, n: usize, recognize: F) -> Result<HeardChunk>
+    where
+        F: FnOnce(PathBuf, f64, f64) -> Result<Vec<HeardWord>> + Send + 'static,
+    {
+        let env = self.envelope(id, lang).await?;
+        let bounds = chunk_bounds(&env, crate::envelope::FPS);
+        let &(start, end) = bounds.get(n).ok_or("listen-heard-range")?;
+        let path = self
+            .media_dir(id, lang)
+            .join("heard")
+            .join(format!("{n}.json"));
+        let lock = video_lock(&format!("{id}/{}/heard/{n}", base_lang(lang)));
+        let _guard = lock.lock().await;
+        if let Some(done) = read_json::<HeardChunk>(&path) {
+            return Ok(done);
+        }
+        let audio = self.audio_path(id, lang).await?;
+        let words = tokio::task::spawn_blocking(move || recognize(audio, start, end))
+            .await
+            .map_err(|e| e.to_string())??;
+        let chunk = HeardChunk {
+            words: words
+                .into_iter()
+                .map(|w| HeardWord {
+                    start: ms(w.start + start),
+                    end: ms(w.end + start),
+                    ..w
+                })
+                .collect(),
+            start,
+            end,
+            chunks: bounds.len(),
+        };
+        let bytes = serde_json::to_vec(&chunk).map_err(|e| e.to_string())?;
+        write_atomic(&path, &bytes)?;
+        Ok(chunk)
     }
 
     /// Where a fetched track's audio sits (call after `fetch`).
