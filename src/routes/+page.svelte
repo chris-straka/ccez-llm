@@ -9748,10 +9748,10 @@
 	onMount(() => {
 		// A failed save keeps working in memory: say so once per
 		// kind, before a relaunch loses what didn't save.
-		const saveWarned = new Set<string>();
+		const saveWarned: string[] = [];
 		onSaveFailure((copy) => {
-			if (saveWarned.has(copy)) return;
-			saveWarned.add(copy);
+			if (saveWarned.includes(copy)) return;
+			saveWarned.push(copy);
 			flashErrorToast(copy);
 		});
 		try {
