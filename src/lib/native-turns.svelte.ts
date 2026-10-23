@@ -114,6 +114,11 @@ export class NativeTurns {
 	};
 
 	/** The scan in flight (see reconcile). */
+	/** Turns the user stopped this session: their files only dismiss.
+	Rust can outlive the stop by a moment (still streaming, then
+	"Reply stopped."), and neither may restart or fail the reply the
+	user chose to keep. */
+	private readonly stopped = new SvelteSet<TurnId>();
 	private reconciling: Promise<void> | null = null;
 	private rescan = false;
 
@@ -250,6 +255,7 @@ export class NativeTurns {
 	async stopChat(chatId: ChatId): Promise<void> {
 		const owned = ownedNativeTurnIds(this.turns, chatId);
 		for (const turnId of owned) {
+			this.stopped.add(turnId);
 			try {
 				await stopNativeTurn(turnId);
 			} catch {
@@ -472,6 +478,19 @@ export class NativeTurns {
 			// Live turns stream through their listeners; the scan only
 			// covers what suspension (or death) took off the event path.
 			if (file.status === "streaming" && this.turns.has(file.turn_id)) {
+				continue;
+			}
+			if (this.stopped.has(file.turn_id)) {
+				// A streaming file stays until Rust settles it; the
+				// settled one goes.
+				if (file.status !== "streaming") {
+					this.stopped.delete(file.turn_id);
+					try {
+						await dismissNativeTurn(file.turn_id);
+					} catch {
+						// Already gone.
+					}
+				}
 				continue;
 			}
 			releaseNativeTurn(this.own, file.turn_id, file.chat_id);

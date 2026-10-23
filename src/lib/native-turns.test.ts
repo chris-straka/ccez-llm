@@ -404,6 +404,35 @@ describe("NativeTurns.reconcile", () => {
 		expect(chat.messages[1]?.error).toBe(INTERRUPTED_COPY);
 	});
 
+	it("a stopped turn's files never restart or fail the kept reply", async () => {
+		const { calls } = stubInvoke();
+		const h = harness();
+		await sendOne(h);
+		const chat = activeChat(h.state);
+		const turnId = startArgs(calls).turn_id;
+		const reply = chat.messages[chat.messages.length - 1]!;
+		await h.turns.stopChat(chat.id);
+		const stale = (status: string): NativeTurnFile => ({
+			turn_id: turnId,
+			chat_id: chat.id,
+			message_id: reply.id,
+			status,
+			content: status === "streaming" ? "" : "Reply stopped.",
+			finished_at: 1
+		});
+		const scan = stubInvoke({ turn_scan: () => [stale("streaming")] });
+		await h.turns.reconcile();
+		expect(scan.calls.map((c) => c.cmd)).toEqual(["turn_scan"]);
+		const settled = stubInvoke({ turn_scan: () => [stale("error")] });
+		await h.turns.reconcile();
+		expect(settled.calls.map((c) => c.cmd)).toEqual([
+			"turn_scan",
+			"turn_dismiss"
+		]);
+		expect(chat.messages[chat.messages.length - 1]?.error ?? null).toBeNull();
+		expect(h.state.sendingChatIds).toEqual([]);
+	});
+
 	it("skips streaming files a live listener still owns", async () => {
 		const { calls } = stubInvoke();
 		const h = harness();
