@@ -80,6 +80,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 		[
 			"Play / pause",
 			"Stop playing",
+			"Replay from the start",
 			"Slow replay",
 			"Show the text",
 			"Next clip",

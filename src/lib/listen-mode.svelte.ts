@@ -728,6 +728,19 @@ export class ListenMode {
 		this.toggle(clip.i, slow);
 	}
 
+	/** r: replay a clip from its start (the one sounding, else the one
+	 * waiting for a guess, else the newest). */
+	restart(i?: number): void {
+		const chat = activeChat(this.deps.getChatState());
+		const target =
+			i ??
+			this.playing?.i ??
+			openClip(chat)?.clip?.i ??
+			chat.messages.findLast((m) => m.clip)?.clip?.i;
+		if (target === undefined) return;
+		this.play(target, this.playing?.i === target && this.playing.slow);
+	}
+
 	/** Shift+A or Show text: the waiting clip's transcript appears
 	 * while it still waits (Next or a guess settles it). */
 	peek(): boolean {

@@ -11474,8 +11474,9 @@
 			}
 			// Listening drill keys: Space stops what sounds or plays the
 			// clip under the pointer (else it's the page's Space: the
-			// prompt), S slows (the hovered clip, else the newest),
-			// ⌘Enter or a reveals, A shows the text (listenKeyAction).
+			// prompt), S slows and r replays from the start (the hovered
+			// clip, else the newest), ⌘Enter or a reveals, A shows the
+			// text (listenKeyAction).
 			const listenKey = listenKeyAction({
 				key: event.key,
 				code: event.code,
@@ -11493,6 +11494,7 @@
 						event.target instanceof HTMLInputElement ||
 						event.target instanceof HTMLTextAreaElement),
 				hovered: hoveredIdx >= 0,
+				hoveredClip: chat.messages[hoveredIdx]?.clip !== undefined,
 				selection: window.getSelection()?.isCollapsed === false,
 				playing: listenMode.playing !== null,
 				overPlayer: listenMode.hoveredPlayer !== null
@@ -11508,6 +11510,7 @@
 					listenMode.toggle(listenMode.hoveredPlayer, false);
 				else if (listenKey === "slow" && hoveredClip !== undefined)
 					listenMode.toggle(hoveredClip, true);
+				else if (listenKey === "restart") listenMode.restart(hoveredClip);
 				else listenMode.replay(listenKey === "slow");
 				return;
 			}

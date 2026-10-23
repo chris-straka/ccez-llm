@@ -197,6 +197,7 @@ describe("listenKeyAction", () => {
 		inComposer: true,
 		inOtherField: false,
 		hovered: false,
+		hoveredClip: false,
 		selection: false,
 		playing: false,
 		overPlayer: true
@@ -240,6 +241,17 @@ describe("listenKeyAction", () => {
 		expect(listenKeyAction({ ...a, inComposer: true })).toBe("pass");
 		expect(listenKeyAction({ ...a, hovered: true })).toBe("pass");
 		expect(listenKeyAction({ ...a, key: "A", selection: true })).toBe("pass");
+	});
+
+	it("r replays from the start, over a clip too; elsewhere it reruns", () => {
+		const r = { ...base, key: "r", code: "KeyR", inComposer: false };
+		expect(listenKeyAction(r)).toBe("restart");
+		expect(listenKeyAction({ ...r, hovered: true, hoveredClip: true })).toBe(
+			"restart"
+		);
+		expect(listenKeyAction({ ...r, hovered: true })).toBe("pass");
+		expect(listenKeyAction({ ...r, inComposer: true })).toBe("pass");
+		expect(listenKeyAction({ ...r, key: "R" })).toBe("pass");
 	});
 
 	it("S slows outside the composer; a question can start with s", () => {

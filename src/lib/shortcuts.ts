@@ -257,6 +257,7 @@ export function desktopShortcuts(
 			keys: `Space over the video · click the video · ${altm}+Space anywhere`
 		},
 		{ group: drill, name: "Stop playing", keys: "Space" },
+		{ group: drill, name: "Replay from the start", keys: "R" },
 		{ group: drill, name: "Slow replay", keys: `S · ${altm}+S anywhere` },
 		{ group: drill, name: "Show the text", keys: "Shift+A" },
 		{ group: drill, name: "Next clip", keys: `a · ${meta}Enter` },

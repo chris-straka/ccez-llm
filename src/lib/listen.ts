@@ -357,6 +357,8 @@ export interface ListenKeyFacts {
 	inOtherField: boolean;
 	/** The pointer rests on a message (its own keys win: A annotates). */
 	hovered: boolean;
+	/** That message is one of the drill's clips. */
+	hoveredClip: boolean;
 	/** Text is selected (Select + A annotates it). */
 	selection: boolean;
 	/** A clip is sounding. */
@@ -366,7 +368,7 @@ export interface ListenKeyFacts {
 }
 
 export type ListenKeyAction =
-	"play" | "stop" | "slow" | "reveal" | "peek" | "pass";
+	"play" | "stop" | "slow" | "restart" | "reveal" | "peek" | "pass";
 
 /**
  * Drill keys. The composer is a normal chat in a drill (questions
@@ -375,9 +377,10 @@ export type ListenKeyAction =
  * and otherwise is the page's own Space (it brings up the prompt, as
  * in any chat). ⌘Enter / Ctrl+Enter reveals while the composer is
  * empty. Outside it, S replays slowly, a reveals the waiting clip and
- * moves on, and A shows its text without moving on; a and A yield to
- * a hovered message or a selection, where they annotate. The page
- * aims S at a hovered clip. ⌥Space / ⌥S work anywhere. Matched on
+ * moves on, A shows its text without moving on, and r replays from
+ * the start; a and A yield to a hovered message or a selection, where
+ * they annotate, and r to a hovered message that isn't a clip (where
+ * it reruns). The page aims S and r at a hovered clip. ⌥Space / ⌥S work anywhere. Matched on
  * `code` where ⌥ rewrites the character (⌥S types ß).
  */
 export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
@@ -395,10 +398,13 @@ export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 		return f.overPlayer ? "play" : "pass";
 	}
 	if (f.inComposer || f.hovered || f.selection) {
-		if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
+		if (f.inComposer) return "pass";
+		if (f.key === "s" || f.key === "S") return "slow";
+		if (f.key === "r" && f.hovered && f.hoveredClip) return "restart";
 		return "pass";
 	}
 	if (f.key === "s" || f.key === "S") return "slow";
+	if (f.key === "r") return "restart";
 	if (f.key === "a") return "reveal";
 	if (f.key === "A") return "peek";
 	return "pass";

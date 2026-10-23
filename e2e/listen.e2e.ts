@@ -373,6 +373,23 @@ test("clicking the picture plays and pauses; restart plays from the top", async 
 		"Pause"
 	);
 	expect(Number(await scrub.inputValue())).toBeLessThan(held);
+
+	// r does the same from the keyboard, the pointer anywhere.
+	await expect
+		.poll(async () => Number(await scrub.inputValue()))
+		.toBeGreaterThan(0.3);
+	await screen.click();
+	const paused = Number(await scrub.inputValue());
+	await page.mouse.move(2, 2);
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur()
+	);
+	await page.keyboard.press("r");
+	await expect(first.locator(".controls button.play")).toHaveAttribute(
+		"aria-label",
+		"Pause"
+	);
+	expect(Number(await scrub.inputValue())).toBeLessThan(paused);
 });
 
 test("keys: S slows the hovered clip, A shows the text, a moves on", async ({
