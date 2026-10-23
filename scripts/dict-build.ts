@@ -236,12 +236,14 @@ async function main(): Promise<void> {
 		const packed = gzipSync(raw, { level: 9 });
 		const file = `${lang}.dict.gz`;
 		writeFileSync(`${OUT}/${file}`, packed);
+		const sha256 = createHash("sha256").update(packed).digest("hex");
 		manifest.packs[lang] = {
 			file,
-			version: header.version,
+			// The hash rides along: a same-day rebuild still reads as new.
+			version: `${header.version}-${sha256.slice(0, 8)}`,
 			bytes: packed.length,
 			unpacked: raw.length,
-			sha256: createHash("sha256").update(packed).digest("hex"),
+			sha256,
 			sources: header.sources
 		};
 		console.log(
