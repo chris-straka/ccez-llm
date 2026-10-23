@@ -238,8 +238,8 @@ const editionTarget = (
  * ones, Latin America the Mexican, Brazilian, and Argentine ones
  * (each minus the learner's own feed when it is one of the mix —
  * the home chips cover that); the rest read their country's
- * English edition. World chips show `icon`, home chips the
- * label. Appended after the native regions, skipping any `gl`
+ * English edition. World chips show `icon`, home chips their
+ * country's flag (`regionFlag`). Appended after the native regions, skipping any `gl`
  * the feed already carries natively (es-US, ang-GB, fr-CA —
  * every other `hl`+US request redirects home).
  */
@@ -1139,6 +1139,16 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 		}
 	}
 };
+
+/** A region's chip face: a world desk's `icon`, else its country's
+flag from the two-letter `gl` (the label when `gl` is no country). */
+export function regionFlag(region: NewsRegion): string {
+	if (region.icon) return region.icon;
+	if (!/^[A-Z]{2}$/.test(region.gl)) return region.label;
+	return String.fromCodePoint(
+		...[...region.gl].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+	);
+}
 
 export function newsRegionsFor(code: string): NewsRegion[] | null {
 	const feed = NEWS_FEEDS[code];

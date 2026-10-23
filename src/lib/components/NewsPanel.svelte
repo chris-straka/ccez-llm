@@ -11,6 +11,7 @@ everything else is theme tokens, never raw hex. -->
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
+		regionFlag,
 		sessionWords,
 		type CefrLevel,
 		type NewsKind,
@@ -132,7 +133,7 @@ everything else is theme tokens, never raw hex. -->
 						type="button"
 						class="news-chip"
 						class:on={panel.region === region.gl}
-						class:icon={!!region.icon}
+						class:world={!!region.icon}
 						class:translated={!!region.translate}
 						aria-pressed={panel.region === region.gl}
 						aria-label={chipLabel(region)}
@@ -140,7 +141,7 @@ everything else is theme tokens, never raw hex. -->
 						onclick={() => actions.region(region.gl)}
 						in:fly={{ y: 8, duration: motionMs(200), delay: motionMs(i * 25) }}
 					>
-						{region.icon ?? region.label}
+						{regionFlag(region)}
 					</button>
 				{/each}
 			</div>
@@ -446,7 +447,7 @@ everything else is theme tokens, never raw hex. -->
 	.news-chips::-webkit-scrollbar {
 		display: none;
 	}
-	/* Home editions (word chips) | world desks (flag chips). */
+	/* Home editions | world desks, all flag chips. */
 	.news-sep {
 		flex: 0 0 auto;
 		width: 1px;
@@ -463,8 +464,9 @@ everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		border-radius: 999px;
-		padding: calc(0.4 * var(--u, 1rem)) calc(0.85 * var(--u, 1rem));
-		font-size: calc(0.85 * var(--u, 1rem));
+		padding: calc(0.4 * var(--u, 1rem)) calc(0.65 * var(--u, 1rem));
+		font-size: calc(1.1 * var(--u, 1rem));
+		line-height: 1;
 		min-height: calc(2.5 * var(--u, 1rem));
 		cursor: pointer;
 		white-space: nowrap;
@@ -498,11 +500,6 @@ everything else is theme tokens, never raw hex. -->
 		to {
 			transform: none;
 		}
-	}
-	.news-chip.icon {
-		font-size: calc(1.1 * var(--u, 1rem));
-		line-height: 1;
-		padding: calc(0.4 * var(--u, 1rem)) calc(0.65 * var(--u, 1rem));
 	}
 	/* Machine-translated desks: dashed rim, a step brighter so it
 	   reads on a phone; white dashes when picked. */

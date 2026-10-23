@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	regionFlag,
 	cachedFeed,
 	loadNewsPicks,
 	relevelNewsOpener,
@@ -69,6 +70,12 @@ const memStore = (): KeyValueStore => {
 };
 
 describe("news feeds", () => {
+	it("shows every region as a flag: home editions by country", () => {
+		const faces = newsRegionsFor("fr")?.map(regionFlag) ?? [];
+		expect(faces.slice(0, 4)).toEqual(["🇫🇷", "🇨🇦", "🇧🇪", "🇨🇭"]);
+		expect(faces).toContain("🌐");
+		expect(regionFlag({ gl: "XYZ", label: "Elsewhere" })).toBe("Elsewhere");
+	});
 	it("builds Google News URLs for known pairs only", () => {
 		expect(newsRssUrl("fr", "FR")).toBe(
 			"https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr"

@@ -248,13 +248,16 @@ test.describe("mock shell feed", () => {
 		await openFrenchNews(page);
 		const chips = page.locator(".news-chips");
 		await expect(chips.locator(".news-sep")).toHaveCount(1);
-		// The rule sits right after the last word chip.
+		// The rule sits right after the last home flag.
 		const before = await chips
 			.locator(".news-sep")
 			.evaluate((el) =>
-				(el.previousElementSibling as HTMLElement).classList.contains("icon")
+				(el.previousElementSibling as HTMLElement).classList.contains("world")
 			);
 		expect(before).toBe(false);
+		await expect(
+			chips.getByRole("button", { name: "France", exact: true })
+		).toHaveText("🇫🇷");
 	});
 
 	test("translated desks wear a dashed rim; native ones stay solid", async ({
