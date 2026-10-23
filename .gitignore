@@ -22,3 +22,6 @@ pnpm-lock.yaml
 # bun-run toolchain never reads.
 pnpm-workspace.yaml
 .mise.toml
+
+# Dictionary sources and built packs (scripts/dictionaries)
+.dict-cache/

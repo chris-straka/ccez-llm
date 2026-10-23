@@ -52,6 +52,12 @@ TTS/OCR/dictation, page fetch, Android background turns).
   files are listed in `.prettierignore`.
 - Rust: `cd src-tauri && cargo test --lib` (CI runs `cargo check --locked`
   per target plus `cargo test --locked`).
+- Dictionaries (word cards): `bun scripts/dict-build.ts fr de ja` builds
+  packs into `.dict-cache/out/` (sources download there too, gitignored);
+  `bun scripts/dict-publish.ts` uploads them to the `dictionaries`
+  release, which the app downloads per language on first use
+  (`src-tauri/src/dict.rs`). That release stays a prerelease never
+  marked Latest: app updates read `/releases/latest`.
 - Web: `bun run build:web` → `build/`. Cloudflare Pages project
   `personalized-llm-client` builds `main` on push and serves
   https://llm.ccez.uk (`docs/platforms/web-deploy.md`).
