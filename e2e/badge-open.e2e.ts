@@ -216,3 +216,29 @@ test("a note in flight inks its own word while another card opens", async ({
 	expect(before).toEqual(["décédé", "son"]);
 	expect(await inked(page)).toEqual(["décédé", "son"]);
 });
+
+/** Pressing the badge of a note still being answered marks nothing
+new: no underline on the line it overlaps. */
+test("pressing a loading badge inks nothing above it", async ({ page }) => {
+	await page.addInitScript(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "8000")
+	);
+	await seedDrill(page, [{ id: "a1", quote: "décédé", answer: "passed away" }]);
+	await dragQuote(page, 0, "son");
+	await page.keyboard.press("a");
+	const waiting = page.locator("button.ccez-ann-badge.ans-waiting");
+	await expect(waiting).toHaveCount(1);
+	await page.mouse.move(2, 2);
+	await page.waitForTimeout(300);
+	const box = (await waiting.boundingBox())!;
+	// The badge rides up over the line above: press its upper half.
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.3, {
+		steps: 4
+	});
+	await page.mouse.down();
+	await page.mouse.up();
+	await page.waitForTimeout(500);
+	await page.screenshot({ path: ".screenshots/badge-loading-press.png" });
+	expect(await inked(page)).toEqual(["décédé", "son"]);
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
+});

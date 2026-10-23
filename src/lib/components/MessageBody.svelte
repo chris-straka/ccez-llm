@@ -29,7 +29,11 @@
 	import { annRefsFor } from "$lib/annotation-block";
 	import { applyMarks } from "$lib/annotations-stamp";
 	import { inkForQuote, type RepeatInk } from "$lib/ann-repeats";
-	import { clearRepeatInks, paintRepeatInks } from "$lib/ann-repeat-paint";
+	import {
+		clearRepeatInks,
+		paintRepeatInks,
+		repaintInks
+	} from "$lib/ann-repeat-paint";
 	import { stackBadges } from "$lib/badge-stack";
 
 	interface Props {
@@ -259,13 +263,19 @@
 		};
 	});
 	// A rewrap can bring badges together (or apart): re-measure them.
+	// Any body changing size moves text under the underlines: repaint.
 	$effect(() => {
 		const el = bodyEl;
 		if (!el || typeof ResizeObserver !== "function") return;
-		const observer = new ResizeObserver(() =>
-			stackBadges([...el.querySelectorAll<HTMLElement>("[data-ann-badge]")])
-		);
+		const observer = new ResizeObserver(() => {
+			stackBadges([...el.querySelectorAll<HTMLElement>("[data-ann-badge]")]);
+			repaintInks();
+		});
 		observer.observe(el);
+		// The message around it too: a clip's video folding away
+		// resizes the message, not its text.
+		const article = el.closest("article");
+		if (article) observer.observe(article);
 		return () => observer.disconnect();
 	});
 

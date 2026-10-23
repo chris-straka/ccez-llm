@@ -222,6 +222,25 @@ export function paintRepeatInks(
 	}
 }
 
+let repaintQueued = false;
+
+/**
+ * Repaint every inked body once, next frame. The Mac shell keeps
+ * highlight pixels where text used to be when layout shifts under
+ * them (a clip's video folding away moves the text below it), so an
+ * underline seemed to sit on a line it never covered; the one-frame
+ * nudge makes it paint the ranges where they are now. Never throws.
+ */
+export function repaintInks(): void {
+	if (repaintQueued || typeof requestAnimationFrame !== "function") return;
+	repaintQueued = true;
+	requestAnimationFrame(() => {
+		repaintQueued = false;
+		for (const root of bodies.keys())
+			if (root.isConnected) invalidateWashPaint(root);
+	});
+}
+
 /** Drop one body's inks (unmount). Never throws. */
 export function clearRepeatInks(root: HTMLElement): void {
 	const body = bodies.get(root);
