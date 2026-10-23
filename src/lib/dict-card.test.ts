@@ -59,14 +59,45 @@ describe("cardFromDictionary", () => {
 			[{ tags: "participle past", entry: franchir }],
 			"fr"
 		)!;
-		expect(card.meaning).toBe("past participle of franchir");
+		expect(card.meaning).toBe("to clear, to cross (a line)");
 		expect(card.parts).toEqual([
 			{ text: "franch", label: "franchir", kind: "core" },
 			{ text: "i", label: "past participle", kind: "tense" }
 		]);
-		expect(card.base).toContain("franchir, verb: to clear");
+		// The split already shows what the form is.
+		expect(card.base).toBeUndefined();
 		expect(card.partial).toBe(true);
 		expect(card.lang).toBe("fr");
+	});
+
+	it("gives a noun's gender as its article, never twice", () => {
+		const caleche = {
+			w: "calèche",
+			p: "noun",
+			g: "feminine",
+			s: ["calèche, carriage"]
+		};
+		const card = cardFromDictionary(
+			"calèches",
+			[
+				{ tags: "plural", entry: caleche },
+				{ tags: "feminine plural", entry: caleche }
+			],
+			"fr"
+		)!;
+		expect(card.meaning).toBe("calèche, carriage");
+		expect(card.parts[1]).toMatchObject({ text: "s", label: "plural" });
+		expect(card.facts).toEqual([{ text: "la calèche", kind: "agree" }]);
+		expect(card.base).toBeUndefined();
+		const oeil = { w: "œil", p: "noun", g: "masculine", s: ["eye"] };
+		expect(
+			cardFromDictionary("yeux", [{ tags: "plural", entry: oeil }], "fr")
+		).toMatchObject({
+			meaning: "eye",
+			parts: [],
+			facts: [{ text: "l'œil" }],
+			base: "plural of œil, noun"
+		});
 	});
 
 	it("gives a headword its first sense and gender", () => {
@@ -86,7 +117,7 @@ describe("cardFromDictionary", () => {
 		)!;
 		expect(card.meaning).toBe("hospital");
 		expect(card.parts).toEqual([]);
-		expect(card.facts).toEqual([{ text: "neuter", kind: "agree" }]);
+		expect(card.facts).toEqual([{ text: "das Krankenhaus", kind: "agree" }]);
 	});
 
 	it("marks case endings as the word's role", () => {
@@ -178,7 +209,7 @@ describe("Japanese pieces", () => {
 		)!;
 		expect(card.parts).toHaveLength(5);
 		expect(card.meaning).toBe("to read");
-		expect(card.base).toBe("読む (よむ), godan verb: to read");
+		expect(card.base).toBe("読む (よむ), godan verb");
 	});
 });
 
@@ -283,7 +314,7 @@ describe("annotationAnswer with a dictionary", () => {
 		});
 		expect(partials).toHaveLength(1);
 		expect(partials[0]).toMatchObject({
-			meaning: "past participle of franchir",
+			meaning: "to clear, to cross (a line)",
 			partial: true
 		});
 		expect(reply.card?.meaning).toBe("crossed");

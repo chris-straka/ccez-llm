@@ -134,9 +134,10 @@ function firstSense(entry: DictEntry): string {
 	return s.trim();
 }
 
+/** The base word, its reading and part of speech: the meaning is already on the card. */
 function baseLine(entry: DictEntry): string {
 	const reading = entry.r && entry.r !== entry.w ? ` (${entry.r})` : "";
-	return `${entry.w}${reading}, ${entry.p}: ${entry.s.slice(0, 3).join("; ")}`;
+	return `${entry.w}${reading}, ${entry.p}`;
 }
 
 /** Fold for comparing a form with its headword. */
@@ -259,11 +260,40 @@ export function japaneseHead(pieces: JaPiece[]): string | null {
 	return head?.base ?? null;
 }
 
+const GENDER_TAGS = new Set(["masculine", "feminine", "neuter"]);
+
+/** Definite articles by gender, where the article shows it. */
+const ARTICLES: Record<string, Record<string, string>> = {
+	fr: { masculine: "le", feminine: "la" },
+	de: { masculine: "der", feminine: "die", neuter: "das" },
+	es: { masculine: "el", feminine: "la" },
+	it: { masculine: "il", feminine: "la" },
+	pt: { masculine: "o", feminine: "a" }
+};
+
+/** A noun's gender as its base form with the article (la calèche), or the gender's name. */
+function genderFact(entry: DictEntry, lang: string): string | null {
+	if (!entry.g) return null;
+	const article = ARTICLES[lang]?.[entry.g];
+	if (!article) return entry.g;
+	const w = entry.w;
+	if ((lang === "fr" || lang === "it") && /^[aeiouàâéèêîôûœæ]/iu.test(w))
+		return `l'${w}`;
+	if (
+		lang === "it" &&
+		entry.g === "masculine" &&
+		/^(s[^aeiou]|z|gn|ps|x)/iu.test(w)
+	)
+		return `lo ${w}`;
+	return `${article} ${w}`;
+}
+
 /**
- * The instant card from dictionary hits: what the form is (or the
- * headword's first sense), the split where the stem shows, gender,
- * and the base word's senses. Marked partial; the model's card
- * replaces it. Null without hits.
+ * The instant card from dictionary hits: the base word's first sense,
+ * the split where the stem shows (the ending named, its gender left
+ * to the gender fact), the gender as the article where one shows it,
+ * and what the form is only when no split shows it. Marked partial;
+ * the model's card replaces it. Null without hits.
  */
 export function cardFromDictionary(
 	quote: string,
@@ -277,28 +307,41 @@ export function cardFromDictionary(
 	const form = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
 	const tagName = formatTags(top.tags);
 	const isHeadword = fold(top.entry.w) === fold(form);
-	const meaning =
-		!isHeadword && tagName
-			? `${tagName} of ${top.entry.w}`
-			: firstSense(top.entry);
+	// A noun's gender is its own fact, not its ending's.
+	const endingName = top.entry.g
+		? formatTags(
+				top.tags
+					.split(/\s+/)
+					.filter((t) => !GENDER_TAGS.has(t))
+					.join(" ")
+			)
+		: tagName;
 	let parts: WordPart[] = [];
 	if (japanese.length > 1) parts = japaneseParts(japanese);
 	else if (!isHeadword) {
 		const split = stemSplit(form, top.entry.w);
-		if (split && tagName)
+		if (split && endingName)
 			parts = [
 				{ text: split[0], label: top.entry.w, kind: "core" },
-				{ text: split[1], label: tagName, kind: endingKind(top.tags) }
+				{ text: split[1], label: endingName, kind: endingKind(top.tags) }
 			];
 	}
-	const facts = top.entry.g
-		? [{ text: top.entry.g, kind: "agree" as const }]
-		: [];
+	const gender = genderFact(top.entry, lang);
+	const facts = gender ? [{ text: gender, kind: "agree" as const }] : [];
+	// What the form is, when no split already shows it; a Japanese
+	// split still wants its base's reading and verb class.
+	const base = isHeadword
+		? undefined
+		: parts.length === 0
+			? `${endingName ? `${endingName} of ` : ""}${baseLine(top.entry)}`
+			: japanese.length > 1
+				? baseLine(top.entry)
+				: undefined;
 	return {
-		meaning: meaning || top.entry.w,
+		meaning: firstSense(top.entry) || top.entry.w,
 		parts,
 		facts,
-		base: baseLine(top.entry),
+		...(base ? { base } : {}),
 		partial: true,
 		lang
 	};
