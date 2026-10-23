@@ -15191,6 +15191,7 @@
 					: undefined}
 				thread={answered.thread ?? []}
 				wordCard={answered.card}
+				finishing={drafts.isAsking(answered.id)}
 				onReply={(text: string) => drafts.askFollowUp(answered.id, text)}
 			/>
 		{/if}

@@ -220,6 +220,9 @@ export class AnnotationDrafts {
 			void _stale;
 			const edited = { ...rest, comment: draft };
 			this.list = this.list.map((a) => (a.id === id ? edited : a));
+			// A word card still finishing asked the old question: drop
+			// that request so the new one goes out.
+			this.cancelAsk(id);
 			void this.ask(edited);
 			return true;
 		}
@@ -269,6 +272,19 @@ export class AnnotationDrafts {
 		}
 	}
 
+	/** Whether a note's request is in flight (a partial card is still finishing). */
+	isAsking(id: string): boolean {
+		return this.asking.has(id);
+	}
+
+	/** Abort a note's request and forget it: its late reply lands nowhere. */
+	private cancelAsk(id: string): void {
+		this.controllers.get(id)?.abort();
+		this.controllers.delete(id);
+		this.asking.delete(id);
+		this.interrupted.delete(id);
+	}
+
 	/** Delete one filed note by id (pill-cancel fresh path). */
 	deleteById(id: string): void {
 		this.list = deleteAnnotation(this.list, id);
@@ -316,9 +332,13 @@ export class AnnotationDrafts {
 					lang: this.deps.langFor?.(ann) ?? null
 				},
 				controller.signal,
-				(partial) =>
-					this.attachAnswer(chatId, ann.id, partial.answer, partial.card)
+				(partial) => {
+					if (this.controllers.get(ann.id) === controller)
+						this.attachAnswer(chatId, ann.id, partial.answer, partial.card);
+				}
 			);
+			// Cancelled for a newer ask (an edit): that one answers.
+			if (this.controllers.get(ann.id) !== controller) return;
 			const { answer, card } =
 				typeof reply === "string" ? { answer: reply, card: undefined } : reply;
 			this.attachAnswer(chatId, ann.id, answer, card);
@@ -333,6 +353,7 @@ export class AnnotationDrafts {
 			)
 				this.deps.openBadge(ann.id);
 		} catch (error) {
+			if (this.controllers.get(ann.id) !== controller) return;
 			lostToBackground = this.interrupted.has(ann.id);
 			if (!lostToBackground) {
 				this.failed.add(ann.id);
@@ -341,9 +362,11 @@ export class AnnotationDrafts {
 				if (this.deps.isPhone()) this.deps.toastError(message);
 			}
 		} finally {
-			this.asking.delete(ann.id);
-			this.controllers.delete(ann.id);
-			this.interrupted.delete(ann.id);
+			if (this.controllers.get(ann.id) === controller) {
+				this.asking.delete(ann.id);
+				this.controllers.delete(ann.id);
+				this.interrupted.delete(ann.id);
+			}
 		}
 		if (lostToBackground) this.reaskLost(ann.id);
 	}
@@ -357,7 +380,9 @@ export class AnnotationDrafts {
 			return;
 		}
 		const current = this.list.find((a) => a.id === id);
-		if (current && current.answer === undefined) void this.ask(current);
+		// A dictionary card still finishing is unanswered too.
+		if (current && unansweredAnnotations([current]).length > 0)
+			void this.ask(current);
 	}
 
 	/** The app left the foreground: everything in flight is at the

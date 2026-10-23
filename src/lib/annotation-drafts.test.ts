@@ -600,6 +600,36 @@ describe("word cards", () => {
 		expect(drafts.list[0]?.card).toEqual(card);
 	});
 
+	it("an edit while the card finishes asks the new question", async () => {
+		const instant: WordCard = { ...card, partial: true };
+		let finishOld: (reply: AnnotationReply) => void = () => undefined;
+		const { drafts, calls } = harness({
+			partial: { answer: instant.meaning, card: instant },
+			answer: (q) =>
+				q.question
+					? Promise.resolve("about the edit")
+					: new Promise<AnnotationReply>((resolve) => {
+							finishOld = resolve;
+						})
+		});
+		const q = note({ quote: "franchi" });
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(drafts.isAsking(q.id)).toBe(true));
+		await vi.waitFor(() => expect(drafts.list[0]?.card).toEqual(instant));
+		expect(drafts.commitCommentEdit(q.id, "why the i?")).toBe(true);
+		await vi.waitFor(() =>
+			expect(drafts.list[0]?.answer).toBe("about the edit")
+		);
+		expect(calls.answers.map((a) => a.question)).toEqual(["", "why the i?"]);
+		// The first request's late reply lands nowhere.
+		finishOld({ answer: "crossed", card });
+		await asked;
+		expect(drafts.list[0]?.answer).toBe("about the edit");
+		expect(calls.banners).toEqual([]);
+		expect(drafts.isAsking(q.id)).toBe(false);
+	});
+
 	it("a note left with only the dictionary's card is asked again", async () => {
 		const { drafts, calls } = harness();
 		drafts.setList([
