@@ -885,14 +885,26 @@ export function buildWordCardMessages(
 		`derive (a piece that turns it into a noun, adjective or adverb).\n` +
 		`"facts": at most three short facts about the whole word that matter ` +
 		`here, from the checklist below (gender, case, the tense it forms ` +
-		`with a helper verb); [] when none apply.\n` +
-		`"base": one sentence giving the base form and its meaning, when the ` +
-		`word is inflected or derived; leave it out for a plain word.\n` +
-		`"here": one sentence on why this form is used in this sentence, ` +
-		`citing the nearby words that matter. Say only what the passage ` +
-		`says; never add claims about people or events it doesn't state.\n` +
+		`with a helper verb); [] when none apply. Never repeat what a ` +
+		`piece's label already says (an ending labeled plural needs no ` +
+		`plural fact). Where nouns take a gendered article, give the gender ` +
+		`as the base form with its article ("la calèche", "der Tisch"), ` +
+		`never as "feminine noun".\n` +
+		`"base": one sentence giving the base form and its meaning, only ` +
+		`when the card doesn't already show it: a form spelled unlike its ` +
+		`base (yeux from œil, ging from gehen), or a derived word whose base ` +
+		`means something else. Leave it out when the base is the core ` +
+		`piece's label and means what "meaning" says, or a fact already ` +
+		`gives it.\n` +
+		`"here": one sentence on what the word does in this sentence: its ` +
+		`job (who acts, what is acted on, what it describes) and the nearby ` +
+		`words it works with ("who is hiring: the subject of embauche"). ` +
+		`Explain why it takes this form only when the form is the point (a ` +
+		`subjunctive after que). Say only what the passage says; never add ` +
+		`claims about people or events it doesn't state.\n` +
 		`"watch": one sentence on the trap a learner most likely falls into ` +
-		`with this word, from the checklist; leave it out when there is none.\n` +
+		`with this word, from the checklist, saying nothing the facts ` +
+		`already say; leave it out when there is none.\n` +
 		`Checklist:\n${checklist}` +
 		(opts.dictionary
 			? `\nDictionary entries for the word. Trust their forms and base ` +
