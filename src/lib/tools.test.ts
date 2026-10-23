@@ -67,6 +67,16 @@ describe("validFetchUrl", () => {
 });
 
 describe("htmlToText", () => {
+	it("breaks lines at block boundaries in minified markup", () => {
+		expect(
+			htmlToText(
+				"<main><ul><li>One</li><li>Two</li></ul><p>Three</p><div>Four<br>Five</div></main>"
+			)
+		).toBe("One\nTwo\nThree\nFour\nFive");
+		// Inline tags still join their words.
+		expect(htmlToText("<main><p>un<b>bold</b>ed</p></main>")).toBe("unbolded");
+	});
+
 	it("prefers article text and drops chrome", () => {
 		const text = htmlToText(
 			"<html><head><title>T</title><style>.x{}</style></head>" +

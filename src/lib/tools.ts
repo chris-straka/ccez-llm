@@ -240,6 +240,10 @@ export function parseSearchResults(html: string): FeedItem[] {
 	return out;
 }
 
+/** Tags whose boundaries break lines (mirrors `BLOCK_TAGS` in page_text.rs). */
+const BLOCK_SELECTOR =
+	"p, div, br, li, tr, h1, h2, h3, h4, h5, h6, section, blockquote, pre, dd, dt, td, th";
+
 /**
  * Readable text out of a page's HTML: prefers `<article>`/`<main>`,
  * drops scripts, styles, nav, headers, footers, forms, and templates,
@@ -258,6 +262,13 @@ export function htmlToText(html: string): string {
 		doc.querySelector("main") ??
 		doc.body ??
 		doc.documentElement;
+	// Block boundaries break lines (the BLOCK_TAGS of page_text.rs),
+	// so minified markup never glues <li>One</li><li>Two</li> into
+	// "OneTwo".
+	root?.querySelectorAll(BLOCK_SELECTOR).forEach((el) => {
+		el.before("\n");
+		el.after("\n");
+	});
 	const text = (root?.textContent ?? "")
 		.split("\n")
 		.map((line) => line.replace(/[ \t\u00a0]+/g, " ").trim())
