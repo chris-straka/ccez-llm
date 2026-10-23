@@ -72,17 +72,20 @@ again if it failed. -->
 {/if}
 
 <style>
-	/* Everything here is sized off the message text (em, with a floor)
-	so it keeps pace with the text size instead of staying tiny. */
+	/* The fold sits in the message's type, so the English keeps pace
+	with the text size; the pill is sized like the message's own
+	buttons (MessageActions' text buttons), growing with the text when
+	buttons scale with it. */
 	.gloss {
 		margin-top: 0.35em;
+		font-size: calc(0.92rem * var(--font-scale, 1));
 	}
 	.toggle {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4em;
 		font: inherit;
-		font-size: max(0.85rem, 0.42em);
+		font-size: calc(0.92rem * 0.85);
 		padding: 0.3em 0.85em 0.3em 0.7em;
 		border: 1px solid var(--line-soft);
 		border-radius: 999px;
@@ -93,6 +96,9 @@ again if it failed. -->
 			color 0.15s ease,
 			border-color 0.15s ease,
 			background-color 0.15s ease;
+	}
+	:global(main.scale-actions) .toggle {
+		font-size: calc(0.92rem * min(var(--font-scale, 1), 6) * 0.85);
 	}
 	.toggle:hover {
 		color: var(--ink);

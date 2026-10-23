@@ -268,6 +268,21 @@ test("a drill runs: show text, next clip at once, tally", async ({ page }) => {
 	await expect(first).toContainText(GRADE.translation);
 	await expect(first).toContainText("welcome");
 	expect(graded).toBe(1);
+
+	// The pill is sized like the message's own text buttons: at 2.5x
+	// text it reads at 85% of the message type, not a fixed chip.
+	await page.evaluate(() =>
+		document
+			.querySelector<HTMLElement>(".app")
+			?.style.setProperty("--font-scale", "2.5")
+	);
+	const size = (el: Element) => parseFloat(getComputedStyle(el).fontSize);
+	const [pill, text] = await Promise.all([
+		english.evaluate(size),
+		first.locator(".rendered").evaluate(size)
+	]);
+	expect(pill).toBeCloseTo(text * 0.85, 0);
+	await first.screenshot({ path: ".screenshots/listen-english-2.5x.png" });
 });
 
 test("the search box searches on a typing pause; emptying it drops the results", async ({
