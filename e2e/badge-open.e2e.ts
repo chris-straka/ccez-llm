@@ -200,7 +200,9 @@ test("a note in flight inks its own word while another card opens", async ({
 		localStorage.setItem("ccez-mock-chat-ms", "6000")
 	);
 	await seedDrill(page, [{ id: "a1", quote: "décédé", answer: "passed away" }]);
-	await dragQuote(page, 0, "estiment");
+	// A short word: Linux fonts hyphenate longer ones across lines,
+	// where a drag through the middle of the box misses the word.
+	await dragQuote(page, 0, "son");
 	await page.keyboard.press("a");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(2);
 	await page.mouse.move(2, 2);
@@ -211,6 +213,6 @@ test("a note in flight inks its own word while another card opens", async ({
 	await expect(page.locator(".ann-answer.placed")).toBeVisible();
 	await page.waitForTimeout(400);
 	await page.screenshot({ path: ".screenshots/badge-inflight-open.png" });
-	expect(before).toEqual(["décédé", "estiment"]);
-	expect(await inked(page)).toEqual(["décédé", "estiment"]);
+	expect(before).toEqual(["décédé", "son"]);
+	expect(await inked(page)).toEqual(["décédé", "son"]);
 });
