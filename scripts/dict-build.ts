@@ -1,7 +1,8 @@
 /**
  * Build dictionary packs from their sources (see dict-pack.ts):
  *
- *   bun scripts/dict-build.ts fr de ja
+ *   bun scripts/dict-build.ts fr de ja    (or `all`)
+ *   bun scripts/dict-build.ts --fetch     (download every source only)
  *
  * Sources download into .dict-cache/ (gitignored) on first run:
  * Wiktionary extracts from kaikki.org for most languages, JMdict for
@@ -38,21 +39,70 @@ const WIKTIONARY = {
 	url: "https://kaikki.org/"
 };
 
-/** Languages built from the English Wiktionary extract. */
-const KAIKKI: Record<string, string> = {
-	fr: "French",
-	de: "German",
-	es: "Spanish",
-	it: "Italian",
-	pt: "Portuguese",
-	ru: "Russian",
-	pl: "Polish",
-	cs: "Czech",
-	nl: "Dutch",
-	sv: "Swedish",
-	la: "Latin",
-	grc: "Ancient Greek"
+/**
+ * Languages built from the English Wiktionary extract, by kaikki.org's
+ * language names. Cantonese words mostly live under Chinese there, so
+ * its pack reads both.
+ */
+export const KAIKKI: Record<string, string[]> = {
+	fr: ["French"],
+	de: ["German"],
+	es: ["Spanish"],
+	pt: ["Portuguese"],
+	it: ["Italian"],
+	ro: ["Romanian"],
+	ru: ["Russian"],
+	uk: ["Ukrainian"],
+	pl: ["Polish"],
+	cs: ["Czech"],
+	sk: ["Slovak"],
+	bg: ["Bulgarian"],
+	sr: ["Serbo-Croatian"],
+	el: ["Greek"],
+	hu: ["Hungarian"],
+	fi: ["Finnish"],
+	nl: ["Dutch"],
+	sv: ["Swedish"],
+	da: ["Danish"],
+	no: ["Norwegian Bokmål"],
+	is: ["Icelandic"],
+	zh: ["Chinese"],
+	yue: ["Cantonese", "Chinese"],
+	ko: ["Korean"],
+	vi: ["Vietnamese"],
+	th: ["Thai"],
+	id: ["Indonesian"],
+	ms: ["Malay"],
+	tl: ["Tagalog"],
+	hi: ["Hindi"],
+	ur: ["Urdu"],
+	pa: ["Punjabi"],
+	bn: ["Bengali"],
+	ta: ["Tamil"],
+	fa: ["Persian"],
+	ar: ["Arabic"],
+	he: ["Hebrew"],
+	hy: ["Armenian"],
+	tr: ["Turkish"],
+	sw: ["Swahili"],
+	am: ["Amharic"],
+	la: ["Latin"],
+	grc: ["Ancient Greek"],
+	sa: ["Sanskrit"],
+	non: ["Old Norse"],
+	ang: ["Old English"],
+	sux: ["Sumerian"],
+	akk: ["Akkadian"]
 };
+
+/** Where a kaikki language's extract lives, and its cache file. */
+export function kaikkiSource(name: string): { url: string; path: string } {
+	const file = `kaikki.org-dictionary-${name.replace(/[ -]/g, "")}.jsonl`;
+	return {
+		url: `https://kaikki.org/dictionary/${encodeURIComponent(name)}/${encodeURIComponent(file)}`,
+		path: `${CACHE}/${file}`
+	};
+}
 
 async function download(url: string, path: string): Promise<void> {
 	if (existsSync(path)) return;
@@ -81,26 +131,27 @@ async function* lines(path: string): AsyncGenerator<string> {
 async function buildKaikki(
 	lang: string
 ): Promise<{ b: PackBuilder; header: PackHeader }> {
-	const name = KAIKKI[lang]!;
-	const path = `${CACHE}/kaikki-${lang}.jsonl`;
-	await download(
-		`https://kaikki.org/dictionary/${encodeURIComponent(name)}/kaikki.org-dictionary-${name.replace(/ /g, "")}.jsonl`,
-		path
-	);
-	const b = new PackBuilder();
+	const paths: string[] = [];
+	for (const name of KAIKKI[lang]!) {
+		const { url, path } = kaikkiSource(name);
+		await download(url, path);
+		paths.push(path);
+	}
+	const b = new PackBuilder(lang);
 	const lemmas = new Map<string, number[]>();
 	const formOnly: KaikkiRecord[] = [];
-	for await (const line of lines(path)) {
-		if (!line) continue;
-		const r = JSON.parse(line) as KaikkiRecord;
-		const later = addKaikkiRecord(b, r, lemmas);
-		if (later)
-			formOnly.push({
-				word: later.word,
-				pos: later.pos,
-				senses: later.senses ?? []
-			});
-	}
+	for (const path of paths)
+		for await (const line of lines(path)) {
+			if (!line) continue;
+			const r = JSON.parse(line) as KaikkiRecord;
+			const later = addKaikkiRecord(b, r, lemmas);
+			if (later)
+				formOnly.push({
+					word: later.word,
+					pos: later.pos,
+					senses: later.senses ?? []
+				});
+		}
 	for (const r of formOnly) addKaikkiFormOf(b, r, lemmas);
 	return { b, header: { lang, version: today(), sources: [WIKTIONARY] } };
 }
@@ -158,7 +209,8 @@ interface ManifestPack {
 }
 
 async function main(): Promise<void> {
-	const langs = process.argv.slice(2);
+	const args = process.argv.slice(2);
+	const langs = args[0] === "all" ? [...Object.keys(KAIKKI), "ja"] : args;
 	if (langs.length === 0)
 		throw new Error("usage: bun scripts/dict-build.ts fr de ja");
 	mkdirSync(OUT, { recursive: true });
@@ -200,4 +252,11 @@ async function main(): Promise<void> {
 	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
 }
 
-await main();
+if (process.argv[2] === "--fetch") {
+	// Download every source without building, so builds can run offline.
+	mkdirSync(CACHE, { recursive: true });
+	for (const name of new Set(Object.values(KAIKKI).flat())) {
+		const { url, path } = kaikkiSource(name);
+		await download(url, path);
+	}
+} else await main();

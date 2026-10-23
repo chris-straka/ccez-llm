@@ -52,8 +52,8 @@ TTS/OCR/dictation, page fetch, Android background turns).
   files are listed in `.prettierignore`.
 - Rust: `cd src-tauri && cargo test --lib` (CI runs `cargo check --locked`
   per target plus `cargo test --locked`).
-- Dictionaries (word cards): `bun scripts/dict-build.ts fr de ja` builds
-  packs into `.dict-cache/out/` (sources download there too, gitignored);
+- Dictionaries (word cards): `bun scripts/dict-build.ts all` (or named
+  languages) builds one pack per language in the menus into `.dict-cache/out/` (sources download there too, gitignored);
   `bun scripts/dict-publish.ts` uploads them to the `dictionaries`
   release, which the app downloads per language on first use
   (`src-tauri/src/dict.rs`). That release stays a prerelease never

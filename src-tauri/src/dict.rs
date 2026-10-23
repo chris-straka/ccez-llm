@@ -553,6 +553,10 @@ mod tests {
         );
         let pack = Pack::open(&dir.join("fr.dict")).unwrap();
         assert_eq!(pack.lookup("franchi").unwrap()[0].entry["w"], "franchir");
+        // A pack beyond the first three, reached by its unstressed spelling.
+        tauri::async_runtime::block_on(fetch_pack(&dir, "ru", RELEASE_URL, |_, _| {})).unwrap();
+        let ru = Pack::open(&dir.join("ru.dict")).unwrap();
+        assert_eq!(ru.lookup("говорю").unwrap()[0].entry["w"], "говорить");
         // Current already: nothing downloads again.
         let again = tauri::async_runtime::block_on(fetch_pack(&dir, "fr", RELEASE_URL, |_, _| {
             panic!("downloaded twice")

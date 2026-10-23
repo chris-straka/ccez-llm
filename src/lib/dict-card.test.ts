@@ -7,6 +7,7 @@ import {
 	japaneseHead,
 	japaneseParts,
 	lookupForms,
+	plainSpelling,
 	stemSplit,
 	type DictHit,
 	type JaPiece
@@ -34,6 +35,7 @@ describe("formatTags", () => {
 			"dative masculine singular"
 		);
 		expect(formatTags("feminine plural")).toBe("feminine plural");
+		expect(formatTags("inessive singular")).toBe("inessive singular");
 		expect(formatTags("alternative")).toBe("alternative form");
 		expect(formatTags("")).toBe("");
 	});
@@ -104,6 +106,26 @@ describe("cardFromDictionary", () => {
 		});
 	});
 
+	it("cuts the first sense outside its brackets", () => {
+		const card = cardFromDictionary(
+			"中国",
+			[
+				{
+					tags: "",
+					entry: {
+						w: "中國",
+						p: "name",
+						s: [
+							"China (a country in Asia; capital: Beijing); the Middle Kingdom"
+						]
+					}
+				}
+			],
+			"zh"
+		)!;
+		expect(card.meaning).toBe("China (a country in Asia; capital: Beijing)");
+	});
+
 	it("is nothing without hits", () => {
 		expect(cardFromDictionary("x", [], "fr")).toBeNull();
 	});
@@ -160,7 +182,28 @@ describe("Japanese pieces", () => {
 	});
 });
 
+describe("plainSpelling", () => {
+	it("drops the marks ordinary text leaves out", () => {
+		expect(plainSpelling("говорю́", "ru")).toBe("говорю");
+		expect(plainSpelling("amō", "la")).toBe("amo");
+		expect(plainSpelling("kùća", "sr")).toBe("kuća");
+		expect(plainSpelling("كَتَبَ", "ar")).toBe("كتب");
+		expect(plainSpelling("שָׁלוֹם", "he")).toBe("שלום");
+	});
+
+	it("keeps letters that only look marked", () => {
+		expect(plainSpelling("ćao", "sr")).toBeNull();
+		expect(plainSpelling("йод", "ru")).toBeNull();
+		expect(plainSpelling("ёлка", "ru")).toBeNull();
+		expect(plainSpelling("été", "fr")).toBeNull();
+	});
+});
+
 describe("lookups", () => {
+	it("try a marked word without its marks", () => {
+		expect(lookupForms("говорю́,", "ru")).toEqual(["говорю́", "говорю"]);
+	});
+
 	it("try the word, then what follows an elided article", () => {
 		expect(lookupForms("« franchi, »")).toEqual(["franchi"]);
 		expect(lookupForms("l'homme")).toEqual(["l'homme", "homme"]);
