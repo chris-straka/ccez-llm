@@ -154,3 +154,16 @@ test("clicking a previewed row makes it the active chat", async ({ page }) => {
 	await expect(page.locator("main .messages")).not.toContainText(ALPHA);
 	await expect(rows.nth(1)).toHaveClass(/active/);
 });
+
+/** ⇧⌘Delete mid preview drops the chat on screen, never the hidden
+active one (chat deletes have no undo). */
+test("deleting during a preview drops the previewed chat", async ({ page }) => {
+	await openSidebar(page);
+	const main = page.locator("main .messages");
+	await page.locator("aside ul li button.side-chat").nth(1).hover();
+	await expect(main).toContainText(BRAVO);
+	await page.keyboard.press("Shift+Meta+Backspace");
+	await expect(page.locator("aside ul li button.side-chat")).toHaveCount(1);
+	await page.mouse.move(600, 500);
+	await expect(main).toContainText(ALPHA);
+});

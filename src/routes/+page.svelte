@@ -11857,9 +11857,13 @@
 				// ⇧⌘Delete drops the whole current chat (a blank one takes
 				// its place, so the composer never strands) and resets the
 				// voice language to the checked keyboard. Works from
-				// anywhere, typing targets included.
+				// anywhere, typing targets included. Mid hover preview it
+				// drops the chat on screen, never the hidden active one:
+				// chat deletes have no undo.
 				consumeEvent(event);
-				dropChat(chat.id);
+				const onScreen = viewChat.id;
+				endPreview();
+				dropChat(onScreen);
 				editor?.focus();
 				return;
 			}
