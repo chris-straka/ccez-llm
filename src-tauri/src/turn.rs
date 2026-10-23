@@ -323,7 +323,11 @@ struct SummaryRefresh {
 /// into a fresh summary; otherwise the prior text stands. A failed
 /// refresh falls back to the prior summary — the turn still runs
 /// windowed — so only the (to_use, refreshed) pair escapes.
-async fn resolve_summary(client: &reqwest::Client, req: &TurnRequest) -> (String, Option<String>) {
+async fn resolve_summary(
+    client: &reqwest::Client,
+    req: &TurnRequest,
+    stop: &AtomicBool,
+) -> (String, Option<String>) {
     if req.fold_text.is_empty() {
         return (req.prior_summary.clone(), None);
     }
@@ -334,7 +338,8 @@ async fn resolve_summary(client: &reqwest::Client, req: &TurnRequest) -> (String
             &refresh_user_text(&req.prior_summary, &req.fold_text),
         ),
     ];
-    match post_plain(client, req, &history, false).await {
+    let deadline = Instant::now() + Duration::from_secs(ATTEMPT_DEADLINE_SECS);
+    match post_plain(client, req, &history, false, stop, deadline).await {
         Ok((content, _, _)) => {
             let trimmed = content.trim();
             if trimmed.is_empty() {
@@ -511,6 +516,29 @@ fn reqwest_client() -> Result<reqwest::Client, String> {
         .map_err(|_| "http client failed".to_string())
 }
 
+/// Await one network step while checking the stop flag and the
+/// attempt deadline once a second. A socket that goes silent (a radio
+/// asleep behind a backgrounded app) never pins the turn, and Stop
+/// lands within a second even mid-request or mid-fetch.
+async fn watched<F: Future>(
+    step: F,
+    stop: &AtomicBool,
+    deadline: Instant,
+) -> Result<F::Output, AttemptEnd> {
+    let mut step = std::pin::pin!(step);
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            return Err(AttemptEnd::Stopped);
+        }
+        if Instant::now() > deadline {
+            return Err(AttemptEnd::Retryable(None));
+        }
+        if let Ok(out) = tokio::time::timeout(Duration::from_secs(1), step.as_mut()).await {
+            return Ok(out);
+        }
+    }
+}
+
 fn classify_send_error(error: reqwest::Error) -> AttemptEnd {
     // Send-time failures are transport by construction (statuses arrive
     // as responses, never errors): timeouts, refused/reset/closed
@@ -562,13 +590,7 @@ async fn read_stream(
     let mut frags: Vec<ToolFrag> = Vec::new();
     let mut usage: Option<TurnUsage> = None;
     loop {
-        if ev.stop.load(Ordering::Relaxed) {
-            return Err(AttemptEnd::Stopped);
-        }
-        if Instant::now() > deadline {
-            return Err(AttemptEnd::Retryable(None));
-        }
-        match response.chunk().await {
+        match watched(response.chunk(), &ev.stop, deadline).await? {
             Ok(Some(bytes)) => take_payloads(
                 decoder.push(&bytes),
                 &mut content,
@@ -601,6 +623,8 @@ async fn post_stream(
     deadline: Instant,
     ev: &mut AttemptEvents,
 ) -> Result<(u16, String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
+    let stop = Arc::clone(&ev.stop);
+    let stop = &*stop;
     let mut post = client
         .post(format!(
             "{}/chat/completions",
@@ -615,22 +639,24 @@ async fn post_stream(
     // goes out as pre-encoded bytes with the header set above.
     let encoded = serde_json::to_vec(&stream_body(req, history, tools))
         .map_err(|error| AttemptEnd::Fatal(format!("encode request: {error}")))?;
-    let res = post
-        .body(encoded)
-        .send()
-        .await
+    let res = watched(post.body(encoded).send(), &ev.stop, deadline)
+        .await?
         .map_err(classify_send_error)?;
     // A tools rejection reads as a plain turn, exactly like TypeScript's
     // 400 fallback — the reply still lands, just without page fetches.
     // The body rides along as the content so a later round can report
     // the server's reason (see `rejected_400`).
     if res.status().as_u16() == 400 && tools {
-        let head = res.text().await.unwrap_or_default();
+        let head = watched(res.text(), &ev.stop, deadline)
+            .await?
+            .unwrap_or_default();
         return Ok((400, head.chars().take(300).collect(), Vec::new(), None));
     }
     if !res.status().is_success() {
         let status = res.status().as_u16();
-        let head = res.text().await.unwrap_or_default();
+        let head = watched(res.text(), stop, deadline)
+            .await?
+            .unwrap_or_default();
         let head: String = head.chars().take(300).collect();
         let message = format!("stream failed (HTTP {status}): {head}");
         return Err(if retryable_http_status(status) {
@@ -649,6 +675,8 @@ async fn post_plain(
     req: &TurnRequest,
     history: &[serde_json::Value],
     tools: bool,
+    stop: &AtomicBool,
+    deadline: Instant,
 ) -> Result<(String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
     let mut post = client
         .post(format!(
@@ -661,14 +689,14 @@ async fn post_plain(
     }
     let encoded = serde_json::to_vec(&plain_body(req, history, tools))
         .map_err(|error| AttemptEnd::Fatal(format!("encode request: {error}")))?;
-    let res = post
-        .body(encoded)
-        .send()
-        .await
+    let res = watched(post.body(encoded).send(), stop, deadline)
+        .await?
         .map_err(classify_send_error)?;
     if !res.status().is_success() {
         let status = res.status().as_u16();
-        let head = res.text().await.unwrap_or_default();
+        let head = watched(res.text(), stop, deadline)
+            .await?
+            .unwrap_or_default();
         let head: String = head.chars().take(300).collect();
         let message = format!("request failed (HTTP {status}): {head}");
         return Err(if retryable_http_status(status) {
@@ -680,13 +708,15 @@ async fn post_plain(
     // No `json` feature either: read bytes, parse by hand. Transport
     // cuts stay retryable; malformed payloads fail the turn (a second
     // identical response would parse the same way).
-    let bytes = res.bytes().await.map_err(|error| {
-        if error.is_timeout() || error.is_connect() || error.is_body() {
-            AttemptEnd::Retryable(None)
-        } else {
-            AttemptEnd::Fatal(format!("bad response: {error}"))
-        }
-    })?;
+    let bytes = watched(res.bytes(), stop, deadline)
+        .await?
+        .map_err(|error| {
+            if error.is_timeout() || error.is_connect() || error.is_body() {
+                AttemptEnd::Retryable(None)
+            } else {
+                AttemptEnd::Fatal(format!("bad response: {error}"))
+            }
+        })?;
     let json: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|error| AttemptEnd::Fatal(format!("bad response: {error}")))?;
     let message = &json["choices"][0]["message"];
@@ -717,6 +747,7 @@ async fn run_fetch_batch(
     assistant_text: &str,
     pending: &[ExecCall],
     page_fetch: &PageFetch,
+    deadline: Instant,
     ev: &mut AttemptEvents,
 ) -> Result<(), AttemptEnd> {
     if ev.stop.load(Ordering::Relaxed) {
@@ -735,7 +766,12 @@ async fn run_fetch_batch(
         // as the TypeScript provider's onFetchStart/onFetchEnd, so
         // both engines drive one indicator.
         (ev.on_fetch)(true, call.url.clone());
-        let text = match page_fetch(call.url.clone()).await {
+        let fetched = watched(page_fetch(call.url.clone()), &ev.stop, deadline).await;
+        let Ok(fetched) = fetched else {
+            (ev.on_fetch)(false, call.url.clone());
+            return fetched.map(|_| ());
+        };
+        let text = match fetched {
             Ok(text) => text,
             Err(code) => fetch_error_copy(&code),
         };
@@ -810,14 +846,23 @@ async fn run_attempt(
         if pending.is_empty() {
             break;
         }
-        run_fetch_batch(&mut history, &assistant_text, &pending, page_fetch, ev).await?;
+        run_fetch_batch(
+            &mut history,
+            &assistant_text,
+            &pending,
+            page_fetch,
+            deadline,
+            ev,
+        )
+        .await?;
         // The last batch goes straight to the streamed answer (as in
         // the TypeScript engine): a plain follow-up here could only ask
         // for fetches nothing would run.
         if round + 1 >= MAX_TOOL_ROUNDS {
             break;
         }
-        let (content, frags, round_usage) = post_plain(client, req, &history, true).await?;
+        let (content, frags, round_usage) =
+            post_plain(client, req, &history, true, &ev.stop, deadline).await?;
         if round_usage.is_some() {
             usage = round_usage;
         }
@@ -862,7 +907,15 @@ async fn run_attempt(
         if final_usage.is_some() {
             usage = final_usage;
         }
-        run_fetch_batch(&mut history, &final_content, &more, page_fetch, ev).await?;
+        run_fetch_batch(
+            &mut history,
+            &final_content,
+            &more,
+            page_fetch,
+            deadline,
+            ev,
+        )
+        .await?;
     }
 }
 
@@ -1110,7 +1163,7 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
             if live.stop.load(Ordering::Relaxed) {
                 TurnOutcome::Stopped
             } else {
-                let (summary, fresh) = resolve_summary(&client, &req).await;
+                let (summary, fresh) = resolve_summary(&client, &req, &live.stop).await;
                 if let Some(text) = fresh {
                     refreshed = Some(SummaryRefresh {
                         text,
@@ -1687,6 +1740,8 @@ mod tests {
             body: Vec<u8>,
         },
         Drop,
+        /// Read the request, then hold the socket open in silence.
+        Hang,
     }
 
     fn read_http_body(stream: &mut std::net::TcpStream) -> String {
@@ -1736,6 +1791,11 @@ mod tests {
                     StubStep::Drop => {
                         let request = read_http_body(&mut stream);
                         bodies.lock().unwrap().push(request);
+                    }
+                    StubStep::Hang => {
+                        let request = read_http_body(&mut stream);
+                        bodies.lock().unwrap().push(request);
+                        std::thread::sleep(Duration::from_secs(30));
                     }
                     StubStep::Respond {
                         status,
@@ -1855,6 +1915,47 @@ mod tests {
             }),
             stop: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    #[test]
+    fn stop_lands_while_the_server_says_nothing() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(vec![StubStep::Hang], Arc::clone(&bodies));
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>(String::new()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let stop = Arc::new(AtomicBool::new(false));
+        let raise = Arc::clone(&stop);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1500));
+            raise.store(true, Ordering::Relaxed);
+        });
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let started = Instant::now();
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || AttemptEvents {
+                stop: Arc::clone(&stop),
+                ..test_events(&rec)
+            },
+        ));
+        assert!(matches!(outcome, TurnOutcome::Stopped), "got {outcome:?}");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "stop waited on the socket"
+        );
     }
 
     #[test]
@@ -2228,7 +2329,8 @@ mod tests {
         req.prior_summary = "old stuff".to_string();
         req.fold_text = "User: hi".to_string();
         req.fold_through = "m1".to_string();
-        let (to_use, refreshed) = tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        let (to_use, refreshed) =
+            tauri::async_runtime::block_on(resolve_summary(&client, &req, &AtomicBool::new(false)));
         assert_eq!(to_use, "fresh summary");
         assert_eq!(refreshed, Some("fresh summary".to_string()));
         let bodies = bodies.lock().unwrap();
@@ -2247,7 +2349,8 @@ mod tests {
         let client = reqwest_client().unwrap();
         let mut req = test_request(1);
         req.prior_summary = "old stuff".to_string();
-        let (to_use, refreshed) = tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        let (to_use, refreshed) =
+            tauri::async_runtime::block_on(resolve_summary(&client, &req, &AtomicBool::new(false)));
         assert_eq!(to_use, "old stuff");
         assert_eq!(refreshed, None);
     }
@@ -2267,7 +2370,8 @@ mod tests {
         let mut req = test_request(port);
         req.prior_summary = "old stuff".to_string();
         req.fold_text = "User: hi".to_string();
-        let (to_use, refreshed) = tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        let (to_use, refreshed) =
+            tauri::async_runtime::block_on(resolve_summary(&client, &req, &AtomicBool::new(false)));
         // The turn still runs windowed on the prior text.
         assert_eq!(to_use, "old stuff");
         assert_eq!(refreshed, None);
