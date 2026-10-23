@@ -1086,6 +1086,9 @@ export type WordLookup = (
 	lang: string
 ) => Promise<{ hits: DictHit[]; japanese: JaPiece[] } | null>;
 
+/** Longest the model request waits on a dictionary lookup (ms). */
+export const LOOKUP_WAIT_MS = 1200;
+
 /**
  * Ask the model one annotation question: a separate request, never
  * linked to the main prompt or chat history. No cache — every filing
@@ -1111,31 +1114,49 @@ export async function annotationAnswer(
 	if (!q.quote.trim()) throw new Error("Nothing to answer about.");
 	if (!q.question.trim() && isWordQuote(q.quote)) {
 		const lang = wordCardLang(q.quote, opts.lang);
-		const found =
-			lang && opts.lookup
-				? await opts.lookup(q.quote, lang).catch(() => null)
-				: null;
-		if (found && lang) {
+		const lookup =
+			lang && opts.lookup ? opts.lookup(q.quote, lang).catch(() => null) : null;
+		// A first lookup can load a whole pack (or the Japanese
+		// tokenizer): the model never waits long on it, and a late
+		// result still shows its instant card while the model works.
+		const found = lookup
+			? await Promise.race([
+					lookup,
+					new Promise<null>((resolve) =>
+						setTimeout(() => resolve(null), LOOKUP_WAIT_MS)
+					)
+				])
+			: null;
+		let modelDone = false;
+		const showInstant = (hits: Awaited<ReturnType<WordLookup>>): void => {
+			if (!hits || !lang || modelDone) return;
 			const instant = cardFromDictionary(
 				q.quote,
-				found.hits,
+				hits.hits,
 				lang,
-				found.japanese
+				hits.japanese
 			);
 			if (instant)
 				opts.onPartial?.({ answer: wordCardText(instant), card: instant });
-		}
+		};
+		if (found) showInstant(found);
+		else if (lookup) void lookup.then(showInstant);
 		const dictionary = found ? dictionaryPromptLines(q.quote, found.hits) : "";
-		const reply = await provider.chat(
-			buildWordCardMessages(q, lang, {
-				...opts,
-				...(dictionary ? { dictionary } : {})
-			}) as Array<{
-				role: "system" | "user" | "assistant";
-				content: string;
-			}>,
-			{ signal }
-		);
+		let reply: Awaited<ReturnType<ChatProvider["chat"]>>;
+		try {
+			reply = await provider.chat(
+				buildWordCardMessages(q, lang, {
+					...opts,
+					...(dictionary ? { dictionary } : {})
+				}) as Array<{
+					role: "system" | "user" | "assistant";
+					content: string;
+				}>,
+				{ signal }
+			);
+		} finally {
+			modelDone = true;
+		}
 		const parsed = parseWordCard(reply.content, q.quote);
 		if (parsed) {
 			const card = lang ? { ...parsed, lang } : parsed;

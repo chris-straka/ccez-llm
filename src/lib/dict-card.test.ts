@@ -12,7 +12,7 @@ import {
 	type DictHit,
 	type JaPiece
 } from "./dict-card";
-import { annotationAnswer } from "./reading";
+import { annotationAnswer, LOOKUP_WAIT_MS } from "./reading";
 import type { ChatProvider } from "./providers/types";
 
 const franchir = {
@@ -430,6 +430,48 @@ describe("annotationAnswer with a dictionary", () => {
 		)[0][0]!.content;
 		expect(system).toContain("Dictionary entries for the word");
 		expect(system).toContain("past participle of franchir");
+	});
+
+	it("never holds the model on a slow lookup, yet shows its card when it lands", async () => {
+		vi.useFakeTimers();
+		try {
+			let land: (v: { hits: DictHit[]; japanese: [] }) => void = () =>
+				undefined;
+			let answer: (v: { content: string; usage: null }) => void = () =>
+				undefined;
+			const chat = vi.fn(
+				() =>
+					new Promise<{ content: string; usage: null }>((resolve) => {
+						answer = resolve;
+					})
+			);
+			const provider = {
+				id: "s",
+				chat,
+				stream: chat
+			} as unknown as ChatProvider;
+			const partials: unknown[] = [];
+			const replied = annotationAnswer(provider, q, undefined, {
+				lang: "fr",
+				lookup: () =>
+					new Promise((resolve) => {
+						land = resolve;
+					}),
+				onPartial: (r) => partials.push(r.card)
+			});
+			await vi.advanceTimersByTimeAsync(LOOKUP_WAIT_MS);
+			expect(chat).toHaveBeenCalledOnce();
+			land({
+				hits: [{ tags: "participle past", entry: franchir }],
+				japanese: []
+			});
+			await vi.advanceTimersByTimeAsync(0);
+			expect(partials).toHaveLength(1);
+			answer({ content: model, usage: null });
+			expect((await replied).card?.meaning).toBe("crossed");
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("asks the model alone when the lookup has nothing or fails", async () => {
