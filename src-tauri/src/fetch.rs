@@ -7,7 +7,15 @@
 //! cleans it to readable text, so the browser-preview fallback shares
 //! the cap and the copy. Compiled everywhere; only invoked from the
 //! shell (browser dev never reaches here).
+//!
+//! Public internet only: the model picks these URLs, and a page it
+//! read can tell it which to pick next. Loopback, home-network and
+//! link-local addresses are refused as literals, through DNS, and on
+//! every redirect hop, so a prompt-injected fetch can't reach the
+//! router, a local model server or the tailnet.
 
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
 use std::time::Duration;
 
 const FETCH_TIMEOUT_SECS: u64 = 20;
@@ -36,6 +44,104 @@ pub(crate) fn fetchable_url(url: &str) -> Option<&str> {
         return None;
     }
     Some(url)
+}
+
+/// [`fetchable_url`] on the public internet only (see the module note).
+pub(crate) fn public_url(url: &str) -> Option<&str> {
+    let url = fetchable_url(url)?;
+    let parsed = rquest::Url::parse(url).ok()?;
+    (!private_host(&parsed)).then_some(url)
+}
+
+/// Addresses a fetch never reaches: loopback, private, link-local,
+/// carrier-grade NAT (the tailnet), unspecified and broadcast.
+fn private_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let [a, b, ..] = v4.octets();
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || a == 0
+                || (a == 100 && (64..128).contains(&b))
+        }
+        IpAddr::V6(v6) => {
+            let first = v6.segments()[0];
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || (first & 0xfe00) == 0xfc00
+                || (first & 0xffc0) == 0xfe80
+                || v6
+                    .to_ipv4_mapped()
+                    .is_some_and(|v4| private_ip(IpAddr::V4(v4)))
+        }
+    }
+}
+
+/// A URL whose host is a private address literal or a local name.
+fn private_host(url: &rquest::Url) -> bool {
+    let Some(host) = url.host_str() else {
+        return true;
+    };
+    // The URL parser already normalized IP literals (0x7f.1 reads
+    // 127.0.0.1); IPv6 keeps its brackets.
+    if let Ok(ip) = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse::<IpAddr>()
+    {
+        return private_ip(ip);
+    }
+    let name = host.trim_end_matches('.').to_ascii_lowercase();
+    name == "localhost" || name.ends_with(".localhost")
+}
+
+/// System DNS with private answers dropped: a public name that
+/// resolves to a home-network address fails like an unknown one.
+struct PublicDns;
+
+impl rquest::dns::Resolve for PublicDns {
+    fn resolve(&self, name: rquest::dns::Name) -> rquest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let found = tauri::async_runtime::spawn_blocking(move || {
+                (host.as_str(), 0)
+                    .to_socket_addrs()
+                    .map(|addrs| addrs.collect::<Vec<SocketAddr>>())
+            })
+            .await
+            .map_err(|_| "dns failed")??;
+            let public: Vec<SocketAddr> = found
+                .into_iter()
+                .filter(|addr| !private_ip(addr.ip()))
+                .collect();
+            if public.is_empty() {
+                return Err("private address".into());
+            }
+            Ok(Box::new(public.into_iter()) as rquest::dns::Addrs)
+        })
+    }
+}
+
+/// Every app fetch client: public DNS only, and redirects that stop
+/// at a private literal (ten hops at most, rquest's default).
+fn reach(builder: rquest::ClientBuilder, public: bool) -> rquest::ClientBuilder {
+    if !public {
+        return builder;
+    }
+    builder
+        .dns_resolver(Arc::new(PublicDns))
+        .redirect(rquest::redirect::Policy::custom(|attempt| {
+            if private_host(attempt.url()) {
+                attempt.error("private address")
+            } else if attempt.previous().len() >= 10 {
+                attempt.error("too many redirects")
+            } else {
+                attempt.follow()
+            }
+        }))
 }
 
 /// Transport failure to its machine code: timeouts read as
@@ -192,8 +298,8 @@ async fn send_capped(client: &rquest::Client, url: &str) -> Result<String, Strin
 /// Plain-client second try for consent shells (see
 /// `looks_like_consent_shell`). Whatever it returns stands — no
 /// third try.
-async fn fetch_plain(url: &str) -> Result<String, String> {
-    let client = rquest::Client::builder()
+async fn fetch_plain(url: &str, public: bool) -> Result<String, String> {
+    let client = reach(rquest::Client::builder(), public)
         .cookie_store(true)
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
         .build()
@@ -203,8 +309,15 @@ async fn fetch_plain(url: &str) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn fetch_page(url: String) -> Result<String, String> {
-    let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
-    let client = rquest::Client::builder()
+    fetch_page_with(url, true).await
+}
+
+/// The fetch itself; tests reach their loopback stubs with `public`
+/// off, the app never does.
+async fn fetch_page_with(url: String, public: bool) -> Result<String, String> {
+    let gate = if public { public_url } else { fetchable_url };
+    let url = gate(&url).ok_or_else(|| "bad-url".to_string())?;
+    let client = reach(rquest::Client::builder(), public)
         .impersonate(rquest::impersonate::Impersonate::Safari17_5)
         // Anonymous-ID dances (Québecor, Tamedia) 307-loop without a
         // jar; it lives for this fetch only and is dropped after.
@@ -214,7 +327,7 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
         .map_err(|_| "failed".to_string())?;
     let html = send_capped(&client, url).await?;
     if looks_like_consent_shell(&html) {
-        return fetch_plain(url).await;
+        return fetch_plain(url, public).await;
     }
     Ok(html)
 }
@@ -233,6 +346,30 @@ mod tests {
         assert!(fetchable_url("https://example.com/a b").is_none());
         assert!(fetchable_url("").is_none());
         assert!(fetchable_url("https://").is_none());
+    }
+
+    #[test]
+    fn public_url_refuses_home_and_loopback_addresses() {
+        assert!(public_url("https://example.com/").is_some());
+        assert!(public_url("https://93.184.215.14/").is_some());
+        assert!(public_url("http://localhost:1420/").is_none());
+        assert!(public_url("http://app.localhost/").is_none());
+        assert!(public_url("http://127.0.0.1:11434/api/tags").is_none());
+        assert!(public_url("http://192.168.1.1/").is_none());
+        assert!(public_url("http://10.0.0.5/").is_none());
+        assert!(public_url("http://169.254.169.254/latest/").is_none());
+        assert!(public_url("http://100.101.102.103/").is_none());
+        assert!(public_url("http://[::1]/").is_none());
+        assert!(public_url("http://[::ffff:127.0.0.1]/").is_none());
+        assert!(public_url("http://0x7f.1/").is_none());
+    }
+
+    #[test]
+    fn public_dns_drops_private_answers() {
+        use rquest::dns::Resolve;
+        let name: rquest::dns::Name = "localhost".parse().unwrap();
+        let out = tauri::async_runtime::block_on(PublicDns.resolve(name));
+        assert!(out.is_err(), "localhost resolved through the guard");
     }
 
     #[test]
@@ -365,7 +502,7 @@ mod tests {
                 }
             }
         });
-        let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/")));
+        let out = tauri::async_runtime::block_on(fetch_page_with(format!("http://{addr}/"), false));
         let _ = server.join();
         assert_eq!(out.unwrap(), "danced");
     }
@@ -533,7 +670,10 @@ mod tests {
     #[test]
     fn fetch_page_retries_consent_shells_plain() {
         let (addr, server) = spawn_outlet_stub();
-        let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/consent")));
+        let out = tauri::async_runtime::block_on(fetch_page_with(
+            format!("http://{addr}/consent"),
+            false,
+        ));
         let _ = server.join();
         let html = out.unwrap();
         assert!(
@@ -545,7 +685,8 @@ mod tests {
     #[test]
     fn fetch_page_transcodes_legacy_charsets() {
         let (addr, server) = spawn_outlet_stub();
-        let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/win")));
+        let out =
+            tauri::async_runtime::block_on(fetch_page_with(format!("http://{addr}/win"), false));
         let _ = server.join();
         assert_eq!(
             out.unwrap(),
