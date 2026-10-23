@@ -54,6 +54,10 @@ rustls = { version = "0.23", default-features = false, features = ["std", "ring"
 # webpki roots work on every target including Android (native-tls does
 # not). Version pins against the copy already in Cargo.lock.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "cookies"] }
+# Dictionary packs (dict.rs): gunzip and checksum the download. Both
+# versions match the copies already in Cargo.lock (transitive).
+flate2 = "1.1"
+sha2 = "0.10"
 # Listening drills: YouTube tracks, captions and lists over plain HTTPS.
 ccez-listen = { path = "listen" }
 # Grading concurrency for listening drills (already in the tree via tauri).

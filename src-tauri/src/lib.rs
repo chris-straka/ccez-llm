@@ -10,6 +10,7 @@ mod capture;
 mod coderun;
 #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
 mod dev_secrets;
+mod dict;
 mod game_line;
 // Deep-link parsing, routing and the pending-link drain serve every
 // platform (iOS/Android open URLs too); the summon kit, tray and sleep
@@ -374,6 +375,10 @@ pub fn run() {
     let builder = builder
         .invoke_handler(tauri::generate_handler![
             annotate::drain_pending_external,
+            dict::dict_installed,
+            dict::dict_lookup,
+            dict::dict_install,
+            dict::dict_remove,
             #[cfg(desktop)]
             desktop::desktop_sleep_block,
             #[cfg(desktop)]

@@ -323,6 +323,12 @@ export interface AppSettings {
 	 * learner) instead of English. Off by default; Ctrl+⌥+L flips it.
 	 */
 	annotationAnswersInPassageLang: boolean;
+	/**
+	 * Download a language's dictionary (Wiktionary, JMdict) the first
+	 * time a word in it is annotated, so word cards open at once. On
+	 * by default; desktop and Android only.
+	 */
+	wordCardDictionaries: boolean;
 	/** What an empty chat in a language opens: news or listening. */
 	emptyChatMode: "news" | "listen";
 	/**
@@ -595,6 +601,7 @@ export function defaultSettings(): AppSettings {
 		flashcardsEnabled: false,
 		listenChannels: [],
 		annotationAnswersInPassageLang: false,
+		wordCardDictionaries: true,
 		emptyChatMode: "news",
 		aiTitles: true
 	};
@@ -855,6 +862,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.emptyChatMode = "news";
 		if (typeof merged.annotationAnswersInPassageLang !== "boolean")
 			merged.annotationAnswersInPassageLang = false;
+		if (typeof merged.wordCardDictionaries !== "boolean")
+			merged.wordCardDictionaries = true;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")

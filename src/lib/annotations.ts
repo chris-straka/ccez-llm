@@ -304,8 +304,10 @@ export function dropFollowUp(
  * off the wire. Answered ones stay out. Pure — the boot/switch scan
  * refires exactly these.
  */
+/** Notes still waiting on the model: no answer yet, or only the
+dictionary's instant card. */
 export function unansweredAnnotations(list: Annotation[]): Annotation[] {
-	return list.filter((a) => a.answer === undefined);
+	return list.filter((a) => a.answer === undefined || a.card?.partial === true);
 }
 
 /**

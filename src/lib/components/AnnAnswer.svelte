@@ -29,7 +29,8 @@ where it was left. -->
 		type NoteColumn
 	} from "$lib/annPop";
 	import type { AnnotationFollowUp } from "$lib/annotations";
-	import { wordCardDir, type WordCard } from "$lib/word-card";
+	import { WORD_PROFILES, wordCardDir, type WordCard } from "$lib/word-card";
+	import { dictDownloads } from "$lib/dictionary.svelte";
 
 	interface Props {
 		answer: string;
@@ -90,6 +91,10 @@ where it was left. -->
 			: []
 	);
 	const cardReadings = $derived(cardWord.some((p) => p.reading));
+	/** The card's language pack downloading right now (0 to 1). */
+	const downloading = $derived(
+		wordCard?.lang !== undefined ? dictDownloads[wordCard.lang] : undefined
+	);
 
 	/** The reply field's text, and its height (re-measures the card
 	when it changes). The field shows only after Reply is pressed,
@@ -408,6 +413,19 @@ where it was left. -->
 					<p class="wc-line" dir="auto">
 						<span class="wc-key wc-watch">Watch:</span>
 						{wordCard.watch}
+					</p>
+				{/if}
+				{#if wordCard.partial}
+					<!-- The dictionary's instant card: the model's notes
+					are still on the way. -->
+					<p class="ann-thread-wait" aria-label="Finishing the card">
+						<span></span><span></span><span></span>
+					</p>
+				{/if}
+				{#if downloading !== undefined && wordCard.lang}
+					<p class="wc-key wc-download">
+						Downloading the {WORD_PROFILES[wordCard.lang]?.name ?? ""} dictionary
+						· {Math.round(downloading * 100)}%
 					</p>
 				{/if}
 			</div>
@@ -789,6 +807,10 @@ where it was left. -->
 	}
 	.wc-part.k-core .wc-label {
 		color: var(--muted);
+	}
+	.wc-download {
+		margin: 0;
+		font-size: 0.82em;
 	}
 	.wc-facts {
 		display: flex;

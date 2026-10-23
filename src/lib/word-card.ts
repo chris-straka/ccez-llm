@@ -53,6 +53,8 @@ export interface WordCard {
 	watch?: string;
 	/** Language code the card was made for (direction, lang attribute). */
 	lang?: string;
+	/** The dictionary's instant card, while the model writes the rest. */
+	partial?: boolean;
 }
 
 export interface WordProfile {
@@ -767,6 +769,7 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 	const here = text(r.here, MAX.line);
 	const watch = text(r.watch, MAX.line);
 	const lang = text(r.lang, 12);
+	const partial = r.partial === true;
 	return {
 		meaning,
 		...(inSentence && inSentence !== meaning ? { inSentence } : {}),
@@ -775,7 +778,8 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 		...(base ? { base } : {}),
 		...(here ? { here } : {}),
 		...(watch ? { watch } : {}),
-		...(lang ? { lang } : {})
+		...(lang ? { lang } : {}),
+		...(partial ? { partial } : {})
 	};
 }
 
@@ -836,7 +840,7 @@ export function wordCardDir(lang: string | undefined): "rtl" | "ltr" {
 export function buildWordCardMessages(
 	q: { quote: string; context: string },
 	lang: string | null,
-	opts: { inPassageLang?: boolean } = {}
+	opts: { inPassageLang?: boolean; dictionary?: string } = {}
 ): Array<{ role: string; content: string }> {
 	const profile = lang ? WORD_PROFILES[lang] : undefined;
 	const tongue = opts.inPassageLang
@@ -889,7 +893,13 @@ export function buildWordCardMessages(
 		`says; never add claims about people or events it doesn't state.\n` +
 		`"watch": one sentence on the trap a learner most likely falls into ` +
 		`with this word, from the checklist; leave it out when there is none.\n` +
-		`Checklist:\n${checklist}`;
+		`Checklist:\n${checklist}` +
+		(opts.dictionary
+			? `\nDictionary entries for the word. Trust their forms and base ` +
+				`words; choose the sense that fits the passage, and give a sense ` +
+				`none of them lists only when the passage plainly needs it:\n` +
+				opts.dictionary
+			: "");
 	return [
 		{ role: "system", content: system },
 		{

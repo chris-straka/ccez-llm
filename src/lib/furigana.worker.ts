@@ -22,6 +22,40 @@ import { furiganaLineHtml } from "./furiganaRuby";
 interface ConvertRequest {
 	id: number;
 	text: string;
+	/** "tokens" asks for the analysis (word cards), not ruby HTML. */
+	kind?: "tokens";
+}
+
+/** One analyzed piece of a word (IPAdic details). */
+export interface JaToken {
+	surface: string;
+	/** Part of speech and its first subtype (動詞, 助動詞; 非自立). */
+	pos: string;
+	sub: string;
+	/** Dictionary form (読む for 読ま). */
+	base: string;
+	/** Katakana reading. */
+	reading: string;
+}
+
+async function analyze(text: string): Promise<JaToken[]> {
+	const raw = (await ensureReady()).tokenize(text) as unknown;
+	return (Array.isArray(raw) ? raw : []).map(
+		(t: { surface?: unknown; details?: unknown }) => {
+			const d = Array.isArray(t.details)
+				? (t.details as unknown[]).map(String)
+				: [];
+			const surface = typeof t.surface === "string" ? t.surface : "";
+			const field = (i: number): string => (d[i] && d[i] !== "*" ? d[i] : "");
+			return {
+				surface,
+				pos: field(0),
+				sub: field(1),
+				base: field(6) || surface,
+				reading: field(7)
+			};
+		}
+	);
 }
 
 /** Minimal worker scope: lib.dom types the window flavor, not this one. */
@@ -101,6 +135,17 @@ async function convert(text: string): Promise<string> {
 
 scope.addEventListener("message", (event: Event) => {
 	const request = (event as MessageEvent).data as ConvertRequest;
+	if (request.kind === "tokens") {
+		void analyze(request.text).then(
+			(tokens) => scope.postMessage({ id: request.id, tokens }),
+			(error: unknown) =>
+				scope.postMessage({
+					id: request.id,
+					error: error instanceof Error ? error.message : String(error)
+				})
+		);
+		return;
+	}
 	void convert(request.text).then(
 		(html) => scope.postMessage({ id: request.id, html }),
 		(error: unknown) =>

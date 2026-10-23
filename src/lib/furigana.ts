@@ -1,6 +1,9 @@
 import { escapeHtml, sanitize } from "./render";
 import { pinyinRuby, plainParagraphs } from "./pinyin";
 import { classifyAidLine, codeAwareLines, type LocalAid } from "./reading";
+import type { JaToken } from "./furigana.worker";
+
+export type { JaToken };
 
 /**
  * Japanese furigana via lindera (IPAdic) in a Web Worker. Conversion
@@ -14,6 +17,7 @@ import { classifyAidLine, codeAwareLines, type LocalAid } from "./reading";
 interface ConvertResponse {
 	id: number;
 	html?: string;
+	tokens?: JaToken[];
 	error?: string;
 }
 
@@ -23,7 +27,10 @@ let worker: Worker | null = null;
 let nextRequestId = 0;
 const inflight = new Map<
 	number,
-	{ resolve: (html: string) => void; reject: (error: Error) => void }
+	{
+		resolve: (result: ConvertResponse) => void;
+		reject: (error: Error) => void;
+	}
 >();
 
 function getWorker(): Worker {
@@ -43,7 +50,7 @@ function getWorker(): Worker {
 			inflight.delete(response.id);
 			if (response.error !== undefined)
 				pending.reject(new Error(response.error));
-			else pending.resolve(response.html ?? "");
+			else pending.resolve(response);
 		};
 		created.onerror = (event: Event) => {
 			// Drop the worker so the next request starts fresh instead of
@@ -71,9 +78,22 @@ function getWorker(): Worker {
 const CONVERT_TIMEOUT_MS = 60_000;
 
 function convertInWorker(text: string): Promise<string> {
+	return askWorker(text).then((r) => r.html ?? "");
+}
+
+/**
+ * A Japanese word's analysis (surface, part of speech, dictionary
+ * form, reading per piece): what word cards split and look up by.
+ * Shares the furigana worker and its dictionary load.
+ */
+export function japaneseTokens(text: string): Promise<JaToken[]> {
+	return askWorker(text, "tokens").then((r) => r.tokens ?? []);
+}
+
+function askWorker(text: string, kind?: "tokens"): Promise<ConvertResponse> {
 	const w = getWorker();
 	const id = nextRequestId++;
-	return new Promise<string>((resolve, reject) => {
+	return new Promise<ConvertResponse>((resolve, reject) => {
 		const timer = setTimeout(() => {
 			try {
 				w.terminate();
@@ -86,16 +106,16 @@ function convertInWorker(text: string): Promise<string> {
 			inflight.clear();
 		}, CONVERT_TIMEOUT_MS);
 		inflight.set(id, {
-			resolve: (html) => {
+			resolve: (result) => {
 				clearTimeout(timer);
-				resolve(html);
+				resolve(result);
 			},
 			reject: (error) => {
 				clearTimeout(timer);
 				reject(error);
 			}
 		});
-		w.postMessage({ id, text });
+		w.postMessage(kind ? { id, text, kind } : { id, text });
 	});
 }
 

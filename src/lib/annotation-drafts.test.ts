@@ -39,6 +39,7 @@ function harness(
 			signal: AbortSignal
 		) => Promise<string | AnnotationReply>;
 		lang?: string;
+		partial?: AnnotationReply;
 		followUp?: (reply: string) => Promise<string>;
 	} = {}
 ): {
@@ -78,9 +79,10 @@ function harness(
 		getChatIds: () => chats,
 		resolveProvider: async () =>
 			opts.provider === undefined ? PROVIDER : opts.provider,
-		answerQuestion: (provider, q, signal) => {
+		answerQuestion: (provider, q, signal, onPartial) => {
 			void provider;
 			calls.answers.push(q);
+			if (opts.partial) onPartial?.(opts.partial);
 			return answer(q, signal);
 		},
 		answerContextFor: () => "ctx",
@@ -573,6 +575,42 @@ describe("word cards", () => {
 		expect(drafts.list[0]?.card).toEqual(card);
 		drafts.fileChat("c1" as ChatId);
 		expect(loadDraftAnnotations("c1")[0]?.card).toEqual(card);
+	});
+
+	it("the dictionary's card lands first and the model's replaces it", async () => {
+		const instant: WordCard = {
+			...card,
+			meaning: "past participle of franchir",
+			partial: true
+		};
+		let finish: (reply: AnnotationReply) => void = () => undefined;
+		const { drafts } = harness({
+			partial: { answer: instant.meaning, card: instant },
+			answer: () =>
+				new Promise<AnnotationReply>((resolve) => {
+					finish = resolve;
+				})
+		});
+		const q = note({ quote: "franchi" });
+		drafts.setList([q]);
+		const asked = drafts.ask(q);
+		await vi.waitFor(() => expect(drafts.list[0]?.card).toEqual(instant));
+		finish({ answer: "crossed", card });
+		await asked;
+		expect(drafts.list[0]?.card).toEqual(card);
+	});
+
+	it("a note left with only the dictionary's card is asked again", async () => {
+		const { drafts, calls } = harness();
+		drafts.setList([
+			note({
+				quote: "franchi",
+				answer: "past participle of franchir",
+				card: { ...card, partial: true }
+			})
+		]);
+		drafts.resumeUnanswered();
+		await vi.waitFor(() => expect(calls.answers).toHaveLength(1));
 	});
 
 	it("a plain answer drops a stale card", async () => {

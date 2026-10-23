@@ -102,6 +102,10 @@
 				/>
 				<span>Answer annotations in the passage's language</span>
 			</label>
+			<label class="check">
+				<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
+				<span>Download dictionaries for word cards (Wiktionary, JMdict)</span>
+			</label>
 		</fieldset>
 		<!-- On/off features under one "Enable" legend, two columns where
 		the panel has room (one when narrow or zoomed). -->
@@ -207,6 +211,10 @@
 				bind:checked={settings.annotationAnswersInPassageLang}
 			/>
 			<span>Answer annotations in the passage's language</span>
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
+			<span>Download dictionaries for word cards (Wiktionary, JMdict)</span>
 		</label>
 	{/if}
 </section>

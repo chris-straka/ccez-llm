@@ -189,6 +189,7 @@
 	import { escapeHtml } from "$lib/render-math";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
+	import { makeWordLookup } from "$lib/dictionary.svelte";
 	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
@@ -965,14 +966,19 @@
 	// closures (notices, newsMode, annotateMode, androidUI) all
 	// resolve before the first call, like newsMode's onBadge. Annotated
 	// (not inferred): the two controllers reference each other.
+	// Word cards look one-word notes up in the language's downloaded
+	// dictionary first (desktop and Android; see dictionary.svelte.ts).
+	const wordLookup = makeWordLookup(() => settings.wordCardDictionaries);
 	const drafts: AnnotationDrafts = new AnnotationDrafts({
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),
 		resolveProvider: () => providerKeys.resolveActive(),
-		answerQuestion: (provider, q, signal) =>
+		answerQuestion: (provider, q, signal, onPartial) =>
 			annotationAnswer(provider, q, signal, {
 				inPassageLang: settings.annotationAnswersInPassageLang,
-				lang: q.lang ?? null
+				lang: q.lang ?? null,
+				lookup: wordLookup,
+				...(onPartial ? { onPartial } : {})
 			}),
 		langFor: (ann) =>
 			ann.story?.lang ??
@@ -5203,7 +5209,8 @@
 					undefined,
 					{
 						inPassageLang: settings.annotationAnswersInPassageLang,
-						lang: game.replyLang
+						lang: game.replyLang,
+						lookup: wordLookup
 					}
 				);
 				const added = list[list.length - 1];

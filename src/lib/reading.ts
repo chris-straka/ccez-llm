@@ -3,6 +3,12 @@ import { annRefsFor } from "./annotation-block";
 import { escapeHtml } from "./render-math";
 import { partialReading } from "./kanjiSplit";
 import {
+	dictionaryPromptLines,
+	type DictHit,
+	type JaPiece,
+	cardFromDictionary
+} from "./dict-card";
+import {
 	buildWordCardMessages,
 	isWordQuote,
 	looksLikeJson,
@@ -1073,6 +1079,13 @@ export interface AnnotationReply {
 	card?: WordCard;
 }
 
+/** Dictionary hits for a one-word quote in a language (with its
+Japanese analysis), or null when no pack is installed for it. */
+export type WordLookup = (
+	quote: string,
+	lang: string
+) => Promise<{ hits: DictHit[]; japanese: JaPiece[] } | null>;
+
 /**
  * Ask the model one annotation question: a separate request, never
  * linked to the main prompt or chat history. No cache — every filing
@@ -1086,13 +1099,38 @@ export async function annotationAnswer(
 	provider: ChatProvider,
 	q: AnnotationQuestion,
 	signal?: AbortSignal,
-	opts: { inPassageLang?: boolean; lang?: string | null } = {}
+	opts: {
+		inPassageLang?: boolean;
+		lang?: string | null;
+		/** Dictionary hits for a word (installed packs only). */
+		lookup?: WordLookup;
+		/** The dictionary's instant card, before the model's lands. */
+		onPartial?: (reply: AnnotationReply) => void;
+	} = {}
 ): Promise<AnnotationReply> {
 	if (!q.quote.trim()) throw new Error("Nothing to answer about.");
 	if (!q.question.trim() && isWordQuote(q.quote)) {
 		const lang = wordCardLang(q.quote, opts.lang);
+		const found =
+			lang && opts.lookup
+				? await opts.lookup(q.quote, lang).catch(() => null)
+				: null;
+		if (found && lang) {
+			const instant = cardFromDictionary(
+				q.quote,
+				found.hits,
+				lang,
+				found.japanese
+			);
+			if (instant)
+				opts.onPartial?.({ answer: wordCardText(instant), card: instant });
+		}
+		const dictionary = found ? dictionaryPromptLines(q.quote, found.hits) : "";
 		const reply = await provider.chat(
-			buildWordCardMessages(q, lang, opts) as Array<{
+			buildWordCardMessages(q, lang, {
+				...opts,
+				...(dictionary ? { dictionary } : {})
+			}) as Array<{
 				role: "system" | "user" | "assistant";
 				content: string;
 			}>,

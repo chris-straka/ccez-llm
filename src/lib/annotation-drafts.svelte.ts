@@ -32,7 +32,9 @@ export interface AnnotationDraftsDeps {
 	answerQuestion: (
 		provider: ChatProvider,
 		q: AnnotationQuestion,
-		signal: AbortSignal
+		signal: AbortSignal,
+		/** The dictionary's instant card, before the full answer. */
+		onPartial?: (reply: AnnotationReply) => void
 	) => Promise<string | AnnotationReply>;
 	answerContextFor: (ann: Annotation) => string;
 	/** The passage's language for a note (its story's, else its
@@ -313,7 +315,9 @@ export class AnnotationDrafts {
 					context: this.deps.answerContextFor(ann),
 					lang: this.deps.langFor?.(ann) ?? null
 				},
-				controller.signal
+				controller.signal,
+				(partial) =>
+					this.attachAnswer(chatId, ann.id, partial.answer, partial.card)
 			);
 			const { answer, card } =
 				typeof reply === "string" ? { answer: reply, card: undefined } : reply;
