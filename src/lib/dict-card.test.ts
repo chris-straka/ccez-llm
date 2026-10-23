@@ -125,9 +125,85 @@ describe("cardFromDictionary", () => {
 		).toMatchObject({
 			meaning: "eye",
 			parts: [],
-			facts: [{ text: "l'œil" }],
+			facts: [{ text: "un œil" }],
 			base: "plural of œil, noun"
 		});
+	});
+
+	it("shows gender where l' would hide it, and el before a stressed a", () => {
+		const fact = (w: string, g: string, lang: string) =>
+			cardFromDictionary(
+				w,
+				[{ tags: "", entry: { w, p: "noun", g, s: ["x"] } }],
+				lang
+			)!.facts[0]?.text;
+		expect(fact("homme", "masculine", "fr")).toBe("un homme");
+		expect(fact("heure", "feminine", "fr")).toBe("une heure");
+		expect(fact("hache", "feminine", "fr")).toBe("une hache");
+		expect(fact("amica", "feminine", "it")).toBe("un'amica");
+		expect(fact("amico", "masculine", "it")).toBe("un amico");
+		expect(fact("agua", "feminine", "es")).toBe("el agua");
+		expect(fact("hambre", "feminine", "es")).toBe("el hambre");
+		expect(fact("águila", "feminine", "es")).toBe("el águila");
+		expect(fact("amiga", "feminine", "es")).toBe("la amiga");
+		expect(fact("acción", "feminine", "es")).toBe("la acción");
+	});
+
+	it("keeps homographs apart", () => {
+		const hits = [
+			{
+				tags: "",
+				entry: { w: "Leiter", p: "noun", g: "feminine", s: ["ladder"] }
+			},
+			{
+				tags: "",
+				entry: { w: "Leiter", p: "noun", g: "masculine", s: ["leader"] }
+			}
+		];
+		const lines = dictionaryPromptLines("Leiter", hits);
+		expect(lines).toContain("ladder");
+		expect(lines).toContain("leader");
+	});
+
+	it("lets the headword beat a variant spelling of itself", () => {
+		const homme = { w: "homme", p: "noun", g: "masculine", s: ["man"] };
+		const lines = dictionaryPromptLines("homme", [
+			{ tags: "alternative", entry: homme },
+			{ tags: "", entry: homme }
+		]);
+		expect(lines).not.toContain("alternative");
+	});
+
+	it("never splits on a two-letter prefix or outside eliding languages", () => {
+		expect(stemSplit("gegangen", "gehen")).toBeNull();
+		expect(stemSplit("нашёл", "найти")).toBeNull();
+		expect(stemSplit("prenons", "prendre")).toEqual(["pren", "ons"]);
+		const meat = { w: "м'ясо", p: "noun", s: ["meat"] };
+		const card = cardFromDictionary(
+			"м'яса",
+			[{ tags: "genitive singular", entry: meat }],
+			"uk"
+		)!;
+		expect(card.parts.map((p) => p.text)).not.toContain("м'");
+		const today = { w: "aujourd'hui", p: "adv", s: ["today"] };
+		const curly = cardFromDictionary(
+			"aujourd’hui",
+			[{ tags: "", entry: today }],
+			"fr"
+		)!;
+		expect(curly.parts).toEqual([]);
+		expect(curly.base).toBeUndefined();
+	});
+
+	it("splits off long elided words (lorsqu'il)", () => {
+		expect(lookupForms("lorsqu'il", "fr")).toContain("il");
+		const il = { w: "il", p: "pron", s: ["he"] };
+		const card = cardFromDictionary(
+			"lorsqu'il",
+			[{ tags: "", entry: il }],
+			"fr"
+		)!;
+		expect(card.parts[0]).toMatchObject({ text: "lorsqu'", label: "when" });
 	});
 
 	it("gives a headword its first sense and gender", () => {

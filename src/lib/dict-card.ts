@@ -140,9 +140,9 @@ function baseLine(entry: DictEntry): string {
 	return `${entry.w}${reading}, ${entry.p}`;
 }
 
-/** Fold for comparing a form with its headword. */
+/** Fold for comparing a form with its headword (curly apostrophes straight). */
 function fold(s: string): string {
-	return s.normalize("NFC").toLowerCase();
+	return s.normalize("NFC").toLowerCase().replace(/[’ʼ]/g, "'");
 }
 
 /**
@@ -162,19 +162,32 @@ export function stemSplit(
 	// The whole form starts the headword (franchi, franchir): the
 	// headword's own ending isn't stem, so back off by its length.
 	if (n === fa.length) n -= b.length - n;
-	if (n < 2 || n >= a.length) return null;
+	// The stem must be most of the headword: gegangen shares only
+	// "ge" with gehen, нашёл only "на" with найти.
+	if (n < 3 || n < b.length - 3 || n >= a.length) return null;
 	return [a.slice(0, n).join(""), a.slice(n).join("")];
 }
 
-/** Hits for the same entry merge; the most specific tags win. */
+/** One entry's identity: homographs (der Leiter, die Leiter) stay apart. */
+function entryKey(e: DictEntry): string {
+	return [e.w, e.p, e.g ?? "", e.r ?? "", e.s.join("\u0001")].join("\u0000");
+}
+
+/**
+ * Hits for the same entry merge; the most specific tags win, except
+ * that the headword itself (no tags) beats a variant spelling of it
+ * (Homme filed as an alternative form of homme).
+ */
 function bestHits(hits: DictHit[]): DictHit[] {
 	const out: DictHit[] = [];
 	for (const h of hits) {
-		const same = out.find(
-			(o) => o.entry.w === h.entry.w && o.entry.p === h.entry.p
-		);
-		if (!same) out.push(h);
-		else if (formatTags(h.tags).length > formatTags(same.tags).length)
+		const same = out.find((o) => entryKey(o.entry) === entryKey(h.entry));
+		if (!same) out.push({ ...h });
+		else if (
+			same.tags !== "" &&
+			(h.tags === "" ||
+				formatTags(h.tags).length > formatTags(same.tags).length)
+		)
 			same.tags = h.tags;
 	}
 	return out;
@@ -273,7 +286,11 @@ const ELIDED: Record<string, Record<string, string>> = {
 		"s'": "self",
 		"n'": "not",
 		"c'": "it",
-		"qu'": "that"
+		"qu'": "that",
+		"jusqu'": "until",
+		"lorsqu'": "when",
+		"puisqu'": "since",
+		"quoiqu'": "although"
 	},
 	it: {
 		"l'": "the",
@@ -282,9 +299,19 @@ const ELIDED: Record<string, Record<string, string>> = {
 		"all'": "to the",
 		"nell'": "in the",
 		"sull'": "on the",
-		"dall'": "from the"
+		"dall'": "from the",
+		"quell'": "that",
+		"quest'": "this",
+		"bell'": "beautiful"
 	}
 };
+
+/** An elided article or pronoun and the word after it (l'épineuse), in languages that elide. */
+function splitElided(word: string, lang: string): [string, string] | null {
+	if (lang && !ELIDED[lang]) return null;
+	const m = /^(\p{L}{1,6}['’])(\p{L}.+)$/u.exec(word);
+	return m ? [m[1]!, m[2]!] : null;
+}
 
 /** Definite articles by gender, where the article shows it. */
 const ARTICLES: Record<string, Record<string, string>> = {
@@ -295,20 +322,39 @@ const ARTICLES: Record<string, Record<string, string>> = {
 	pt: { masculine: "o", feminine: "a" }
 };
 
-/** A noun's gender as its base form with the article (la calèche), or the gender's name. */
+/**
+ * Spanish feminine nouns stressed on a first-syllable a (agua, hambre,
+ * águila) take el. Stress by the spelling rules: a written accent
+ * says where; otherwise a two-syllable word ending in a vowel, n or s
+ * stresses its first.
+ */
+function stressedA(w: string): boolean {
+	const bare = w.toLowerCase().replace(/^h/, "");
+	if (bare.startsWith("á")) return true;
+	if (!bare.startsWith("a") || /[áéíóú]/.test(bare)) return false;
+	const syllables = bare.match(/[aeiouü]+/g)?.length ?? 0;
+	return syllables === 2 && /[aeiouns]$/.test(bare);
+}
+
+/**
+ * A noun's gender as its base form with an article that shows it
+ * (la calèche), or the gender's name. Before a vowel or h, where l'
+ * hides the gender, French and Italian take the indefinite article
+ * (un homme, une heure, un'amica).
+ */
 function genderFact(entry: DictEntry, lang: string): string | null {
 	if (!entry.g) return null;
 	const article = ARTICLES[lang]?.[entry.g];
 	if (!article) return entry.g;
 	const w = entry.w;
-	if ((lang === "fr" || lang === "it") && /^[aeiouàâéèêîôûœæ]/iu.test(w))
-		return `l'${w}`;
-	if (
-		lang === "it" &&
-		entry.g === "masculine" &&
-		/^(s[^aeiou]|z|gn|ps|x)/iu.test(w)
-	)
+	const fem = entry.g === "feminine";
+	if (lang === "fr" && /^[aeiouyhàâéèêëîïôûœæ]/iu.test(w))
+		return `${fem ? "une" : "un"} ${w}`;
+	if (lang === "it" && /^[aeiouàèéìòù]/iu.test(w))
+		return fem ? `un'${w}` : `un ${w}`;
+	if (lang === "it" && !fem && /^(s[^aeiou]|z|gn|ps|x)/iu.test(w))
 		return `lo ${w}`;
+	if (lang === "es" && fem && stressedA(w)) return `el ${w}`;
 	return `${article} ${w}`;
 }
 
@@ -328,18 +374,19 @@ export function cardFromDictionary(
 	const best = bestHits(hits);
 	const top = best[0];
 	if (!top) return null;
-	const whole = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
+	const whole = quote
+		.normalize("NFC")
+		.trim()
+		.replace(/^\p{P}+|\p{P}+$/gu, "");
 	// An elided article or pronoun is its own piece: l' + épineuse.
 	const elided =
-		fold(top.entry.w) === fold(whole)
-			? null
-			: /^(\p{L}{1,4}['’])(\p{L}.+)$/u.exec(whole);
-	const form = elided?.[2] ?? whole;
-	const lead: WordPart[] = elided?.[1]
+		fold(top.entry.w) === fold(whole) ? null : splitElided(whole, lang);
+	const form = elided?.[1] ?? whole;
+	const lead: WordPart[] = elided
 		? [
 				{
-					text: elided[1],
-					label: ELIDED[lang]?.[fold(elided[1]).replace("’", "'")] ?? "",
+					text: elided[0],
+					label: ELIDED[lang]?.[fold(elided[0])] ?? "",
 					kind: "agree"
 				}
 			]
@@ -575,8 +622,7 @@ export function lookupForms(quote: string, lang = ""): string[] {
 	const add = (f: string | null | undefined) => {
 		if (f && !forms.includes(f)) forms.push(f);
 	};
-	const elided = /^\p{L}{1,4}['’](\p{L}.+)$/u.exec(word);
-	add(elided?.[1]);
+	add(splitElided(word, lang)?.[1]);
 	for (const f of [...forms]) add(SPELLINGS[lang]?.(f));
 	for (const f of [...forms]) add(plainSpelling(f, lang));
 	for (const f of [...forms])
