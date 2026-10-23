@@ -151,7 +151,20 @@ export async function quoteRect(
 	article: number,
 	quote: string,
 	rootSelector = "article .rendered"
-): Promise<{ x: number; y: number; width: number; height: number }> {
+): Promise<Box> {
+	return (await quoteBoxes(page, article, quote, rootSelector)).box;
+}
+
+type Box = { x: number; y: number; width: number; height: number };
+
+/** A quote's bounding box and its first and last line boxes: a quote
+can wrap, even inside one word (hyphenation at big type on Linux). */
+async function quoteBoxes(
+	page: Page,
+	article: number,
+	quote: string,
+	rootSelector: string
+): Promise<{ box: Box; first: Box; last: Box }> {
 	return page.evaluate(
 		([n, text, sel]: [number, string, string]) => {
 			const root = document.querySelectorAll(sel)[n];
@@ -184,11 +197,18 @@ export async function quoteRect(
 			const range = document.createRange();
 			range.setStart(startNode, startOff);
 			range.setEnd(endNode, endOff);
-			return range.getBoundingClientRect().toJSON() as {
-				x: number;
-				y: number;
-				width: number;
-				height: number;
+			const box = (r: DOMRect) => ({
+				x: r.x,
+				y: r.y,
+				width: r.width,
+				height: r.height
+			});
+			const lines = [...range.getClientRects()].filter((r) => r.width > 0);
+			const whole = range.getBoundingClientRect();
+			return {
+				box: box(whole),
+				first: box(lines[0] ?? whole),
+				last: box(lines[lines.length - 1] ?? whole)
 			};
 		},
 		[article, quote, rootSelector] as [number, string, string]
@@ -203,7 +223,8 @@ export async function dragQuote(
 	quote: string,
 	rootSelector = "article .rendered"
 ): Promise<void> {
-	let rect = await quoteRect(page, article, quote, rootSelector);
+	let quoted = await quoteBoxes(page, article, quote, rootSelector);
+	const rect = quoted.box;
 	// Off screen (taller font metrics on Linux): center it first. Only
 	// then — an unneeded scroll moves quotes other specs measured.
 	const vh = page.viewportSize()?.height ?? 720;
@@ -216,11 +237,14 @@ export async function dragQuote(
 			[rootSelector, article] as [string, number]
 		);
 		await page.waitForTimeout(300);
-		rect = await quoteRect(page, article, quote, rootSelector);
+		quoted = await quoteBoxes(page, article, quote, rootSelector);
 	}
-	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
+	// From the start of its first line to the end of its last, so a
+	// wrapped quote selects only itself.
+	const { first, last } = quoted;
+	await page.mouse.move(first.x + 1, first.y + first.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, {
+	await page.mouse.move(last.x + last.width - 1, last.y + last.height / 2, {
 		steps: 8
 	});
 	await page.mouse.up();
