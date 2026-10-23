@@ -120,6 +120,9 @@ export interface ListenSession {
 	/** Clips cut on the track's own pauses (drills from before that
 	 * are moved onto them once their audio loads). */
 	aligned?: boolean;
+	/** Clips moved onto the times a speech recognizer heard each word
+	 * at (`listenHeard.ts`), the whole track through. */
+	heard?: boolean;
 }
 
 export interface ClipNote {

@@ -11,6 +11,7 @@ import type {
 	ListenFetched,
 	ListenVideo
 } from "./listen";
+import type { HeardChunk } from "./listenHeard";
 
 export interface ListenBackend {
 	search: (query: string, kind: "video" | "channel") => Promise<ListenEntry[]>;
@@ -23,6 +24,9 @@ export interface ListenBackend {
 	envelope: (id: string, lang: string) => Promise<ArrayBuffer>;
 	/** The video's picture (H.264, no sound), downloaded once. */
 	video: (id: string) => Promise<ArrayBuffer>;
+	/** Piece `n` of the words a speech recognizer hears in the track,
+	 * timed (Mac only; rejects elsewhere). */
+	heard: (id: string, lang: string, n: number) => Promise<HeardChunk>;
 }
 
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
@@ -39,6 +43,7 @@ export function shellBackend(invoke: Invoke): ListenBackend {
 		audio: (id, lang) => invoke<ArrayBuffer>("listen_audio", { id, lang }),
 		envelope: (id, lang) =>
 			invoke<ArrayBuffer>("listen_envelope", { id, lang }),
-		video: (id) => invoke<ArrayBuffer>("listen_video", { id })
+		video: (id) => invoke<ArrayBuffer>("listen_video", { id }),
+		heard: (id, lang, n) => invoke<HeardChunk>("listen_heard", { id, lang, n })
 	};
 }

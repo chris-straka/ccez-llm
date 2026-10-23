@@ -87,7 +87,10 @@ async function mockListenShell(page: Page): Promise<void> {
 				thumbnail: ""
 			};
 			const shell = {
-				invoke: async (cmd: string): Promise<unknown> => {
+				invoke: async (
+					cmd: string,
+					args?: Record<string, unknown>
+				): Promise<unknown> => {
 					if (cmd === "listen_channel")
 						return {
 							name: "Learner Channel",
@@ -118,6 +121,16 @@ async function mockListenShell(page: Page): Promise<void> {
 						};
 					}
 					if (cmd === "listen_audio") return silentWav(12);
+					// A spec can stand in for the speech recognizer.
+					if (cmd === "listen_heard") {
+						const heard = (
+							window as unknown as {
+								__heard?: (args?: Record<string, unknown>) => unknown;
+							}
+						).__heard;
+						if (!heard) throw new Error("listen-heard-unsupported");
+						return heard(args);
+					}
 					if (cmd === "listen_video") {
 						if (!(window as unknown as { __withVideo?: boolean }).__withVideo)
 							throw new Error("listen-no-video");
@@ -749,4 +762,61 @@ test("the shown text marks the word sounding as the clip plays", async ({
 	const often = { timeout: 5_000, intervals: [50] };
 	await expect.poll(marked, often).toBe("tous");
 	await expect.poll(marked, often).toBe("bienvenue.");
+});
+
+test("clips move onto the times the speech recognizer heard", async ({
+	page
+}) => {
+	// Every word heard 0.6 s after its caption says, in two pieces.
+	await page.evaluate((text: string) => {
+		const doc = JSON.parse(text) as {
+			events: {
+				tStartMs: number;
+				segs: { utf8: string; tOffsetMs?: number }[];
+			}[];
+		};
+		const words = doc.events.flatMap((e) =>
+			e.segs.map((g) => {
+				const start = (e.tStartMs + (g.tOffsetMs ?? 0)) / 1000 + 0.6;
+				return { text: g.utf8.trim(), start, end: start + 0.4 };
+			})
+		);
+		const w = window as unknown as {
+			__heard: (args?: Record<string, unknown>) => unknown;
+			__heardAsked: unknown[];
+		};
+		w.__heardAsked = [];
+		w.__heard = (args) => {
+			w.__heardAsked.push(args);
+			const n = Number(args?.n);
+			const half =
+				n === 0
+					? words.filter((x) => x.start < 6)
+					: words.filter((x) => x.start >= 6);
+			return { words: half, start: n * 6, end: n * 6 + 6, chunks: 2 };
+		};
+	}, captions());
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	await expect(page.locator(".clip")).toHaveCount(1, { timeout: 10_000 });
+	const stored = () =>
+		page.evaluate(() => {
+			const chats = JSON.parse(
+				localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
+			) as { listen?: { heard?: boolean; clips: { start: number }[] } }[];
+			return chats.find((c) => c.listen)?.listen;
+		});
+	await expect.poll(async () => (await stored())?.heard).toBe(true);
+	const clips = (await stored())?.clips ?? [];
+	// Each clip starts just before its first word as heard.
+	expect(clips[1]?.start).toBeCloseTo(4.6 - 0.15, 1);
+	expect(clips[2]?.start).toBeCloseTo(8.6 - 0.15, 1);
+	expect(
+		await page.evaluate(
+			() => (window as unknown as { __heardAsked: unknown[] }).__heardAsked
+		)
+	).toEqual([
+		{ id: VIDEO, lang: "fr", n: 0 },
+		{ id: VIDEO, lang: "fr", n: 1 }
+	]);
 });

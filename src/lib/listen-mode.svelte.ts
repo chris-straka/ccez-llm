@@ -41,6 +41,7 @@ import {
 	type ClipSpan,
 	type Token
 } from "./listenClips";
+import { heardTimes, type HeardWord } from "./listenHeard";
 import type { ChatProvider } from "./providers/types";
 
 export interface ListenModeDeps {
@@ -93,6 +94,8 @@ const MIN_CLIP_SEC = 0.3;
 const GRADE_CONCURRENCY = 2;
 /** Recent videos probed per channel row. */
 const CHANNEL_PROBE = 6;
+/** Recognized pieces (about 45 s each) between two retimes. */
+const HEARD_STEP = 4;
 /** Typing pause before the search box searches by itself. */
 const TYPING_PAUSE_MS = 450;
 
@@ -462,7 +465,8 @@ export class ListenMode {
 
 	/** Time the active drill's words, and move a drill cut before
 	 * clips followed the audio onto its pauses (same clips, same
-	 * text, better start and end). */
+	 * text, better start and end). Then the recognizer's word times,
+	 * where the platform has one. */
 	private async timeWords(
 		chatId: ChatId,
 		session: ListenSession,
@@ -476,18 +480,69 @@ export class ListenMode {
 			tokens
 		);
 		if (this.audioFor !== key) return;
+		let clips = session.clips;
 		if (!session.aligned && aligned) {
-			const clips = retimeClips(session.clips, tokens, aligned);
-			if (clips) {
-				retimeDrill(this.deps.getChatState(), chatId, clips);
-				this.wordTimes = { key, tokens: aligned };
-				return;
+			const moved = retimeClips(session.clips, tokens, aligned);
+			if (moved) {
+				retimeDrill(this.deps.getChatState(), chatId, moved);
+				clips = moved;
 			}
 		}
-		this.wordTimes = {
-			key,
-			tokens: session.aligned ? (aligned ?? tokens) : tokens
-		};
+		const base =
+			session.aligned || clips !== session.clips ? (aligned ?? tokens) : tokens;
+		this.wordTimes = { key, tokens: base };
+		await this.hearWords(chatId, session, key, clips, base);
+	}
+
+	/** Move the drill's clips and word times onto what the speech
+	 * recognizer hears, piece by piece from the start of the track
+	 * (the first clips are timed within seconds). A platform or
+	 * language without one keeps the pause times. */
+	private async hearWords(
+		chatId: ChatId,
+		session: ListenSession,
+		key: string,
+		clips: ClipSpan[],
+		base: Token[]
+	): Promise<void> {
+		const backend = this.deps.backend();
+		if (!backend) return;
+		const heard: HeardWord[] = [];
+		let shown = -1;
+		for (let n = 0; ; n++) {
+			let chunk;
+			try {
+				chunk = await backend.heard(session.videoId, session.lang, n);
+			} catch {
+				return;
+			}
+			if (this.audioFor !== key) return;
+			heard.push(...chunk.words);
+			const done = n + 1 >= chunk.chunks;
+			// Cached pieces come back at once: show the first piece
+			// right away, then every few.
+			// A drill heard before needs only the whole list.
+			if (!done && (session.heard || (n > 0 && n - shown < HEARD_STEP)))
+				continue;
+			shown = n;
+			const times = heardTimes(base, heard);
+			if (!times) {
+				if (done) return;
+				continue;
+			}
+			this.wordTimes = { key, tokens: times.tokens };
+			if (session.heard) continue;
+			const moved = retimeClips(
+				clips,
+				base,
+				times.tokens,
+				DEFAULT_SEGMENT,
+				done ? Infinity : times.upTo
+			);
+			if (moved)
+				retimeDrill(this.deps.getChatState(), chatId, moved, undefined, done);
+			if (done) return;
+		}
 	}
 
 	/** Fetch the drill's track once per video (blob URL, so every clip

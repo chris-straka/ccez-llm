@@ -529,29 +529,54 @@ export function alignTokens(
 	return out;
 }
 
+/** Which clip each token belongs to, by the clips' text (a clip's
+ * text is its tokens joined); null when the texts don't add up. */
+function ownersByText(
+	clips: readonly ClipSpan[],
+	tokens: readonly Token[]
+): number[] | null {
+	const owner: number[] = [];
+	let k = 0;
+	for (const clip of clips) {
+		const from = k;
+		const want = clip.text.length;
+		while (k < tokens.length && joinTokens(tokens.slice(from, k)).length < want)
+			k++;
+		if (joinTokens(tokens.slice(from, k)) !== clip.text) return null;
+		for (let j = from; j < k; j++) owner.push(clip.i);
+	}
+	return k === tokens.length ? owner : null;
+}
+
 /**
- * Move clips cut on caption times onto aligned ones (`alignTokens`
- * over the same tokens): each clip keeps its words and text, and its
- * window follows those words' new times, padded into the quiet
- * around them. Null when the clips don't come from these tokens.
+ * Move clips onto new times for the same tokens (`alignTokens`, or
+ * what a recognizer heard): each clip keeps its words and text, and
+ * its window follows those words' new times, padded into the quiet
+ * around them. A token belongs to the clip whose text it is part of,
+ * else to the clip its `from` start falls in. Clips holding a token
+ * past `upTo` keep their window (those words aren't timed yet). Null
+ * when the clips don't come from these tokens.
  */
 export function retimeClips(
 	clips: readonly ClipSpan[],
 	from: readonly Token[],
 	to: readonly Token[],
-	opts: SegmentOptions = DEFAULT_SEGMENT
+	opts: SegmentOptions = DEFAULT_SEGMENT,
+	upTo = Infinity
 ): ClipSpan[] | null {
 	if (from.length !== to.length) return null;
-	// Each token belongs to the clip its start falls in.
-	const owner: number[] = [];
-	let c = 0;
-	for (const tok of from) {
-		while (
-			c + 1 < clips.length &&
-			tok.start >= (clips[c + 1] as ClipSpan).start
-		)
-			c++;
-		owner.push(c);
+	let owner = ownersByText(clips, from);
+	if (!owner) {
+		owner = [];
+		let c = 0;
+		for (const tok of from) {
+			while (
+				c + 1 < clips.length &&
+				tok.start >= (clips[c + 1] as ClipSpan).start
+			)
+				c++;
+			owner.push(c);
+		}
 	}
 	const firsts = new Map<number, number>();
 	const lasts = new Map<number, number>();
@@ -563,6 +588,10 @@ export function retimeClips(
 	for (const clip of clips) {
 		const first = firsts.get(clip.i);
 		const last = lasts.get(clip.i);
+		if (last !== undefined && last > upTo) {
+			out.push(clip);
+			continue;
+		}
 		const head = first === undefined ? undefined : to[first];
 		const tail = last === undefined ? undefined : to[last];
 		if (!head || !tail) return null;

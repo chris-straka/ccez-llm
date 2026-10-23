@@ -374,4 +374,35 @@ describe("alignTokens", () => {
 		expect(moved?.[1]?.start).toBeCloseTo(clips[1]?.start ?? NaN);
 		expect(moved?.[1]?.end).toBeCloseTo(clips[1]?.end ?? NaN);
 	});
+
+	it("moved clips keep their words when the new times jump past a window", () => {
+		const opts = { ...DEFAULT_SEGMENT, minSec: 0.3 };
+		const old = segmentClips(late, opts);
+		// Every word heard 2 s later: by start time alone, each clip's
+		// first word would fall into the clip after it.
+		const later = late.map((t) => ({
+			...t,
+			start: t.start + 2,
+			end: t.end + 2
+		}));
+		const once = retimeClips(old, late, later) ?? [];
+		const twice = retimeClips(once, late, later);
+		expect(twice?.map((c) => c.text)).toEqual(old.map((c) => c.text));
+		expect(twice?.[1]?.start).toBeCloseTo(once[1]?.start ?? NaN);
+	});
+
+	it("clips with words not yet timed keep their windows", () => {
+		const opts = { ...DEFAULT_SEGMENT, minSec: 0.3 };
+		const old = segmentClips(late, opts);
+		const later = late.map((t) => ({
+			...t,
+			start: t.start + 2,
+			end: t.end + 2
+		}));
+		// Only the first clip's words are timed.
+		const firstClip = late.findIndex((t) => t.text === "peste.");
+		const moved = retimeClips(old, late, later, opts, firstClip);
+		expect(moved?.[0]?.start).toBeGreaterThan(old[0]?.start ?? NaN);
+		expect(moved?.slice(1)).toEqual(old.slice(1));
+	});
 });

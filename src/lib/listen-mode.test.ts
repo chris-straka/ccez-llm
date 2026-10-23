@@ -166,7 +166,8 @@ describe("search box", () => {
 			fetch: () => new Promise<never>(() => {}),
 			audio: () => new Promise<never>(() => {}),
 			envelope: () => new Promise<never>(() => {}),
-			video: () => new Promise<never>(() => {})
+			video: () => new Promise<never>(() => {}),
+			heard: () => new Promise<never>(() => {})
 		} satisfies ListenBackend;
 		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
 		const state = createChatState(store);
@@ -253,7 +254,7 @@ describe("starting a drill", () => {
 	});
 
 	/** A browse screen whose video fetch resolves when `land` is called. */
-	function starter() {
+	function starter(more: Partial<ListenBackend> = {}) {
 		let land: () => void = () => {};
 		const backend = {
 			search: () => Promise.resolve([]),
@@ -281,7 +282,9 @@ describe("starting a drill", () => {
 				}),
 			audio: () => new Promise<never>(() => {}),
 			envelope: () => Promise.reject(new Error("none")),
-			video: () => new Promise<never>(() => {})
+			video: () => new Promise<never>(() => {}),
+			heard: () => Promise.reject(new Error("listen-heard-unsupported")),
+			...more
 		} satisfies ListenBackend;
 		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
 		const state = createChatState(store);
@@ -317,6 +320,55 @@ describe("starting a drill", () => {
 		expect(drill?.messages).toHaveLength(1);
 		expect(activeChat(state).messages).toHaveLength(0);
 		expect(activeChat(state).listen).toBeUndefined();
+	});
+
+	it("moves its clip onto the times the recognizer heard", async () => {
+		const { mode, state, land } = starter({
+			audio: () => Promise.resolve(new ArrayBuffer(8)),
+			heard: (_id, _lang, n) =>
+				Promise.resolve({
+					words: [
+						{ text: "parlons", start: 1, end: 1.5 },
+						{ text: "de", start: 1.8, end: 1.9 },
+						{ text: "la", start: 2.1, end: 2.2 },
+						{ text: "peste", start: 2.5, end: 3 }
+					].filter(() => n === 0),
+					start: 0,
+					end: 60,
+					chunks: 1
+				})
+		});
+		const from = activeChat(state).id;
+		const drill = () => state.chats.find((c) => c.id === from)?.listen;
+		const started = mode.start("ujQZH4qyEgQ");
+		land();
+		// The track loads with a second (cached) fetch.
+		await vi.waitFor(() => expect(drill()).toBeDefined());
+		land();
+		await started;
+		await vi.waitFor(() => expect(drill()?.heard).toBe(true));
+		const clip = drill()?.clips[0];
+		expect(clip?.text).toBe("Parlons de la peste.");
+		expect(clip?.start).toBeCloseTo(0.85);
+		expect(clip?.end).toBeCloseTo(3.35);
+	});
+
+	it("keeps its own times where nothing was heard", async () => {
+		const { mode, state, land } = starter({
+			audio: () => Promise.resolve(new ArrayBuffer(8))
+		});
+		const from = activeChat(state).id;
+		const started = mode.start("ujQZH4qyEgQ");
+		land();
+		await vi.waitFor(() =>
+			expect(state.chats.find((c) => c.id === from)?.listen).toBeDefined()
+		);
+		land();
+		await started;
+		await new Promise((r) => setTimeout(r, 10));
+		const drill = state.chats.find((c) => c.id === from)?.listen;
+		expect(drill?.heard).toBeUndefined();
+		expect(drill?.clips[0]?.start).toBe(0);
 	});
 
 	it("closing the browse screen drops the video loading for that chat", async () => {

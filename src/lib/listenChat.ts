@@ -57,16 +57,23 @@ export function startDrill(
 	return first.id;
 }
 
-/** Move a drill's clips onto new times (same clips, same text). */
+/** Move a drill's clips onto new times (same clips, same text);
+ * `heard` marks times a recognizer heard the whole track through. */
 export function retimeDrill(
 	state: ChatState,
 	chatId: ChatId,
 	clips: ClipSpan[],
-	store?: KeyValueStore
+	store?: KeyValueStore,
+	heard = false
 ): void {
 	const chat = chatById(state, chatId);
 	if (!chat?.listen || chat.listen.clips.length !== clips.length) return;
-	chat.listen = { ...chat.listen, clips, aligned: true };
+	chat.listen = {
+		...chat.listen,
+		clips,
+		aligned: true,
+		...(heard ? { heard: true } : {})
+	};
 	persistChats(state, store);
 }
 

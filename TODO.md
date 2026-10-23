@@ -16,6 +16,11 @@ they ship — the commit is the record.
 - Owner feedback batch of 2026-10-13: `PLAN.md` (annotations, selection,
   speech, chats, layout, news/video). Work rows off there.
 
+- Drill word timing beyond the Mac: `listen_heard` answers
+  `listen-heard-unsupported` on Android, Windows and Linux, so their
+  drills keep the pause times. Android's own recognizer next (owner,
+  2026-10-23), behind the same command and `heard::chunk_bounds`.
+
 - OpenCode Zen outside Android: its API sends no CORS headers, so the
   web build and the desktop webview can't send to it (the model list
   already loads from Rust via `list_models`). Desktop sends from Rust,

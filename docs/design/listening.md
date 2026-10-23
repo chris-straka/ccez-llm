@@ -56,8 +56,24 @@ the phone.
   drift). It shows centered on the clip in play; until it lands, or
   when there is none, the storyboard still stays.
 - Captions: YouTube's speech recognition of the picked track
-  (`kind: asr` in its language) carries word timings, so no Whisper
-  pass is needed. Uploaded subtitles are used when they exist.
+  (`kind: asr` in its language) carries the text and rough word
+  timings. Uploaded subtitles are used when they exist. On dubs the
+  times run 1–3 s off the audio.
+- Timing: the captions first move onto the track's pauses (its
+  loudness envelope, `alignTokens`). On the Mac, Apple's speech
+  recognizer then hears the track in pieces of about 45 s cut in the
+  quiet (`listen_heard`, `heard_macos.rs`), one at a time: Apple ends
+  a recognition when a second one starts in the same app. Its words
+  line up with the caption words (`listenHeard.ts`), and each caption
+  word takes the time it was heard. The first piece is back within
+  seconds and the drill's clips move as pieces land; pieces cache
+  beside the audio. Apple's on-device model needs Dictation turned on
+  with the language downloaded; otherwise the audio goes to Apple's
+  servers. Android keeps the pause times for now; its recognizer is
+  next.
+  On a 15-minute French dub scored by Whisper, clips cut two or more
+  words wrong went from 12 of 37 (pauses) to 9 (Apple); Whisper's own
+  times scored 8.
 - Clips: `listenClips.ts` cuts sentence-sized clips (2.2–8 s) on word
   timings, with a little padding. Nothing is re-encoded: the app loads
   the track once and plays each clip by seeking.
