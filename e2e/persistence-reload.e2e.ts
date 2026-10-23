@@ -136,3 +136,35 @@ test("theme choice survives a reload", async ({ page }) => {
 		"rgb(0, 0, 0)"
 	);
 });
+
+/** A change made just before the app goes away (quit, swipe-away)
+saves at once instead of dying in the save debounce. */
+test("a settings change saves as the page hides", async ({ page }) => {
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	const panel = page.locator(".settings-panel");
+	await expect(panel).not.toHaveClass(/closed/);
+	await panel.getByRole("radio", { name: "Dark", exact: true }).click();
+	// Hidden inside the 400ms debounce, read back in the same task.
+	const saved = await page.evaluate((key) => {
+		window.dispatchEvent(new PageTransitionEvent("pagehide"));
+		return new Promise<string | null>((resolve) =>
+			queueMicrotask(() =>
+				queueMicrotask(() =>
+					setTimeout(() => {
+						const raw = window.localStorage.getItem(key);
+						resolve(
+							raw
+								? ((JSON.parse(raw) as { theme?: string }).theme ?? null)
+								: null
+						);
+					}, 50)
+				)
+			)
+		);
+	}, SETTINGS_KEY);
+	expect(saved).toBe("dark");
+});

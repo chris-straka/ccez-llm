@@ -714,8 +714,10 @@
 			return;
 		}
 		if (saveTimer) clearTimeout(saveTimer);
+		pendingSettings = snapshot;
 		saveTimer = setTimeout(() => {
 			saveTimer = null;
+			pendingSettings = null;
 			// The top-of-effect snapshot (a synchronous settings read, so
 			// the effect subscribes) freezes the debounced save.
 			saveSettingsNow(snapshot);
@@ -727,6 +729,18 @@
 			}
 		};
 	});
+	/** The debounced save still waiting, if any. */
+	let pendingSettings: AppSettings | null = null;
+	/** Leaving the app (quit, swipe-away, tab close) saves at once: a
+	change in the last 400ms would otherwise die with the page. */
+	function flushSettingsSave(): void {
+		if (!saveTimer || !pendingSettings) return;
+		clearTimeout(saveTimer);
+		saveTimer = null;
+		const snapshot = pendingSettings;
+		pendingSettings = null;
+		saveSettingsNow(snapshot);
+	}
 
 	const useMock = mockProviderEnabled();
 	/** Keys, the no-key lock, and provider resolution (see provider-keys). */
@@ -8629,6 +8643,7 @@
 		const hide = (): void => {
 			saveChatScroll();
 			persistChatScrolls();
+			flushSettingsSave();
 		};
 		const onVisibility = (): void => {
 			if (document.visibilityState === "hidden") hide();
