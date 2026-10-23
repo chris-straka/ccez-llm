@@ -332,6 +332,15 @@ export function startSpeechError(facts: {
 }
 
 /**
+ * Web Speech codes for speech the app itself stopped: "canceled" drops
+ * a queued utterance, "interrupted" one already speaking (a newer
+ * speak or a stop). Neither is a failure to tell the user about.
+ */
+export function webSpeechStopped(code: string): boolean {
+	return code === "canceled" || code === "interrupted";
+}
+
+/**
  * Web Speech error codes (`SpeechSynthesisErrorEvent.error`) in plain
  * words: "synthesis-failed" is what a browser with no speech engine
  * (headless or voice-less Linux) reports for every utterance. Other
@@ -491,7 +500,7 @@ function queueUtterances(
 			}
 		};
 		utterance.onerror = (event) => {
-			if (!cancelled && event.error !== "canceled") {
+			if (!cancelled && !webSpeechStopped(event.error)) {
 				cancelled = true;
 				callbacks.onError?.(String(event.error || "speech error"));
 			}

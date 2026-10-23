@@ -14,6 +14,7 @@ import {
 	speechLangsFor,
 	startSpeechError,
 	webSpeechErrorCopy,
+	webSpeechStopped,
 	speechErrorStep,
 	replyLangFor,
 	sentenceSpeechLang,
@@ -517,6 +518,14 @@ describe("speech rate", () => {
 		expect(currentSpeechVolume()).toBe(1);
 		setSpeechVolume(Number.NaN);
 		expect(currentSpeechVolume()).toBe(1);
+	});
+});
+
+describe("webSpeechStopped", () => {
+	it("treats a stop or a newer speak as no error", () => {
+		expect(webSpeechStopped("canceled")).toBe(true);
+		expect(webSpeechStopped("interrupted")).toBe(true);
+		expect(webSpeechStopped("synthesis-failed")).toBe(false);
 	});
 });
 
