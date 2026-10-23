@@ -1,7 +1,7 @@
-<!-- Under the clip waiting to be answered, at the end of its text:
-Show text (the eye; A) keeps the clip and shows what was said; Next
-(the down arrow; a) reveals it and plays the next clip. Both scale with
-the text size, like the row's other actions. -->
+<!-- Under the clip waiting to be answered, at the end of its text: one
+step at a time. The eye (A) shows what was said; once it shows, the
+down arrow (Space, or a) moves on to the next clip. Scales with the
+text size, like the row's other actions. -->
 <script lang="ts">
 	interface Props {
 		/** The text already shows (Show text was used). */
@@ -19,7 +19,7 @@ the text size, like the row's other actions. -->
 			type="button"
 			class="step"
 			aria-label="Show text"
-			title="Show the text, stay on this clip (A)"
+			title="Show the text (A)"
 			onclick={(e) => {
 				e.stopPropagation();
 				peek();
@@ -31,21 +31,22 @@ the text size, like the row's other actions. -->
 				/><circle cx="8" cy="8" r="2" /></svg
 			>
 		</button>
-	{/if}
-	<button
-		type="button"
-		class="step next"
-		aria-label="Next clip"
-		title="Reveal and play the next clip (a)"
-		onclick={(e) => {
-			e.stopPropagation();
-			next();
-		}}
-	>
-		<svg viewBox="0 0 16 16" aria-hidden="true"
-			><path d="M8 2.5v10" /><path d="M3.8 8.5 8 12.7l4.2-4.2" /></svg
+	{:else}
+		<button
+			type="button"
+			class="step next"
+			aria-label="Next clip"
+			title="Next clip (Space)"
+			onclick={(e) => {
+				e.stopPropagation();
+				next();
+			}}
 		>
-	</button>
+			<svg viewBox="0 0 16 16" aria-hidden="true"
+				><path d="M8 2.5v10" /><path d="M3.8 8.5 8 12.7l4.2-4.2" /></svg
+			>
+		</button>
+	{/if}
 </div>
 
 <style>

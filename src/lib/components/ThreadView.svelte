@@ -192,6 +192,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			/** The drill audio's volume (0-2) and its setter. */
 			volume: number;
 			setVolume: (volume: number) => void;
+			/** Touch UI: the drill's step button stands in for Space. */
+			touch: boolean;
 		};
 		/** Flashcards due now (0 hides the hero's entry). */
 		flashcardsDue: number;
@@ -436,7 +438,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			{/if}
 		{/snippet}
 		{#snippet clipFooter()}
-			{#if msg.clip && msg.clip.heard === undefined}
+			{#if listen.touch && msg.clip && msg.clip.heard === undefined}
 				<ListenSteps
 					peeked={msg.clip.peeked === true}
 					peek={() => void listen.mode.peek()}

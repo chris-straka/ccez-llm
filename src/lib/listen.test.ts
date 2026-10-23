@@ -192,6 +192,7 @@ describe("listenKeyAction", () => {
 		alt: false,
 		meta: false,
 		ctrl: false,
+		shift: false,
 		inDrill: true,
 		composerEmpty: true,
 		inComposer: true,
@@ -200,12 +201,27 @@ describe("listenKeyAction", () => {
 		hoveredClip: false,
 		selection: false,
 		playing: false,
-		overPlayer: true
+		overPlayer: true,
+		waiting: true,
+		revealed: false
 	};
 	it("Space plays the clip under the pointer; ? types", () => {
 		expect(listenKeyAction(base)).toBe("play");
 		expect(listenKeyAction({ ...base, composerEmpty: false })).toBe("pass");
 		expect(listenKeyAction({ ...base, key: "?", code: "Slash" })).toBe("pass");
+	});
+	it("Space moves on once the text shows; Shift+Space is the prompt's", () => {
+		const away = { ...base, overPlayer: false, revealed: true };
+		expect(listenKeyAction(away)).toBe("reveal");
+		expect(listenKeyAction({ ...away, revealed: false })).toBe("peek");
+		expect(listenKeyAction({ ...away, waiting: false })).toBe("pass");
+		expect(listenKeyAction({ ...away, shift: true })).toBe("pass");
+		expect(listenKeyAction({ ...away, shift: true, inComposer: false })).toBe(
+			"ask"
+		);
+		expect(listenKeyAction({ ...away, playing: true })).toBe("stop");
+		expect(listenKeyAction({ ...away, overPlayer: true })).toBe("play");
+		expect(listenKeyAction({ ...away, composerEmpty: false })).toBe("pass");
 	});
 	it("Space stops a clip sounding wherever the pointer is", () => {
 		const away = { ...base, overPlayer: false, playing: true };
@@ -215,11 +231,10 @@ describe("listenKeyAction", () => {
 		// A question being typed keeps its spaces.
 		expect(listenKeyAction({ ...away, composerEmpty: false })).toBe("pass");
 	});
-	it("Space away from the player with nothing sounding is the page's (the prompt)", () => {
-		expect(listenKeyAction({ ...base, overPlayer: false })).toBe("pass");
-		expect(
-			listenKeyAction({ ...base, overPlayer: false, inComposer: false })
-		).toBe("pass");
+	it("Space with no clip waiting is the page's (the prompt)", () => {
+		const idle = { ...base, overPlayer: false, waiting: false };
+		expect(listenKeyAction(idle)).toBe("pass");
+		expect(listenKeyAction({ ...idle, inComposer: false })).toBe("pass");
 	});
 	it("⌘Enter / Ctrl+Enter reveals only over an empty composer (a typed question sends)", () => {
 		const enter = { ...base, key: "Enter", code: "Enter" };
@@ -240,6 +255,21 @@ describe("listenKeyAction", () => {
 		expect(listenKeyAction({ ...a, key: "A" })).toBe("peek");
 		expect(listenKeyAction({ ...a, inComposer: true })).toBe("pass");
 		expect(listenKeyAction({ ...a, hovered: true })).toBe("pass");
+		// Over a clip, a and A show its text.
+		expect(listenKeyAction({ ...a, hovered: true, hoveredClip: true })).toBe(
+			"peek"
+		);
+		expect(
+			listenKeyAction({ ...a, key: "A", hovered: true, hoveredClip: true })
+		).toBe("peek");
+		expect(
+			listenKeyAction({
+				...a,
+				hovered: true,
+				hoveredClip: true,
+				selection: true
+			})
+		).toBe("pass");
 		expect(listenKeyAction({ ...a, key: "A", selection: true })).toBe("pass");
 	});
 

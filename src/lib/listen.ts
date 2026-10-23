@@ -347,6 +347,7 @@ export interface ListenKeyFacts {
 	alt: boolean;
 	meta: boolean;
 	ctrl: boolean;
+	shift: boolean;
 	/** The active chat is a drill with a clip to play. */
 	inDrill: boolean;
 	/** The composer holds no text. */
@@ -365,17 +366,23 @@ export interface ListenKeyFacts {
 	playing: boolean;
 	/** The pointer is over a clip's player. */
 	overPlayer: boolean;
+	/** A clip waits to be answered (Space steps through it). */
+	waiting: boolean;
+	/** The waiting clip's text is showing (Space moves on). */
+	revealed: boolean;
 }
 
 export type ListenKeyAction =
-	"play" | "stop" | "slow" | "restart" | "reveal" | "peek" | "pass";
+	"play" | "stop" | "slow" | "restart" | "reveal" | "peek" | "ask" | "pass";
 
 /**
  * Drill keys. The composer is a normal chat in a drill (questions
  * about the clips), so typing there stays typing. Space stops a clip
  * that is sounding, plays the clip whose player the pointer is over,
- * and otherwise is the page's own Space (it brings up the prompt, as
- * in any chat). ⌘Enter / Ctrl+Enter reveals while the composer is
+ * and otherwise steps the waiting clip: its text, then the next clip.
+ * With no clip waiting it is the page's own Space (the prompt).
+ * Shift+Space summons the prompt, to ask about a clip. a and A
+ * over a clip show its text. ⌘Enter / Ctrl+Enter reveals while the composer is
  * empty. Outside it, S replays slowly, a reveals the waiting clip and
  * moves on, A shows its text without moving on, and r replays from
  * the start; a and A yield to a hovered message or a selection, where
@@ -394,11 +401,16 @@ export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 	}
 	if (f.code === "Space") {
 		if (f.inComposer && !f.composerEmpty) return "pass";
+		if (f.shift) return f.inComposer ? "pass" : "ask";
 		if (f.playing) return "stop";
-		return f.overPlayer ? "play" : "pass";
+		if (f.overPlayer) return "play";
+		if (!f.waiting) return "pass";
+		return f.revealed ? "reveal" : "peek";
 	}
 	if (f.inComposer || f.hovered || f.selection) {
 		if (f.inComposer) return "pass";
+		if ((f.key === "a" || f.key === "A") && f.hoveredClip && !f.selection)
+			return "peek";
 		if (f.key === "s" || f.key === "S") return "slow";
 		if (f.key === "r" && f.hovered && f.hoveredClip) return "restart";
 		return "pass";

@@ -259,12 +259,20 @@ export function desktopShortcuts(
 		{ group: drill, name: "Stop playing", keys: "Space" },
 		{ group: drill, name: "Replay from the start", keys: "R" },
 		{ group: drill, name: "Slow replay", keys: `S · ${altm}+S anywhere` },
-		{ group: drill, name: "Show the text", keys: "Shift+A" },
-		{ group: drill, name: "Next clip", keys: `a · ${meta}Enter` },
+		{
+			group: drill,
+			name: "Show the text",
+			keys: "Space · Shift+A · A over the clip"
+		},
+		{
+			group: drill,
+			name: "Next clip",
+			keys: `Space once the text shows · a · ${meta}Enter`
+		},
 		{
 			group: drill,
 			name: "Ask about the video",
-			keys: "Space, then type"
+			keys: "Shift+Space, then type"
 		},
 		{ group: mouse, name: "Speak text aloud", keys: "Right-click" },
 		{

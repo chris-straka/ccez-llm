@@ -320,6 +320,7 @@
 	import { NewsMode } from "$lib/news-mode.svelte";
 	import { ListenMode, type NativeGradeResult } from "$lib/listen-mode.svelte";
 	import { listenKeyAction, summarizeDrill } from "$lib/listen";
+	import { openClip } from "$lib/listenChat";
 	import { shellBackend } from "$lib/listenBackend";
 	import { nativeRouteFor } from "$lib/turns";
 	import { drillStates } from "$lib/listenChat";
@@ -11483,6 +11484,7 @@
 				alt: event.altKey,
 				meta: event.metaKey,
 				ctrl: event.ctrlKey,
+				shift: event.shiftKey,
 				inDrill:
 					Boolean(chat.listen) && !reader && !shortcutsOpen && !palette.open,
 				composerEmpty: !hasText,
@@ -11497,7 +11499,9 @@
 				hoveredClip: chat.messages[hoveredIdx]?.clip !== undefined,
 				selection: window.getSelection()?.isCollapsed === false,
 				playing: listenMode.playing !== null,
-				overPlayer: listenMode.hoveredPlayer !== null
+				overPlayer: listenMode.hoveredPlayer !== null,
+				waiting: openClip(chat) !== null,
+				revealed: openClip(chat)?.clip?.peeked === true
 			});
 			if (listenKey !== "pass" && !event.repeat) {
 				consumeEvent(event);
@@ -11511,7 +11515,10 @@
 				else if (listenKey === "slow" && hoveredClip !== undefined)
 					listenMode.toggle(hoveredClip, true);
 				else if (listenKey === "restart") listenMode.restart(hoveredClip);
-				else listenMode.replay(listenKey === "slow");
+				else if (listenKey === "ask") {
+					restorePrompt();
+					void tick().then(() => enterEditMode());
+				} else listenMode.replay(listenKey === "slow");
 				return;
 			}
 			// Browse screen: hover a channel and F folds its videos (the
@@ -14821,6 +14828,7 @@
 					"",
 				channels: settings.listenChannels,
 				available: listenBackend() !== null,
+				touch: androidUI,
 				modes:
 					!androidUI || (activeReplyCode !== null && listenBackend() !== null),
 				summary:
