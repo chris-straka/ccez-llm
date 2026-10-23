@@ -19,9 +19,10 @@ describe("annotation answer card", () => {
 		expect(answerSource()).not.toContain("{@html");
 	});
 
-	it("reads at message size with the popup-size setting on top", () => {
+	it("reads at message size, damped past 1x, with the popup-size setting on top", () => {
+		// The sizes themselves are measured in e2e/answer-card-sizes.
 		expect(answerSource()).toMatch(
-			/\.ann-answer\s*\{[^}]*font-size:\s*calc\(0\.92rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
+			/\.ann-answer\s*\{[^}]*font-size:\s*calc\(\s*0\.92rem \* \(1 \+ \(var\(--font-scale, 1\) - 1\) \* 0\.6\) \* var\(--annpop-scale, 1\)\s*\)/
 		);
 	});
 
