@@ -2,7 +2,7 @@
 	import { activeProviderSettings, type AppSettings } from "$lib/settings";
 	import { getProviderDef } from "$lib/providers/registry";
 	import type { VoiceLangFollow } from "$lib/voiceTiers";
-	import { hydrateSecrets, tauriBackendAvailable } from "$lib/secrets";
+	import { tauriBackendAvailable } from "$lib/secrets";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { onMount } from "svelte";
 	import ProviderPanel from "./settings/ProviderPanel.svelte";
@@ -61,9 +61,6 @@
 	const appVersion = import.meta.env.VITE_APP_VERSION ?? "";
 	const showStamp = !import.meta.env.DEV;
 	onMount(() => {
-		// Pull Keychain keys into memory (Tauri shell); no-op elsewhere.
-		// hydrateSecrets mutates the shared proxy, which is already reactive.
-		void hydrateSecrets(settings);
 		// Browser voice-install guidance (no shell, so no inventory API
 		// and no Rust opener): the OS-specific path below. Browsers
 		// cannot install voices themselves.

@@ -60,19 +60,35 @@ export class ProviderKeys {
 		});
 	});
 
+	/** Stored keys are in memory: work that needs a key at launch
+	(resuming filed notes) waits on this rather than finding none. */
+	readonly ready: Promise<void>;
+
 	constructor(deps: ProviderKeysDeps) {
 		this.deps = deps;
-		if (!deps.secure) return;
+		const settings = deps.getSettings();
+		if (!deps.secure) {
+			// Browsers keep keys encrypted in local storage: no lock
+			// waits on the read, but launch work does.
+			this.ready = deps.hydrate(settings).then(
+				() => undefined,
+				() => undefined
+			);
+			return;
+		}
 		// Pull Keychain keys into memory before the first send. A key
 		// still parked in a pre-bundle item migrates here too: the
 		// no-key lock blocks typing, so waiting for a send would strand it.
 		this.loaded = false;
-		const settings = deps.getSettings();
 		const launchId = settings.activeProviderId;
 		this.legacyTried.add(launchId);
-		void deps
+		this.ready = deps
 			.hydrate(settings)
 			.then(() => deps.migrateLegacy(settings, launchId))
+			.then(
+				() => undefined,
+				() => undefined
+			)
 			.finally(() => {
 				this.loaded = true;
 			});

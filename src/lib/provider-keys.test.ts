@@ -61,7 +61,7 @@ function harness(
 describe("ProviderKeys lock", () => {
 	it("a browser starts loaded and locks a blank keyed provider", () => {
 		const { keys, settings, calls } = harness();
-		expect(calls.hydrated).toBe(0);
+		expect(calls.hydrated).toBe(1);
 		expect(keys.loaded).toBe(true);
 		expect(keys.locked).toBe(true);
 		setKey(settings, DEEPSEEK, "sk-1");
@@ -87,6 +87,20 @@ describe("ProviderKeys lock", () => {
 		expect(calls.migrated).toEqual([DEEPSEEK]);
 		expect(keys.loaded).toBe(true);
 		expect(keys.locked).toBe(true);
+	});
+
+	it("ready settles once the keys are in, in a browser and in the shell", async () => {
+		for (const secure of [false, true]) {
+			const hydration = gate();
+			const { keys } = harness({ secure, hydrate: hydration.promise });
+			let ready = false;
+			void keys.ready.then(() => (ready = true));
+			await new Promise((r) => setTimeout(r, 0));
+			expect(ready).toBe(false);
+			hydration.open();
+			await new Promise((r) => setTimeout(r, 0));
+			expect(ready).toBe(true);
+		}
 	});
 
 	it("a launch key parked in a legacy item unlocks after hydration", async () => {

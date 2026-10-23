@@ -9874,9 +9874,10 @@
 		// through the listeners below, which the scan skips.
 		void nativeTurns.reconcile();
 		// Filed annotation asks a restart took off the wire relaunch
-		// here (answered drafts never refire, keyless boots stay
-		// silent) — blue badges turn orange on their own.
-		drafts.resumeUnanswered();
+		// once the stored keys are in (answered drafts never refire,
+		// keyless boots stay silent) — blue badges turn orange on
+		// their own.
+		void providerKeys.ready.then(() => drafts.resumeUnanswered());
 		// File Handling launch: a .md file opened with the app lands
 		// its text in the composer (blank-line joined like shared
 		// text); anything else rides the attachments path. Where
