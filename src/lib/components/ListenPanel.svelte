@@ -238,15 +238,17 @@ channel or start a video. State lives in `ListenMode`. -->
 						><path d="M6 4l4 4-4 4" /></svg
 					>
 				</button>
-				<span class="channel-name">{view?.page?.name ?? c.name}</span>
-				<span class="video-meta">
-					{#if view?.status === "ready"}
-						{channelLabel(mode.channelVideos(c.url), langName)}
-					{:else if view?.status === "error"}
-						{view.error}
-					{:else}
-						<span class="busy">checking…</span>
-					{/if}
+				<span class="channel-label">
+					<span class="channel-name">{view?.page?.name ?? c.name}</span>
+					<span class="video-meta">
+						{#if view?.status === "ready"}
+							{channelLabel(mode.channelVideos(c.url), langName)}
+						{:else if view?.status === "error"}
+							{view.error}
+						{:else}
+							<span class="busy">checking…</span>
+						{/if}
+					</span>
 				</span>
 				<button
 					type="button"
@@ -274,8 +276,9 @@ channel or start a video. State lives in `ListenMode`. -->
 	.listen-panel {
 		/* Controls stay put at any text size (--u, a fixed 1rem), as in
 		the News panel. Only reading text (titles, meta, channel names)
-		rides --t (scaled with --font-scale) and ends in an ellipsis
-		where it runs out of room. */
+		rides --t (scaled with --font-scale), and a row's own icons and
+		thumbnail grow with it. Big text wraps and stacks instead of
+		cutting names short, and widens the panel up to the column. */
 		--u: 1rem;
 		--t: calc(1rem * var(--font-scale, 1));
 		font-size: var(--u);
@@ -283,7 +286,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		flex-direction: column;
 		gap: calc(0.6 * var(--u, 1rem));
 		width: calc(100% - calc(2.4 * var(--u, 1rem)));
-		max-width: calc(40 * var(--u, 1rem));
+		max-width: max(calc(40 * var(--u, 1rem)), calc(24 * var(--t, 1rem)));
 		padding-bottom: calc(1.5 * var(--u, 1rem));
 		user-select: none;
 		-webkit-user-select: none;
@@ -435,9 +438,12 @@ channel or start a video. State lives in `ListenMode`. -->
 		flex-direction: column;
 		gap: calc(0.15 * var(--u, 1rem));
 	}
+	/* The text keeps ten text-widths beside the thumbnail; big text
+	that can't have them wraps under it. */
 	.video,
 	.channel-hit {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: calc(0.7 * var(--u, 1rem));
 		width: 100%;
@@ -464,7 +470,7 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.thumb {
 		flex: 0 0 auto;
-		width: calc(6.4 * var(--u, 1rem));
+		width: min(calc(6.4 * var(--t, 1rem)), 100%);
 		aspect-ratio: 16 / 9;
 		object-fit: cover;
 		border-radius: calc(0.45 * var(--u, 1rem));
@@ -484,7 +490,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		flex-direction: column;
 		gap: calc(0.15 * var(--u, 1rem));
 		min-width: 0;
-		flex: 1 1 auto;
+		flex: 1 1 calc(10 * var(--t, 1rem));
 	}
 	.video-title {
 		font-size: calc(0.95 * var(--t, 1rem));
@@ -498,9 +504,7 @@ channel or start a video. State lives in `ListenMode`. -->
 	.video-meta {
 		font-size: calc(0.8 * var(--t, 1rem));
 		color: var(--muted);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		overflow-wrap: anywhere;
 	}
 	.avail {
 		color: var(--ok);
@@ -522,19 +526,31 @@ channel or start a video. State lives in `ListenMode`. -->
 		padding-top: calc(0.35 * var(--u, 1rem));
 		border-top: 1px solid var(--line-soft);
 	}
+	/* The head is sized in its name's em, so the fold arrow and × keep
+	pace with the name at any text size. */
 	.channel-head {
+		font-size: calc(0.95 * var(--t, 1rem));
 		display: flex;
-		align-items: baseline;
-		gap: calc(0.6 * var(--u, 1rem));
+		align-items: center;
+		gap: 0.3em;
 		padding: 0 calc(0.4 * var(--u, 1rem));
+	}
+	/* Name, then label; the label drops under a name that fills the row. */
+	.channel-label {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		column-gap: 0.6em;
+		min-width: 0;
+		flex: 1 1 auto;
 	}
 	.channel-name {
 		font-weight: 600;
-		font-size: calc(0.95 * var(--t, 1rem));
 		min-width: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		overflow-wrap: anywhere;
+	}
+	.channel-head .video-meta {
+		font-size: 0.84em;
 	}
 	.fold {
 		align-self: center;
@@ -543,9 +559,10 @@ channel or start a video. State lives in `ListenMode`. -->
 		border: none;
 		background: transparent;
 		color: var(--muted);
-		padding: calc(0.2 * var(--u, 1rem));
-		margin-left: -0.2rem;
-		border-radius: calc(0.3 * var(--u, 1rem));
+		font: inherit;
+		padding: 0.2em;
+		margin-left: -0.2em;
+		border-radius: 0.3em;
 		cursor: pointer;
 	}
 	.fold:hover {
@@ -553,8 +570,8 @@ channel or start a video. State lives in `ListenMode`. -->
 		background: var(--hover-wash);
 	}
 	.fold svg {
-		width: calc(0.8 * var(--u, 1rem));
-		height: calc(0.8 * var(--u, 1rem));
+		width: max(0.8rem, 0.6em);
+		height: max(0.8rem, 0.6em);
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 1.8;
@@ -571,8 +588,11 @@ channel or start a video. State lives in `ListenMode`. -->
 		}
 	}
 	.channel-head .remove {
-		margin-left: auto;
-		font-size: calc(1.1 * var(--u, 1rem));
+		align-self: center;
+		font-size: max(1.1rem, 0.8em);
+		font-weight: 400;
+		padding: 0.25em 0.4em;
+		border-radius: 0.35em;
 	}
 	.add {
 		flex: 0 0 auto;

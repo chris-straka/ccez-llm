@@ -550,6 +550,42 @@ test("Listen titles follow the text size; its controls stay put", async ({
 	expect(await px(search)).toBe(control);
 });
 
+test("big text wraps the channel list instead of cutting it short", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1000, height: 1300 });
+	await page.getByRole("tab", { name: "Listen" }).click();
+	const panel = page.locator(".listen-panel");
+	await expect(panel.locator(".video-title").first()).toBeVisible();
+	await page.evaluate(() =>
+		document
+			.querySelector<HTMLElement>(".app")
+			?.style.setProperty("--font-scale", "3.7")
+	);
+	const layout = await panel.evaluate((el) => {
+		const box = (s: string) => el.querySelector(s)!.getBoundingClientRect();
+		const name = el.querySelector(".channel-name")!;
+		const thumb = box(".video .thumb");
+		const text = box(".video .video-text");
+		const fold = box(".channel-head .fold svg");
+		return {
+			clipped: name.scrollWidth > name.clientWidth + 1,
+			stacked: text.top >= thumb.bottom - 1,
+			fold: fold.height,
+			name: parseFloat(getComputedStyle(name).fontSize)
+		};
+	});
+	expect(layout.clipped).toBe(false);
+	// The thumbnail sits above its title once the two can't share a row.
+	expect(layout.stacked).toBe(true);
+	// The fold arrow keeps pace with the name, not the fixed controls.
+	expect(layout.fold).toBeGreaterThan(layout.name * 0.5);
+	await panel.screenshot({
+		path: ".screenshots/listen-big-text.png",
+		animations: "disabled"
+	});
+});
+
 test("the clip in play shows the video, centered; others keep a still", async ({
 	page
 }) => {
