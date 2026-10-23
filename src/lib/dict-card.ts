@@ -262,6 +262,30 @@ export function japaneseHead(pieces: JaPiece[]): string | null {
 
 const GENDER_TAGS = new Set(["masculine", "feminine", "neuter"]);
 
+/** What an elided article, pronoun or preposition stands for. */
+const ELIDED: Record<string, Record<string, string>> = {
+	fr: {
+		"l'": "the",
+		"d'": "of",
+		"j'": "I",
+		"m'": "me",
+		"t'": "you",
+		"s'": "self",
+		"n'": "not",
+		"c'": "it",
+		"qu'": "that"
+	},
+	it: {
+		"l'": "the",
+		"un'": "a",
+		"dell'": "of the",
+		"all'": "to the",
+		"nell'": "in the",
+		"sull'": "on the",
+		"dall'": "from the"
+	}
+};
+
 /** Definite articles by gender, where the article shows it. */
 const ARTICLES: Record<string, Record<string, string>> = {
 	fr: { masculine: "le", feminine: "la" },
@@ -304,7 +328,22 @@ export function cardFromDictionary(
 	const best = bestHits(hits);
 	const top = best[0];
 	if (!top) return null;
-	const form = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
+	const whole = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
+	// An elided article or pronoun is its own piece: l' + épineuse.
+	const elided =
+		fold(top.entry.w) === fold(whole)
+			? null
+			: /^(\p{L}{1,4}['’])(\p{L}.+)$/u.exec(whole);
+	const form = elided?.[2] ?? whole;
+	const lead: WordPart[] = elided?.[1]
+		? [
+				{
+					text: elided[1],
+					label: ELIDED[lang]?.[fold(elided[1]).replace("’", "'")] ?? "",
+					kind: "agree"
+				}
+			]
+		: [];
 	const tagName = formatTags(top.tags);
 	const isHeadword = fold(top.entry.w) === fold(form);
 	// A noun's gender is its own fact, not its ending's.
@@ -326,13 +365,21 @@ export function cardFromDictionary(
 				{ text: split[1], label: endingName, kind: endingKind(top.tags) }
 			];
 	}
+	if (lead.length > 0)
+		parts = [
+			...lead,
+			...(parts.length > 0
+				? parts
+				: [{ text: form, label: top.entry.w, kind: "core" as const }])
+		];
 	const gender = genderFact(top.entry, lang);
 	const facts = gender ? [{ text: gender, kind: "agree" as const }] : [];
 	// What the form is, when no split already shows it; a Japanese
 	// split still wants its base's reading and verb class.
+	const splitShown = parts.length > lead.length + 1 || japanese.length > 1;
 	const base = isHeadword
 		? undefined
-		: parts.length === 0
+		: !splitShown
 			? `${endingName ? `${endingName} of ` : ""}${baseLine(top.entry)}`
 			: japanese.length > 1
 				? baseLine(top.entry)

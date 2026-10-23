@@ -366,19 +366,14 @@ where it was left. -->
 	<div class="ann-answer-body" bind:this={body} onscroll={rememberScroll}>
 		{#if wordCard}
 			<!-- Word card: the literal meaning leads; the sentence's
-			sense shows only when it differs. The word splits into its
+			sense (Here, or an older card's In this sentence) follows
+			the base. The word splits into its
 			colored pieces, each labeled under it (readings above where
 			the script hides the sound). -->
 			<div class="wc">
 				<p class="ann-answer-text ann-answer-head" dir="auto">
 					{wordCard.meaning}
 				</p>
-				{#if wordCard.inSentence}
-					<p class="wc-line" dir="auto">
-						<span class="wc-key">In this sentence:</span>
-						{wordCard.inSentence}
-					</p>
-				{/if}
 				{#if cardWord.length > 0}
 					<div class="wc-word" dir={wordCardDir(wordCard.lang)}>
 						{#each cardWord as part, i (i)}
@@ -403,6 +398,12 @@ where it was left. -->
 				{/if}
 				{#if wordCard.base}
 					<p class="wc-line" dir="auto">{wordCard.base}</p>
+				{/if}
+				{#if wordCard.inSentence}
+					<p class="wc-line" dir="auto">
+						<span class="wc-key">In this sentence:</span>
+						{wordCard.inSentence}
+					</p>
 				{/if}
 				{#if wordCard.here}
 					<p class="wc-line" dir="auto">

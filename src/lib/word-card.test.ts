@@ -164,7 +164,9 @@ describe("buildWordCardMessages", () => {
 		expect(system!.content).toContain(
 			"Never the sense of an idiom or larger phrase it sits in"
 		);
-		expect(system!.content).toContain('"inSentence": only when');
+		expect(system!.content).toContain(
+			"the sense it takes when that differs from"
+		);
 		expect(system!.content).toContain("never an abbreviation");
 		expect(system!.content).toContain("Work out the passage's language first");
 	});

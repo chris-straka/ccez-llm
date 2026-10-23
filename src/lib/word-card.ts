@@ -859,7 +859,7 @@ export function buildWordCardMessages(
 		`You make a word card for a language learner who highlighted one word ` +
 		`in a passage they are reading. ${langLine} Reply with one JSON object ` +
 		`and nothing else, no markdown:\n` +
-		`{"meaning": "", "inSentence": "", "parts": [{"text": "", "reading": "", ` +
+		`{"meaning": "", "parts": [{"text": "", "reading": "", ` +
 		`"label": "", "kind": ""}], "facts": [{"text": "", "kind": ""}], ` +
 		`"base": "", "here": "", "watch": ""}\n` +
 		`Write every field in ${tongue}.\n` +
@@ -867,9 +867,6 @@ export function buildWordCardMessages(
 		`sense, in the same form where the language allows ("being ironic" ` +
 		`for a present participle, "crossed" for a past one), a few words. ` +
 		`Never the sense of an idiom or larger phrase it sits in.\n` +
-		`"inSentence": only when the passage gives the word a sense its ` +
-		`literal meaning doesn't carry (part of an idiom, a figurative use); ` +
-		`otherwise leave it out.\n` +
 		`"parts": the word split into its meaningful pieces, in order; the ` +
 		`pieces joined must spell the word exactly as highlighted. A word ` +
 		`with no inner structure is one piece. ${reading} "label": for the ` +
@@ -883,25 +880,28 @@ export function buildWordCardMessages(
 		`particles or prepositions attached: the word's job in the sentence), ` +
 		`agree (gender, number, person, politeness, an attached article), ` +
 		`derive (a piece that turns it into a noun, adjective or adverb).\n` +
-		`"facts": at most three short facts about the whole word that matter ` +
-		`here, from the checklist below (gender, case, the tense it forms ` +
-		`with a helper verb); [] when none apply. Never repeat what a ` +
+		`"facts": at most three short facts about the word itself that ` +
+		`matter here, from the checklist below (gender, case, the tense it ` +
+		`forms with a helper verb); [] when none apply. What it agrees ` +
+		`with or does in this sentence goes in "here". Never repeat what a ` +
 		`piece's label already says (an ending labeled plural needs no ` +
 		`plural fact). Where nouns take a gendered article, give the gender ` +
 		`as the base form with its article ("la calèche", "der Tisch"), ` +
 		`never as "feminine noun".\n` +
-		`"base": one sentence giving the base form and its meaning, only ` +
-		`when the card doesn't already show it: a form spelled unlike its ` +
-		`base (yeux from œil, ging from gehen), or a derived word whose base ` +
-		`means something else. Leave it out when the base is the core ` +
-		`piece's label and means what "meaning" says, or a fact already ` +
-		`gives it.\n` +
-		`"here": one sentence on what the word does in this sentence: its ` +
-		`job (who acts, what is acted on, what it describes) and the nearby ` +
-		`words it works with ("who is hiring: the subject of embauche"). ` +
+		`"base": the base form and its meaning as "base → meaning", a few ` +
+		`words ("épineux → thorny, spiky"), only when the base is spelled ` +
+		`unlike the word's core piece (épineuse from épineux, yeux from ` +
+		`œil). Leave it out when they match (calèches: the piece is ` +
+		`calèche) or a fact already gives it.\n` +
+		`"here": one short sentence, at most fifteen words, on the word in ` +
+		`this sentence: the sense it takes when that differs from ` +
+		`"meaning" (figurative, part of an idiom), its job (who acts, what ` +
+		`is acted on, what it describes) and the nearby words it works ` +
+		`with or agrees with ("who is hiring: the subject of embauche"). ` +
 		`Explain why it takes this form only when the form is the point (a ` +
-		`subjunctive after que). Say only what the passage says; never add ` +
-		`claims about people or events it doesn't state.\n` +
+		`subjunctive after que). Never repeat "meaning", a fact or "base". ` +
+		`Say only what the passage says; never add claims about people or ` +
+		`events it doesn't state.\n` +
 		`"watch": one sentence on the trap a learner most likely falls into ` +
 		`with this word, from the checklist, saying nothing the facts ` +
 		`already say; leave it out when there is none.\n` +

@@ -70,6 +70,36 @@ describe("cardFromDictionary", () => {
 		expect(card.lang).toBe("fr");
 	});
 
+	it("splits an elided article off as its own piece", () => {
+		const epineux = { w: "épineux", p: "adj", s: ["spikey; spiny"] };
+		expect(
+			cardFromDictionary(
+				"l'épineuse",
+				[{ tags: "feminine singular", entry: epineux }],
+				"fr"
+			)
+		).toMatchObject({
+			meaning: "spikey",
+			parts: [
+				{ text: "l'", label: "the", kind: "agree" },
+				{ text: "épineu", label: "épineux", kind: "core" },
+				{ text: "se", label: "feminine singular", kind: "agree" }
+			]
+		});
+		const homme = { w: "homme", p: "noun", g: "masculine", s: ["man"] };
+		expect(
+			cardFromDictionary("l’homme", [{ tags: "", entry: homme }], "fr")?.parts
+		).toEqual([
+			{ text: "l’", label: "the", kind: "agree" },
+			{ text: "homme", label: "homme", kind: "core" }
+		]);
+		// A word with an apostrophe of its own stays whole.
+		const auj = { w: "aujourd'hui", p: "adv", s: ["today"] };
+		expect(
+			cardFromDictionary("aujourd'hui", [{ tags: "", entry: auj }], "fr")?.parts
+		).toEqual([]);
+	});
+
 	it("gives a noun's gender as its article, never twice", () => {
 		const caleche = {
 			w: "calèche",
