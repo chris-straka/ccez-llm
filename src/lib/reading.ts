@@ -4,6 +4,7 @@ import { escapeHtml } from "./render-math";
 import { partialReading } from "./kanjiSplit";
 import {
 	dictionaryPromptLines,
+	knownFacts,
 	knownParts,
 	type DictHit,
 	type JaPiece,
@@ -1176,11 +1177,19 @@ export async function annotationAnswer(
 		}
 		const parsed = parseWordCard(reply.content, q.quote);
 		if (parsed) {
-			// Cleaned again with the known parts: a base their label
-			// already names drops out.
+			// The dictionary's split and gender stand; cleaned again so a
+			// base their labels already name drops out.
+			const facts = found && lang ? knownFacts(q.quote, found.hits, lang) : [];
 			const withParts =
-				(known.length > 0 &&
-					cleanWordCard({ ...parsed, parts: known }, q.quote)) ||
+				((known.length > 0 || facts.length > 0) &&
+					cleanWordCard(
+						{
+							...parsed,
+							...(known.length > 0 ? { parts: known } : {}),
+							...(facts.length > 0 ? { facts } : {})
+						},
+						q.quote
+					)) ||
 				parsed;
 			const card = lang ? { ...withParts, lang } : withParts;
 			return { answer: wordCardText(card), card };

@@ -153,6 +153,39 @@ describe("wordCardText", () => {
 		]);
 	});
 
+	it("keeps the form the word belongs to and the phrase it means", () => {
+		const card = parseWordCard(
+			JSON.stringify({
+				meaning: "gone",
+				parts: [],
+				facts: [],
+				construction: {
+					name: "perfect tense",
+					words: "sind … gegangen",
+					gloss: "are … gone"
+				},
+				phrase: { words: "sind … spazieren gegangen", meaning: "we strolled" }
+			}),
+			"gegangen"
+		)!;
+		expect(card.construction?.words).toBe("sind … gegangen");
+		expect(wordCardText(card).split("\n")).toEqual([
+			"gone",
+			"perfect tense: sind … gegangen (are … gone)",
+			"sind … spazieren gegangen → we strolled"
+		]);
+		// Half a construction is none.
+		expect(
+			parseWordCard(
+				JSON.stringify({
+					meaning: "gone",
+					construction: { name: "perfect tense" }
+				}),
+				"gegangen"
+			)!.construction
+		).toBeUndefined();
+	});
+
 	it("drops a base the core piece's label already names", () => {
 		const named = parseWordCard(JSON.stringify(franchi), "franchi")!;
 		expect(named.base).toBeUndefined();
@@ -182,9 +215,8 @@ describe("buildWordCardMessages", () => {
 		expect(system!.content).toContain(
 			"Never the sense of an idiom or larger phrase it sits in"
 		);
-		expect(system!.content).toContain(
-			"the sense it takes when that differs from"
-		);
+		// The idiom goes in the phrase, with what it means here.
+		expect(system!.content).toContain('"pleut des cordes"');
 		expect(system!.content).toContain("never an abbreviation");
 		expect(system!.content).toContain("Work out the passage's language first");
 	});

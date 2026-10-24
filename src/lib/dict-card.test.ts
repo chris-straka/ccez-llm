@@ -140,6 +140,26 @@ describe("cardFromDictionary", () => {
 		]);
 	});
 
+	it("says when a verb is irregular", () => {
+		const gehen = { w: "gehen", p: "verb", s: ["to go"], i: 1 as const };
+		expect(
+			cardFromDictionary(
+				"gegangen",
+				[{ tags: "participle past", entry: gehen, split: [2, 4, 0] }],
+				"de"
+			)!.parts[1]
+		).toEqual({
+			text: "gang",
+			label: "gehen",
+			note: "irregular",
+			kind: "core"
+		});
+		// No split: the base line says it.
+		expect(
+			cardFromDictionary("ging", [{ tags: "past", entry: gehen }], "de")!.base
+		).toBe("past of gehen, irregular verb");
+	});
+
 	it("keeps the guessed split when the pack's counts another spelling", () => {
 		// Found under a spelling with fewer letters: the lengths don't fit.
 		const card = cardFromDictionary(

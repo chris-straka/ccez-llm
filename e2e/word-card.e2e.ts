@@ -18,7 +18,15 @@ test("a one-word note files and renders a word card", async ({ page }) => {
 					{ text: "bank", label: "edge of land", kind: "core" }
 				],
 				facts: [{ text: "noun", kind: "agree" }],
-				here: "Where the fog sits at dawn.",
+				construction: {
+					name: "compound",
+					words: "the riverbank",
+					gloss: "the river-bank"
+				},
+				phrase: {
+					words: "the riverbank at dawn",
+					meaning: "the shore at sunrise"
+				},
 				watch: "Not the bank that keeps money."
 			})
 		);
@@ -45,6 +53,15 @@ test("a one-word note files and renders a word card", async ({ page }) => {
 	await expect(card.locator(".wc-label")).toHaveText(["river", "edge of land"]);
 	await expect(card.locator(".wc-fact")).toHaveText(["noun"]);
 	await expect(card).toContainText("Watch: Not the bank that keeps money.");
+	// The form it belongs to sits by the split; the phrase closes the card.
+	await expect(card.locator(".wc-form > span")).toHaveText([
+		"compound",
+		"the riverbank",
+		"the river-bank"
+	]);
+	await expect(card.locator(".wc-phrase")).toHaveText(
+		/the riverbank at dawn\s*→\s*means\s*the shore at sunrise/
+	);
 	await page.keyboard.press("Escape");
 	await page.reload();
 	await expect(ready).toBeVisible({ timeout: 60_000 });

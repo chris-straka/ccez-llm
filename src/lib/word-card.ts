@@ -29,7 +29,27 @@ export interface WordPart {
 	reading?: string;
 	/** Base form for the core, else the grammar name ("past participle"). */
 	label: string;
+	/** A second, quieter line under the label ("irregular"). */
+	note?: string;
 	kind: WordPartKind;
+}
+
+/** The multi-word form a word is one part of in its sentence. */
+export interface WordConstruction {
+	/** What courses call it ("perfect tense", "passé composé"). */
+	name: string;
+	/** Its words as they stand, … for a gap ("sind … gegangen"). */
+	words: string;
+	/** The same words word for word in English ("are … gone"). */
+	gloss: string;
+}
+
+/** The stretch of the sentence around the word and what it means. */
+export interface WordPhrase {
+	/** "sind … spazieren gegangen" */
+	words: string;
+	/** "we strolled" */
+	meaning: string;
 }
 
 export interface WordFact {
@@ -47,6 +67,10 @@ export interface WordCard {
 	facts: WordFact[];
 	/** The base form and its meaning, for an inflected or derived word. */
 	base?: string;
+	/** The multi-word form the word is part of here (perfect: sind … gegangen). */
+	construction?: WordConstruction;
+	/** The phrase around the word and what it means here. */
+	phrase?: WordPhrase;
 	/** Why this form is used in this sentence. */
 	here?: string;
 	/** The trap a learner most likely falls into with this word. */
@@ -743,10 +767,12 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 			const t = text(o.text, MAX.label);
 			if (!t) continue;
 			const reading = text(o.reading, MAX.label);
+			const note = text(o.note, MAX.label);
 			parts.push({
 				text: t,
 				...(reading ? { reading } : {}),
 				label: text(o.label, MAX.label) ?? "",
+				...(note ? { note } : {}),
 				kind: kind(o.kind)
 			});
 		}
@@ -777,6 +803,21 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 			? undefined
 			: baseLine;
 	const here = text(r.here, MAX.line);
+	const field = (raw: unknown, key: string): string | undefined =>
+		raw && typeof raw === "object"
+			? text((raw as Record<string, unknown>)[key], MAX.short)
+			: undefined;
+	const cName = field(r.construction, "name");
+	const cWords = field(r.construction, "words");
+	const cGloss = field(r.construction, "gloss");
+	const construction =
+		cName && cWords && cGloss
+			? { name: cName, words: cWords, gloss: cGloss }
+			: undefined;
+	const pWords = field(r.phrase, "words");
+	const pMeaning = field(r.phrase, "meaning");
+	const phrase =
+		pWords && pMeaning ? { words: pWords, meaning: pMeaning } : undefined;
 	const watch = text(r.watch, MAX.line);
 	const lang = text(r.lang, 12);
 	const partial = r.partial === true;
@@ -786,6 +827,8 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 		parts: spelled ? parts : [],
 		facts,
 		...(base ? { base } : {}),
+		...(construction ? { construction } : {}),
+		...(phrase ? { phrase } : {}),
 		...(here ? { here } : {}),
 		...(watch ? { watch } : {}),
 		...(lang ? { lang } : {}),
@@ -826,9 +869,14 @@ export function wordCardText(card: WordCard): string {
 				.map((p) => (p.label ? `${p.text} (${p.label})` : p.text))
 				.join(" + ")
 		);
+	if (card.construction)
+		lines.push(
+			`${card.construction.name}: ${card.construction.words} (${card.construction.gloss})`
+		);
 	if (card.facts.length > 0)
 		lines.push(card.facts.map((f) => f.text).join(" · "));
 	if (card.base) lines.push(card.base);
+	if (card.phrase) lines.push(`${card.phrase.words} → ${card.phrase.meaning}`);
 	if (card.here) lines.push(card.here);
 	if (card.watch) lines.push(`Watch: ${card.watch}`);
 	return lines.join("\n");
@@ -876,7 +924,8 @@ export function buildWordCardMessages(
 		`and nothing else, no markdown:\n` +
 		`{"meaning": "", "parts": [{"text": "", "reading": "", ` +
 		`"label": "", "kind": ""}], "facts": [{"text": "", "kind": ""}], ` +
-		`"base": "", "here": "", "watch": ""}\n` +
+		`"base": "", "construction": {"name": "", "words": "", "gloss": ""}, ` +
+		`"phrase": {"words": "", "meaning": ""}, "watch": ""}\n` +
 		`Write every field in ${tongue}.\n` +
 		`"meaning": what the word itself means, literally: its dictionary ` +
 		`sense, in the same form where the language allows ("being ironic" ` +
@@ -897,29 +946,32 @@ export function buildWordCardMessages(
 				`particles or prepositions attached: the word's job in the sentence), ` +
 				`agree (gender, number, person, politeness, an attached article), ` +
 				`derive (a piece that turns it into a noun, adjective or adverb).\n`) +
-		`"facts": at most two facts of a few words each about the word ` +
-		`itself that matter here, from the checklist below (gender, the ` +
-		`helper verb its perfect takes); [] when none apply. What it agrees ` +
-		`with or does in this sentence goes in "here". Never repeat what a ` +
-		`piece's label already says (an ending labeled plural needs no ` +
-		`plural fact). Where nouns take a gendered article, give the gender ` +
-		`as the base form with its article ("la calèche", "der Tisch"), ` +
-		`never as "feminine noun".\n` +
+		`"facts": where nouns take a gendered article, the noun's gender as ` +
+		`its base form with that article ("la calèche", "der Tisch"), never ` +
+		`as "feminine noun"; [] otherwise.\n` +
 		`"base": the base form and its meaning as "base → meaning", a few ` +
 		`words ("épineux → thorny, spiky"), only when the base is spelled ` +
 		`unlike the word's core piece (épineuse from épineux, yeux from ` +
 		`œil). Leave it out when they match (calèches: the piece is ` +
 		`calèche), a piece's label already names the base (ironis labeled ` +
 		`ironiser) or a fact already gives it.\n` +
-		`"here": one short sentence, at most ten words, on the word in ` +
-		`this sentence: the sense it takes when that differs from ` +
-		`"meaning" (figurative, part of an idiom), its job (who acts, what ` +
-		`is acted on, what it describes) and the nearby words it works ` +
-		`with or agrees with ("who is hiring: the subject of embauche"). ` +
-		`Explain why it takes this form only when the form is the point (a ` +
-		`subjunctive after que). Never repeat "meaning", a fact or "base". ` +
-		`Say only what the passage says; never add claims about people or ` +
-		`events it doesn't state.\n` +
+		`"construction": only when the word is one part of a multi-word ` +
+		`grammatical form in this sentence (a helper verb with a participle ` +
+		`or infinitive: a perfect, passive or future; a verb with its ` +
+		`separated prefix; a reflexive pronoun): "name", the form's name ` +
+		`as English-language courses give it ("perfect tense", "passé ` +
+		`composé", "passive"); "words", only the form's own words (the ` +
+		`helper, prefix or pronoun and the highlighted word) as they stand, ` +
+		`with … for everything between them ("sind … gegangen", never ` +
+		`"sind … spazieren gegangen"); "gloss", those words word for word ` +
+		`in English, keeping the gaps ("are … gone"). Leave it out ` +
+		`otherwise.\n` +
+		`"phrase": the stretch of the sentence around the word that means ` +
+		`one thing together, as it stands, with … for a gap ("sind … ` +
+		`spazieren gegangen", "pleut des cordes"), and "meaning": what it ` +
+		`means here in plain words, as few as do ("we strolled", "it's ` +
+		`pouring"). Leave it out when the stretch would be the word alone. ` +
+		`Say only what the passage says.\n` +
 		`"watch": one short sentence, only for a trap learners really fall ` +
 		`into with this word (a false friend, a form or gender commonly ` +
 		`got wrong), saying nothing the facts already say. Most words have ` +

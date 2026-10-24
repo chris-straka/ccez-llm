@@ -17,9 +17,14 @@ and keep cards small.
   (`knownParts`), and its card keeps the pack's pieces. Scripts whose
   pieces want readings (Arabic vowels, pinyin) still ask the model;
   Japanese takes its pieces from the tokenizer.
-- Notes stay short: Here at most ten words, at most two facts of a few
-  words, Watch only for a real trap, no base line a piece's label
-  already names.
+- The card's shape (owner sketch, 2026-10-24): the split, with
+  "irregular" under the stem of an irregular verb (from the pack);
+  beside it, the multi-word form the word belongs to in this sentence,
+  its name, its words and a word-for-word gloss ("perfect tense / sind
+  … gegangen / are … gone"); last, the phrase it sits in and what that
+  means ("sind … spazieren gegangen → went for a walk"). No Here line,
+  no fact pills beyond a noun's gender, Watch only for a real trap, no
+  base line a piece's label already names.
 - What a pack can't give is left to the model: irregular forms
   (gegangen splits, ging doesn't), ending chains finer than one plural
   or degree marker, and the sense the sentence gives the word.

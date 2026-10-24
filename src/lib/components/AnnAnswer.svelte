@@ -369,28 +369,53 @@ where it was left. -->
 >
 	<div class="ann-answer-body" bind:this={body} onscroll={rememberScroll}>
 		{#if wordCard}
-			<!-- Word card: the literal meaning leads; the sentence's
-			sense (Here, or an older card's In this sentence) follows
-			the base. The word splits into its
-			colored pieces, each labeled under it (readings above where
-			the script hides the sound). -->
+			<!-- Word card: the literal meaning leads. The word splits into
+			its colored pieces, each labeled under it (readings above where
+			the script hides the sound), with the multi-word form it belongs
+			to beside them (sind … gegangen, word for word); the phrase it
+			sits in and what that means close the card (older cards: Here,
+			In this sentence). -->
 			<div class="wc">
 				<p class="ann-answer-text ann-answer-head" dir="auto">
 					{wordCard.meaning}
 				</p>
-				{#if cardWord.length > 0}
-					<div class="wc-word" dir={wordCardDir(wordCard.lang)}>
-						{#each cardWord as part, i (i)}
-							<div class="wc-part k-{part.kind}">
-								{#if cardReadings}
-									<span class="wc-read" dir="auto">{part.reading ?? ""}</span>
-								{/if}
-								<span class="wc-piece" lang={wordCard.lang}>{part.text}</span>
-								{#if part.label}
-									<span class="wc-label" dir="auto">{part.label}</span>
-								{/if}
+				{#if cardWord.length > 0 || wordCard.construction}
+					<div class="wc-top">
+						{#if cardWord.length > 0}
+							<div class="wc-word" dir={wordCardDir(wordCard.lang)}>
+								{#each cardWord as part, i (i)}
+									<div class="wc-part k-{part.kind}">
+										{#if cardReadings}
+											<span class="wc-read" dir="auto"
+												>{part.reading ?? ""}</span
+											>
+										{/if}
+										<span class="wc-piece" lang={wordCard.lang}
+											>{part.text}</span
+										>
+										{#if part.label}
+											<span class="wc-label" dir="auto">{part.label}</span>
+										{/if}
+										{#if part.note}
+											<span class="wc-note" dir="auto">{part.note}</span>
+										{/if}
+									</div>
+								{/each}
 							</div>
-						{/each}
+						{/if}
+						{#if wordCard.construction}
+							<div class="wc-form">
+								<span class="wc-form-name" dir="auto"
+									>{wordCard.construction.name}</span
+								>
+								<span class="wc-form-words" lang={wordCard.lang} dir="auto"
+									>{wordCard.construction.words}</span
+								>
+								<span class="wc-form-gloss" dir="auto"
+									>{wordCard.construction.gloss}</span
+								>
+							</div>
+						{/if}
 					</div>
 				{/if}
 				{#if wordCard.facts.length > 0}
@@ -402,6 +427,14 @@ where it was left. -->
 				{/if}
 				{#if wordCard.base}
 					<p class="wc-line" dir="auto">{wordCard.base}</p>
+				{/if}
+				{#if wordCard.phrase}
+					<p class="wc-line wc-phrase" dir="auto">
+						<span lang={wordCard.lang}>{wordCard.phrase.words}</span>
+						<span class="wc-arrow" aria-hidden="true">→</span>
+						<span class="wc-said">means</span>
+						{wordCard.phrase.meaning}
+					</p>
 				{/if}
 				{#if wordCard.inSentence}
 					<p class="wc-line" dir="auto">
@@ -817,6 +850,50 @@ where it was left. -->
 	}
 	.wc-part.k-core .wc-label {
 		color: var(--muted);
+	}
+	.wc-note {
+		max-width: 10ch;
+		margin: 0 auto;
+		font-size: 0.72em;
+		line-height: 1.25;
+		text-align: center;
+		font-style: italic;
+		color: var(--muted);
+	}
+	/* The split and the form it belongs to sit side by side, the form
+	dropping under the split where the card is too narrow. */
+	.wc-top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6em 1.6em;
+	}
+	.wc-form {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.2em;
+		min-width: 0;
+		text-align: center;
+	}
+	.wc-form-name {
+		font-size: 0.82em;
+		color: var(--muted);
+	}
+	.wc-form-gloss {
+		color: color-mix(in srgb, currentColor 70%, transparent);
+	}
+	.wc-arrow {
+		color: var(--muted);
+	}
+	/* Spoken by screen readers in place of the arrow. */
+	.wc-said {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 	.wc-download {
 		margin: 0;

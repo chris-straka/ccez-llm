@@ -4,7 +4,7 @@
  * shows) while the model writes the rest, and the lines the model
  * reads so it picks the sense that fits instead of guessing. Pure.
  */
-import type { WordCard, WordPart, WordPartKind } from "./word-card";
+import type { WordCard, WordFact, WordPart, WordPartKind } from "./word-card";
 
 /** One pack entry as stored (scripts/dict-pack.ts). */
 export interface DictEntry {
@@ -15,6 +15,8 @@ export interface DictEntry {
 	s: string[];
 	/** Derivation pieces (text, label, kind) that spell the headword. */
 	m?: Array<[string, string, WordPartKind]>;
+	/** An irregular verb (scripts/dict-pack.ts). */
+	i?: 1;
 }
 
 export interface DictHit {
@@ -144,7 +146,7 @@ function firstSense(entry: DictEntry): string {
 /** The base word, its reading and part of speech: the meaning is already on the card. */
 function baseLine(entry: DictEntry): string {
 	const reading = entry.r && entry.r !== entry.w ? ` (${entry.r})` : "";
-	return `${entry.w}${reading}, ${entry.p}`;
+	return `${entry.w}${reading}, ${entry.i ? "irregular verb" : entry.p}`;
 }
 
 /** Fold for comparing a form with its headword (curly apostrophes straight). */
@@ -409,7 +411,12 @@ function packParts(form: string, hit: DictHit, endingName: string): WordPart[] {
 		: endingName;
 	const parts: WordPart[] = [];
 	if (pre) parts.push({ text: pre, label: endingName, kind });
-	parts.push({ text: stem, label: hit.entry.w, kind: "core" });
+	parts.push({
+		text: stem,
+		label: hit.entry.w,
+		...(hit.entry.i ? { note: "irregular" } : {}),
+		kind: "core"
+	});
 	if (num)
 		parts.push({
 			text: num,
@@ -463,6 +470,15 @@ export function knownParts(
 ): WordPart[] {
 	const made = dictionaryCard(quote, hits, lang, japanese, matched);
 	return made?.known ? made.card.parts : [];
+}
+
+/** The facts the dictionary knows (a noun's gender as its article). */
+export function knownFacts(
+	quote: string,
+	hits: DictHit[],
+	lang: string
+): WordFact[] {
+	return dictionaryCard(quote, hits, lang, [], undefined)?.card.facts ?? [];
 }
 
 function dictionaryCard(
