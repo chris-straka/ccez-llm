@@ -500,6 +500,19 @@ describe("answerCardKeyAction", () => {
 		expect(answerCardKeyAction({ ...open, metaKey: true })).toBeNull();
 	});
 
+	it("opens the reply on bare R with a card open", () => {
+		expect(answerCardKeyAction({ ...open, key: "r" })).toBe("reply");
+		expect(
+			answerCardKeyAction({ ...open, key: "r", inField: true })
+		).toBeNull();
+		expect(
+			answerCardKeyAction({ ...open, key: "r", ctrlKey: true })
+		).toBeNull();
+		expect(
+			answerCardKeyAction({ ...open, key: "r", cardOpen: false })
+		).toBeNull();
+	});
+
 	it("needs the key spelling exactly", () => {
 		expect(answerCardKeyAction({ ...open, key: "Enter" })).toBeNull();
 		expect(answerCardKeyAction({ ...open, key: "Escape" })).toBeNull();

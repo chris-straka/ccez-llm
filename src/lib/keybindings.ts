@@ -384,23 +384,25 @@ export interface AnswerCardKeyFacts extends KeyModifiers {
 	inEditable: boolean;
 }
 
-export type AnswerCardKeyAction = "edit-answer";
+export type AnswerCardKeyAction = "edit-answer" | "reply";
 
-/** E with an answer card open rewords its annotation (the edit card
-opens in place where the answer sat). Typing in any field keeps the
-key — only a bare E outside fields edits. */
+/** With an answer card open, E rewords its annotation (the edit card
+opens in place where the answer sat) and R opens the reply field
+(desktop has no Reply button). Typing in any field keeps the key —
+only a bare E or R outside fields acts. */
 export function answerCardKeyAction(
 	facts: AnswerCardKeyFacts
 ): AnswerCardKeyAction | null {
 	if (
-		facts.cardOpen &&
-		facts.key === "e" &&
-		bare(facts) &&
-		!facts.inField &&
-		!facts.inEditor &&
-		!facts.inEditable
+		!facts.cardOpen ||
+		!bare(facts) ||
+		facts.inField ||
+		facts.inEditor ||
+		facts.inEditable
 	)
-		return "edit-answer";
+		return null;
+	if (facts.key === "e") return "edit-answer";
+	if (facts.key === "r") return "reply";
 	return null;
 }
 

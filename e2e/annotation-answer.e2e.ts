@@ -1112,18 +1112,10 @@ test("replies thread under the answer in the same card", async ({ page }) => {
 	const card = page.locator(".ann-answer");
 	await expect(card).toBeVisible({ timeout: 10_000 });
 	const field = card.getByRole("textbox", { name: "Reply to this answer" });
-	// The field waits for Reply, which hangs outside the card.
+	// The field waits for R; desktop shows no Reply button.
 	await expect(field).toHaveCount(0);
-	const replyBtn = card.getByRole("button", { name: "Reply" });
-	const below = await page.evaluate(() => {
-		const el = document.querySelector(".ann-answer")!.getBoundingClientRect();
-		const btn = document
-			.querySelector(".ann-answer-reply")!
-			.getBoundingClientRect();
-		return btn.top >= el.bottom || btn.bottom <= el.top;
-	});
-	expect(below).toBe(true);
-	await replyBtn.click();
+	await expect(card.getByRole("button", { name: "Reply" })).toHaveCount(0);
+	await page.keyboard.press("r");
 	await expect(field).toBeFocused();
 	// Letters that are shortcuts elsewhere (e edits, a annotates).
 	await page.keyboard.type("are you sure about that?");
@@ -1195,10 +1187,13 @@ test("the answer card reopens at its scroll position", async ({ page }) => {
 		page.evaluate(() => document.querySelector(".ann-answer-body")!.scrollTop);
 	await open();
 	expect(await scrollTop()).toBe(0);
-	// A capped card keeps its padding inside the cap: it and its
-	// buttons stay above the composer instead of running onto it.
+	// A capped card keeps its padding inside the cap: it (and its
+	// buttons, where it has any) stays above the composer instead of
+	// running onto it.
 	const overrun = await page.evaluate(() => {
-		const row = document.querySelector(".ann-answer-actions")!;
+		const row =
+			document.querySelector(".ann-answer-actions") ??
+			document.querySelector(".ann-answer")!;
 		const prompt = document.querySelector(".prompt")!;
 		return (
 			row.getBoundingClientRect().bottom - prompt.getBoundingClientRect().top

@@ -50,7 +50,8 @@ test("a one-word note files and renders a word card", async ({ page }) => {
 		"the bank of a river"
 	);
 	await expect(card.locator(".wc-piece")).toHaveText(["river", "bank"]);
-	await expect(card.locator(".wc-label")).toHaveText(["river", "edge of land"]);
+	// "river" labeled river only repeats its piece: no label.
+	await expect(card.locator(".wc-label")).toHaveText(["edge of land"]);
 	await expect(card.locator(".wc-fact")).toHaveText(["noun"]);
 	await expect(card).toContainText("Watch: Not the bank that keeps money.");
 	// The form it belongs to sits by the split; the phrase closes the card.

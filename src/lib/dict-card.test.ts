@@ -140,6 +140,19 @@ describe("cardFromDictionary", () => {
 		]);
 	});
 
+	it("adds the next sense when the first only repeats the word", () => {
+		const extension = {
+			w: "extension",
+			p: "noun",
+			g: "feminine",
+			s: ["extension", "semantic widening"]
+		};
+		expect(
+			cardFromDictionary("extension", [{ tags: "", entry: extension }], "fr")!
+				.meaning
+		).toBe("extension; semantic widening");
+	});
+
 	it("says when a verb is irregular", () => {
 		const gehen = { w: "gehen", p: "verb", s: ["to go"], i: 1 as const };
 		expect(

@@ -22,14 +22,20 @@ where it was left. -->
 </script>
 
 <script lang="ts">
-	import { tick } from "svelte";
+	import { tick, untrack } from "svelte";
 	import {
 		placeAnswerPopover,
 		type AnchorRect,
 		type NoteColumn
 	} from "$lib/annPop";
 	import type { AnnotationFollowUp } from "$lib/annotations";
-	import { WORD_PROFILES, wordCardDir, type WordCard } from "$lib/word-card";
+	import {
+		cardWordRow,
+		shortGrammar,
+		WORD_PROFILES,
+		wordCardDir,
+		type WordCard
+	} from "$lib/word-card";
 	import { dictDownloads, dictPack } from "$lib/dictionary.svelte";
 
 	interface Props {
@@ -66,6 +72,12 @@ where it was left. -->
 		/** Send a reply; resolves false when it failed (the text comes
 		back to the field). Absent hides the reply field. */
 		onReply?: ((text: string) => Promise<boolean>) | undefined;
+		/** The annotated words (the word row drops what repeats them). */
+		quote?: string;
+		/** Bumped by R on desktop: opens the reply field. */
+		replyRequest?: number;
+		/** Phones show a Reply icon; desktop replies with R. */
+		replyButton?: boolean;
 	}
 
 	let {
@@ -83,17 +95,18 @@ where it was left. -->
 		thread = [],
 		wordCard,
 		finishing = true,
-		onReply
+		onReply,
+		quote = "",
+		replyRequest = 0,
+		replyButton = false
 	}: Props = $props();
 
 	/** The split row shows when there is a split, or a base form for
 	a word with none. */
-	const cardWord = $derived(
-		wordCard &&
-			(wordCard.parts.length > 1 || (wordCard.parts[0]?.label ?? "") !== "")
-			? wordCard.parts
-			: []
-	);
+	/** The word row without repeats (cardWordRow): pieces, the ghost
+	article, and the facts left for pills. */
+	const row = $derived(wordCard ? cardWordRow(wordCard, quote) : null);
+	const cardWord = $derived(row?.parts ?? []);
 	const cardReadings = $derived(cardWord.some((p) => p.reading));
 	/** The card's language pack downloading right now (0 to 1). */
 	const downloading = $derived.by(() => {
@@ -123,6 +136,16 @@ where it was left. -->
 		replyingFor = badgeId;
 		void tick().then(() => field?.focus());
 	}
+	// R on desktop: each bump opens the reply field (the first value
+	// is the page's count so far, not a press).
+	let seenReplyRequest = untrack(() => replyRequest);
+	$effect(() => {
+		if (replyRequest === seenReplyRequest) return;
+		seenReplyRequest = replyRequest;
+		if (!onReply || replying) return;
+		replyingFor = badgeId;
+		void tick().then(() => field?.focus());
+	});
 	const waiting = $derived(thread.some((t) => t.a === undefined));
 	const splitLines = (text: string): string[] =>
 		text
@@ -383,6 +406,13 @@ where it was left. -->
 					<div class="wc-top">
 						{#if cardWord.length > 0}
 							<div class="wc-word" dir={wordCardDir(wordCard.lang)}>
+								{#if row?.article}
+									<!-- The article in ghost: it shows the gender without a
+									pill repeating the word. -->
+									<span class="wc-ghost" lang={wordCard.lang}
+										>{row.article}</span
+									>
+								{/if}
 								{#each cardWord as part, i (i)}
 									<div class="wc-part k-{part.kind}">
 										{#if cardReadings}
@@ -394,7 +424,11 @@ where it was left. -->
 											>{part.text}</span
 										>
 										{#if part.label}
-											<span class="wc-label" dir="auto">{part.label}</span>
+											<span class="wc-label" dir="auto"
+												>{part.kind === "core"
+													? part.label
+													: shortGrammar(part.label)}</span
+											>
 										{/if}
 										{#if part.note}
 											<span class="wc-note" dir="auto">{part.note}</span>
@@ -418,9 +452,9 @@ where it was left. -->
 						{/if}
 					</div>
 				{/if}
-				{#if wordCard.facts.length > 0}
+				{#if row && row.facts.length > 0}
 					<div class="wc-facts">
-						{#each wordCard.facts as fact, i (i)}
+						{#each row.facts as fact, i (i)}
 							<span class="wc-fact k-{fact.kind}" dir="auto">{fact.text}</span>
 						{/each}
 					</div>
@@ -520,7 +554,7 @@ where it was left. -->
 				}}></textarea>
 		</form>
 	{/if}
-	{#if onToggleSave || onReply}
+	{#if onToggleSave || (onReply && replyButton)}
 		<!-- Save and Reply hang outside the card, on the side away from
 		the word, so they add no layout to the note. -->
 		<div
@@ -547,12 +581,13 @@ where it was left. -->
 					>{saved ? "Saved" : "Save"}
 				</button>
 			{/if}
-			{#if onReply}
+			{#if onReply && replyButton}
 				<button
 					type="button"
 					class="ann-answer-reply"
 					class:on={replying}
 					aria-pressed={replying}
+					aria-label="Reply"
 					onclick={(e) => {
 						e.stopPropagation();
 						toggleReply();
@@ -560,7 +595,7 @@ where it was left. -->
 				>
 					<svg viewBox="0 0 16 16" aria-hidden="true"
 						><path d="M6.5 4 2.5 7.5l4 3.5M2.5 7.5h7a4 4 0 0 1 4 4v1" /></svg
-					>Reply
+					>
 				</button>
 			{/if}
 		</div>
@@ -610,6 +645,10 @@ where it was left. -->
 		cursor: pointer;
 		pointer-events: auto;
 		transition: color 120ms ease;
+	}
+	/* Reply is an icon alone (phones). */
+	.ann-answer-actions .ann-answer-reply {
+		padding: 0.3em 0.75em;
 	}
 	.ann-answer-actions button:hover,
 	.ann-answer-actions button.on {
@@ -823,13 +862,23 @@ where it was left. -->
 	.wc-part + .wc-part .wc-piece {
 		border-inline-start: 1px solid var(--bg-overlay);
 	}
-	.wc-part:first-child .wc-piece {
+	.wc-part:first-of-type .wc-piece {
 		border-start-start-radius: 0.4em;
 		border-end-start-radius: 0.4em;
 	}
-	.wc-part:last-child .wc-piece {
+	.wc-part:last-of-type .wc-piece {
 		border-start-end-radius: 0.4em;
 		border-end-end-radius: 0.4em;
+	}
+	/* The article in ghost before the first piece, on its baseline
+	and size, as quiet as the labels. */
+	.wc-ghost {
+		align-self: flex-start;
+		padding: 0.1em 0.3em 0 0;
+		font-size: 1.2em;
+		line-height: inherit;
+		color: color-mix(in srgb, var(--muted) 70%, transparent);
+		white-space: nowrap;
 	}
 	.wc-read {
 		min-height: 1.3em;

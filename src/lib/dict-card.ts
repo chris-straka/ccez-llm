@@ -143,6 +143,18 @@ function firstSense(entry: DictEntry): string {
 	return s.trim();
 }
 
+/**
+ * The card's meaning: the first sense, and the next one too when the
+ * first only repeats the word (extension's "extension" says nothing;
+ * with "semantic widening" beside it, it does).
+ */
+function meaningOf(entry: DictEntry): string {
+	const first = firstSense(entry);
+	if (fold(first) !== fold(entry.w) || entry.s.length < 2) return first;
+	const next = firstSense({ ...entry, s: entry.s.slice(1) });
+	return next ? `${first}; ${next}` : first;
+}
+
 /** The base word, its reading and part of speech: the meaning is already on the card. */
 function baseLine(entry: DictEntry): string {
 	const reading = entry.r && entry.r !== entry.w ? ` (${entry.r})` : "";
@@ -556,7 +568,7 @@ function dictionaryCard(
 				: undefined;
 	return {
 		card: {
-			meaning: firstSense(top.entry) || top.entry.w,
+			meaning: meaningOf(top.entry) || top.entry.w,
 			parts,
 			facts,
 			...(base ? { base } : {}),

@@ -4,12 +4,15 @@ import { annotationAnswer } from "./reading";
 import type { ChatProvider } from "./providers/types";
 import {
 	buildWordCardMessages,
+	cardWordRow,
 	isWordQuote,
+	shortGrammar,
 	parseWordCard,
 	WORD_PROFILES,
 	wordCardDir,
 	wordCardLang,
-	wordCardText
+	wordCardText,
+	type WordCard
 } from "./word-card";
 
 const franchi = {
@@ -288,5 +291,62 @@ describe("annotationAnswer with one word", () => {
 		});
 		expect(chat).toHaveBeenCalledTimes(1);
 		expect(reply.card).toBeUndefined();
+	});
+});
+
+describe("cardWordRow", () => {
+	const base: WordCard = {
+		meaning: "extension, add-on",
+		parts: [{ text: "extension", label: "extension", kind: "core" }],
+		facts: [{ text: "une extension", kind: "agree" }]
+	};
+
+	it("puts the article in ghost and drops what only repeats the word", () => {
+		expect(cardWordRow(base, "extension")).toEqual({
+			article: "une",
+			parts: [{ text: "extension", label: "", kind: "core" }],
+			facts: []
+		});
+	});
+
+	it("keeps an elided article and a fact about another form", () => {
+		expect(
+			cardWordRow(
+				{ ...base, parts: [], facts: [{ text: "l'homme", kind: "agree" }] },
+				"homme"
+			)
+		).toMatchObject({ article: "l'", parts: [{ text: "homme" }] });
+		// calèches is not la calèche: the pill stays, the split shows.
+		const row = cardWordRow(
+			{
+				meaning: "carriages",
+				parts: [
+					{ text: "calèche", label: "calèche", kind: "core" },
+					{ text: "s", label: "plural", kind: "agree" }
+				],
+				facts: [{ text: "la calèche", kind: "agree" }]
+			},
+			"calèches"
+		);
+		expect(row.article).toBe("");
+		expect(row.facts).toHaveLength(1);
+		// Its stem's label only repeats the piece: dropped too.
+		expect(row.parts.map((p) => p.label)).toEqual(["", "plural"]);
+	});
+
+	it("shows nothing for a lone piece with nothing to add", () => {
+		expect(cardWordRow({ ...base, facts: [] }, "extension").parts).toEqual([]);
+	});
+});
+
+describe("shortGrammar", () => {
+	it("draws persons, number and tense short", () => {
+		expect(shortGrammar("present indicative, third-person singular")).toBe(
+			"▶ indicative, 3rd 👤"
+		);
+		expect(shortGrammar("first-person plural")).toBe("1st 👨‍👨‍👧‍👦");
+		expect(shortGrammar("past participle")).toBe("⏪ participle");
+		expect(shortGrammar("present continuous")).toBe("▶ 🔁");
+		expect(shortGrammar("passé composé")).toBe("passé composé");
 	});
 });

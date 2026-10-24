@@ -882,6 +882,73 @@ export function wordCardText(card: WordCard): string {
 	return lines.join("\n");
 }
 
+/** Grammar words drawn as numbers and symbols on the card. */
+const GRAMMAR_SHORT: Array<[RegExp, string]> = [
+	[/\bfirst[- ]person\b/gi, "1st"],
+	[/\bsecond[- ]person\b/gi, "2nd"],
+	[/\bthird[- ]person\b/gi, "3rd"],
+	[/\bsingular\b/gi, "👤"],
+	[/\bplural\b/gi, "👨‍👨‍👧‍👦"],
+	[/\b(?:continuous|progressive)\b/gi, "🔁"],
+	[/\bpresent\b/gi, "▶"],
+	[/\bpast\b/gi, "⏪"],
+	[/\bfuture\b/gi, "⏩"]
+];
+
+/**
+ * A grammar label in short (owner, 2026-10-24): persons as 1st, 2nd,
+ * 3rd; singular 👤, plural 👨‍👨‍👧‍👦; present ▶, past ⏪, future ⏩,
+ * continuous 🔁. For grammar labels only: a stem's label is its base
+ * word and stays as written. Pure.
+ */
+export function shortGrammar(label: string): string {
+	let out = label;
+	for (const [word, short] of GRAMMAR_SHORT) out = out.replace(word, short);
+	return out.replace(/\s{2,}/g, " ").trim();
+}
+
+/** What a card's word row shows. */
+export interface WordRow {
+	/** The article in ghost before the word ("une"), when the gender
+	 * fact would only repeat the word with it. */
+	article: string;
+	/** The pieces to draw; empty when the row would add nothing. */
+	parts: WordPart[];
+	/** The facts left to draw as pills. */
+	facts: WordFact[];
+}
+
+/**
+ * The word row without repeats: a label that only repeats its piece
+ * goes (extension labeled extension), and a gender fact that is just
+ * an article and this very word (une extension) becomes the ghost
+ * article before the word instead of a pill. A lone piece with
+ * nothing to add shows only to carry that article. Pure.
+ */
+export function cardWordRow(card: WordCard, quote: string): WordRow {
+	const word = spelling(quote);
+	let article = "";
+	const facts = card.facts.filter((f) => {
+		if (article) return true;
+		const m = /^(\p{L}{1,4}['’]|\p{L}{1,4}\s+)(.+)$/u.exec(f.text.trim());
+		if (!m || spelling(m[2]!) !== word) return true;
+		article = m[1]!.trim();
+		return false;
+	});
+	const parts = card.parts.map((p) =>
+		p.label && spelling(p.label) === spelling(p.text) ? { ...p, label: "" } : p
+	);
+	const adds = parts.length > 1 || parts.some((p) => p.label !== "" || p.note);
+	if (adds) return { article, parts, facts };
+	if (!article) return { article, parts: [], facts };
+	const text = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
+	return {
+		article,
+		parts: parts.length === 1 ? parts : [{ text, label: "", kind: "core" }],
+		facts
+	};
+}
+
 /** Text direction for a card's word and passage. */
 export function wordCardDir(lang: string | undefined): "rtl" | "ltr" {
 	return lang && WORD_PROFILES[lang]?.rtl ? "rtl" : "ltr";

@@ -2712,6 +2712,8 @@
 		activeReplyCode ? replyLanguageFor(activeReplyCode) : null
 	);
 	let settingsOpen = $state(false);
+	/** R on an open answer card bumps this; the card opens its reply. */
+	let answerReplyRequest = $state(0);
 	// The dictionary manager opens from Settings and closes with it.
 	$effect(() => {
 		if (!settingsOpen) {
@@ -12219,6 +12221,11 @@
 				editOrangeAnnotation(annotateMode.answerPop.id);
 				return;
 			}
+			if (cardEdit === "reply" && annotateMode.answerPop) {
+				event.preventDefault();
+				answerReplyRequest++;
+				return;
+			}
 			// Shift+R over the open chat list reads a chat's title
 			// (hovered row, else the walked one) before message keys.
 			const speakRow = sidebarSpeakTarget({
@@ -15329,6 +15336,9 @@
 				wordCard={answered.card}
 				finishing={drafts.isAsking(answered.id)}
 				onReply={(text: string) => drafts.askFollowUp(answered.id, text)}
+				quote={answered.quote}
+				replyRequest={answerReplyRequest}
+				replyButton={androidUI}
 			/>
 		{/if}
 	{/if}
