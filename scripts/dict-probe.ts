@@ -30,7 +30,7 @@ for (const word of words) {
 				: entry.m && tags === ""
 					? entry.m.map(([t, l]) => `${t}(${l})`).join(" + ")
 					: "-";
-			return `${entry.w} [${tags || "headword"}] ${cut}`;
+			return `${entry.w}${entry.i ? " (irregular)" : ""} [${tags || "headword"}] ${cut}`;
 		});
 	console.log(`${word}: ${lines.join(" | ") || "no hits"}`);
 }

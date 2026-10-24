@@ -3,6 +3,7 @@ import {
 	AffixCounts,
 	fallbackStem,
 	isCell,
+	stemFits,
 	paradigmStem,
 	separateMarkers,
 	splitForm,
@@ -122,6 +123,22 @@ describe("fallbackStem", () => {
 			{ form: "war", tags: ["past", "first-person", "singular"] }
 		];
 		expect(fallbackStem("sein", "verb", sein, de)).toBeNull();
+	});
+});
+
+describe("stemFits", () => {
+	it("needs the headword to be its stem plus an ending seen often", () => {
+		const verbs = Array.from({ length: 20 }, (_, i) => `mach${"x".repeat(i)}`);
+		const de = counted(verbs.map((s) => [`${s}en`, "verb", weakVerb(s)]));
+		const machen = weakVerb("mach");
+		expect(stemFits("mach", "machen", "verb", machen, de)).toBe(true);
+		// haben's forms share ha, but -ben closes no infinitive.
+		const haben: Cell[] = [
+			{ form: "haben", tags: ["infinitive"] },
+			{ form: "hast", tags: [...PRES, "second-person", "singular"] },
+			{ form: "hat", tags: [...PRES, "third-person", "singular"] }
+		];
+		expect(stemFits("ha", "haben", "verb", haben, de)).toBe(false);
 	});
 });
 

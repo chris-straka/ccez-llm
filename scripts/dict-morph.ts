@@ -167,6 +167,28 @@ export function paradigmStem(lemma: string, forms: string[]): string | null {
 }
 
 /**
+ * True when a regular stem fits its headword: the headword is the
+ * stem plus an ending seen on at least 20 forms with its own cell's
+ * tags (machen is mach + en; comer's -er counts, though -ar verbs
+ * outnumber it fifty to one). haben's forms all share ha, but ben is
+ * no infinitive ending, so haben isn't regular. A headword missing
+ * from its own table fits.
+ */
+export function stemFits(
+	stem: string,
+	lemma: string,
+	pos: string,
+	cells: Array<{ form: string; tags: string[] }>,
+	counts: AffixCounts
+): boolean {
+	const l = bare(fold(lemma));
+	const own = cells.find((c) => bare(fold(c.form)).join("") === l.join(""));
+	if (!own) return true;
+	const rest = l.slice([...stem].length).join("");
+	return counts.seen(tagKey(pos, own.tags), rest) >= 20;
+}
+
+/**
  * The stem of a headword whose forms run on several stems: the
  * headword less the usual ending for its own cell's tags (sehen less
  * the infinitive's -en is seh; Haus, whose nominative has none, is
@@ -292,6 +314,19 @@ export class AffixCounts {
 
 	endings(key: string): string[] {
 		return this.trustedEnds.get(key) ?? [];
+	}
+
+	/**
+	 * How many forms with these tags an ending closed, in both
+	 * tallies, marks aside (parlare's -are counts parlàre's -àre).
+	 */
+	seen(key: string, end: string): number {
+		const want = bare([...end]).join("");
+		let n = 0;
+		for (const t of this.tallies)
+			for (const [e, count] of t.ends.get(key) ?? [])
+				if (bare([...e]).join("") === want) n += count;
+		return n;
 	}
 
 	prefixes(key: string): string[] {

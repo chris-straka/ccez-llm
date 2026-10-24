@@ -16,7 +16,7 @@
  * per hit three u8s: the key's prefix, stem and plural-marker lengths
  * in characters (stem 0xff when the split isn't known; readers from
  * before splits stop at the hits). An entry is JSON
- * `{w, p, g?, r?, s, m?}`.
+ * `{w, p, g?, r?, s, m?, i?}`.
  */
 
 import { plainSpelling } from "../src/lib/dict-card";
@@ -24,6 +24,7 @@ import {
 	AffixCounts,
 	fallbackStem,
 	isCell,
+	stemFits,
 	paradigmStem,
 	separateMarkers,
 	splitForm,
@@ -49,6 +50,8 @@ export interface PackEntry {
 	s: string[];
 	/** Derivation pieces, when the headword's etymology lines them up. */
 	m?: Morpheme[];
+	/** An irregular verb (dict-pack.ts irregularVerb). */
+	i?: 1;
 }
 
 /** Stem length marking a hit whose split isn't known. */
@@ -467,13 +470,32 @@ function recordStem(
 	r: KaikkiRecord,
 	forms: Array<{ form: string; tags: string[] }>,
 	counts?: AffixCounts
-): string | null {
+): { stem: string | null; regular: boolean } {
 	const cells = forms.filter((f) => isCell(f.tags));
+	const shared = paradigmStem(
+		r.word,
+		cells.map((f) => f.form)
+	);
+	if (!counts) return { stem: shared, regular: shared !== null };
+	if (shared && stemFits(shared, r.word, r.pos, cells, counts))
+		return { stem: shared, regular: true };
+	return { stem: fallbackStem(r.word, r.pos, cells, counts), regular: false };
+}
+
+/**
+ * An irregular verb: its table runs on more than one stem, or on
+ * one its headword doesn't end in the usual way (gehen, haben,
+ * pensar). Judged only on a table of a few forms at least.
+ */
+function irregularVerb(
+	r: KaikkiRecord,
+	forms: Array<{ form: string; tags: string[] }>,
+	regular: boolean
+): boolean {
 	return (
-		paradigmStem(
-			r.word,
-			cells.map((f) => f.form)
-		) ?? (counts ? fallbackStem(r.word, r.pos, cells, counts) : null)
+		r.pos === "verb" &&
+		!regular &&
+		forms.filter((f) => isCell(f.tags)).length >= 4
 	);
 }
 
@@ -496,7 +518,7 @@ export function observeKaikkiRecord(
 		cells.map((f) => f.form)
 	);
 	if (pass === 1) counts.observe(r.pos, regular, forms);
-	else if (!regular)
+	else if (!regular || !stemFits(regular, r.word, r.pos, cells, counts))
 		counts.observe(
 			r.pos,
 			fallbackStem(r.word, r.pos, cells, counts),
@@ -543,19 +565,22 @@ export function addKaikkiRecord(
 	const pieces = morph
 		? wordMorphemes(r.word, r.pos, r.etymology_templates)
 		: undefined;
+	const forms = tableForms(r, b.lang);
+	const { stem, regular } = morph
+		? recordStem(r, forms, morph.counts)
+		: { stem: null, regular: true };
 	const id = b.addEntry({
 		w: r.word,
 		p: r.pos,
 		...(gender ? { g: gender } : {}),
 		...(reading ? { r: reading } : {}),
 		s: senses,
-		...(pieces ? { m: pieces } : {})
+		...(pieces ? { m: pieces } : {}),
+		...(morph && irregularVerb(r, forms, regular) ? { i: 1 as const } : {})
 	});
 	b.addForm(r.word, id);
 	for (const key of lemmaKeys(r.word, b.lang))
 		lemmas.set(key, [...(lemmas.get(key) ?? []), id]);
-	const forms = tableForms(r, b.lang);
-	const stem = morph ? recordStem(r, forms, morph.counts) : null;
 	morph?.stems.set(id, { lemma: r.word, stem });
 	const splits = forms.map((f) =>
 		morph && isCell(f.tags)
