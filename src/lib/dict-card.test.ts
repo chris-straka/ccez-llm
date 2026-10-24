@@ -432,6 +432,11 @@ describe("Japanese pieces", () => {
 
 describe("plainSpelling", () => {
 	it("drops the marks ordinary text leaves out", () => {
+		expect(plainSpelling("parliàmo", "it")).toBe("parliamo");
+		expect(plainSpelling("parlerèbbero", "it")).toBe("parlerebbero");
+		// A final accent is ordinary Italian spelling.
+		expect(plainSpelling("parlò", "it")).toBeNull();
+		expect(plainSpelling("perché", "it")).toBeNull();
 		expect(plainSpelling("говорю́", "ru")).toBe("говорю");
 		expect(plainSpelling("amō", "la")).toBe("amo");
 		expect(plainSpelling("kùća", "sr")).toBe("kuća");

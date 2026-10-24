@@ -582,8 +582,14 @@ const VOWEL = "aeiouyæœøɛɔаеёиоуыэюяіїєαεηιουω";
  * (είναι, typed ειναι), vowel points in Arabic and Hebrew. `onVowel`
  * marks only count on a vowel (and syllabic r), so ć, й and ї stay.
  */
-const OPTIONAL_MARKS: Record<string, { marks: RegExp; onVowel: boolean }> = {};
-for (const [langs, marks, onVowel] of [
+const OPTIONAL_MARKS: Record<
+	string,
+	{ marks: RegExp; onVowel: boolean; keepFinal?: boolean }
+> = {};
+for (const [langs, marks, onVowel, keepFinal] of [
+	// Wiktionary marks Italian stress inside words (parliàmo); ordinary
+	// text writes only a final one (parlò, città).
+	[["it"], /[\u0300\u0301]/gu, true, true],
 	[["ru"], /[\u0300\u0301\u0308]/gu, true],
 	[["uk", "bg"], /[\u0300\u0301]/gu, true],
 	[["el"], /[\u0301]/gu, true],
@@ -593,7 +599,12 @@ for (const [langs, marks, onVowel] of [
 	[["ar", "fa", "ur"], /[\u0610-\u061a\u064b-\u065f\u0670\u0640]/gu, false],
 	[["he"], /[\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/gu, false]
 ] as const)
-	for (const lang of langs) OPTIONAL_MARKS[lang] = { marks, onVowel };
+	for (const lang of langs)
+		OPTIONAL_MARKS[lang] = {
+			marks,
+			onVowel,
+			...(keepFinal ? { keepFinal } : {})
+		};
 
 /**
  * A form without the marks its language leaves out of ordinary text,
@@ -605,11 +616,15 @@ export function plainSpelling(form: string, lang: string): string | null {
 	const nfd = form.normalize("NFD");
 	const plain = (
 		rule.onVowel
-			? nfd.replace(/(\p{L})(\p{M}+)/gu, (_, base: string, ms: string) =>
-					VOWEL.includes(base.toLowerCase()) ||
-					(lang === "sr" && /[rр]/i.test(base))
-						? base + ms.replace(rule.marks, "")
-						: base + ms
+			? nfd.replace(
+					/(\p{L})(\p{M}+)/gu,
+					(whole: string, base: string, ms: string, at: number) =>
+						rule.keepFinal && at + whole.length === nfd.length
+							? whole
+							: VOWEL.includes(base.toLowerCase()) ||
+								  (lang === "sr" && /[rр]/i.test(base))
+								? base + ms.replace(rule.marks, "")
+								: base + ms
 				)
 			: nfd.replace(rule.marks, "")
 	).normalize("NFC");
