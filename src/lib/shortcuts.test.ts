@@ -68,6 +68,8 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Voice readback on / off",
 			"Annotation answers in English / the passage's language",
 			"Stop voice / close",
+			"Reply to an open note",
+			"Reword an open note",
 			"Reading aids",
 			"Stroke order step",
 			"Flashcards",
@@ -103,6 +105,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 		"Window & view",
 		[
 			"Shortcuts",
+			"Settings",
 			"Summon / hide window",
 			"Fullscreen",
 			"Exit fullscreen",
@@ -192,7 +195,8 @@ describe("shortcuts menu copy", () => {
 			MAC_NAMES.filter((n) => !macOnly.includes(n))
 		);
 		const keys = new Map(rows.map((r) => [r.name, r.keys]));
-		expect(keys.get("Shortcuts")).toContain("Ctrl+Shift+/");
+		expect(keys.get("Shortcuts")).toContain("Shift+?");
+		expect(keys.get("Settings")).toBe("Shift+L · Ctrl+,");
 		expect(keys.get("Search chats")).toBe("Ctrl+K · Ctrl+P");
 		expect(keys.get("Delete")).toBe("Ctrl+Delete · Shift+D");
 		expect(keys.get("Delete this chat")).toBe("Ctrl+Shift+Delete");

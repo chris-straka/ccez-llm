@@ -192,7 +192,7 @@ export function desktopShortcuts(
 		{
 			group: chats,
 			name: "Chat list",
-			keys: `${meta}B · ${shiftMeta}H · J / K walk · Space enters`
+			keys: `Shift+H · ${meta}B · J / K walk · Space enters`
 		},
 		{
 			group: chats,
@@ -202,7 +202,7 @@ export function desktopShortcuts(
 		{
 			group: chats,
 			name: "Newer / older chat",
-			keys: `${shiftMeta}J / ${shiftMeta}K · ${meta}↑ / ${meta}↓`
+			keys: `Shift+J / Shift+K · ${meta}↑ / ${meta}↓`
 		},
 		{
 			group: chats,
@@ -242,6 +242,8 @@ export function desktopShortcuts(
 			keys: `Ctrl+${altm}+L`
 		},
 		{ group: reading, name: "Stop voice / close", keys: "Esc" },
+		{ group: reading, name: "Reply to an open note", keys: "R" },
+		{ group: reading, name: "Reword an open note", keys: "E" },
 		{ group: reading, name: "Reading aids", keys: "M pinyin · N furigana" },
 		{ group: reading, name: "Stroke order step", keys: "H / L in Inspect" },
 		{
@@ -299,8 +301,9 @@ export function desktopShortcuts(
 		{
 			group: view,
 			name: "Shortcuts",
-			keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click`
+			keys: "Shift+? · middle-click"
 		},
+		{ group: view, name: "Settings", keys: `Shift+L · ${meta},` },
 		{ group: view, name: "Summon / hide window", keys: `${shiftMeta}Space` },
 		{
 			group: view,

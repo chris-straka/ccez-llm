@@ -835,6 +835,22 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		if (facts.code === "KeyJ") return "step-chat-newer";
 		if (facts.code === "KeyK") return "step-chat-older";
 	}
+	// Not typing (prompt and fields unfocused): Shift alone does the
+	// same, so Shift+H / Shift+L open the panels, Shift+J / Shift+K
+	// step chats and Shift+? opens the shortcuts.
+	if (
+		!cmd &&
+		facts.shiftKey &&
+		!facts.altKey &&
+		!facts.inEditor &&
+		!facts.inField
+	) {
+		if (facts.code === "KeyH") return "dismiss-or-sidebar";
+		if (facts.code === "KeyL") return "dismiss-or-settings";
+		if (facts.code === "Slash" || facts.key === "?") return "shortcuts-toggle";
+		if (facts.code === "KeyJ") return "step-chat-newer";
+		if (facts.code === "KeyK") return "step-chat-older";
+	}
 	// Shell only: a browser owns ⌘/Ctrl+plus/minus (page zoom — the
 	// shell has no browser-chrome zoom to fall back on, the web does).
 	if (

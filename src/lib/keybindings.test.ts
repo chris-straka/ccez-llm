@@ -1828,3 +1828,38 @@ describe("counterPeekStep", () => {
 		);
 	});
 });
+
+describe("chromeChord without the command key", () => {
+	const base = {
+		key: "H",
+		code: "KeyH",
+		metaKey: false,
+		ctrlKey: false,
+		altKey: false,
+		shiftKey: true,
+		inEditor: false,
+		hovered: false,
+		inField: false,
+		inShell: true
+	};
+	it("opens panels, steps chats and opens shortcuts on Shift alone when not typing", () => {
+		expect(chromeChord(base)).toBe("dismiss-or-sidebar");
+		expect(chromeChord({ ...base, key: "L", code: "KeyL" })).toBe(
+			"dismiss-or-settings"
+		);
+		expect(chromeChord({ ...base, key: "J", code: "KeyJ" })).toBe(
+			"step-chat-newer"
+		);
+		expect(chromeChord({ ...base, key: "K", code: "KeyK" })).toBe(
+			"step-chat-older"
+		);
+		expect(chromeChord({ ...base, key: "?", code: "Slash" })).toBe(
+			"shortcuts-toggle"
+		);
+	});
+	it("leaves typing alone", () => {
+		expect(chromeChord({ ...base, inEditor: true })).toBeNull();
+		expect(chromeChord({ ...base, inField: true })).toBeNull();
+		expect(chromeChord({ ...base, shiftKey: false, key: "h" })).toBeNull();
+	});
+});
