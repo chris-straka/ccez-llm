@@ -196,6 +196,7 @@
 	import DictionaryManager from "$lib/components/DictionaryManager.svelte";
 	import LicensesModal from "$lib/components/LicensesModal.svelte";
 	import { licensesView, readyApk } from "$lib/overlays.svelte";
+	import { focusInks } from "$lib/ann-repeat-paint";
 	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
@@ -1010,6 +1011,20 @@
 		const onFocus = (): void => prewarmNative(locale, voiceId);
 		window.addEventListener("focus", onFocus);
 		return () => window.removeEventListener("focus", onFocus);
+	});
+	// An open answer card keeps only its own message's underlines
+	// (see focusInks): the shell drew the others on the wrong line.
+	$effect(() => {
+		const pop = annotateMode.answerPop;
+		const open = pop && !annotateMode.answerClosing ? pop.id : null;
+		void tick().then(() => {
+			const body = open
+				? document
+						.querySelector(`[data-ann-badge="${CSS.escape(open)}"]`)
+						?.closest<HTMLElement>(".rendered")
+				: null;
+			focusInks(body ?? null);
+		});
 	});
 	// Packs update a little after launch (the lookups only check
 	// the languages you read in a session).

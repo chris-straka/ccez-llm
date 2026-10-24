@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { clearRepeatInks, paintRepeatInks } from "./ann-repeat-paint";
+import {
+	clearRepeatInks,
+	focusInks,
+	paintRepeatInks
+} from "./ann-repeat-paint";
 
 /** A stand-in Highlight registry (jsdom has none). */
 class FakeHighlight extends Set<Range> {
@@ -49,6 +53,31 @@ describe("paintRepeatInks", () => {
 		});
 		expect(registry.get("ccez-rep-0")?.priority).toBe(1);
 		expect(registry.get("ccez-rep-0-again")?.priority).toBe(0);
+	});
+
+	it("paints only the open card's message while it's focused", () => {
+		const other = document.createElement("div");
+		other.className = "rendered";
+		other.innerHTML = "<p>Ein altes Haus.</p>";
+		document.body.append(other);
+		paintRepeatInks(
+			root,
+			[{ quote: "alt", ink: 1, from: 0 }],
+			[{ quote: "alt", at: 0 }]
+		);
+		paintRepeatInks(
+			other,
+			[{ quote: "Haus", ink: 0, from: 0 }],
+			[{ quote: "Haus", at: 0 }]
+		);
+		expect(Object.keys(inked()).sort()).toEqual(["ccez-rep-0", "ccez-rep-1"]);
+		focusInks(root);
+		expect(inked()["ccez-rep-1"]).toEqual(["alt"]);
+		expect(inked()["ccez-rep-0"] ?? []).toEqual([]);
+		focusInks(null);
+		expect(inked()["ccez-rep-0"]).toEqual(["Haus"]);
+		clearRepeatInks(other);
+		other.remove();
 	});
 
 	it("re-inks after DOM surgery under the body, never onto other text", async () => {

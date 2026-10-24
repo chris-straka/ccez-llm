@@ -144,6 +144,23 @@ function register(name: string, ranges: Range[]): void {
  * rewrite the names whose ranges changed and repaint the bodies that
  * hold them.
  */
+/**
+ * The message an open answer card belongs to: while it's set, only
+ * that body's underlines paint. The Mac shell drew the other bodies'
+ * underlines across the first line of the card or of the open
+ * message instead of under their words (a headline's two quotes
+ * underlined a whole line of the article below), and they sit
+ * under the card's dim anyway.
+ */
+let focusRoot: HTMLElement | null = null;
+
+/** Paint only `root`'s underlines (an answer card is open), or all (null). */
+export function focusInks(root: HTMLElement | null): void {
+	if (root === focusRoot) return;
+	focusRoot = root;
+	rebuild();
+}
+
 function rebuild(): void {
 	for (const [root, body] of [...bodies]) {
 		if (!root.isConnected) {
@@ -158,6 +175,7 @@ function rebuild(): void {
 		const owners: HTMLElement[] = [];
 		const ranges: Range[] = [];
 		for (const [root, body] of bodies) {
+			if (focusRoot && root !== focusRoot) continue;
 			const mine = body.ranges.filter((r) => r.name === name);
 			if (mine.length > 0) owners.push(root);
 			for (const r of mine) ranges.push(r.range);
