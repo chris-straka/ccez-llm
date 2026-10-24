@@ -84,22 +84,23 @@ test.describe("gestures", () => {
 			name: "Text size percent",
 			exact: true
 		});
-		// Sample height and the stepper's offset below it: both hold
-		// whether or not the sheet is still scrolling.
+		// The sample's height, and where the next row starts below it
+		// (the row itself grows a Reset link off the default size).
 		const layout = () =>
 			page.evaluate(() => {
 				const sample = document.querySelector(
 					".settings-panel .reading-preview"
 				);
-				const step = document.querySelector(
-					'.settings-panel [aria-label="Text size percent"]'
-				);
-				if (!sample || !step) return null;
+				const next = sample?.nextElementSibling;
+				if (!sample || !next) return null;
 				const a = sample.getBoundingClientRect();
-				const b = step.getBoundingClientRect();
-				return { height: Math.round(a.height), gap: Math.round(b.top - a.top) };
+				return {
+					height: Math.round(a.height),
+					next: Math.round(next.getBoundingClientRect().top - a.top)
+				};
 			});
 		const before = await layout();
+		expect(before).not.toBeNull();
 		await setSettingValue(page, "Text size percent", 300);
 		await expect(size).toHaveAttribute("aria-valuenow", "300");
 		expect(await layout()).toEqual(before);
