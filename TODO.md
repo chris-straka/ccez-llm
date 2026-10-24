@@ -13,18 +13,6 @@ they ship — the commit is the record.
 
 ## Open
 
-- Owner notes of 2026-10-24, still open:
-  - Settings as a centered window on desktop: groups listed on the
-    left, one group at a time, a live sample on Reading, Look and
-    Layout. Chats as a centered switcher (search, grouped by date,
-    preview) instead of the sidebar; it replaces the search palette.
-  - Simpler shortcuts: with the prompt unfocused, Shift+J/K switch
-    chats, Shift+H/L open the left and right panels, Shift+? opens the
-    shortcuts list; update that list (add R reply and E reword on an
-    open answer).
-  - A dotted underline under selected text in an open word card,
-    seen in the Mac shell only (not reproduced in WebKit headless).
-
 - Owner feedback batch of 2026-10-13: `PLAN.md` (annotations, selection,
   speech, chats, layout, news/video). Work rows off there.
 
