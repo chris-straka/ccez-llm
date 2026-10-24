@@ -14,6 +14,7 @@ import {
 	speakNative,
 	speakNativeMulti,
 	stopNative,
+	prewarmNative,
 	saveNativeSpeech
 } from "./nativeTts";
 import { ttsLangFor } from "./reading";
@@ -518,6 +519,22 @@ describe("speakNative watchdog", () => {
 		stopNative();
 		await vi.advanceTimersByTimeAsync(60_000);
 		expect(errors).toEqual([]);
+	});
+});
+
+describe("prewarmNative", () => {
+	it("asks the engine to load the language's voice, silently", () => {
+		mockInvoke.mockResolvedValue(undefined);
+		prewarmNative("fr-FR", "voice-1");
+		expect(mockInvoke).toHaveBeenCalledWith("tts_prewarm", {
+			lang: "fr-FR",
+			voice: "voice-1"
+		});
+	});
+
+	it("never throws when the bridge is missing", () => {
+		mockInvoke.mockRejectedValue(new Error("no bridge"));
+		expect(() => prewarmNative("de-DE")).not.toThrow();
 	});
 });
 

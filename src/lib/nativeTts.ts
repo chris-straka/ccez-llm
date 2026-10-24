@@ -612,6 +612,20 @@ export function speakNativeWord(
 	});
 }
 
+/**
+ * Load a language's voice ahead of its first readback (opening a
+ * chat), so the first annotation read aloud starts at once. Silent and
+ * fire-and-forget. Never throws.
+ */
+export function prewarmNative(
+	lang: string,
+	voiceId: string | null = null
+): void {
+	invoke("tts_prewarm", { lang, voice: voiceId }).catch(() => {
+		// Warming is a nicety: an engine without it just loads later.
+	});
+}
+
 /** Stop native speech and invalidate in-flight event listeners. Never throws. */
 export function stopNative(): void {
 	teardown();

@@ -410,6 +410,7 @@ pub fn run() {
             tts::tts_supported,
             tts::tts_speak,
             tts::tts_stop,
+            tts::tts_prewarm,
             tts::tts_save_speech,
             tts::tts_voices,
             tts::tts_identify_lang,

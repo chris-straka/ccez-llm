@@ -627,6 +627,7 @@
 		type SpeakCallbacks
 	} from "$lib/voice";
 	import {
+		prewarmNative,
 		speakNative,
 		speakNativeMulti,
 		stopNative,
@@ -993,6 +994,23 @@
 	// (not inferred): the two controllers reference each other.
 	// Word cards look one-word notes up in the language's downloaded
 	// dictionary first (desktop and Android; see dictionary.svelte.ts).
+	// Opening a chat warms its language's voice, and so does coming
+	// back to the window (a long idle can unload it): the first
+	// annotation read aloud starts at once instead of after a pause.
+	$effect(() => {
+		const locale = replyLanguageFor(chat.replyLang)?.voice;
+		if (
+			!locale ||
+			settings.voiceEngine !== "native" ||
+			!tauriBackendAvailable()
+		)
+			return;
+		const voiceId = settings.nativeVoiceId;
+		prewarmNative(locale, voiceId);
+		const onFocus = (): void => prewarmNative(locale, voiceId);
+		window.addEventListener("focus", onFocus);
+		return () => window.removeEventListener("focus", onFocus);
+	});
 	// Packs update a little after launch (the lookups only check
 	// the languages you read in a session).
 	$effect(() => {

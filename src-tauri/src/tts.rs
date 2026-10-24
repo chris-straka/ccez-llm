@@ -604,6 +604,35 @@ mod imp {
         });
     }
 
+    // A second synthesizer, silent and with no delegate, that only
+    // loads voices ahead of the first readback (prewarm).
+    thread_local! {
+        static WARM_SYNTH: RefCell<Option<Retained<AVSpeechSynthesizer>>> =
+            const { RefCell::new(None) };
+    }
+
+    /// Load `lang`'s voice before it is needed: a zero-volume dot on
+    /// the warm synthesizer, so the first readback after opening a
+    /// chat starts at once instead of waiting on the voice to load.
+    /// It never touches the main synthesizer, its ids or its events.
+    pub fn prewarm(app: &AppHandle, lang: String, voice: Option<String>) {
+        let _ = app.run_on_main_thread(move || {
+            WARM_SYNTH.with(|warm| unsafe {
+                if warm.borrow().is_none() {
+                    *warm.borrow_mut() = Some(AVSpeechSynthesizer::new());
+                }
+                if let Some(synth) = warm.borrow().as_ref() {
+                    if synth.isSpeaking() {
+                        return;
+                    }
+                    let utterance = build_utterance(".", &lang, voice.as_deref(), "warm", 1.0);
+                    utterance.setVolume(0.0);
+                    synth.speakUtterance(&utterance);
+                }
+            });
+        });
+    }
+
     fn stop_on_main(app: &AppHandle) {
         let _ = app.run_on_main_thread(|| {
             with_main_synth(|synth| unsafe {
@@ -1026,6 +1055,17 @@ mod rate_tests {
         assert_eq!(clamp_rate(Some(3.0)), 1.5);
         assert_eq!(clamp_rate(Some(0.8)), 0.8);
     }
+}
+
+/// Load a language's voice ahead of the first readback (opening a
+/// chat). Silent and fire-and-forget; engines without the need do
+/// nothing.
+#[tauri::command]
+pub fn tts_prewarm(app: AppHandle, lang: String, voice: Option<String>) {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    imp::prewarm(&app, lang, voice);
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    let _ = (app, lang, voice);
 }
 
 /// Stop any in-progress native speech immediately.
