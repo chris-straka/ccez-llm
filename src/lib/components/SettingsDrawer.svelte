@@ -1,5 +1,6 @@
-<!-- Settings: a window centered over the chat on desktop (a dim veil
-behind it closes it), a full sheet on phones; it hosts SettingsPanel.
+<!-- Settings: a window centered over the dimmed chat on desktop (a
+click on the chat closes it), a full sheet on phones; it hosts
+SettingsPanel.
 The page owns the open flag, the settings object, token labels, and
 every behavior; this component owns the drawer shell (open-space
 double-click to close, inert while shut), the fixed-width inner, and
@@ -45,12 +46,9 @@ bookkeeping reads it). -->
 
 <!-- Keep Meta+,. -->
 {#if !android}
-	<div
-		class="settings-veil"
-		class:shown={open}
-		aria-hidden="true"
-		onclick={() => actions.drawerClose()}
-	></div>
+	<!-- Dims only: a click goes through to the chat, whose click-back
+	closes Settings and lands in the prompt, as it always has. -->
+	<div class="settings-veil" class:shown={open} aria-hidden="true"></div>
 {/if}
 <aside
 	class="settings-panel"
@@ -235,6 +233,7 @@ bookkeeping reads it). -->
 	.settings-veil {
 		position: fixed;
 		inset: 0;
+		pointer-events: none;
 		z-index: 57;
 		background: rgba(0, 0, 0, 0.35);
 		opacity: 0;
@@ -247,10 +246,7 @@ bookkeeping reads it). -->
 		opacity: 1;
 		visibility: visible;
 	}
-	/* Fading out, it never eats the next click. */
-	.settings-veil:not(.shown) {
-		pointer-events: none;
-	}
+
 	/* The window fades; it never animates its width (a zoom change
 	would swell it past the screen mid-transition). */
 	.settings-panel.windowed[data-fade-scroll],

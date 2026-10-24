@@ -42,10 +42,8 @@ const settingsPanel = (page: Page) => page.locator(".settings-panel");
 /** Dead message-area point: inside the text run, clear of the action
 row below it and the settings drawer to its right. */
 async function clickBackToChat(page: Page): Promise<void> {
-	await page
-		.locator("article .rendered")
-		.first()
-		.click({ position: { x: 50, y: 200 } });
+	// The window sits centered over the chat: click the chat beside it.
+	await page.mouse.click(60, 400);
 }
 
 /** Dismissing settings by clicking back lands the caret in the shown prompt. */

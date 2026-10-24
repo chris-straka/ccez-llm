@@ -29,7 +29,8 @@ test("clicking the main chat closes the settings panel", async ({ page }) => {
 	await page.keyboard.press("Meta+,");
 	await expect(panel).not.toHaveClass(/closed/);
 
-	await page.locator(".empty-state h1").click();
+	// The window sits centered over the chat: click the chat beside it.
+	await page.mouse.click(60, 400);
 	await expect(panel).toHaveClass(/closed/);
 });
 
@@ -85,9 +86,9 @@ test("clicking the main chat closes the settings panel mid-stream", async ({
 	const partial = ((await body.textContent()) ?? "").trim();
 	expect(partial.length).toBeGreaterThan(0);
 	expect(partial).not.toBe("Mock reply to: mid-stream close probe");
-	// Forced (no stability wait): the events must dispatch mid-stream.
-	// Click the user's own message, not the streaming one.
-	await page.locator("article.user .rendered").last().click({ force: true });
+	// Click the chat beside the centered window (no stability wait:
+	// the events must dispatch mid-stream).
+	await page.mouse.click(60, 400);
 	// Proof the click landed mid-stream: tokens still arriving after.
 	const after = ((await body.textContent()) ?? "").trim();
 	expect(after).not.toBe("Mock reply to: mid-stream close probe");
