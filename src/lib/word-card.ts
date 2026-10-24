@@ -765,7 +765,17 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 		}
 	}
 	const inSentence = text(r.inSentence, MAX.line);
-	const base = text(r.base, MAX.line);
+	// A base the core piece's label already names says nothing new.
+	const baseLine = text(r.base, MAX.line);
+	const baseHead = baseLine?.split(/\s*[→=]\s*/)[0];
+	const base =
+		baseHead &&
+		spelled &&
+		parts.some(
+			(p) => p.kind === "core" && spelling(p.label) === spelling(baseHead)
+		)
+			? undefined
+			: baseLine;
 	const here = text(r.here, MAX.line);
 	const watch = text(r.watch, MAX.line);
 	const lang = text(r.lang, 12);
@@ -840,7 +850,12 @@ export function wordCardDir(lang: string | undefined): "rtl" | "ltr" {
 export function buildWordCardMessages(
 	q: { quote: string; context: string },
 	lang: string | null,
-	opts: { inPassageLang?: boolean; dictionary?: string } = {}
+	opts: {
+		inPassageLang?: boolean;
+		dictionary?: string;
+		/** The dictionary already split the word: no parts asked for. */
+		knownParts?: boolean;
+	} = {}
 ): Array<{ role: string; content: string }> {
 	const profile = lang ? WORD_PROFILES[lang] : undefined;
 	const tongue = opts.inPassageLang
@@ -867,22 +882,24 @@ export function buildWordCardMessages(
 		`sense, in the same form where the language allows ("being ironic" ` +
 		`for a present participle, "crossed" for a past one), a few words. ` +
 		`Never the sense of an idiom or larger phrase it sits in.\n` +
-		`"parts": the word split into its meaningful pieces, in order; the ` +
-		`pieces joined must spell the word exactly as highlighted. A word ` +
-		`with no inner structure is one piece. ${reading} "label": for the ` +
-		`piece carrying the meaning, its base form ("ironiser"); for the ` +
-		`others, the short grammar name English-language courses for this ` +
-		`language use ("past participle", "passé composé", "te-form", ` +
-		`"dative"), never an abbreviation.\n` +
-		`"kind": core (the stem or root), tense (tense, aspect, mood, or a ` +
-		`form such as participle or infinitive), voice (passive, causative, ` +
-		`ability, negation, a prefix that changes the verb), role (case, ` +
-		`particles or prepositions attached: the word's job in the sentence), ` +
-		`agree (gender, number, person, politeness, an attached article), ` +
-		`derive (a piece that turns it into a noun, adjective or adverb).\n` +
-		`"facts": at most three short facts about the word itself that ` +
-		`matter here, from the checklist below (gender, case, the tense it ` +
-		`forms with a helper verb); [] when none apply. What it agrees ` +
+		(opts.knownParts
+			? `"parts": [] always: the dictionary already split the word.\n`
+			: `"parts": the word split into its meaningful pieces, in order; the ` +
+				`pieces joined must spell the word exactly as highlighted. A word ` +
+				`with no inner structure is one piece. ${reading} "label": for the ` +
+				`piece carrying the meaning, its base form ("ironiser"); for the ` +
+				`others, the short grammar name English-language courses for this ` +
+				`language use ("past participle", "passé composé", "te-form", ` +
+				`"dative"), never an abbreviation.\n` +
+				`"kind": core (the stem or root), tense (tense, aspect, mood, or a ` +
+				`form such as participle or infinitive), voice (passive, causative, ` +
+				`ability, negation, a prefix that changes the verb), role (case, ` +
+				`particles or prepositions attached: the word's job in the sentence), ` +
+				`agree (gender, number, person, politeness, an attached article), ` +
+				`derive (a piece that turns it into a noun, adjective or adverb).\n`) +
+		`"facts": at most two facts of a few words each about the word ` +
+		`itself that matter here, from the checklist below (gender, the ` +
+		`helper verb its perfect takes); [] when none apply. What it agrees ` +
 		`with or does in this sentence goes in "here". Never repeat what a ` +
 		`piece's label already says (an ending labeled plural needs no ` +
 		`plural fact). Where nouns take a gendered article, give the gender ` +
@@ -892,8 +909,9 @@ export function buildWordCardMessages(
 		`words ("épineux → thorny, spiky"), only when the base is spelled ` +
 		`unlike the word's core piece (épineuse from épineux, yeux from ` +
 		`œil). Leave it out when they match (calèches: the piece is ` +
-		`calèche) or a fact already gives it.\n` +
-		`"here": one short sentence, at most fifteen words, on the word in ` +
+		`calèche), a piece's label already names the base (ironis labeled ` +
+		`ironiser) or a fact already gives it.\n` +
+		`"here": one short sentence, at most ten words, on the word in ` +
 		`this sentence: the sense it takes when that differs from ` +
 		`"meaning" (figurative, part of an idiom), its job (who acts, what ` +
 		`is acted on, what it describes) and the nearby words it works ` +
@@ -902,9 +920,10 @@ export function buildWordCardMessages(
 		`subjunctive after que). Never repeat "meaning", a fact or "base". ` +
 		`Say only what the passage says; never add claims about people or ` +
 		`events it doesn't state.\n` +
-		`"watch": one sentence on the trap a learner most likely falls into ` +
-		`with this word, from the checklist, saying nothing the facts ` +
-		`already say; leave it out when there is none.\n` +
+		`"watch": one short sentence, only for a trap learners really fall ` +
+		`into with this word (a false friend, a form or gender commonly ` +
+		`got wrong), saying nothing the facts already say. Most words have ` +
+		`none: then leave it out.\n` +
 		`Checklist:\n${checklist}` +
 		(opts.dictionary
 			? `\nDictionary entries for the word. Trust their forms and base ` +

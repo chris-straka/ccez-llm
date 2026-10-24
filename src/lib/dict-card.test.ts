@@ -70,6 +70,117 @@ describe("cardFromDictionary", () => {
 		expect(card.lang).toBe("fr");
 	});
 
+	it("splits where the pack says, prefix and markers apart", () => {
+		const hablar = { w: "hablar", p: "verb", s: ["to speak"] };
+		expect(
+			cardFromDictionary(
+				"hablamos",
+				[
+					{
+						tags: "first-person indicative plural present",
+						entry: hablar,
+						split: [0, 4, 0]
+					}
+				],
+				"es"
+			)!.parts
+		).toEqual([
+			{ text: "habl", label: "hablar", kind: "core" },
+			{
+				text: "amos",
+				label: "present indicative, first-person plural",
+				kind: "tense"
+			}
+		]);
+		const machen = { w: "machen", p: "verb", s: ["to make, to do"] };
+		expect(
+			cardFromDictionary(
+				"gemacht",
+				[{ tags: "participle past", entry: machen, split: [2, 4, 0] }],
+				"de"
+			)!.parts
+		).toEqual([
+			{ text: "ge", label: "past participle", kind: "tense" },
+			{ text: "mach", label: "machen", kind: "core" },
+			{ text: "t", label: "", kind: "tense" }
+		]);
+		const klein = { w: "klein", p: "adj", s: ["small"] };
+		expect(
+			cardFromDictionary(
+				"kleineren",
+				[
+					{
+						tags: "comparative genitive masculine singular strong",
+						entry: klein,
+						split: [0, 5, 2]
+					}
+				],
+				"de"
+			)!.parts
+		).toEqual([
+			{ text: "klein", label: "klein", kind: "core" },
+			{ text: "er", label: "comparative", kind: "derive" },
+			{
+				text: "en",
+				label: "strong genitive masculine singular",
+				kind: "role"
+			}
+		]);
+		const talo = { w: "talo", p: "noun", s: ["house"] };
+		expect(
+			cardFromDictionary(
+				"taloissa",
+				[{ tags: "inessive plural", entry: talo, split: [0, 4, 1] }],
+				"fi"
+			)!.parts
+		).toEqual([
+			{ text: "talo", label: "talo", kind: "core" },
+			{ text: "i", label: "plural", kind: "agree" },
+			{ text: "ssa", label: "inessive", kind: "role" }
+		]);
+	});
+
+	it("keeps the guessed split when the pack's counts another spelling", () => {
+		// Found under a spelling with fewer letters: the lengths don't fit.
+		const card = cardFromDictionary(
+			"franchi",
+			[{ tags: "participle past", entry: franchir, split: [0, 3, 0] }],
+			"fr",
+			[],
+			"franch"
+		)!;
+		expect(card.parts.map((p) => p.text)).toEqual(["franch", "i"]);
+	});
+
+	it("shows a headword's derivation pieces", () => {
+		const card = cardFromDictionary(
+			"Krankenhaus",
+			[
+				{
+					tags: "",
+					entry: {
+						w: "Krankenhaus",
+						p: "noun",
+						g: "neuter",
+						s: ["hospital"],
+						m: [
+							["Krank", "Kranker", "core"],
+							["en", "", "derive"],
+							["haus", "Haus", "core"]
+						]
+					}
+				}
+			],
+			"de"
+		)!;
+		expect(card.parts).toEqual([
+			{ text: "Krank", label: "Kranker", kind: "core" },
+			{ text: "en", label: "", kind: "derive" },
+			{ text: "haus", label: "Haus", kind: "core" }
+		]);
+		expect(card.facts).toEqual([{ text: "das Krankenhaus", kind: "agree" }]);
+	});
+
 	it("splits an elided article off as its own piece", () => {
 		const epineux = { w: "épineux", p: "adj", s: ["spikey; spiny"] };
 		expect(
@@ -388,6 +499,11 @@ describe("lookups", () => {
 			"- franchi: past participle of franchir. franchir (verb): " +
 				"to clear, to cross (a line); to get over (a fence); to cover (a distance)"
 		);
+		expect(
+			dictionaryPromptLines("franchi", [
+				{ tags: "participle past", entry: franchir, split: [0, 6, 0] }
+			])
+		).toMatch(/^- franchi \(franch \+ i\): past participle of franchir\./);
 	});
 });
 
@@ -430,6 +546,38 @@ describe("annotationAnswer with a dictionary", () => {
 		)[0][0]!.content;
 		expect(system).toContain("Dictionary entries for the word");
 		expect(system).toContain("past participle of franchir");
+	});
+
+	it("keeps the pack's split and asks the model only for notes", async () => {
+		// The model splits differently; the pack's split stands.
+		const chat = vi.fn(async () => ({
+			content: JSON.stringify({
+				meaning: "crossed",
+				parts: [{ text: "franchi", label: "franchir", kind: "core" }],
+				facts: [],
+				base: "franchir → to cross"
+			}),
+			usage: null
+		}));
+		const provider = { id: "s", chat, stream: chat } as unknown as ChatProvider;
+		const reply = await annotationAnswer(provider, q, undefined, {
+			lang: "fr",
+			lookup: async () => ({
+				hits: [{ tags: "participle past", entry: franchir, split: [0, 6, 0] }],
+				japanese: [],
+				form: "franchi"
+			})
+		});
+		expect(reply.card?.parts).toEqual([
+			{ text: "franch", label: "franchir", kind: "core" },
+			{ text: "i", label: "past participle", kind: "tense" }
+		]);
+		// The franch piece already names franchir.
+		expect(reply.card?.base).toBeUndefined();
+		const system = (
+			chat.mock.calls[0] as unknown as [Array<{ content: string }>]
+		)[0][0]!.content;
+		expect(system).toContain("the dictionary already split the word");
 	});
 
 	it("never holds the model on a slow lookup, yet shows its card when it lands", async () => {

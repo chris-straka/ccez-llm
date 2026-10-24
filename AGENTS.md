@@ -56,7 +56,9 @@ TTS/OCR/dictation, page fetch, Android background turns).
   languages) builds one pack per language in the menus into `.dict-cache/out/` (sources download there too, gitignored);
   `bun scripts/dict-publish.ts` uploads them to the `dictionaries`
   release, which the app downloads per language on first use
-  (`src-tauri/src/dict.rs`). That release stays a prerelease never
+  (`src-tauri/src/dict.rs`). Packs carry each form's split
+  (`scripts/dict-morph.ts`); `bun scripts/dict-probe.ts fr franchi`
+  prints what a built pack knows about a word. That release stays a prerelease never
   marked Latest: app updates read `/releases/latest`. The release
   workflow's prune deletes only `v*` releases; it once took this one.
 - Web: `bun run build:web` → `build/`. Cloudflare Pages project

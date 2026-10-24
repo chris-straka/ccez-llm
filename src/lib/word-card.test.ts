@@ -148,10 +148,28 @@ describe("wordCardText", () => {
 			"In this sentence: burst past",
 			"franch (franchir) + i (past participle)",
 			"passé composé, with a",
-			"franchir = to cross.",
 			"With a before it, it is the passé composé.",
 			"Watch: With avoir it doesn't agree with the subject."
 		]);
+	});
+
+	it("drops a base the core piece's label already names", () => {
+		const named = parseWordCard(JSON.stringify(franchi), "franchi")!;
+		expect(named.base).toBeUndefined();
+		// épineuse's core is épineus: épineux is news.
+		const card = parseWordCard(
+			JSON.stringify({
+				meaning: "thorny",
+				parts: [
+					{ text: "épineus", label: "épineuse", kind: "core" },
+					{ text: "e", label: "feminine", kind: "agree" }
+				],
+				facts: [],
+				base: "épineux → thorny"
+			}),
+			"épineuse"
+		)!;
+		expect(card.base).toBe("épineux → thorny");
 	});
 });
 
@@ -169,6 +187,16 @@ describe("buildWordCardMessages", () => {
 		);
 		expect(system!.content).toContain("never an abbreviation");
 		expect(system!.content).toContain("Work out the passage's language first");
+	});
+
+	it("asks for no pieces when the dictionary split the word", () => {
+		const [known] = buildWordCardMessages(q, "fr", { knownParts: true });
+		expect(known!.content).toContain(
+			'"parts": [] always: the dictionary already split the word.'
+		);
+		expect(known!.content).not.toContain("meaningful pieces");
+		const [asked] = buildWordCardMessages(q, "fr");
+		expect(asked!.content).toContain("meaningful pieces");
 	});
 
 	it("carries the language's checklist and reading line", () => {

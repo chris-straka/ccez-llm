@@ -13,12 +13,19 @@ export interface DictEntry {
 	g?: string;
 	r?: string;
 	s: string[];
+	/** Derivation pieces (text, label, kind) that spell the headword. */
+	m?: Array<[string, string, WordPartKind]>;
 }
 
 export interface DictHit {
 	/** The form's grammar tags, space-separated (empty for the headword). */
 	tags: string;
 	entry: DictEntry;
+	/**
+	 * Where the form splits, from the pack: its prefix, stem and plural
+	 * marker lengths in characters; the ending is the rest.
+	 */
+	split?: [number, number, number];
 }
 
 /** One analyzed Japanese piece (furigana worker). */
@@ -187,8 +194,11 @@ function bestHits(hits: DictHit[]): DictHit[] {
 			same.tags !== "" &&
 			(h.tags === "" ||
 				formatTags(h.tags).length > formatTags(same.tags).length)
-		)
+		) {
 			same.tags = h.tags;
+			if (h.split) same.split = h.split;
+			else delete same.split;
+		}
 	}
 	return out;
 }
@@ -358,19 +368,110 @@ function genderFact(entry: DictEntry, lang: string): string | null {
 	return `${article} ${w}`;
 }
 
+/** A form cut at the pack's lengths: prefix, stem, plural marker, ending. */
+function cutForm(
+	form: string,
+	[a, b, c]: [number, number, number]
+): [string, string, string, string] | null {
+	const chars = [...form];
+	if (a + b + c > chars.length || b === 0) return null;
+	return [
+		chars.slice(0, a).join(""),
+		chars.slice(a, a + b).join(""),
+		chars.slice(a + b, a + b + c).join(""),
+		chars.slice(a + b + c).join("")
+	];
+}
+
+/** Marker tags in the order packs pick a form's marker (scripts/dict-morph.ts). */
+const MARKERS = ["comparative", "superlative", "plural"] as const;
+
+/**
+ * An inflected form's pieces from the pack's split: a prefix carries
+ * the form's grammar name (ge- in gemacht), the stem its headword, a
+ * marker its own piece (the plural i in taloissa, the comparative er
+ * in kleineren), the ending what's left to name.
+ */
+function packParts(form: string, hit: DictHit, endingName: string): WordPart[] {
+	const cut = hit.split ? cutForm(form, hit.split) : null;
+	if (!cut) return [];
+	const [pre, stem, num, end] = cut;
+	const kind = endingKind(hit.tags);
+	const tags = hit.tags.split(/\s+/);
+	const marker = num ? MARKERS.find((m) => tags.includes(m)) : undefined;
+	const endName = marker
+		? formatTags(
+				tags
+					// A noun's gender is its own fact, as in endingName.
+					.filter((t) => t !== marker && !(hit.entry.g && GENDER_TAGS.has(t)))
+					.join(" ")
+			)
+		: endingName;
+	const parts: WordPart[] = [];
+	if (pre) parts.push({ text: pre, label: endingName, kind });
+	parts.push({ text: stem, label: hit.entry.w, kind: "core" });
+	if (num)
+		parts.push({
+			text: num,
+			label: marker ?? "",
+			kind: marker === "plural" ? "agree" : "derive"
+		});
+	if (end) parts.push({ text: end, label: pre ? "" : endName, kind });
+	return parts.length > 1 ? parts : [];
+}
+
+/** A headword's derivation pieces, when they spell the word as written. */
+function morphemeParts(form: string, entry: DictEntry): WordPart[] {
+	const m = entry.m ?? [];
+	if (m.length < 2 || fold(m.map(([t]) => t).join("")) !== fold(form))
+		return [];
+	return m.map(([text, label, kind]) => ({ text, label, kind }));
+}
+
 /**
  * The instant card from dictionary hits: the base word's first sense,
- * the split where the stem shows (the ending named, its gender left
- * to the gender fact), the gender as the article where one shows it,
- * and what the form is only when no split shows it. Marked partial;
- * the model's card replaces it. Null without hits.
+ * the split (the pack's, else where the stem shows; the ending named,
+ * its gender left to the gender fact), a headword's derivation pieces,
+ * the gender as the article where one shows it, and what the form is
+ * only when no split shows it. `matched` is the lookup form the hits
+ * came from: the pack's split counts its letters, so a differently
+ * spelled match keeps the guessed split. Marked partial; the model's
+ * card replaces it. Null without hits.
  */
 export function cardFromDictionary(
 	quote: string,
 	hits: DictHit[],
 	lang: string,
-	japanese: JaPiece[] = []
+	japanese: JaPiece[] = [],
+	matched?: string
 ): WordCard | null {
+	return dictionaryCard(quote, hits, lang, japanese, matched)?.card ?? null;
+}
+
+/**
+ * The pieces the dictionary knows for certain (the pack's split, a
+ * headword's derivation, the Japanese analysis), never a guess: the
+ * model's card keeps them instead of splitting again. Empty when
+ * there are none.
+ */
+export function knownParts(
+	quote: string,
+	hits: DictHit[],
+	lang: string,
+	japanese: JaPiece[] = [],
+	matched?: string
+): WordPart[] {
+	const made = dictionaryCard(quote, hits, lang, japanese, matched);
+	return made?.known ? made.card.parts : [];
+}
+
+function dictionaryCard(
+	quote: string,
+	hits: DictHit[],
+	lang: string,
+	japanese: JaPiece[],
+	matched: string | undefined
+): { card: WordCard; known: boolean } | null {
 	const best = bestHits(hits);
 	const top = best[0];
 	if (!top) return null;
@@ -403,8 +504,14 @@ export function cardFromDictionary(
 			)
 		: tagName;
 	let parts: WordPart[] = [];
+	const sameLetters =
+		matched === undefined ||
+		[...fold(matched)].length === [...fold(form)].length;
 	if (japanese.length > 1) parts = japaneseParts(japanese);
-	else if (!isHeadword) {
+	else if (isHeadword) parts = morphemeParts(form, top.entry);
+	else if (sameLetters && endingName) parts = packParts(form, top, endingName);
+	const known = parts.length > 1;
+	if (!known && !isHeadword && japanese.length <= 1) {
 		const split = stemSplit(form, top.entry.w);
 		if (split && endingName)
 			parts = [
@@ -432,12 +539,15 @@ export function cardFromDictionary(
 				? baseLine(top.entry)
 				: undefined;
 	return {
-		meaning: firstSense(top.entry) || top.entry.w,
-		parts,
-		facts,
-		...(base ? { base } : {}),
-		partial: true,
-		lang
+		card: {
+			meaning: firstSense(top.entry) || top.entry.w,
+			parts,
+			facts,
+			...(base ? { base } : {}),
+			partial: true,
+			lang
+		},
+		known
 	};
 }
 
@@ -451,7 +561,11 @@ export function dictionaryPromptLines(quote: string, hits: DictHit[]): string {
 		.slice(0, 4)
 		.map((h) => {
 			const what = formatTags(h.tags);
-			const head = what ? `${quote.trim()}: ${what} of ${h.entry.w}. ` : "";
+			const cut = h.split ? cutForm(quote.trim(), h.split) : null;
+			const pieces = cut ? ` (${cut.filter(Boolean).join(" + ")})` : "";
+			const head = what
+				? `${quote.trim()}${pieces}: ${what} of ${h.entry.w}. `
+				: "";
 			const gender = h.entry.g ? `, ${h.entry.g}` : "";
 			return `- ${head}${h.entry.w} (${h.entry.p}${gender}): ${h.entry.s.join("; ")}`;
 		})

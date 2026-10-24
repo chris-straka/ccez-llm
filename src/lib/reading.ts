@@ -4,17 +4,20 @@ import { escapeHtml } from "./render-math";
 import { partialReading } from "./kanjiSplit";
 import {
 	dictionaryPromptLines,
+	knownParts,
 	type DictHit,
 	type JaPiece,
 	cardFromDictionary
 } from "./dict-card";
 import {
 	buildWordCardMessages,
+	cleanWordCard,
 	isWordQuote,
 	looksLikeJson,
 	parseWordCard,
 	wordCardLang,
 	wordCardText,
+	WORD_PROFILES,
 	type WordCard
 } from "./word-card";
 
@@ -1084,7 +1087,12 @@ Japanese analysis), or null when no pack is installed for it. */
 export type WordLookup = (
 	quote: string,
 	lang: string
-) => Promise<{ hits: DictHit[]; japanese: JaPiece[] } | null>;
+) => Promise<{
+	hits: DictHit[];
+	japanese: JaPiece[];
+	/** The lookup form the hits came from. */
+	form?: string;
+} | null>;
 
 /** Longest the model request waits on a dictionary lookup (ms). */
 export const LOOKUP_WAIT_MS = 1200;
@@ -1134,7 +1142,8 @@ export async function annotationAnswer(
 				q.quote,
 				hits.hits,
 				lang,
-				hits.japanese
+				hits.japanese,
+				hits.form
 			);
 			if (instant)
 				opts.onPartial?.({ answer: wordCardText(instant), card: instant });
@@ -1142,12 +1151,20 @@ export async function annotationAnswer(
 		if (found) showInstant(found);
 		else if (lookup) void lookup.then(showInstant);
 		const dictionary = found ? dictionaryPromptLines(q.quote, found.hits) : "";
+		// The dictionary's certain split stands; the model only writes
+		// the notes. Scripts whose pieces want readings (Arabic vowels,
+		// pinyin) still ask, except Japanese, whose analysis has them.
+		const known =
+			found && lang && (lang === "ja" || !WORD_PROFILES[lang]?.reading)
+				? knownParts(q.quote, found.hits, lang, found.japanese, found.form)
+				: [];
 		let reply: Awaited<ReturnType<ChatProvider["chat"]>>;
 		try {
 			reply = await provider.chat(
 				buildWordCardMessages(q, lang, {
 					...opts,
-					...(dictionary ? { dictionary } : {})
+					...(dictionary ? { dictionary } : {}),
+					...(known.length > 0 ? { knownParts: true } : {})
 				}) as Array<{
 					role: "system" | "user" | "assistant";
 					content: string;
@@ -1159,7 +1176,13 @@ export async function annotationAnswer(
 		}
 		const parsed = parseWordCard(reply.content, q.quote);
 		if (parsed) {
-			const card = lang ? { ...parsed, lang } : parsed;
+			// Cleaned again with the known parts: a base their label
+			// already names drops out.
+			const withParts =
+				(known.length > 0 &&
+					cleanWordCard({ ...parsed, parts: known }, q.quote)) ||
+				parsed;
+			const card = lang ? { ...withParts, lang } : withParts;
 			return { answer: wordCardText(card), card };
 		}
 		if (!looksLikeJson(reply.content)) {

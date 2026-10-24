@@ -173,6 +173,9 @@ export function makeWordLookup(enabled: (lang: string) => boolean): WordLookup {
 			return null;
 		}
 		const hits = firstHits(lists);
-		return hits.length > 0 ? { hits, japanese } : null;
+		const form = forms[lists.indexOf(hits)];
+		return hits.length > 0
+			? { hits, japanese, ...(form ? { form } : {}) }
+			: null;
 	};
 }
