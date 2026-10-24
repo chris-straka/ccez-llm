@@ -15386,7 +15386,7 @@
 	{#if !androidUI}
 		<!-- Chat counter peek (Shift held outside the prompt, ⇧⌘ anywhere): where
 		this chat sits in the list, quiet in the top-right corner.
-		Always mounted so it fades both ways. -->
+		It snaps in and out, no fade. -->
 		<p
 			class="chat-counter"
 			class:shown={counterPeek}
@@ -15785,16 +15785,11 @@
 		font-size: calc(0.85rem * var(--font-scale, 1));
 		font-variant-numeric: tabular-nums;
 		pointer-events: none;
-		opacity: 0;
-		transition: opacity 0.1s ease;
+		/* Snaps in and out: a fade read as lag (owner, 2026-10-24). */
+		visibility: hidden;
 	}
 	.chat-counter.shown {
-		opacity: 1;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.chat-counter {
-			transition: none;
-		}
+		visibility: visible;
 	}
 	@keyframes voice-pulse {
 		0%,

@@ -687,33 +687,22 @@ test("Shift+Cmd peek shows fast and survives the chat steps", async ({
 			if (el.classList.contains("shown") && !w["__shownAt"])
 				w["__shownAt"] = performance.now();
 		}).observe(el, { attributes: true, attributeFilter: ["class"] });
-		el.addEventListener("transitionend", () => {
-			if (!w["__opaqueAt"] && getComputedStyle(el).opacity === "1")
-				w["__opaqueAt"] = performance.now();
-		});
 	});
+	// It snaps: no fade either way.
 	expect(
 		await counter.evaluate((el) => getComputedStyle(el).transitionDuration)
-	).toBe("0.1s");
+	).toBe("0s");
 	await page.keyboard.down("Shift");
 	await page.keyboard.down("Meta");
 	await expect(counter).toHaveClass(/shown/);
-	await expect
-		.poll(() =>
-			page.evaluate(
-				() => (window as unknown as Record<string, number>)["__opaqueAt"] ?? 0
-			)
-		)
-		.toBeGreaterThan(0);
-	const t = await page.evaluate(() => {
+	expect(await counter.evaluate((el) => getComputedStyle(el).visibility)).toBe(
+		"visible"
+	);
+	const shown = await page.evaluate(() => {
 		const w = window as unknown as Record<string, number>;
-		return {
-			shown: w["__shownAt"]! - w["__shiftAt"]!,
-			opaque: w["__opaqueAt"]! - w["__shiftAt"]!
-		};
+		return w["__shownAt"]! - w["__shiftAt"]!;
 	});
-	expect(t.shown).toBeLessThan(200);
-	expect(t.opaque).toBeLessThan(350);
+	expect(shown).toBeLessThan(200);
 	// Chat steps keep it up, and it follows them.
 	await page.keyboard.press("KeyJ");
 	await page.waitForTimeout(300);
