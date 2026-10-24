@@ -10,7 +10,6 @@
 	import DefaultsPanel from "./settings/DefaultsPanel.svelte";
 	import AppearancePanel from "./settings/AppearancePanel.svelte";
 	import ReadingPanel from "./settings/ReadingPanel.svelte";
-	import SettingsSample from "./settings/SettingsSample.svelte";
 	import VoiceSection from "./settings/VoiceSection.svelte";
 	import LayoutPanel from "./settings/LayoutPanel.svelte";
 	import UpdatesPanel from "./settings/UpdatesPanel.svelte";
@@ -57,11 +56,9 @@
 		onExpand,
 		windowed = false
 	}: Props = $props();
-	let sampleEl: HTMLElement | undefined = $state();
-	/** What covers the top of the scroller: the pinned sample in the
-	window, the jump bar on the sheet. */
-	const coverHeight = (): number =>
-		(windowed ? sampleEl?.offsetHeight : navEl?.offsetHeight) ?? 0;
+	/** What covers the top of the scroller: the jump bar on the sheet
+	(the window's groups list sits beside the groups instead). */
+	const coverHeight = (): number => (windowed ? 0 : navEl?.offsetHeight) ?? 0;
 	const buildStamp = import.meta.env.VITE_BUILD_STAMP ?? "release";
 	const appVersion = import.meta.env.VITE_APP_VERSION ?? "";
 	const showStamp = !import.meta.env.DEV;
@@ -236,13 +233,6 @@
 		>
 	{/each}
 </nav>
-{#if windowed}
-	<!-- The live sample stays in view while any group scrolls under
-	it: every change shows at once, even with the chat covered. -->
-	<div class="settings-sample" bind:this={sampleEl}>
-		<SettingsSample {settings} />
-	</div>
-{/if}
 <ReadingPanel bind:settings sample={!windowed} />
 <VoiceSection bind:settings {androidUI} {followVoice} />
 <LayoutPanel bind:settings {androidUI} />

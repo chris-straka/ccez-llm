@@ -1,7 +1,7 @@
 <!-- Live sample: the message font, spacing, gap, and own-message ink
-as they are now, in the current theme. Clipped, so giant sizes stay a
-preview. Reading shows it on top on phones; the desktop window pins
-it over the whole scroll. -->
+as they are now, in the current theme. A fixed box, so giant sizes
+stay a preview. Phones only: there the sheet covers the chat, while
+the desktop window leaves the chat itself in view. -->
 <script lang="ts">
 	import {
 		LINE_HEIGHT_DEFAULT,

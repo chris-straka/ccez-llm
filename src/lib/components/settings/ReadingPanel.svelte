@@ -20,7 +20,7 @@ is a stepper. -->
 
 	interface Props {
 		settings: AppSettings;
-		/** The live sample on top (the window pins its own instead). */
+		/** The live sample on top (the window shows the chat instead). */
 		sample?: boolean;
 	}
 

@@ -209,8 +209,6 @@ bookkeeping reads it). -->
 		box-sizing: border-box;
 		inset: 0;
 		margin: auto;
-		/* Jumps and focus land below the pinned sample. */
-		scroll-padding-top: 9rem;
 		width: min(64rem, calc((100vw - 4rem) * var(--ui-scale-inv, 1)));
 		height: min(48rem, calc((100dvh - 4rem) * var(--ui-scale-inv, 1)));
 		max-width: none;

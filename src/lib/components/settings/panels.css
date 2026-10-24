@@ -1033,7 +1033,8 @@ scroll beneath it; one row that scrolls sideways on a narrow sheet. */
 	}
 }
 /* Desktop window: the groups list pinned down the left, everything
-else in the right column, the live sample pinned on top of it. A
+else in the right column. No sample: the chat around the window
+shows every reading change as it happens. A
 grid with the list spanning every row keeps one scroll (find by
 eye still works) without changing the markup the sheet shares. */
 .windowed .settings-inner {
@@ -1083,20 +1084,6 @@ eye still works) without changing the markup the sheet shares. */
 	stroke: currentColor;
 	stroke-width: 1.6;
 	stroke-linecap: round;
-}
-.windowed .settings-inner > .settings-sample {
-	position: sticky;
-	top: 0;
-	z-index: 2;
-	padding: 1.2rem 0 0.8rem;
-	background: var(--bg-chrome);
-	border-bottom: 1px solid var(--line-soft);
-}
-.windowed .settings-sample .reading-preview {
-	margin: 0;
-}
-.windowed .settings-inner > .settings-sample + section {
-	border-top: 0;
 }
 /* The bar covers the top of the scroller: a jumped-to heading lands
 just below it. */
@@ -1278,10 +1265,11 @@ html[data-theme="dark"] .settings-inner .thumb {
 	background: var(--ink);
 }
 /* Live reading sample: message size, spacing, gap, and own ink as
-set (the interface zoom is undone, as messages don't zoom). Clipped
-with a fade, so giant sizes stay a preview. */
+set (the interface zoom is undone, as messages don't zoom). A fixed
+box, clipped with a fade: bigger text grows inside it and never
+pushes the steppers down. */
 .settings-inner .reading-preview {
-	max-height: 11rem;
+	height: 6rem;
 	overflow: hidden;
 	margin: 0 0 1rem;
 	padding: 0.8rem 0.9rem;

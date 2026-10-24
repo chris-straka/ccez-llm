@@ -195,16 +195,11 @@ test("section bar jumps between groups", async ({ page }) => {
 	await expect(page.locator("#reading-heading")).toBeInViewport();
 });
 
-/** The Reading sample tracks text size and line spacing live. */
-test("reading preview follows text size and spacing", async ({ page }) => {
-	const preview = page.locator(".settings-panel .reading-preview");
-	const font = () =>
-		preview.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-	const before = await font();
-	await setSettingValue(page, "Text size percent", 200);
-	await expect.poll(font).toBeCloseTo(before * 2, 0);
-	await setSettingValue(page, "Line spacing", 2);
-	await expect(preview).toHaveCSS("line-height", `${(await font()) * 2}px`);
+/** The desktop window has no reading sample: the chat around it shows
+every change, and a sample growing with the text pushed the settings
+down (owner, 2026-10-24). */
+test("the desktop window shows no reading sample", async ({ page }) => {
+	await expect(page.locator(".settings-panel .reading-preview")).toHaveCount(0);
 });
 
 /** Background on my messages is a look, not a feature: it sits in Look. */

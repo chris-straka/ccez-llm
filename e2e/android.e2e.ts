@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, setSettingValue } from "./helpers";
 
 test.use({
 	hasTouch: true,
@@ -70,6 +70,28 @@ test.describe("gestures", () => {
 			);
 		}, width);
 	}
+
+	/** The sheet covers the chat, so Reading keeps a sample; bigger
+	text grows inside its fixed box, never pushing the steppers down. */
+	test("the reading sample holds its height as text grows", async ({
+		page
+	}) => {
+		await swipeFromLeftEdge(page);
+		await page.locator("aside button.side-settings").click();
+		const preview = page.locator(".settings-panel .reading-preview");
+		await expect(preview).toBeVisible();
+		const size = page.getByRole("spinbutton", {
+			name: "Text size percent",
+			exact: true
+		});
+		const top = () =>
+			size.evaluate((el) => Math.round(el.getBoundingClientRect().top));
+		const box = await preview.boundingBox();
+		const before = await top();
+		await setSettingValue(page, "Text size percent", 300);
+		expect((await preview.boundingBox())?.height).toBe(box?.height);
+		expect(await top()).toBe(before);
+	});
 
 	test("shortcuts modal teaches touch gestures on Android", async ({
 		page
