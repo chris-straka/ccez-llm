@@ -37,7 +37,7 @@ switch, a one-line summary and the way in. -->
 	<legend>Dictionaries</legend>
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
-		<span>Download for word cards as you read (Wiktionary, JMdict)</span>
+		<span>Download dictionaries automatically</span>
 	</label>
 	<div class="dict-row">
 		<span class="dict-sum"
