@@ -1687,9 +1687,32 @@ const ARTICLE_DROP =
 	"[class*='breadcrumb' i]";
 
 /**
+ * Notices a page shows instead of its video or behind a blocker
+ * ("Une extension de votre navigateur semble bloquer le chargement du
+ * lecteur vidéo…" on France 24): never article prose.
+ */
+const NOTICE_PATTERNS: readonly RegExp[] = [
+	/extension (?:de|du) (?:votre|ton) navigateur/i,
+	/(?:browser|your) extension.*block/i,
+	/\bad[- ]?block(?:er|ing)?\b/i,
+	/bloqueur(?:s)? de publicit/i,
+	/d[ée]sactiver ou (?:la |le )?d[ée]sinstaller/i,
+	/(?:enable|activate|turn on) javascript/i,
+	/javascript (?:is )?(?:disabled|not enabled|deaktiviert)/i,
+	/werbeblocker|adblocker deaktivieren/i,
+	/bloqueador de anuncios/i
+];
+
+/** True when a paragraph is a player or blocker notice, not prose. */
+export function isPageNotice(text: string): boolean {
+	return NOTICE_PATTERNS.some((p) => p.test(text));
+}
+
+/**
  * Article prose out of raw page HTML: chrome stripped (nav, cookie
  * walls, share/related/comment blocks), then the article/main/body
- * scope read as paragraphs. Short crumbs fall away. Pure (needs DOM).
+ * scope read as paragraphs. Short crumbs and player or blocker
+ * notices fall away. Pure (needs DOM).
  */
 export function extractArticleText(html: string): string {
 	let doc: Document;
@@ -1705,7 +1728,7 @@ export function extractArticleText(html: string): string {
 	const blocks: string[] = [];
 	scope.querySelectorAll("h1, h2, h3, p").forEach((el) => {
 		const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
-		if (text.length >= 40) blocks.push(text);
+		if (text.length >= 40 && !isPageNotice(text)) blocks.push(text);
 	});
 	return blocks.join("\n\n").slice(0, MAX_ARTICLE_CHARS);
 }
@@ -1718,6 +1741,9 @@ export function extractArticleText(html: string): string {
  */
 export function stripMarkdownMedia(markdown: string): string {
 	return markdown
+		.split(/\n{2,}/)
+		.filter((block) => !isPageNotice(block))
+		.join("\n\n")
 		.replace(/^(Title|URL Source|Published Time|Markdown Content):.*$/gm, "")
 		.replace(/!\[([^\]]*)\]\([^)\s]*(?:\s+"[^"]*")?\)/g, "$1")
 		.replace(/^\[[^\]]+\]:\s*\S+.*$/gm, "")

@@ -23,6 +23,7 @@ import {
 	createRateGate,
 	decodeNewsLink,
 	extractArticleText,
+	isPageNotice,
 	imageMissSettles,
 	fetchArticleText,
 	isDirectStoryLink,
@@ -1095,6 +1096,21 @@ describe("article fetch", () => {
 		).toContain(body.slice(0, 20));
 		expect(extractArticleText("<html><body><p>Hi</p></body></html>")).toBe("");
 		expect(extractArticleText("not html {{{")).toBe("");
+	});
+
+	it("drops player and blocker notices from the article", () => {
+		const notice =
+			"Une extension de votre navigateur semble bloquer le chargement du lecteur vidéo. Pour pouvoir regarder ce contenu, vous devez la désactiver ou la désinstaller.";
+		const text = extractArticleText(
+			`<html><body><article><p>${notice}</p><p>${body}</p></article></body></html>`
+		);
+		expect(text).toContain(body.slice(0, 20));
+		expect(text).not.toContain("extension de votre navigateur");
+		expect(stripMarkdownMedia(`${notice}\n\n${body}`)).toBe(body);
+		expect(isPageNotice("Please enable JavaScript to view this page.")).toBe(
+			true
+		);
+		expect(isPageNotice("Le conseil municipal a voté jeudi.")).toBe(false);
 	});
 
 	it("strips reader markdown to prose without URLs", () => {
