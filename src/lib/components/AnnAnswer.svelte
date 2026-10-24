@@ -66,9 +66,6 @@ where it was left. -->
 		/** The one-word answer as a word card; renders in place of the
 		answer's lines. */
 		wordCard?: WordCard | undefined;
-		/** A partial word card's request is still in flight (a failed
-		one leaves the dictionary's card standing, without the dots). */
-		finishing?: boolean;
 		/** Send a reply; resolves false when it failed (the text comes
 		back to the field). Absent hides the reply field. */
 		onReply?: ((text: string) => Promise<boolean>) | undefined;
@@ -94,7 +91,6 @@ where it was left. -->
 		onToggleSave,
 		thread = [],
 		wordCard,
-		finishing = true,
 		onReply,
 		quote = "",
 		replyRequest = 0,
@@ -488,13 +484,7 @@ where it was left. -->
 						{wordCard.watch}
 					</p>
 				{/if}
-				{#if wordCard.partial && finishing}
-					<!-- The dictionary's instant card: the model's notes
-					are still on the way. -->
-					<p class="ann-thread-wait" aria-label="Finishing the card">
-						<span></span><span></span><span></span>
-					</p>
-				{/if}
+
 				{#if downloading !== undefined && wordCard.lang}
 					<p class="wc-key wc-download">
 						Downloading the {WORD_PROFILES[wordCard.lang]?.name ?? ""} dictionary

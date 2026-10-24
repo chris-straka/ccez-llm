@@ -811,6 +811,10 @@ readings instead of shoving them: zero layout in every mode. */
 	number inside the pill on every click. */
 	appearance: none;
 	-webkit-appearance: none;
+	/* Its own layer from the start: opening the card lifts it above
+	the scrim, and a badge promoted only then snapped its number half
+	a pixel up on the Mac. */
+	will-change: transform;
 }
 /* Answer states: waiting (filed but not yet asked) rides the
 accent blue, ready (asked and answered) the ans-ready token —
