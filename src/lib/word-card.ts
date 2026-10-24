@@ -888,18 +888,14 @@ const GRAMMAR_SHORT: Array<[RegExp, string]> = [
 	[/\bsecond[- ]person\b/gi, "2nd"],
 	[/\bthird[- ]person\b/gi, "3rd"],
 	[/\bsingular\b/gi, "👤"],
-	[/\bplural\b/gi, "👨‍👨‍👧‍👦"],
-	[/\b(?:continuous|progressive)\b/gi, "🔁"],
-	[/\bpresent\b/gi, "▶"],
-	[/\bpast\b/gi, "⏪"],
-	[/\bfuture\b/gi, "⏩"]
+	[/\bplural\b/gi, "👨‍👨‍👧‍👦"]
 ];
 
 /**
  * A grammar label in short (owner, 2026-10-24): persons as 1st, 2nd,
- * 3rd; singular 👤, plural 👨‍👨‍👧‍👦; present ▶, past ⏪, future ⏩,
- * continuous 🔁. For grammar labels only: a stem's label is its base
- * word and stays as written. Pure.
+ * 3rd; singular 👤, plural 👨‍👨‍👧‍👦. Tenses stay words (symbols for
+ * them read as a puzzle). For grammar labels only: a stem's label is
+ * its base word and stays as written. Pure.
  */
 export function shortGrammar(label: string): string {
 	let out = label;
