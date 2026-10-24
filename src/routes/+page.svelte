@@ -191,7 +191,7 @@
 	import { dictManager, makeWordLookup } from "$lib/dictionary.svelte";
 	import DictionaryManager from "$lib/components/DictionaryManager.svelte";
 	import LicensesModal from "$lib/components/LicensesModal.svelte";
-	import { licensesView } from "$lib/overlays.svelte";
+	import { licensesView, readyApk } from "$lib/overlays.svelte";
 	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
@@ -360,9 +360,13 @@
 	import { caretOffsetInBlock, nodeAtBlockOffset } from "$lib/caret";
 	import { frontendPingOnDone } from "$lib/turns";
 	import {
+		APK_CHECK_KEY,
 		AUTO_CHECK_KEY,
 		autoCheckDue,
+		fetchLatestApk,
+		runAndroidAutoUpdate,
 		runAutoUpdate,
+		switchOverDue,
 		updateRouteFor
 	} from "$lib/updates";
 	import { NativeTurns } from "$lib/native-turns.svelte";
@@ -4543,13 +4547,84 @@
 		flashToast("Chat created");
 	}
 
+	/**
+	 * Background update check on Android release shells: at launch and
+	 * on each return, at most every few hours. A newer APK downloads
+	 * quietly, then one tap opens Android's own install prompt (it
+	 * always asks once); Settings offers the same install meanwhile.
+	 */
+	$effect(() => {
+		const route = updateRouteFor(
+			androidUI,
+			tauriBackendAvailable(),
+			devBuild,
+			isIOSUserAgent(navigator.userAgent)
+		);
+		if (route.kind !== "android") return;
+		let running = false;
+		const install = async (path: string): Promise<void> => {
+			const { invoke } = await import("@tauri-apps/api/core");
+			const status = await invoke<string>("update_install_apk", { path }).catch(
+				() => "failed"
+			);
+			if (status === "needs-approval")
+				flashToast("Allow installs from Ccez LLM, then tap again");
+		};
+		const maybeCheck = (): void => {
+			if (running || readyApk.path || document.visibilityState !== "visible")
+				return;
+			let lastAt: number | null = null;
+			try {
+				const raw = localStorage.getItem(APK_CHECK_KEY);
+				lastAt = raw === null ? null : Number(raw) || null;
+			} catch {
+				// Storage blocked: check, and let the in-memory flag pace it.
+			}
+			const now = Date.now();
+			if (!autoCheckDue(lastAt, now)) return;
+			try {
+				localStorage.setItem(APK_CHECK_KEY, String(now));
+			} catch {
+				// Same as above.
+			}
+			running = true;
+			void runAndroidAutoUpdate({
+				currentVersion: async () => {
+					const { getVersion } = await import("@tauri-apps/api/app");
+					return getVersion();
+				},
+				latest: (current) => fetchLatestApk(fetch, current),
+				download: async (url) => {
+					const { invoke } = await import("@tauri-apps/api/core");
+					return invoke<string>("update_download_apk", { url });
+				},
+				announce: (version, path) => {
+					readyApk.version = version;
+					readyApk.path = path;
+					flashToast(
+						`Version ${version.replace(/^v/, "")} is ready · tap to install`,
+						() => void install(path),
+						30_000
+					);
+				}
+			}).finally(() => {
+				running = false;
+			});
+		};
+		maybeCheck();
+		document.addEventListener("visibilitychange", maybeCheck);
+		return () => document.removeEventListener("visibilitychange", maybeCheck);
+	});
+
 	/** Dev servers (and `tauri dev`) wear the red-dot tab logo. */
 	const devBuild = import.meta.env.DEV === true;
 	/**
 	 * Background update check (desktop release shells only): at launch
 	 * and on each return to the window, at most every few hours, so no
 	 * timer runs. A found update downloads quietly, then a toast offers
-	 * the restart; ignored, it applies at the next launch.
+	 * the restart; ignored, it switches over by itself the next time
+	 * you come back after a break with nothing streaming or typed
+	 * (switchOverDue), or at the next launch.
 	 */
 	$effect(() => {
 		const route = updateRouteFor(
@@ -4561,8 +4636,34 @@
 		if (route.kind !== "updater") return;
 		let running = false;
 		let found = false;
+		let restartReady: (() => Promise<void>) | null = null;
+		let awaySince: number | null = null;
+		const markAway = (): void => {
+			awaySince ??= Date.now();
+		};
+		const maybeSwitch = (): boolean => {
+			const away = awaySince === null ? 0 : Date.now() - awaySince;
+			awaySince = null;
+			if (
+				!restartReady ||
+				!switchOverDue({
+					ready: true,
+					awayMs: away,
+					busy: isSending(chatState) || nativeTurns.live.size > 0,
+					typing: hasText || attachments.length > 0
+				})
+			)
+				return false;
+			void restartReady();
+			return true;
+		};
 		const maybeCheck = (): void => {
-			if (running || found || document.visibilityState !== "visible") return;
+			if (document.visibilityState !== "visible") {
+				markAway();
+				return;
+			}
+			if (maybeSwitch()) return;
+			if (running || found) return;
 			let lastAt: number | null = null;
 			try {
 				const raw = localStorage.getItem(AUTO_CHECK_KEY);
@@ -4590,12 +4691,14 @@
 					await relaunch();
 				},
 				installNow: !currentPlatform().isWindows,
-				announce: (version, restart) =>
+				announce: (version, restart) => {
+					restartReady = restart;
 					flashToast(
 						`Version ${version} is ready · click to restart`,
 						() => void restart(),
 						30_000
-					)
+					);
+				}
 			})
 				.then((version) => {
 					found = version !== null;
@@ -4606,9 +4709,11 @@
 		};
 		maybeCheck();
 		window.addEventListener("focus", maybeCheck);
+		window.addEventListener("blur", markAway);
 		document.addEventListener("visibilitychange", maybeCheck);
 		return () => {
 			window.removeEventListener("focus", maybeCheck);
+			window.removeEventListener("blur", markAway);
 			document.removeEventListener("visibilitychange", maybeCheck);
 		};
 	});

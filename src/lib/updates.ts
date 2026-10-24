@@ -221,6 +221,8 @@ export async function runUpdateFlow(deps: UpdateFlowDeps): Promise<void> {
 export const AUTO_CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 /** localStorage key holding the last background check's epoch ms. */
 export const AUTO_CHECK_KEY = "ccez-llm-update-check-v1";
+/** When the Android background check last ran (epoch ms). */
+export const APK_CHECK_KEY = "ccez-llm-apk-check-v1";
 
 /** Whether a background check is due. A clock that went backwards
 counts as due rather than silencing checks until it catches up. */
@@ -260,6 +262,55 @@ export async function runAutoUpdate(
 			await deps.relaunchApp();
 		});
 		return update.version;
+	} catch {
+		return null;
+	}
+}
+
+/** How long away from the window counts as a safe moment to switch. */
+export const SWITCH_AFTER_AWAY_MS = 10 * 60 * 1000;
+
+/**
+ * Whether an installed update should switch over now, as the window
+ * comes back: only after a real break (ten minutes away), with no
+ * reply streaming and nothing typed in the prompt, so the restart
+ * never eats a reply or a draft. Pure.
+ */
+export function switchOverDue(facts: {
+	ready: boolean;
+	awayMs: number;
+	busy: boolean;
+	typing: boolean;
+}): boolean {
+	return (
+		facts.ready &&
+		facts.awayMs >= SWITCH_AFTER_AWAY_MS &&
+		!facts.busy &&
+		!facts.typing
+	);
+}
+
+/**
+ * Background Android update: check the newest release, download its
+ * APK quietly, and offer the install (Android always asks once
+ * itself). Silent on failure, like the desktop one.
+ */
+export interface AndroidAutoUpdateDeps {
+	currentVersion: () => Promise<string>;
+	latest: (current: string) => Promise<LatestApk | null>;
+	download: (url: string) => Promise<string>;
+	announce: (version: string, path: string) => void;
+}
+
+export async function runAndroidAutoUpdate(
+	deps: AndroidAutoUpdateDeps
+): Promise<string | null> {
+	try {
+		const found = await deps.latest(await deps.currentVersion());
+		if (!found) return null;
+		const path = await deps.download(found.url);
+		deps.announce(found.version, path);
+		return found.version;
 	} catch {
 		return null;
 	}

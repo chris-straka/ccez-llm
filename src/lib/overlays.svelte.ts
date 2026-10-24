@@ -6,3 +6,9 @@
 
 /** Settings → Licenses is open. */
 export const licensesView = $state({ open: false });
+
+/**
+ * An Android update the background check already downloaded: Settings'
+ * button offers its install straight away.
+ */
+export const readyApk = $state({ version: "", path: "" });

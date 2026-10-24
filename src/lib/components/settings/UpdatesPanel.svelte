@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { readyApk } from "$lib/overlays.svelte";
 	import {
 		DEV_UPDATE_MESSAGE,
 		fetchLatestApk,
@@ -46,7 +47,8 @@
 	}
 	/** Newest release waiting, or a downloaded APK ready to install. */
 	let pendingApk = $state<LatestApk | null>(null);
-	let apkPath = $state<string | null>(null);
+	// The background check may have downloaded it already.
+	let apkPath = $state<string | null>(readyApk.path || null);
 	function updateError(error: unknown): string {
 		return error instanceof Error ? error.message : String(error);
 	}

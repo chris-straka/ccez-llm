@@ -6,8 +6,11 @@ import {
 	compareVersions,
 	fetchLatestApk,
 	pickApkAsset,
+	runAndroidAutoUpdate,
 	runAutoUpdate,
 	runUpdateFlow,
+	SWITCH_AFTER_AWAY_MS,
+	switchOverDue,
 	updateButtonLabel,
 	updateRouteFor,
 	type AutoUpdateDeps,
@@ -320,5 +323,63 @@ describe("runAutoUpdate", () => {
 		const broken = deps({ download: () => Promise.reject(new Error("404")) });
 		expect(await runAutoUpdate(broken.d)).toBeNull();
 		expect(broken.calls).toEqual([]);
+	});
+});
+
+describe("switchOverDue", () => {
+	const ready = {
+		ready: true,
+		awayMs: SWITCH_AFTER_AWAY_MS,
+		busy: false,
+		typing: false
+	};
+	it("switches after a real break with nothing in flight", () => {
+		expect(switchOverDue(ready)).toBe(true);
+	});
+	it("waits for a break, an idle chat and an empty prompt", () => {
+		expect(switchOverDue({ ...ready, awayMs: SWITCH_AFTER_AWAY_MS - 1 })).toBe(
+			false
+		);
+		expect(switchOverDue({ ...ready, busy: true })).toBe(false);
+		expect(switchOverDue({ ...ready, typing: true })).toBe(false);
+		expect(switchOverDue({ ...ready, ready: false })).toBe(false);
+	});
+});
+
+describe("runAndroidAutoUpdate", () => {
+	it("downloads a newer APK quietly and offers the install", async () => {
+		const announce = vi.fn();
+		const download = vi.fn(async () => "/cache/update.apk");
+		const version = await runAndroidAutoUpdate({
+			currentVersion: async () => "0.49.0",
+			latest: async () => ({ version: "v0.50.0", url: "https://x/app.apk" }),
+			download,
+			announce
+		});
+		expect(version).toBe("v0.50.0");
+		expect(download).toHaveBeenCalledWith("https://x/app.apk");
+		expect(announce).toHaveBeenCalledWith("v0.50.0", "/cache/update.apk");
+	});
+	it("does nothing when current, and stays quiet on failure", async () => {
+		const announce = vi.fn();
+		expect(
+			await runAndroidAutoUpdate({
+				currentVersion: async () => "0.50.0",
+				latest: async () => null,
+				download: async () => "",
+				announce
+			})
+		).toBeNull();
+		expect(
+			await runAndroidAutoUpdate({
+				currentVersion: async () => "0.49.0",
+				latest: async () => {
+					throw new Error("offline");
+				},
+				download: async () => "",
+				announce
+			})
+		).toBeNull();
+		expect(announce).not.toHaveBeenCalled();
 	});
 });
