@@ -1478,7 +1478,7 @@ const modalBase: ModalScrollFacts = {
 	ctrlKey: false,
 	altKey: false,
 	shiftKey: false,
-	shortcutsOpen: true,
+	boxOpen: true,
 	searchOpen: false,
 	inspectOpen: false,
 	inEditor: false,
@@ -1487,6 +1487,18 @@ const modalBase: ModalScrollFacts = {
 };
 
 describe("modalScrollAction", () => {
+	it("jumps half the box on Ctrl+D / Ctrl+U", () => {
+		expect(modalScrollAction({ ...modalBase, key: "d", ctrlKey: true })).toBe(
+			"half-down"
+		);
+		expect(modalScrollAction({ ...modalBase, key: "u", ctrlKey: true })).toBe(
+			"half-up"
+		);
+		expect(modalScrollAction({ ...modalBase, key: "x", ctrlKey: true })).toBe(
+			null
+		);
+	});
+
 	it("scrolls the modal on j/k only; bare d/u stay put", () => {
 		expect(modalScrollAction(modalBase)).toBe("line-down");
 		expect(modalScrollAction({ ...modalBase, key: "k" })).toBe("line-up");
@@ -1496,9 +1508,7 @@ describe("modalScrollAction", () => {
 	});
 
 	it("yields to the palette, Inspect, fields, and modifiers", () => {
-		expect(modalScrollAction({ ...modalBase, shortcutsOpen: false })).toBe(
-			null
-		);
+		expect(modalScrollAction({ ...modalBase, boxOpen: false })).toBe(null);
 		expect(modalScrollAction({ ...modalBase, searchOpen: true })).toBe(null);
 		expect(modalScrollAction({ ...modalBase, inspectOpen: true })).toBe(null);
 		expect(modalScrollAction({ ...modalBase, inEditor: true })).toBe(null);

@@ -584,3 +584,30 @@ test.describe("phone", () => {
 		).toBe(true);
 	});
 });
+
+/** Vim keys scroll Settings while it's open: j/k a line, Ctrl+D /
+Ctrl+U half the panel; a focused field keeps its typing. */
+test("vim keys scroll settings", async ({ page }) => {
+	const panel = page.locator(".settings-panel");
+	const top = () => panel.evaluate((el) => el.scrollTop);
+	await panel.evaluate((el) => (el.scrollTop = 0));
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur()
+	);
+	await page.keyboard.press("j");
+	await expect.poll(top).toBeGreaterThan(0);
+	const afterLine = await top();
+	await page.keyboard.press("Control+d");
+	await expect.poll(top).toBeGreaterThan(afterLine + 100);
+	const afterHalf = await top();
+	await page.keyboard.press("Control+u");
+	await expect.poll(top).toBeLessThan(afterHalf);
+	// Typing in a field keeps the key.
+	await panel.locator("textarea").first().focus();
+	// Let the smooth scroll and the focus scroll settle first.
+	await page.waitForTimeout(800);
+	const before = await top();
+	await page.keyboard.press("j");
+	await expect(panel.locator("textarea").first()).toHaveValue(/j$/);
+	expect(await top()).toBe(before);
+});

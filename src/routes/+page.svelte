@@ -12618,7 +12618,11 @@
 			}
 			const modalScroll = modalScrollAction({
 				...keyFacts(event),
-				shortcutsOpen,
+				boxOpen:
+					shortcutsOpen ||
+					dictManager.open ||
+					licensesView.open ||
+					settingsOpen,
 				searchOpen: palette.open,
 				inspectOpen: inspectChar !== null,
 				inEditor: inEditor !== null,
@@ -12626,18 +12630,23 @@
 				inEditable: isEditableTarget(event.target)
 			});
 			if (modalScroll !== null) {
-				// The shortcuts modal scrolls under j/k like the main
-				// chat, contained: the palette and Inspect keep their own
-				// keys, fields keep typing, and the main column never moves.
-				const modalBox =
-					document.querySelector<HTMLElement>(".modal-veil .modal");
-				if (modalBox) {
-					const dy =
-						modalScroll === "line-down"
-							? SCROLLKEY_LINE_PX
-							: -SCROLLKEY_LINE_PX;
+				// The topmost overlay scrolls under the vim keys like the
+				// main chat, contained: a modal or sheet first, else
+				// Settings. The palette and Inspect keep their own keys,
+				// fields keep typing, and the main column never moves.
+				const box =
+					document.querySelector<HTMLElement>(".modal-veil .modal") ??
+					(settingsOpen ? settingsEl : null);
+				if (box) {
+					const half = box.clientHeight / 2;
+					const dy = {
+						"line-down": SCROLLKEY_LINE_PX,
+						"line-up": -SCROLLKEY_LINE_PX,
+						"half-down": half,
+						"half-up": -half
+					}[modalScroll];
 					consumeEvent(event);
-					modalBox.scrollBy({ top: dy, behavior: "smooth" });
+					box.scrollBy({ top: dy, behavior: "smooth" });
 					return;
 				}
 			}

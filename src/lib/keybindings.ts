@@ -1022,10 +1022,12 @@ export function scrollEnterAction(facts: ScrollEnterFacts): boolean {
 	return !facts.inOwnedTarget;
 }
 
-/** Facts the shortcuts-modal scroll box reads. */
+/** Facts the overlay scroll box reads. */
 export interface ModalScrollFacts extends KeyModifiers {
 	key: string;
-	shortcutsOpen: boolean;
+	/** A scrolling overlay is up: the shortcuts modal, a sheet
+	 * (dictionaries, licenses) or Settings. */
+	boxOpen: boolean;
 	searchOpen: boolean;
 	inspectOpen: boolean;
 	inEditor: boolean;
@@ -1033,24 +1035,28 @@ export interface ModalScrollFacts extends KeyModifiers {
 	inEditable: boolean;
 }
 
-export type ModalScrollAction = "line-up" | "line-down";
+export type ModalScrollAction =
+	"line-up" | "line-down" | "half-up" | "half-down";
 
 /**
- * The shortcuts modal scrolls under j/k like the main chat,
- * contained: the palette and Inspect keep their own keys, fields keep
- * typing, and the main column never moves. The body keeps the modal-box
- * lookup (a missing box falls through). Bare d/u scroll nothing
- * anywhere — only Ctrl+U / Ctrl+D jump, in scroll mode.
+ * An open overlay (the shortcuts modal, a sheet, Settings) scrolls
+ * under the vim keys like the main chat, contained: j/k by a line,
+ * Ctrl+D / Ctrl+U by half its height. The palette and Inspect keep
+ * their own keys, fields keep typing, and the main column never
+ * moves. The body keeps the box lookup (a missing box falls through).
+ * Bare d/u scroll nothing.
  */
 export function modalScrollAction(
 	facts: ModalScrollFacts
 ): ModalScrollAction | null {
-	if (!facts.shortcutsOpen || facts.searchOpen || facts.inspectOpen)
+	if (!facts.boxOpen || facts.searchOpen || facts.inspectOpen) return null;
+	if (facts.inEditor || facts.androidUI || facts.inEditable) return null;
+	if (facts.metaKey || facts.altKey || facts.shiftKey) return null;
+	if (facts.ctrlKey) {
+		if (facts.key === "d") return "half-down";
+		if (facts.key === "u") return "half-up";
 		return null;
-	if (facts.inEditor || facts.androidUI) return null;
-	if (facts.metaKey || facts.ctrlKey || facts.altKey || facts.shiftKey)
-		return null;
-	if (facts.inEditable) return null;
+	}
 	if (facts.key === "j") return "line-down";
 	if (facts.key === "k") return "line-up";
 	return null;
