@@ -12,11 +12,27 @@
  *   u32[entries + 1] entry offsets
  *   keys blob (sorted by bytes), values blob, entries blob
  * A key is a lowercased form; its value is a u8 hit count, then per
- * hit a u32 entry index and a u16 index into the header's tags; an
- * entry is JSON `{w, p, g?, r?, s}`.
+ * hit a u32 entry index and a u16 index into the header's tags, then
+ * per hit three u8s: the key's prefix, stem and plural-marker lengths
+ * in characters (stem 0xff when the split isn't known; readers from
+ * before splits stop at the hits). An entry is JSON
+ * `{w, p, g?, r?, s, m?}`.
  */
 
 import { plainSpelling } from "../src/lib/dict-card";
+import {
+	AffixCounts,
+	fallbackStem,
+	isCell,
+	paradigmStem,
+	separateMarkers,
+	splitForm,
+	tagKey,
+	wordMorphemes,
+	type EtymologyTemplate,
+	type FormSplit,
+	type Morpheme
+} from "./dict-morph";
 
 export const PACK_MAGIC = "CCEZDIC1";
 
@@ -31,7 +47,15 @@ export interface PackEntry {
 	r?: string;
 	/** Senses, most common first, each one short gloss line. */
 	s: string[];
+	/** Derivation pieces, when the headword's etymology lines them up. */
+	m?: Morpheme[];
 }
+
+/** Stem length marking a hit whose split isn't known. */
+export const NO_SPLIT = 0xff;
+
+/** A key's split as lengths: prefix, stem, plural marker. */
+type SplitLengths = [number, number, number];
 
 export interface PackHeader {
 	lang: string;
@@ -52,7 +76,10 @@ export function packKey(form: string): string {
 /** Collects entries and the forms that reach them, then encodes. */
 export class PackBuilder {
 	readonly entries: PackEntry[] = [];
-	private readonly keys = new Map<string, Array<[number, string]>>();
+	private readonly keys = new Map<
+		string,
+		Array<[number, string, SplitLengths | null]>
+	>();
 
 	/** With a language, every form is also reached by its plain spelling. */
 	constructor(readonly lang = "") {}
@@ -62,14 +89,32 @@ export class PackBuilder {
 		return this.entries.length - 1;
 	}
 
-	/** Point a form at an entry, with the form's grammar tags. */
-	addForm(form: string, entry: number, tags = ""): void {
+	/** Point a form at an entry, with the form's grammar tags and split. */
+	addForm(
+		form: string,
+		entry: number,
+		tags = "",
+		split: FormSplit | null = null
+	): void {
 		const plain = plainSpelling(form, this.lang);
-		if (plain) this.addKey(plain, entry, tags);
-		this.addKey(form, entry, tags);
+		if (plain) {
+			const plainSplit = split && {
+				pre: plainSpelling(split.pre, this.lang) ?? split.pre,
+				stem: plainSpelling(split.stem, this.lang) ?? split.stem,
+				num: plainSpelling(split.num, this.lang) ?? split.num,
+				end: plainSpelling(split.end, this.lang) ?? split.end
+			};
+			this.addKey(plain, entry, tags, plainSplit);
+		}
+		this.addKey(form, entry, tags, split);
 	}
 
-	private addKey(form: string, entry: number, tags: string): void {
+	private addKey(
+		form: string,
+		entry: number,
+		tags: string,
+		split: FormSplit | null
+	): void {
 		const key = packKey(form);
 		if (!key || key.length > 64) return;
 		let hits = this.keys.get(key);
@@ -79,7 +124,7 @@ export class PackBuilder {
 		}
 		if (hits.length >= 8) return;
 		if (hits.some(([e, t]) => e === entry && t === tags)) return;
-		hits.push([entry, tags]);
+		hits.push([entry, tags, splitLengths(key, split)]);
 	}
 
 	get keyCount(): number {
@@ -108,12 +153,14 @@ export class PackBuilder {
 		for (const [key, bytes] of sorted) {
 			keyBlobs.push(bytes);
 			const hits = this.keys.get(key)!;
-			const v = new Uint8Array(1 + hits.length * 6);
+			const v = new Uint8Array(1 + hits.length * 9);
 			const view = new DataView(v.buffer);
 			v[0] = hits.length;
-			hits.forEach(([entry, t], i) => {
+			const splitsAt = 1 + hits.length * 6;
+			hits.forEach(([entry, t, split], i) => {
 				view.setUint32(1 + i * 6, entry, true);
 				view.setUint16(5 + i * 6, tagId(t), true);
+				v.set(split ?? [0, NO_SPLIT, 0], splitsAt + i * 3);
 			});
 			valBlobs.push(v);
 		}
@@ -153,6 +200,29 @@ export class PackBuilder {
 	}
 }
 
+/**
+ * A split as lengths in the key's characters, or null when the
+ * pieces folded the same way don't spell the key (or don't split).
+ */
+function splitLengths(
+	key: string,
+	split: FormSplit | null
+): SplitLengths | null {
+	if (!split) return null;
+	const len = (s: string): number =>
+		[...s.normalize("NFC").toLowerCase().replace(/[’ʼ]/g, "'")].length;
+	const lengths: SplitLengths = [
+		len(split.pre),
+		len(split.stem),
+		len(split.num)
+	];
+	const total = lengths[0] + lengths[1] + lengths[2] + len(split.end);
+	const pieces = [split.pre, split.stem, split.num, split.end].filter(Boolean);
+	if (total !== [...key].length || pieces.length < 2) return null;
+	if (lengths.some((n) => n >= NO_SPLIT)) return null;
+	return lengths;
+}
+
 function compareBytes(a: Uint8Array, b: Uint8Array): number {
 	const n = Math.min(a.length, b.length);
 	for (let i = 0; i < n; i++) if (a[i] !== b[i]) return a[i]! - b[i]!;
@@ -176,7 +246,7 @@ function le(a: Uint32Array): Uint8Array {
 export function lookupPack(
 	pack: Uint8Array,
 	form: string
-): Array<{ entry: PackEntry; tags: string }> {
+): Array<{ entry: PackEntry; tags: string; split?: SplitLengths }> {
 	const dec = new TextDecoder();
 	const view = new DataView(pack.buffer, pack.byteOffset, pack.byteLength);
 	let at = PACK_MAGIC.length;
@@ -212,19 +282,26 @@ export function lookupPack(
 		const c = compareBytes(key, target);
 		if (c === 0) {
 			const v = valsAt + valOffs[mid]!;
-			const hits: Array<[number, string]> = [];
-			for (let i = 0; i < pack[v]!; i++)
+			const n = pack[v]!;
+			const hits: Array<[number, string, SplitLengths | undefined]> = [];
+			for (let i = 0; i < n; i++) {
+				const at = v + 1 + n * 6 + i * 3;
 				hits.push([
 					view.getUint32(v + 1 + i * 6, true),
-					header.tags[view.getUint16(v + 5 + i * 6, true)] ?? ""
+					header.tags[view.getUint16(v + 5 + i * 6, true)] ?? "",
+					pack[at + 1] === NO_SPLIT
+						? undefined
+						: [pack[at]!, pack[at + 1]!, pack[at + 2]!]
 				]);
-			return hits.map(([e, tags]) => ({
+			}
+			return hits.map(([e, tags, split]) => ({
 				entry: JSON.parse(
 					dec.decode(
 						pack.subarray(entsAt + entOffs[e]!, entsAt + entOffs[e + 1]!)
 					)
 				) as PackEntry,
-				tags
+				tags,
+				...(split ? { split } : {})
 			}));
 		}
 		if (c < 0) lo = mid + 1;
@@ -248,6 +325,17 @@ export interface KaikkiRecord {
 	forms?: Array<{ form: string; tags?: string[] }>;
 	sounds?: Array<{ tags?: string[]; zh_pron?: string }>;
 	head_templates?: Array<{ args?: Record<string, string> }>;
+	etymology_templates?: EtymologyTemplate[];
+}
+
+/**
+ * What splitting forms needs while a pack builds: the language's
+ * affix counts (a first pass over every record) and each entry's
+ * headword and stem, for forms that link to it later.
+ */
+export interface Morph {
+	counts: AffixCounts;
+	stems: Map<number, { lemma: string; stem: string | null }>;
 }
 
 /** Tags that describe the table, not the form. */
@@ -346,6 +434,77 @@ function lemmaKeys(word: string, lang: string): string[] {
 	return plain ? [packKey(word), packKey(plain)] : [packKey(word)];
 }
 
+/** A record's table forms kept in the pack, with their tags. */
+function tableForms(
+	r: KaikkiRecord,
+	lang: string
+): Array<{ form: string; tags: string[] }> {
+	const out: Array<{ form: string; tags: string[] }> = [];
+	for (const f of r.forms ?? []) {
+		const tags = f.tags ?? [];
+		if (!f.form || f.form.includes(" ") || f.form.includes("+")) continue;
+		if (tags.some((t) => SKIP_FORM_TAGS.has(t))) continue;
+		if (SKIP_FORMS_IN[lang]?.(tags)) continue;
+		out.push({ form: f.form, tags: tags.filter((t) => !NOISE_TAGS.has(t)) });
+	}
+	return out;
+}
+
+/** True when a record makes an entry of its own (addKaikkiRecord's test). */
+function makesEntry(r: KaikkiRecord, lang: string): boolean {
+	return (
+		Boolean(r.word) &&
+		(!SKIP_POS.has(r.pos) || keepsPos(r.pos, lang)) &&
+		!isFormOnly(r)
+	);
+}
+
+/**
+ * The stem a record's table cells share (dict-morph.ts): the regular
+ * one, else, once regular endings are counted, the fallback.
+ */
+function recordStem(
+	r: KaikkiRecord,
+	forms: Array<{ form: string; tags: string[] }>,
+	counts?: AffixCounts
+): string | null {
+	const cells = forms.filter((f) => isCell(f.tags));
+	return (
+		paradigmStem(
+			r.word,
+			cells.map((f) => f.form)
+		) ?? (counts ? fallbackStem(r.word, r.pos, cells, counts) : null)
+	);
+}
+
+/**
+ * Count a record's endings, before the pack builds: pass 1 counts
+ * headwords with one stem; pass 2, after `settle`, the rest around
+ * their fallback stems (strong verbs teach the participle's -en).
+ */
+export function observeKaikkiRecord(
+	counts: AffixCounts,
+	r: KaikkiRecord,
+	lang: string,
+	pass: 1 | 2
+): void {
+	if (!makesEntry(r, lang)) return;
+	const forms = tableForms(r, lang);
+	const cells = forms.filter((f) => isCell(f.tags));
+	const regular = paradigmStem(
+		r.word,
+		cells.map((f) => f.form)
+	);
+	if (pass === 1) counts.observe(r.pos, regular, forms);
+	else if (!regular)
+		counts.observe(
+			r.pos,
+			fallbackStem(r.word, r.pos, cells, counts),
+			forms,
+			false
+		);
+}
+
 /** True when every sense only points at another word (an inflected form). */
 export function isFormOnly(r: KaikkiRecord): boolean {
 	const senses = r.senses ?? [];
@@ -365,7 +524,8 @@ export function isFormOnly(r: KaikkiRecord): boolean {
 export function addKaikkiRecord(
 	b: PackBuilder,
 	r: KaikkiRecord,
-	lemmas: Map<string, number[]>
+	lemmas: Map<string, number[]>,
+	morph?: Morph
 ): KaikkiRecord | null {
 	if (!r.word || (SKIP_POS.has(r.pos) && !keepsPos(r.pos, b.lang))) return null;
 	if (isFormOnly(r)) return r;
@@ -380,23 +540,38 @@ export function addKaikkiRecord(
 	if (senses.length === 0) return null;
 	const gender = genderOf(r);
 	const reading = readingOf(r, b.lang);
+	const pieces = morph
+		? wordMorphemes(r.word, r.pos, r.etymology_templates)
+		: undefined;
 	const id = b.addEntry({
 		w: r.word,
 		p: r.pos,
 		...(gender ? { g: gender } : {}),
 		...(reading ? { r: reading } : {}),
-		s: senses
+		s: senses,
+		...(pieces ? { m: pieces } : {})
 	});
 	b.addForm(r.word, id);
 	for (const key of lemmaKeys(r.word, b.lang))
 		lemmas.set(key, [...(lemmas.get(key) ?? []), id]);
-	for (const f of r.forms ?? []) {
-		const tags = f.tags ?? [];
-		if (!f.form || f.form.includes(" ") || f.form.includes("+")) continue;
-		if (tags.some((t) => SKIP_FORM_TAGS.has(t))) continue;
-		if (SKIP_FORMS_IN[b.lang]?.(tags)) continue;
-		b.addForm(f.form, id, tags.filter((t) => !NOISE_TAGS.has(t)).join(" "));
-	}
+	const forms = tableForms(r, b.lang);
+	const stem = morph ? recordStem(r, forms, morph.counts) : null;
+	morph?.stems.set(id, { lemma: r.word, stem });
+	const splits = forms.map((f) =>
+		morph && isCell(f.tags)
+			? splitForm(f.form, r.word, stem, tagKey(r.pos, f.tags), morph.counts)
+			: null
+	);
+	// Plural and degree markers come apart against their plain cells.
+	const byTags = new Map<string, { split: FormSplit; tags: string[] }>();
+	forms.forEach((f, i) => {
+		const split = splits[i];
+		if (split) byTags.set(tagKey(r.pos, f.tags), { split, tags: f.tags });
+	});
+	separateMarkers(r.pos, byTags);
+	forms.forEach((f, i) =>
+		b.addForm(f.form, id, f.tags.join(" "), splits[i] ?? null)
+	);
 	return null;
 }
 
@@ -424,14 +599,28 @@ function linkFormOf(
 	b: PackBuilder,
 	r: KaikkiRecord,
 	lemmas: Map<string, number[]>,
-	reached: Map<string, number[]>
+	reached: Map<string, number[]>,
+	morph?: Morph
 ): boolean {
 	const linked = new Set<number>();
 	for (const s of r.senses ?? []) {
-		const tags = (s.tags ?? []).filter((t) => !NOISE_TAGS.has(t)).join(" ");
+		const tagList = (s.tags ?? []).filter((t) => !NOISE_TAGS.has(t));
+		const tags = tagList.join(" ");
 		for (const target of s.form_of ?? [])
 			for (const id of targetIds(target.word, b.lang, lemmas, reached) ?? []) {
-				b.addForm(r.word, id, tags);
+				const head = morph?.stems.get(id);
+				const pos = b.entries[id]?.p ?? r.pos;
+				const split =
+					morph && head && isCell(tagList)
+						? splitForm(
+								r.word,
+								head.lemma,
+								head.stem,
+								tagKey(pos, tagList),
+								morph.counts
+							)
+						: null;
+				b.addForm(r.word, id, tags, split);
 				linked.add(id);
 			}
 	}
@@ -450,12 +639,15 @@ function linkFormOf(
 export function addKaikkiFormsOf(
 	b: PackBuilder,
 	records: KaikkiRecord[],
-	lemmas: Map<string, number[]>
+	lemmas: Map<string, number[]>,
+	morph?: Morph
 ): void {
 	const reached = new Map<string, number[]>();
-	const orphans = records.filter((r) => !linkFormOf(b, r, lemmas, reached));
+	const orphans = records.filter(
+		(r) => !linkFormOf(b, r, lemmas, reached, morph)
+	);
 	for (const r of orphans) {
-		if (linkFormOf(b, r, lemmas, reached)) continue;
+		if (linkFormOf(b, r, lemmas, reached, morph)) continue;
 		const senses = (r.senses ?? [])
 			.filter((s) => s.glosses?.length)
 			.slice(0, 5)

@@ -20,13 +20,16 @@ import {
 	writeFileSync
 } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { AffixCounts } from "./dict-morph";
 import {
 	addKaikkiFormsOf,
 	addKaikkiRecord,
+	observeKaikkiRecord,
 	PackBuilder,
 	parseJmdictEntry,
 	unescapeXml,
 	type KaikkiRecord,
+	type Morph,
 	type PackHeader
 } from "./dict-pack";
 
@@ -137,6 +140,19 @@ async function buildKaikki(
 		await download(url, path);
 		paths.push(path);
 	}
+	// Two counting passes (regular headwords, then the rest around
+	// their fallback stems): which endings and prefixes each grammar
+	// tag set usually takes, so the build can trust or find splits.
+	const morph: Morph = { counts: new AffixCounts(), stems: new Map() };
+	for (const pass of [1, 2] as const) {
+		for (const path of paths)
+			for await (const line of lines(path)) {
+				if (!line) continue;
+				const r = JSON.parse(line) as KaikkiRecord;
+				observeKaikkiRecord(morph.counts, r, lang, pass);
+			}
+		morph.counts.settle();
+	}
 	const b = new PackBuilder(lang);
 	const lemmas = new Map<string, number[]>();
 	const formOnly: KaikkiRecord[] = [];
@@ -144,7 +160,7 @@ async function buildKaikki(
 		for await (const line of lines(path)) {
 			if (!line) continue;
 			const r = JSON.parse(line) as KaikkiRecord;
-			const later = addKaikkiRecord(b, r, lemmas);
+			const later = addKaikkiRecord(b, r, lemmas, morph);
 			if (later)
 				formOnly.push({
 					word: later.word,
@@ -152,7 +168,7 @@ async function buildKaikki(
 					senses: later.senses ?? []
 				});
 		}
-	addKaikkiFormsOf(b, formOnly, lemmas);
+	addKaikkiFormsOf(b, formOnly, lemmas, morph);
 	return { b, header: { lang, version: today(), sources: [WIKTIONARY] } };
 }
 

@@ -1,24 +1,39 @@
 import { describe, expect, it } from "vitest";
+import { AffixCounts } from "./dict-morph";
 import {
 	addKaikkiFormsOf,
 	addKaikkiRecord,
 	lookupPack,
+	observeKaikkiRecord,
 	PackBuilder,
 	parseJmdictEntry,
-	type KaikkiRecord
+	type KaikkiRecord,
+	type Morph
 } from "./dict-pack";
 
 const header = { lang: "fr", version: "test", sources: [] };
 
-function build(records: KaikkiRecord[], lang = ""): Uint8Array {
+function build(
+	records: KaikkiRecord[],
+	lang = "",
+	withSplits = false
+): Uint8Array {
+	let morph: Morph | undefined;
+	if (withSplits) {
+		morph = { counts: new AffixCounts(), stems: new Map() };
+		for (const pass of [1, 2] as const) {
+			for (const r of records) observeKaikkiRecord(morph.counts, r, lang, pass);
+			morph.counts.settle();
+		}
+	}
 	const b = new PackBuilder(lang);
 	const lemmas = new Map<string, number[]>();
 	const later: KaikkiRecord[] = [];
 	for (const r of records) {
-		const form = addKaikkiRecord(b, r, lemmas);
+		const form = addKaikkiRecord(b, r, lemmas, morph);
 		if (form) later.push(form);
 	}
-	addKaikkiFormsOf(b, later, lemmas);
+	addKaikkiFormsOf(b, later, lemmas, morph);
 	return b.encode(header);
 }
 
@@ -118,6 +133,61 @@ describe("dictionary packs", () => {
 			"ru"
 		);
 		expect(lookupPack(russian, "говорю")[0]?.entry.w).toBe("говорить");
+	});
+
+	it("stores where forms split, under their plain spelling too", () => {
+		// Six regular verbs teach the endings; говорить's stressed forms
+		// split at the same letters as the unstressed text readers meet.
+		const verb = (stem: string, stress: string): KaikkiRecord => ({
+			word: `${stem}ить`,
+			pos: "verb",
+			senses: [{ glosses: [`to ${stem}`] }],
+			forms: [
+				{ form: `${stress}ю́`, tags: ["first-person", "singular", "present"] },
+				{
+					form: `${stress}и́шь`,
+					tags: ["second-person", "singular", "present"]
+				},
+				{ form: `${stress}и́т`, tags: ["third-person", "singular", "present"] },
+				{ form: `${stress}и́л`, tags: ["masculine", "singular", "past"] }
+			]
+		});
+		const records = [
+			verb("говор", "говор"),
+			verb("хвал", "хвал"),
+			verb("люб", "люб"),
+			verb("корм", "корм"),
+			verb("цен", "цен"),
+			verb("вар", "вар"),
+			{
+				word: "Krankenhaus",
+				pos: "noun",
+				senses: [{ glosses: ["hospital"] }],
+				etymology_templates: [
+					{
+						name: "affix",
+						args: { "1": "de", "2": "Kranker", "3": "-en-", "4": "Haus" }
+					}
+				]
+			}
+		];
+		const ru = build(records, "ru", true);
+		for (const form of ["говорю́", "говорю"]) {
+			const [hit] = lookupPack(ru, form);
+			expect(hit?.entry.w).toBe("говорить");
+			expect(hit?.split).toEqual([0, 5, 0]);
+		}
+		// The headword itself has no split; its derivation rides on the entry.
+		expect(lookupPack(ru, "говорить")[0]?.split).toBeUndefined();
+		expect(lookupPack(ru, "krankenhaus")[0]?.entry.m).toEqual([
+			["Krank", "Kranker", "core"],
+			["en", "", "derive"],
+			["haus", "Haus", "core"]
+		]);
+		// Built without counts, a pack has no splits and no pieces.
+		const plain = build(records, "ru");
+		expect(lookupPack(plain, "говорю")[0]?.split).toBeUndefined();
+		expect(lookupPack(plain, "krankenhaus")[0]?.entry.m).toBeUndefined();
 	});
 
 	it("lists a word's current senses before its dated ones", () => {
