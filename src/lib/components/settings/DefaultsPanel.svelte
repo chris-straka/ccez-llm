@@ -105,10 +105,10 @@
 				/>
 				<span>Answer annotations in the passage's language</span>
 			</label>
-			{#if dictionaries}
-				<DictionariesSection bind:settings />
-			{/if}
 		</fieldset>
+		{#if dictionaries}
+			<DictionariesSection bind:settings />
+		{/if}
 		<!-- On/off features under one "Enable" legend, two columns where
 		the panel has room (one when narrow or zoomed). -->
 		<fieldset class="toggles">
