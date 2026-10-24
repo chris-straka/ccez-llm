@@ -13,24 +13,17 @@ they ship — the commit is the record.
 
 ## Open
 
-- Owner notes of 2026-10-24, in order of work:
-  - Updates apply on their own: desktop switches to the installed
-    version when you come back after a while (nothing streaming, prompt
-    empty); Android checks and downloads in the background and asks
-    once to install.
-  - The chat count at the top right snaps in and out (no fade).
-  - Text size: type your own percentage into the stepper (it sizes the
-    messages, not Settings, so a typo can't lock you out).
-  - Vim keys scroll Settings and its sheets when they scroll.
-  - Prewarm speech: opening an old chat readies the voice so the first
-    annotation read-aloud starts at once.
+- Owner notes of 2026-10-24, still open:
   - Settings as a centered window on desktop: groups listed on the
     left, one group at a time, a live sample on Reading, Look and
     Layout. Chats as a centered switcher (search, grouped by date,
     preview) instead of the sidebar; it replaces the search palette.
   - Simpler shortcuts: with the prompt unfocused, Shift+J/K switch
     chats, Shift+H/L open the left and right panels, Shift+? opens the
-    shortcuts list; update that list.
+    shortcuts list; update that list (add R reply and E reword on an
+    open answer).
+  - A dotted underline under selected text in an open word card,
+    seen in the Mac shell only (not reproduced in WebKit headless).
 
 - Owner feedback batch of 2026-10-13: `PLAN.md` (annotations, selection,
   speech, chats, layout, news/video). Work rows off there.
