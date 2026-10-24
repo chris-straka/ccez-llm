@@ -61,19 +61,19 @@ test("settings lists dictionaries with sizes, removes one and downloads it again
 	await expect(panel).not.toHaveClass(/closed/);
 	const list = panel.getByRole("list", { name: "Dictionaries" });
 	await expect(list.locator("li")).toHaveText([
-		/French, 20 MB\s*Remove/,
-		/German, 31 MB\s*Remove/
+		/French\s*20 MB\s*Remove/,
+		/German\s*31 MB\s*Remove/
 	]);
-	await expect(panel.getByText("52 MB in all")).toBeVisible();
+	await expect(panel.getByText("2 languages · 52 MB")).toBeVisible();
 	await list.scrollIntoViewIfNeeded();
 	await page.screenshot({ path: ".screenshots/dict-settings.png" });
 
 	await panel.getByRole("button", { name: "Remove French dictionary" }).click();
 	await expect(list.locator("li")).toHaveText([
-		/French, removed\s*Download/,
-		/German, 31 MB\s*Remove/
+		/French\s*removed\s*Download/,
+		/German\s*31 MB\s*Remove/
 	]);
-	await expect(panel.getByText("in all")).toHaveCount(0);
+	await expect(panel.getByText("languages ·")).toHaveCount(0);
 	// Settings save after a short debounce.
 	await expect
 		.poll(() =>
@@ -92,8 +92,8 @@ test("settings lists dictionaries with sizes, removes one and downloads it again
 		.getByRole("button", { name: "Download French dictionary" })
 		.click();
 	await expect(list.locator("li")).toHaveText([
-		/French, 12 MB\s*Remove/,
-		/German, 31 MB\s*Remove/
+		/French\s*12 MB\s*Remove/,
+		/German\s*31 MB\s*Remove/
 	]);
 	const calls = await page.evaluate(
 		() => (window as unknown as { __dictCalls: string[] }).__dictCalls

@@ -74,52 +74,105 @@
 </script>
 
 <!-- Packs download per language on first use; this lists what's on
-disk, with sizes, so a removed one stays removed until asked for. -->
-<div class="dicts">
+disk as an aligned table (language, size, action), so a removed one
+stays removed until asked for. -->
+<fieldset class="dicts">
+	<legend>Dictionaries</legend>
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
-		<span>Download dictionaries for word cards (Wiktionary, JMdict)</span>
+		<span>Download for word cards as you read (Wiktionary, JMdict)</span>
 	</label>
 	{#if rows.length > 0}
-		<ul class="note dict-list" aria-label="Dictionaries">
+		<ul class="dict-list" aria-label="Dictionaries">
 			{#each rows as row (row.lang)}
-				<li>
-					<span>{name(row.lang)}, {row.state}</span>
+				<li class="dict-row" class:off={row.action === "download"}>
+					<span class="dict-name">{name(row.lang)}</span>
+					<span class="dict-size">{row.state}</span>
 					{#if row.action === "remove"}
 						<button
 							type="button"
+							class="dict-act"
 							aria-label="Remove {name(row.lang)} dictionary"
 							onclick={() => void remove(row.lang)}>Remove</button
 						>
 					{:else if row.action === "download"}
 						<button
 							type="button"
+							class="dict-act"
 							aria-label="Download {name(row.lang)} dictionary"
 							onclick={() => download(row.lang)}>Download</button
 						>
+					{:else}
+						<span class="dict-act-gap"></span>
 					{/if}
 				</li>
 			{/each}
 		</ul>
 		{#if installed.length > 1}
-			<p class="note dict-total">{dictSize(total)} in all</p>
+			<p class="dict-total">
+				{installed.length} languages · {dictSize(total)}
+			</p>
 		{/if}
 	{/if}
-</div>
+</fieldset>
 
 <style>
 	.dict-list {
 		list-style: none;
 		padding: 0;
-		margin: 0.35rem 0 0 1.7rem;
+		margin: 0.6rem 0 0;
+		border-top: 1px solid var(--line-soft);
 	}
-	.dict-list li {
-		display: flex;
-		gap: 0.6rem;
-		align-items: baseline;
-		padding: 0.1rem 0;
+	/* One row per language: name, size flush right in even digits,
+	then the action, every row on the same columns. */
+	.dict-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto 4.6rem;
+		align-items: center;
+		gap: 0.8rem;
+		min-height: 2.6rem;
+		border-bottom: 1px solid var(--line-soft);
+	}
+	.dict-name {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	.dict-size {
+		font-variant-numeric: tabular-nums;
+		text-align: end;
+		color: var(--muted);
+	}
+	.dict-row.off .dict-name {
+		color: var(--muted);
+	}
+	/* Quiet text actions: seven bordered buttons in a column read as
+	a toolbar. The hit area stays a full row tall. */
+	.dict-act {
+		justify-self: end;
+		min-height: 2.4rem;
+		padding: 0 0.2rem;
+		font: inherit;
+		font-size: 0.84rem;
+		color: var(--muted);
+		background: none;
+		border: 0;
+		cursor: pointer;
+		transition: color 0.15s ease;
+	}
+	.dict-act:hover,
+	.dict-act:focus-visible {
+		color: var(--ink);
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.dict-total {
-		margin-left: 1.7rem;
+		margin: 0.45rem 0 0;
+		font-size: 0.84rem;
+		text-align: end;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+	:global(.app[data-android]) .dict-row {
+		min-height: 2.9rem;
 	}
 </style>
