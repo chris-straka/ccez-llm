@@ -84,13 +84,25 @@ test.describe("gestures", () => {
 			name: "Text size percent",
 			exact: true
 		});
-		const top = () =>
-			size.evaluate((el) => Math.round(el.getBoundingClientRect().top));
-		const box = await preview.boundingBox();
-		const before = await top();
+		// Sample height and the stepper's offset below it: both hold
+		// whether or not the sheet is still scrolling.
+		const layout = () =>
+			page.evaluate(() => {
+				const sample = document.querySelector(
+					".settings-panel .reading-preview"
+				);
+				const step = document.querySelector(
+					'.settings-panel [aria-label="Text size percent"]'
+				);
+				if (!sample || !step) return null;
+				const a = sample.getBoundingClientRect();
+				const b = step.getBoundingClientRect();
+				return { height: Math.round(a.height), gap: Math.round(b.top - a.top) };
+			});
+		const before = await layout();
 		await setSettingValue(page, "Text size percent", 300);
-		expect((await preview.boundingBox())?.height).toBe(box?.height);
-		expect(await top()).toBe(before);
+		await expect(size).toHaveAttribute("aria-valuenow", "300");
+		expect(await layout()).toEqual(before);
 	});
 
 	test("shortcuts modal teaches touch gestures on Android", async ({
