@@ -333,23 +333,28 @@ export function splitForm(
 	const f = fold(form);
 	// Lowercasing that changes the length (İ) would misplace the cuts.
 	if (f.length !== original.length) return null;
-	const endings = counts.endings(key);
+	// Affixes compare with marks aside: parliamo, as Wiktionary's own
+	// page spells it, takes the tables' -iàmo.
+	const plain = (x: string): string => bare([...x]).join("");
+	const endings = [...new Set(counts.endings(key).map(plain))];
+	const prefixes = [...new Set(counts.prefixes(key).map(plain))];
+	const fb = bare(f);
 	let found: FormSplit | null = null;
 	const around = stem ? aroundStem(f, stem) : null;
 	if (
 		around &&
 		(around.end || around.pre) &&
-		endings.includes(around.end) &&
-		(!around.pre || counts.prefixes(key).includes(around.pre))
+		endings.includes(plain(around.end)) &&
+		(!around.pre || prefixes.includes(plain(around.pre)))
 	)
 		found = around;
 	if (!found) {
 		const l = fold(lemma);
 		// Prefixes first: gegangen is ge + gang + en, not gegang + en.
-		for (const pre of [...counts.prefixes(key), ""]) {
+		for (const pre of [...prefixes, ""]) {
 			const p = [...pre];
-			if (pre && f.slice(0, p.length).join("") !== pre) continue;
-			const rest = f.slice(p.length);
+			if (pre && fb.slice(0, p.length).join("") !== pre) continue;
+			const rest = fb.slice(p.length);
 			const end = endings.find(
 				(e) =>
 					e && rest.length - [...e].length >= 3 && rest.join("").endsWith(e)
