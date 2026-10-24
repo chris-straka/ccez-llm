@@ -381,6 +381,7 @@ pub fn run() {
             dict::dict_install,
             dict::dict_remove,
             dict::dict_list,
+            dict::dict_catalog,
             #[cfg(desktop)]
             desktop::desktop_sleep_block,
             #[cfg(desktop)]

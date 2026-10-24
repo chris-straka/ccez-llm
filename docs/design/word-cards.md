@@ -31,7 +31,11 @@ and keep cards small.
 
 ## Storage
 
-Packs download per language on first use (Settings: "Download
-dictionaries for word cards") and Settings lists them with their size
-and a Remove button. A removed language doesn't download again until
-Download is pressed there.
+Packs download per language on first use (Settings → Dictionaries:
+"Download for word cards as you read"). Settings shows a one-line
+summary and "Manage dictionaries", which opens the manager: a sheet
+most of the window wide (the whole screen on phones; the settings panel
+itself stays narrow so the chat stays visible beside it), every pack as
+a tile grouped like the language menus, with its size on disk or its
+download size, a filter, download ahead, remove, and remove all behind
+a confirm. A removed language doesn't download again on its own.

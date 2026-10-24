@@ -466,6 +466,60 @@ pub fn dict_list(app: AppHandle) -> Vec<Installed> {
         .unwrap_or_default()
 }
 
+/// One pack the release offers: its download and unpacked sizes and
+/// version, for the dictionary manager.
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Offered {
+    pub bytes: u64,
+    pub unpacked: u64,
+    pub version: String,
+}
+
+/// The packs a release manifest offers, by language code.
+fn offered_packs(manifest: &serde_json::Value) -> HashMap<String, Offered> {
+    manifest["packs"]
+        .as_object()
+        .map(|packs| {
+            packs
+                .iter()
+                .filter(|(lang, _)| valid_lang(lang))
+                .filter_map(|(lang, p)| {
+                    Some((
+                        lang.clone(),
+                        Offered {
+                            bytes: p["bytes"].as_u64()?,
+                            unpacked: p["unpacked"].as_u64()?,
+                            version: p["version"].as_str()?.to_string(),
+                        },
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Every pack the release offers (the manager's download sizes);
+/// null when the manifest can't be fetched.
+#[tauri::command]
+pub async fn dict_catalog() -> Option<HashMap<String, Offered>> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("ccez-llm dictionaries")
+        .build()
+        .ok()?;
+    let bytes = client
+        .get(format!("{RELEASE_URL}/manifest.json"))
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .ok()?
+        .bytes()
+        .await
+        .ok()?;
+    let manifest: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    Some(offered_packs(&manifest))
+}
+
 /// Delete a language's pack (Settings).
 #[tauri::command]
 pub fn dict_remove(app: AppHandle, lang: String) -> Result<(), String> {
@@ -647,6 +701,25 @@ mod tests {
             Err("no-pack".to_string())
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn reads_what_a_manifest_offers() {
+        let manifest = serde_json::json!({"v": 1, "packs": {
+            "fr": {"file": "fr.dict.gz", "version": "1", "bytes": 7, "unpacked": 24, "sha256": "x"},
+            "../x": {"version": "1", "bytes": 1, "unpacked": 1},
+            "de": {"version": "1"}
+        }});
+        let offered = offered_packs(&manifest);
+        assert_eq!(offered.len(), 1);
+        assert_eq!(
+            offered["fr"],
+            Offered {
+                bytes: 7,
+                unpacked: 24,
+                version: "1".into()
+            }
+        );
     }
 
     #[test]

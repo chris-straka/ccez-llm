@@ -1,13 +1,14 @@
 <script lang="ts">
 	import type { AppSettings } from "$lib/settings";
-	import { replyLanguageFor } from "$lib/languages";
+	import {
+		DICT_LANGS,
+		dictSummary,
+		type InstalledDictionary
+	} from "$lib/dict-manager";
 	import {
 		dictDownloads,
-		dictSize,
-		installDictionary,
-		listDictionaries,
-		removeDictionary,
-		type InstalledDictionary
+		dictManager,
+		listDictionaries
 	} from "$lib/dictionary.svelte";
 
 	interface Props {
@@ -18,161 +19,70 @@
 
 	let installed: InstalledDictionary[] = $state([]);
 
-	function refresh(): void {
-		void listDictionaries().then((list) => (installed = list));
-	}
-
-	// Re-read the folder whenever a download starts or ends.
+	// Re-read the folder when a download starts or ends, and when the
+	// manager closes (it may have removed some).
 	$effect(() => {
 		void Object.keys(dictDownloads).length;
-		refresh();
+		void dictManager.open;
+		void listDictionaries().then((list) => (installed = list));
 	});
 
-	const name = (lang: string): string => replyLanguageFor(lang)?.name ?? lang;
-
-	interface Row {
-		lang: string;
-		/** Size on disk, or the download's progress. */
-		state: string;
-		action?: "remove" | "download";
-	}
-
-	const rows: Row[] = $derived.by(() => {
-		const out: Row[] = installed.map((d) =>
-			d.lang in dictDownloads
-				? {
-						lang: d.lang,
-						state: `updating ${Math.round((dictDownloads[d.lang] ?? 0) * 100)}%`
-					}
-				: { lang: d.lang, state: dictSize(d.bytes), action: "remove" }
-		);
-		for (const lang of Object.keys(dictDownloads))
-			if (!installed.some((d) => d.lang === lang))
-				out.push({
-					lang,
-					state: `downloading ${Math.round((dictDownloads[lang] ?? 0) * 100)}%`
-				});
-		for (const lang of settings.dictionarySkip)
-			if (!out.some((r) => r.lang === lang))
-				out.push({ lang, state: "removed", action: "download" });
-		return out.sort((a, b) => name(a.lang).localeCompare(name(b.lang)));
-	});
-
-	const total = $derived(installed.reduce((n, d) => n + d.bytes, 0));
-
-	async function remove(lang: string): Promise<void> {
-		if (!settings.dictionarySkip.includes(lang))
-			settings.dictionarySkip = [...settings.dictionarySkip, lang];
-		await removeDictionary(lang);
-		refresh();
-	}
-
-	function download(lang: string): void {
-		settings.dictionarySkip = settings.dictionarySkip.filter((l) => l !== lang);
-		void installDictionary(lang).then(refresh);
-	}
+	const downloading = $derived(Object.keys(dictDownloads).length);
 </script>
 
-<!-- Packs download per language on first use; this lists what's on
-disk as an aligned table (language, size, action), so a removed one
-stays removed until asked for. -->
+<!-- Packs download per language on first use. With up to 49 of them
+the list lives in the manager (a wide sheet); Settings keeps the
+switch, a one-line summary and the way in. -->
 <fieldset class="dicts">
 	<legend>Dictionaries</legend>
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
 		<span>Download for word cards as you read (Wiktionary, JMdict)</span>
 	</label>
-	{#if rows.length > 0}
-		<ul class="dict-list" aria-label="Dictionaries">
-			{#each rows as row (row.lang)}
-				<li class="dict-row" class:off={row.action === "download"}>
-					<span class="dict-name">{name(row.lang)}</span>
-					<span class="dict-size">{row.state}</span>
-					{#if row.action === "remove"}
-						<button
-							type="button"
-							class="dict-act"
-							aria-label="Remove {name(row.lang)} dictionary"
-							onclick={() => void remove(row.lang)}>Remove</button
-						>
-					{:else if row.action === "download"}
-						<button
-							type="button"
-							class="dict-act"
-							aria-label="Download {name(row.lang)} dictionary"
-							onclick={() => download(row.lang)}>Download</button
-						>
-					{:else}
-						<span class="dict-act-gap"></span>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-		{#if installed.length > 1}
-			<p class="dict-total">
-				{installed.length} languages · {dictSize(total)}
-			</p>
-		{/if}
-	{/if}
+	<div class="dict-row">
+		<span class="dict-sum"
+			>{dictSummary(installed, DICT_LANGS.size)}{downloading > 0
+				? ` · ${downloading} downloading`
+				: ""}</span
+		>
+		<button
+			type="button"
+			class="dict-manage"
+			onclick={() => (dictManager.open = true)}>Manage dictionaries</button
+		>
+	</div>
 </fieldset>
 
 <style>
-	.dict-list {
-		list-style: none;
-		padding: 0;
-		margin: 0.6rem 0 0;
-		border-top: 1px solid var(--line-soft);
-	}
-	/* One row per language: name, size flush right in even digits,
-	then the action, every row on the same columns. */
 	.dict-row {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto 4.6rem;
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.8rem;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		margin-top: 0.55rem;
+	}
+	.dict-sum {
+		font-size: 0.88rem;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted);
+	}
+	.dict-manage {
 		min-height: 2.6rem;
-		border-bottom: 1px solid var(--line-soft);
-	}
-	.dict-name {
-		min-width: 0;
-		overflow-wrap: anywhere;
-	}
-	.dict-size {
-		font-variant-numeric: tabular-nums;
-		text-align: end;
-		color: var(--muted);
-	}
-	.dict-row.off .dict-name {
-		color: var(--muted);
-	}
-	/* Quiet text actions: seven bordered buttons in a column read as
-	a toolbar. The hit area stays a full row tall. */
-	.dict-act {
-		justify-self: end;
-		min-height: 2.4rem;
-		padding: 0 0.2rem;
+		padding: 0 0.9rem;
 		font: inherit;
-		font-size: 0.84rem;
-		color: var(--muted);
-		background: none;
-		border: 0;
+		font-size: 0.88rem;
+		color: inherit;
+		background: var(--bg-raised);
+		border: 1px solid var(--line);
+		border-radius: 8px;
 		cursor: pointer;
-		transition: color 0.15s ease;
+		transition: border-color 0.15s ease;
 	}
-	.dict-act:hover,
-	.dict-act:focus-visible {
-		color: var(--ink);
-		text-decoration: underline;
-		text-underline-offset: 2px;
+	.dict-manage:hover {
+		border-color: var(--strong);
 	}
-	.dict-total {
-		margin: 0.45rem 0 0;
-		font-size: 0.84rem;
-		text-align: end;
-		color: var(--muted);
-		font-variant-numeric: tabular-nums;
-	}
-	:global(.app[data-android]) .dict-row {
+	:global(.app[data-android]) .dict-manage {
 		min-height: 2.9rem;
 	}
 </style>

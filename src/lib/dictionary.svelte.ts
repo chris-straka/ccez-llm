@@ -17,21 +17,16 @@ import {
 import type { WordLookup } from "./reading";
 import { tauriBackendAvailable } from "./secrets";
 
-/** Languages the dictionaries release carries a pack for: every one in the language menus. */
-const DICT_LANGS: ReadonlySet<string> = new Set(
-	`fr de es pt it ro ru uk pl cs sk bg sr el hu fi nl sv da no is zh yue ko
-	vi th id ms tl hi ur pa bn ta fa ar he hy tr sw am la grc sa non ang sux
-	akk ja`.split(/\s+/)
-);
+import {
+	dictPack,
+	type InstalledDictionary,
+	type OfferedDictionary
+} from "./dict-manager";
 
-/** Wiktionary files Literary Chinese under Chinese and Biblical Hebrew under Hebrew. */
-const SHARED_PACK: Record<string, string> = { lzh: "zh", hbo: "he" };
+export { dictPack };
 
-/** The pack a language's words come from, or null when there is none. */
-export function dictPack(lang: string): string | null {
-	const pack = SHARED_PACK[lang] ?? lang;
-	return DICT_LANGS.has(pack) ? pack : null;
-}
+/** The dictionary manager (Settings → Manage dictionaries) is open. */
+export const dictManager = $state({ open: false });
 
 /** Download progress per language (0 to 1), while a pack downloads. */
 export const dictDownloads: Record<string, number> = $state({});
@@ -101,13 +96,6 @@ export function installDictionary(lang: string): Promise<boolean> {
 		});
 }
 
-/** One installed pack and its size on disk. */
-export interface InstalledDictionary {
-	lang: string;
-	version: string;
-	bytes: number;
-}
-
 /** Installed packs (Settings); empty without a backend. */
 export async function listDictionaries(): Promise<InstalledDictionary[]> {
 	if (!tauriBackendAvailable()) return [];
@@ -120,12 +108,17 @@ export async function removeDictionary(lang: string): Promise<void> {
 	await invokeDict("dict_remove", { lang }).catch(() => undefined);
 }
 
-/** A pack's size for people: "840 KB", "20 MB". */
-export function dictSize(bytes: number): string {
-	if (bytes < 1e6) return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
-	return `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`;
+/** What the release offers, by language; null offline or without a backend. */
+export async function dictionaryCatalog(): Promise<Record<
+	string,
+	OfferedDictionary
+> | null> {
+	if (!tauriBackendAvailable()) return null;
+	return invokeDict<Record<string, OfferedDictionary> | null>(
+		"dict_catalog",
+		{}
+	).catch(() => null);
 }
-
 async function japanesePieces(word: string): Promise<JaPiece[]> {
 	const { japaneseTokens } = await import("./furigana");
 	const tokens = await japaneseTokens(word);

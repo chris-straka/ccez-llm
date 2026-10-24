@@ -191,7 +191,8 @@
 	import { escapeHtml } from "$lib/render-math";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
-	import { makeWordLookup } from "$lib/dictionary.svelte";
+	import { dictManager, makeWordLookup } from "$lib/dictionary.svelte";
+	import DictionaryManager from "$lib/components/DictionaryManager.svelte";
 	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
@@ -2708,6 +2709,10 @@
 		activeReplyCode ? replyLanguageFor(activeReplyCode) : null
 	);
 	let settingsOpen = $state(false);
+	// The dictionary manager opens from Settings and closes with it.
+	$effect(() => {
+		if (!settingsOpen) dictManager.open = false;
+	});
 	/**
 	 * Opening/closing settings shifts layout under a stationary cursor,
 	 * leaving a stale pointer behind (browsers refresh the cursor on
@@ -11352,7 +11357,10 @@
 		 * Callers preventDefault + stopPropagation around it.
 		 */
 		const dismissEscape = (inEditor: Element | null | undefined): void => {
-			if (shortcutsOpen || inspectChar) {
+			if (dictManager.open) {
+				// Opened from Settings: Esc closes it, Settings stays.
+				dictManager.open = false;
+			} else if (shortcutsOpen || inspectChar) {
 				// A modal always wins Esc, even from inside the prompt.
 				shortcutsOpen = false;
 				closeInspect();
@@ -15321,6 +15329,14 @@
 				exportAnki: () => void flashcards.exportAnki(),
 				close: () => flashcards.close()
 			}}
+		/>
+	{/if}
+
+	{#if dictManager.open && settingsOpen}
+		<DictionaryManager
+			bind:settings
+			android={androidUI}
+			onClose={() => (dictManager.open = false)}
 		/>
 	{/if}
 

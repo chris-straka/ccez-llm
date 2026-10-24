@@ -173,6 +173,30 @@ move here verbatim. -->
 			--sheet-zoom: 1.35;
 		}
 	}
+	/* Dictionary manager: most of the window (three quarters of a
+	desktop window's width, up to 80rem), since fifty language tiles
+	want the room and nothing behind it needs watching; the whole
+	screen on phones. */
+	.dict-modal {
+		width: min(80rem, calc(75vw * var(--ui-scale-inv, 1)));
+		max-width: min(80rem, calc((100vw - 3rem) * var(--ui-scale-inv, 1)));
+		max-height: calc((100dvh - 3rem) * var(--ui-scale-inv, 1));
+		padding-bottom: 1.4rem;
+	}
+	@media (max-width: 760px) {
+		.modal-veil.dict-veil {
+			padding: 0;
+		}
+		.dict-modal {
+			width: calc(100vw * var(--ui-scale-inv, 1));
+			max-width: none;
+			height: calc(100dvh * var(--ui-scale-inv, 1));
+			max-height: none;
+			border: 0;
+			border-radius: 0;
+			padding-top: calc(0.9rem + env(safe-area-inset-top, 0px));
+		}
+	}
 	/* Flashcards box: one card wide, sized like a real card. */
 	.flashcards-modal {
 		width: min(30rem, calc(100vw - 3rem));
