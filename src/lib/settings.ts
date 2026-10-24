@@ -330,6 +330,11 @@ export interface AppSettings {
 	 * by default; desktop and Android only.
 	 */
 	wordCardDictionaries: boolean;
+	/**
+	 * Languages whose dictionary was removed in Settings: they don't
+	 * download again on their own, only from Settings.
+	 */
+	dictionarySkip: string[];
 	/** What an empty chat in a language opens: news or listening. */
 	emptyChatMode: "news" | "listen";
 	/**
@@ -603,6 +608,7 @@ export function defaultSettings(): AppSettings {
 		listenChannels: [],
 		annotationAnswersInPassageLang: false,
 		wordCardDictionaries: true,
+		dictionarySkip: [],
 		emptyChatMode: "news",
 		aiTitles: true
 	};
@@ -865,6 +871,9 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.annotationAnswersInPassageLang = false;
 		if (typeof merged.wordCardDictionaries !== "boolean")
 			merged.wordCardDictionaries = true;
+		merged.dictionarySkip = Array.isArray(merged.dictionarySkip)
+			? merged.dictionarySkip.filter((l): l is string => typeof l === "string")
+			: [];
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")

@@ -985,7 +985,10 @@
 	// (not inferred): the two controllers reference each other.
 	// Word cards look one-word notes up in the language's downloaded
 	// dictionary first (desktop and Android; see dictionary.svelte.ts).
-	const wordLookup = makeWordLookup(() => settings.wordCardDictionaries);
+	const wordLookup = makeWordLookup(
+		(lang) =>
+			settings.wordCardDictionaries && !settings.dictionarySkip.includes(lang)
+	);
 	const drafts: AnnotationDrafts = new AnnotationDrafts({
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),

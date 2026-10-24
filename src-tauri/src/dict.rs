@@ -37,13 +37,21 @@ struct Pack {
     ents_at: u64,
 }
 
-/// One dictionary hit for a form: its grammar tags and the entry
-/// (headword, part of speech, gender, reading, senses) as stored.
+/// One dictionary hit for a form: its grammar tags, the entry
+/// (headword, part of speech, gender, reading, senses) as stored, and
+/// where the form splits when the pack knows: the lengths in
+/// characters of its prefix, stem and number piece (the ending is the
+/// rest). Packs before splits leave it out.
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Hit {
     pub tags: String,
     pub entry: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub split: Option<[u8; 3]>,
 }
+
+/// A stem length of this value marks a form whose split isn't known.
+const NO_SPLIT: u8 = 0xff;
 
 fn read_u32(r: &mut impl Read) -> std::io::Result<u32> {
     let mut b = [0u8; 4];
@@ -142,6 +150,9 @@ impl Pack {
             (self.val_offs[i + 1] - start) as usize,
         )?;
         let count = *val.first().unwrap_or(&0) as usize;
+        // Splits ride after the hits, three bytes each; older readers
+        // stop at the hits and never see them.
+        let splits_at = 1 + count * 6;
         let mut hits = Vec::with_capacity(count);
         for h in 0..count {
             let at = 1 + h * 6;
@@ -160,9 +171,14 @@ impl Pack {
             )?;
             let entry: serde_json::Value =
                 serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            let split = val
+                .get(splits_at + h * 3..splits_at + h * 3 + 3)
+                .filter(|s| s[1] != NO_SPLIT)
+                .map(|s| [s[0], s[1], s[2]]);
             hits.push(Hit {
                 tags: self.tags.get(tag).cloned().unwrap_or_default(),
                 entry,
+                split,
             });
         }
         Ok(hits)
@@ -410,6 +426,46 @@ fn unpack(dir: &Path, lang: &str, gz_path: &Path, version: &str) -> Result<(), S
     Ok(())
 }
 
+/// One installed pack, for Settings.
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Installed {
+    pub lang: String,
+    pub version: String,
+    pub bytes: u64,
+}
+
+/// Installed packs in `dir`, by language code.
+fn installed_packs(dir: &Path) -> Vec<Installed> {
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut out: Vec<Installed> = read
+        .filter_map(Result::ok)
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            let lang = name.strip_suffix(".dict")?;
+            if !valid_lang(lang) {
+                return None;
+            }
+            Some(Installed {
+                lang: lang.to_string(),
+                version: installed_version(dir, lang)?,
+                bytes: e.metadata().ok()?.len(),
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| a.lang.cmp(&b.lang));
+    out
+}
+
+/// Every installed pack with its size on disk (Settings).
+#[tauri::command]
+pub fn dict_list(app: AppHandle) -> Vec<Installed> {
+    dict_dir(&app)
+        .map(|d| installed_packs(&d))
+        .unwrap_or_default()
+}
+
 /// Delete a language's pack (Settings).
 #[tauri::command]
 pub fn dict_remove(app: AppHandle, lang: String) -> Result<(), String> {
@@ -438,6 +494,12 @@ mod tests {
             ("franchi", vec![(0, 1)]),
             ("digue", vec![(1, 0)]),
         ];
+        // franchi splits franch + i; the headword's split isn't known.
+        let split = |k: &str| match k {
+            "franchi" => Some([0u8, 6, 0]),
+            "franchir" => Some([0u8, NO_SPLIT, 0]),
+            _ => None,
+        };
         keys.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
         let entries = [
             br#"{"w":"franchir","p":"verb","s":["to cross"]}"#.to_vec(),
@@ -450,11 +512,14 @@ mod tests {
         out.extend((entries.len() as u32).to_le_bytes());
         let vals: Vec<Vec<u8>> = keys
             .iter()
-            .map(|(_, hits)| {
+            .map(|(k, hits)| {
                 let mut v = vec![hits.len() as u8];
                 for (e, t) in hits {
                     v.extend(e.to_le_bytes());
                     v.extend(t.to_le_bytes());
+                }
+                if let Some(s) = split(k) {
+                    v.extend(s);
                 }
                 v
             })
@@ -496,8 +561,19 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].tags, "participle past");
         assert_eq!(hits[0].entry["w"], "franchir");
+        assert_eq!(hits[0].split, Some([0, 6, 0]));
+        assert_eq!(pack.lookup("franchir").unwrap()[0].split, None);
+        // A pack written before splits: no split, same hits.
+        assert_eq!(pack.lookup("digue").unwrap()[0].split, None);
         assert_eq!(pack.lookup("digue").unwrap()[0].entry["g"], "feminine");
         assert!(pack.lookup("nope").unwrap().is_empty());
+        std::fs::write(dir.join("fr.version"), "2026.10.24").unwrap();
+        std::fs::write(dir.join("xx.part"), b"half").unwrap();
+        let listed = installed_packs(&dir);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].lang, "fr");
+        assert_eq!(listed[0].version, "2026.10.24");
+        assert_eq!(listed[0].bytes, sample_pack().len() as u64);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

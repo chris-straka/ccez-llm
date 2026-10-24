@@ -1,10 +1,11 @@
 /**
  * Dictionary packs at runtime (src-tauri/src/dict.rs): a word's hits
- * for its card, and the on-demand download behind them. A language's
- * pack downloads the first time a word in it is annotated (when the
- * setting allows) and checks for a newer one once a session; until it
- * lands, cards come from the model alone. The web build has no
- * backend and never looks anything up.
+ * for its card, the on-demand download behind them, and the list
+ * Settings shows. A language's pack downloads the first time a word
+ * in it is annotated (when the setting allows and it wasn't removed)
+ * and checks for a newer one once a session; until it lands, cards
+ * come from the model alone. The web build has no backend and never
+ * looks anything up.
  */
 import { toHiragana } from "wanakana";
 import {
@@ -77,22 +78,52 @@ async function hookProgress(): Promise<void> {
 }
 
 /**
- * Fetch (or update) a language's pack in the background. Failures
- * stay quiet: the card already works without it, and the next
- * session tries again.
+ * Fetch (or update) a language's pack in the background; resolves
+ * true once it's installed. Failures stay quiet: the card already
+ * works without it, and the next session tries again.
  */
-export function installDictionary(lang: string): void {
-	if (installing.has(lang) || dictPack(lang) !== lang) return;
+export function installDictionary(lang: string): Promise<boolean> {
+	if (installing.has(lang) || dictPack(lang) !== lang)
+		return Promise.resolve(false);
 	installing.add(lang);
 	checked.add(lang);
-	void hookProgress()
+	dictDownloads[lang] = 0;
+	return hookProgress()
 		.then(() => invokeDict<string>("dict_install", { lang }))
-		.then(() => installed.set(lang, true))
-		.catch(() => undefined)
+		.then(() => {
+			installed.set(lang, true);
+			return true;
+		})
+		.catch(() => false)
 		.finally(() => {
 			installing.delete(lang);
 			delete dictDownloads[lang];
 		});
+}
+
+/** One installed pack and its size on disk. */
+export interface InstalledDictionary {
+	lang: string;
+	version: string;
+	bytes: number;
+}
+
+/** Installed packs (Settings); empty without a backend. */
+export async function listDictionaries(): Promise<InstalledDictionary[]> {
+	if (!tauriBackendAvailable()) return [];
+	return invokeDict<InstalledDictionary[]>("dict_list", {}).catch(() => []);
+}
+
+/** Delete a language's pack; its cards go back to the model alone. */
+export async function removeDictionary(lang: string): Promise<void> {
+	installed.set(lang, false);
+	await invokeDict("dict_remove", { lang }).catch(() => undefined);
+}
+
+/** A pack's size for people: "840 KB", "20 MB". */
+export function dictSize(bytes: number): string {
+	if (bytes < 1e6) return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
+	return `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`;
 }
 
 async function japanesePieces(word: string): Promise<JaPiece[]> {
@@ -112,17 +143,17 @@ async function japanesePieces(word: string): Promise<JaPiece[]> {
 /**
  * The lookup word cards use: hits from the installed pack, or null
  * (no backend, no pack for the language, or not downloaded yet, in
- * which case a download starts when `enabled()`).
+ * which case a download starts when `enabled(lang)`).
  */
-export function makeWordLookup(enabled: () => boolean): WordLookup {
+export function makeWordLookup(enabled: (lang: string) => boolean): WordLookup {
 	return async (quote, cardLang) => {
 		const lang = dictPack(cardLang);
 		if (!tauriBackendAvailable() || !lang) return null;
 		if (!(await isInstalled(lang))) {
-			if (enabled()) installDictionary(lang);
+			if (enabled(lang)) void installDictionary(lang);
 			return null;
 		}
-		if (enabled() && !checked.has(lang)) installDictionary(lang);
+		if (enabled(lang) && !checked.has(lang)) void installDictionary(lang);
 		const forms = lookupForms(quote, lang);
 		const word = forms[0];
 		if (!word) return null;

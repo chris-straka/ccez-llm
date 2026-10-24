@@ -4,6 +4,7 @@
 	import { currentPlatform, micButtonsShown } from "$lib/platform";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { micAvailable } from "$lib/voice";
+	import DictionariesSection from "./DictionariesSection.svelte";
 	import "./panels.css";
 
 	interface Props {
@@ -27,6 +28,8 @@
 		false,
 		false
 	);
+	// Packs need the native backend; the web build never downloads one.
+	const dictionaries = tauriBackendAvailable();
 	const active = $derived(activeProviderSettings(settings));
 	/** This model's thinking dial (native knob or prompt hints); hidden
 	 * when a single level exists. Recomputes from the model field, so a
@@ -102,10 +105,9 @@
 				/>
 				<span>Answer annotations in the passage's language</span>
 			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
-				<span>Download dictionaries for word cards (Wiktionary, JMdict)</span>
-			</label>
+			{#if dictionaries}
+				<DictionariesSection bind:settings />
+			{/if}
 		</fieldset>
 		<!-- On/off features under one "Enable" legend, two columns where
 		the panel has room (one when narrow or zoomed). -->
@@ -212,9 +214,8 @@
 			/>
 			<span>Answer annotations in the passage's language</span>
 		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
-			<span>Download dictionaries for word cards (Wiktionary, JMdict)</span>
-		</label>
+		{#if dictionaries}
+			<DictionariesSection bind:settings />
+		{/if}
 	{/if}
 </section>

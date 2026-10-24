@@ -380,6 +380,7 @@ pub fn run() {
             dict::dict_lookup,
             dict::dict_install,
             dict::dict_remove,
+            dict::dict_list,
             #[cfg(desktop)]
             desktop::desktop_sleep_block,
             #[cfg(desktop)]
