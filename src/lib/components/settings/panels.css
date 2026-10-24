@@ -1142,6 +1142,22 @@ visible space below it (see the slider's hit row). */
 	border-radius: 6px;
 	cursor: default;
 }
+/* A typed value looks like the plain one until focused: same box,
+no field chrome; focus shows the ring and a text caret. */
+.settings-inner .step-input {
+	box-sizing: border-box;
+	height: 100%;
+	margin: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: inherit;
+	cursor: text;
+}
+.settings-inner .step-input:focus {
+	outline: 2px solid var(--focus);
+	outline-offset: 3px;
+}
 .settings-inner .step-value:focus-visible,
 .settings-inner .thumb:focus-visible {
 	outline: 2px solid var(--focus);

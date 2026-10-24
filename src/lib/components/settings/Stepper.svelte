@@ -2,7 +2,10 @@
 on the right. Each press moves one rung of the ladder, so a stray
 click changes the value by one visible step and never by a drag's
 worth; the value is shown once, inside the control. Arrow keys,
-Page keys, Home and End work on the focused value. -->
+Page keys, Home and End work on the focused value. A `typed` stepper
+also takes a number typed into the value (Enter or leaving the field
+sets it, clamped to the ladder's ends): only for sizes that leave
+Settings itself alone, so a slip can't make it unreadable. -->
 <script lang="ts">
 	import { canStep, stepLadder } from "$lib/settingSteps";
 
@@ -20,6 +23,8 @@ Page keys, Home and End work on the focused value. -->
 		/** Tooltip on the Reset link. */
 		resetTitle: string;
 		onChange: (value: number) => void;
+		/** The value takes a typed number too (see above). */
+		typed?: boolean;
 	}
 
 	let {
@@ -31,8 +36,25 @@ Page keys, Home and End work on the focused value. -->
 		format,
 		defaultValue,
 		resetTitle,
-		onChange
+		onChange,
+		typed = false
 	}: Props = $props();
+
+	/** Text in the typed field while it has focus; null shows the value. */
+	let draft = $state<string | null>(null);
+
+	/** Set what was typed: the first number in it, clamped to the ladder. */
+	function commitDraft(): void {
+		const text = draft;
+		draft = null;
+		if (text === null) return;
+		const n = Number(/-?\d+(?:[.,]\d+)?/.exec(text)?.[0]?.replace(",", "."));
+		if (!Number.isFinite(n)) return;
+		const lo = ladder[0] ?? n;
+		const hi = ladder.at(-1) ?? n;
+		const next = Math.round(Math.min(hi, Math.max(lo, n)));
+		if (next !== value) onChange(next);
+	}
 
 	const canDown = $derived(canStep(ladder, value, -1, rank));
 	const canUp = $derived(canStep(ladder, value, 1, rank));
@@ -92,17 +114,62 @@ Page keys, Home and End work on the focused value. -->
 			><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" /></svg
 			></button
 		>
-		<span
-			class="step-value"
-			role="spinbutton"
-			tabindex="0"
-			aria-label={ariaLabel}
-			aria-valuenow={value}
-			aria-valuemin={ladder[0]}
-			aria-valuemax={ladder.at(-1)}
-			aria-valuetext={format(value)}
-			onkeydown={onKey}>{format(value)}</span
-		>
+		{#if typed}
+			<input
+				class="step-value step-input"
+				type="text"
+				inputmode="numeric"
+				role="spinbutton"
+				aria-label={ariaLabel}
+				aria-valuenow={value}
+				aria-valuemin={ladder[0]}
+				aria-valuemax={ladder.at(-1)}
+				aria-valuetext={format(value)}
+				autocomplete="off"
+				spellcheck={false}
+				value={draft ?? format(value)}
+				onfocus={(e) => {
+					draft = format(value);
+					e.currentTarget.select();
+				}}
+				oninput={(e) => (draft = e.currentTarget.value)}
+				onblur={commitDraft}
+				onkeydown={(e) => {
+					if (e.key === "Enter") {
+						e.preventDefault();
+						commitDraft();
+						draft = format(value);
+						e.currentTarget.select();
+						return;
+					}
+					if (e.key === "Escape") {
+						draft = null;
+						e.currentTarget.blur();
+						return;
+					}
+					// Typing keeps its keys; arrows and pages still step.
+					if (e.key.length === 1 || e.key === "Backspace") {
+						e.stopPropagation();
+						return;
+					}
+					if (e.key === "Home" || e.key === "End") return;
+					draft = null;
+					onKey(e);
+				}}
+			/>
+		{:else}
+			<span
+				class="step-value"
+				role="spinbutton"
+				tabindex="0"
+				aria-label={ariaLabel}
+				aria-valuenow={value}
+				aria-valuemin={ladder[0]}
+				aria-valuemax={ladder.at(-1)}
+				aria-valuetext={format(value)}
+				onkeydown={onKey}>{format(value)}</span
+			>
+		{/if}
 		<button
 			type="button"
 			class="step-btn"

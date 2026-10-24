@@ -53,7 +53,7 @@ test("annotation popup size spans 10 to 200 percent", async ({ page }) => {
 	await expect(size).toHaveAttribute("aria-valuemax", "200");
 	await expect(size).toHaveAttribute("aria-valuemin", "10");
 	await setSettingValue(page, "Annotation popup size percent", 50);
-	await expect(size).toHaveText("50%");
+	await expect(size).toHaveValue("50%");
 	await page
 		.locator('.settings-panel button[title="Reset to the default popup size"]')
 		.click();
@@ -74,15 +74,16 @@ test("text size stepper moves one rung per press and resets", async ({
 	);
 	await expect(reset).toHaveCount(0);
 	await page.getByRole("button", { name: "Increase text size" }).click();
-	await expect(size).toHaveText("110%");
+	await expect(size).toHaveValue("110%");
 	await page.getByRole("button", { name: "Increase text size" }).click();
-	await expect(size).toHaveText("120%");
+	await expect(size).toHaveValue("120%");
 	await page.getByRole("button", { name: "Decrease text size" }).click();
-	await expect(size).toHaveText("110%");
+	await expect(size).toHaveValue("110%");
 	const row = page.locator(".settings-panel .stepper-setting", {
 		has: size
 	});
-	expect((await row.innerText()).match(/110%/g)).toHaveLength(1);
+	// The value shows once: in the field, never again as text.
+	expect((await row.innerText()).match(/110%/g)).toBeNull();
 	await expect
 		.poll(() =>
 			page.evaluate(() =>
@@ -93,8 +94,38 @@ test("text size stepper moves one rung per press and resets", async ({
 		)
 		.toBe("1.1");
 	await reset.click();
-	await expect(size).toHaveText("100%");
+	await expect(size).toHaveValue("100%");
 	await expect(reset).toHaveCount(0);
+});
+
+/** Text size also takes a typed percentage: Enter sets it, clamped to
+the ladder's ends; Escape leaves it as it was. */
+test("text size takes a typed percentage", async ({ page }) => {
+	const size = page.getByRole("spinbutton", {
+		name: "Text size percent",
+		exact: true
+	});
+	await size.click();
+	await page.keyboard.type("137");
+	await page.keyboard.press("Enter");
+	await expect(size).toHaveValue("137%");
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				getComputedStyle(document.querySelector(".app")!)
+					.getPropertyValue("--font-scale")
+					.trim()
+			)
+		)
+		.toBe("1.37");
+	await size.click();
+	await page.keyboard.type("99999");
+	await page.keyboard.press("Enter");
+	await expect(size).toHaveValue("2000%");
+	await size.click();
+	await page.keyboard.type("50");
+	await page.keyboard.press("Escape");
+	await expect(size).toHaveValue("2000%");
 });
 
 /** Sliders only move from their thumb: a click elsewhere on the
@@ -532,7 +563,7 @@ test.describe("phone", () => {
 		await plus.tap();
 		await expect(
 			page.getByRole("spinbutton", { name: "Text size percent", exact: true })
-		).toHaveText("110%");
+		).toHaveValue("110%");
 		const name = "Voice volume percent";
 		const hit = page
 			.locator(".settings-panel .slider-setting", {

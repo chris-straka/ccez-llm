@@ -44,6 +44,7 @@ is a stepper. -->
 		<p>Oui, très bien, merci ! Et toi, tu as passé une bonne journée ?</p>
 	</div>
 	<Stepper
+		typed
 		label="Text size"
 		ariaLabel="Text size percent"
 		value={pct(settings.fontScale)}
@@ -74,6 +75,7 @@ is a stepper. -->
 		onChange={(v: number) => (settings.messageGap = v)}
 	/>
 	<Stepper
+		typed
 		label="Prompt text size"
 		ariaLabel="Prompt text size percent"
 		value={pct(settings.promptScale)}
@@ -84,6 +86,7 @@ is a stepper. -->
 		onChange={(v: number) => (settings.promptScale = v / 100)}
 	/>
 	<Stepper
+		typed
 		label="Annotation popup size"
 		ariaLabel="Annotation popup size percent"
 		value={pct(settings.annPopScale)}
