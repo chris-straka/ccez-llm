@@ -1,4 +1,5 @@
-<!-- Settings drawer: right-side overlay panel hosting SettingsPanel.
+<!-- Settings: a window centered over the chat on desktop (a dim veil
+behind it closes it), a full sheet on phones; it hosts SettingsPanel.
 The page owns the open flag, the settings object, token labels, and
 every behavior; this component owns the drawer shell (open-space
 double-click to close, inert while shut), the fixed-width inner, and
@@ -43,8 +44,17 @@ bookkeeping reads it). -->
 </script>
 
 <!-- Keep Meta+,. -->
+{#if !android}
+	<div
+		class="settings-veil"
+		class:shown={open}
+		aria-hidden="true"
+		onclick={() => actions.drawerClose()}
+	></div>
+{/if}
 <aside
 	class="settings-panel"
+	class:windowed={!android}
 	class:closed={!open}
 	bind:this={panelEl}
 	data-fade-scroll
@@ -73,6 +83,7 @@ bookkeeping reads it). -->
 			onGameLineToggle={actions.gameLine}
 			onExpand={(event: MouseEvent) => actions.expand(event)}
 			androidUI={android}
+			windowed={!android}
 		/>
 	</div>
 </aside>
@@ -192,9 +203,68 @@ bookkeeping reads it). -->
 			border-color 0.22s ease,
 			scrollbar-color 0.12s ease;
 	}
+	/* Desktop: a window centered over the chat (owner, 2026-10-24),
+	sized to the screen with the same interface-size caps as the
+	drawer; the groups list on the left (SettingsPanel). Closed, it
+	fades out in place. */
+	.settings-panel.windowed {
+		box-sizing: border-box;
+		inset: 0;
+		margin: auto;
+		/* Jumps and focus land below the pinned sample. */
+		scroll-padding-top: 9rem;
+		width: min(64rem, calc((100vw - 4rem) * var(--ui-scale-inv, 1)));
+		height: min(48rem, calc((100dvh - 4rem) * var(--ui-scale-inv, 1)));
+		max-width: none;
+		z-index: 58;
+		padding: 0 1.6rem 2rem 0;
+		border: 1px solid var(--line-soft);
+		border-radius: 14px;
+		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+		background: var(--bg-chrome);
+	}
+	.settings-panel.windowed.closed {
+		transform: scale(0.98);
+		opacity: 0;
+		visibility: hidden;
+	}
+	.settings-panel.windowed .settings-inner {
+		width: auto;
+		margin: 0;
+	}
+	.settings-veil {
+		position: fixed;
+		inset: 0;
+		z-index: 57;
+		background: rgba(0, 0, 0, 0.35);
+		opacity: 0;
+		visibility: hidden;
+		transition:
+			opacity 0.18s ease,
+			visibility 0.18s;
+	}
+	.settings-veil.shown {
+		opacity: 1;
+		visibility: visible;
+	}
+	/* Fading out, it never eats the next click. */
+	.settings-veil:not(.shown) {
+		pointer-events: none;
+	}
+	/* The window fades; it never animates its width (a zoom change
+	would swell it past the screen mid-transition). */
+	.settings-panel.windowed[data-fade-scroll],
+	.settings-panel.windowed[data-fade-scroll]:global(.scrolling) {
+		transition:
+			transform 0.18s ease,
+			opacity 0.18s ease,
+			visibility 0.18s,
+			scrollbar-color 0.3s ease;
+	}
 	@media (prefers-reduced-motion: reduce) {
 		aside,
-		.settings-panel {
+		.settings-panel,
+		.settings-veil {
 			transition: none;
 		}
 	}

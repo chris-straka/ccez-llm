@@ -10,6 +10,7 @@
 	import DefaultsPanel from "./settings/DefaultsPanel.svelte";
 	import AppearancePanel from "./settings/AppearancePanel.svelte";
 	import ReadingPanel from "./settings/ReadingPanel.svelte";
+	import SettingsSample from "./settings/SettingsSample.svelte";
 	import VoiceSection from "./settings/VoiceSection.svelte";
 	import LayoutPanel from "./settings/LayoutPanel.svelte";
 	import UpdatesPanel from "./settings/UpdatesPanel.svelte";
@@ -34,6 +35,9 @@
 		/** Double-tap the settings top: expand the window like the main
 		top bar (the page owns the shell zoom). */
 		onExpand?: (event: MouseEvent) => void;
+		/** Desktop window: the groups list down the left and the live
+		sample pinned over the scroll. */
+		windowed?: boolean;
 		/** Update results ride the page toast (auto-dismiss, no layout
 		shift) instead of an inline popup. Falls back to inline text
 		when the page passes none. */
@@ -50,8 +54,14 @@
 		androidUI = false,
 		followVoice = null,
 		onToast,
-		onExpand
+		onExpand,
+		windowed = false
 	}: Props = $props();
+	let sampleEl: HTMLElement | undefined = $state();
+	/** What covers the top of the scroller: the pinned sample in the
+	window, the jump bar on the sheet. */
+	const coverHeight = (): number =>
+		(windowed ? sampleEl?.offsetHeight : navEl?.offsetHeight) ?? 0;
 	const buildStamp = import.meta.env.VITE_BUILD_STAMP ?? "release";
 	const appVersion = import.meta.env.VITE_APP_VERSION ?? "";
 	const showStamp = !import.meta.env.DEV;
@@ -102,7 +112,7 @@
 			target.getBoundingClientRect().top -
 			box.getBoundingClientRect().top +
 			box.scrollTop -
-			navEl.offsetHeight;
+			coverHeight();
 		const reduce = window.matchMedia?.(
 			"(prefers-reduced-motion: reduce)"
 		).matches;
@@ -127,7 +137,9 @@
 		if (!box || !navEl) return;
 		const nav = navEl;
 		const spy = (): void => {
-			const line = nav.getBoundingClientRect().bottom + 12;
+			const line = windowed
+				? box.getBoundingClientRect().top + coverHeight() + 12
+				: nav.getBoundingClientRect().bottom + 12;
 			let seen: SectionId = SECTIONS[0][0];
 			for (const [id] of SECTIONS) {
 				const el = document.getElementById(`settings-${id}`);
@@ -204,6 +216,17 @@
 	}}
 ></div>
 <nav class="settings-nav" bind:this={navEl} aria-label="Settings sections">
+	{#if windowed}
+		<button
+			type="button"
+			class="settings-close"
+			aria-label="Close settings"
+			onclick={onClose}
+			><svg viewBox="0 0 16 16" aria-hidden="true"
+				><path d="M4 4l8 8M12 4l-8 8" /></svg
+			></button
+		>
+	{/if}
 	{#each SECTIONS as [id, label] (id)}
 		<button
 			type="button"
@@ -213,7 +236,14 @@
 		>
 	{/each}
 </nav>
-<ReadingPanel bind:settings />
+{#if windowed}
+	<!-- The live sample stays in view while any group scrolls under
+	it: every change shows at once, even with the chat covered. -->
+	<div class="settings-sample" bind:this={sampleEl}>
+		<SettingsSample {settings} />
+	</div>
+{/if}
+<ReadingPanel bind:settings sample={!windowed} />
 <VoiceSection bind:settings {androidUI} {followVoice} />
 <LayoutPanel bind:settings {androidUI} />
 <AppearancePanel bind:settings />

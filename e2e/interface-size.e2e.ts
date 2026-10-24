@@ -192,9 +192,10 @@ async function interfaceSizeFlow(
 		expect(drawerBox250.x).toBeLessThanOrEqual(1);
 		expect(drawerBox250.width).toBeGreaterThanOrEqual(vw - 1);
 	} else {
-		const grew = drawerBox250.width / drawerBox100.width;
-		expect(grew).toBeGreaterThanOrEqual(2.4);
-		expect(grew).toBeLessThanOrEqual(2.6);
+		// The desktop window grows with the zoom until it fills the
+		// screen (less its margin), and never leaves it (checked above).
+		expect(drawerBox250.width).toBeGreaterThanOrEqual(drawerBox100.width);
+		expect(drawerBox250.width).toBeGreaterThanOrEqual(vw - 80);
 	}
 	// Chat list: row text grows 2.5x (lower bound — a capped phone
 	// box may wrap a long title); the box never leaves the screen.

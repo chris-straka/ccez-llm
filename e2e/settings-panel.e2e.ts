@@ -118,11 +118,11 @@ test("text size takes a typed percentage", async ({ page }) => {
 			)
 		)
 		.toBe("1.37");
-	await size.click();
+	await size.focus();
 	await page.keyboard.type("99999");
 	await page.keyboard.press("Enter");
 	await expect(size).toHaveValue("2000%");
-	await size.click();
+	await size.focus();
 	await page.keyboard.type("50");
 	await page.keyboard.press("Escape");
 	await expect(size).toHaveValue("2000%");
@@ -349,7 +349,7 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 		.locator("article.assistant")
 		.first()
 		.evaluate((el) => el.getBoundingClientRect().left);
-	await page.locator(".settings-panel .panel-head").click();
+	await page.locator(".settings-panel .settings-close").click();
 	await waitHitTestable();
 	await page.mouse.dblclick(leftEdge + 20, 400);
 	await expect(sidebar).toHaveClass(/collapsed/);
@@ -357,7 +357,7 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await openSettings();
 	await setSettingValue(page, "Chat width in rem", 28);
 	expect(await chatVar()).toBe("28");
-	await page.locator(".settings-panel .panel-head").click();
+	await page.locator(".settings-panel .settings-close").click();
 	await waitHitTestable();
 	await page.mouse.dblclick(100, 400);
 	await expect(sidebar).not.toHaveClass(/collapsed/);

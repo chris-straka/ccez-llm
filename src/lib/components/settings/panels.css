@@ -1032,6 +1032,72 @@ scroll beneath it; one row that scrolls sideways on a narrow sheet. */
 		padding: 0.3rem 0.55rem;
 	}
 }
+/* Desktop window: the groups list pinned down the left, everything
+else in the right column, the live sample pinned on top of it. A
+grid with the list spanning every row keeps one scroll (find by
+eye still works) without changing the markup the sheet shares. */
+.windowed .settings-inner {
+	display: grid;
+	grid-template-columns: 11rem minmax(0, 1fr);
+	column-gap: 1.8rem;
+	align-items: start;
+}
+.windowed .settings-inner > * {
+	grid-column: 2;
+}
+.windowed .settings-inner > .panel-head {
+	display: none;
+}
+.windowed .settings-inner > .settings-nav {
+	grid-column: 1;
+	grid-row: 1 / span 40;
+	position: sticky;
+	top: 0;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.15rem;
+	overflow: visible;
+	margin: 0;
+	padding: 0.9rem 0.6rem 1rem;
+	border-bottom: 0;
+	background: transparent;
+}
+.windowed .settings-nav button {
+	text-align: start;
+	border-radius: 8px;
+	padding: 0.45rem 0.8rem;
+}
+.windowed .settings-nav .settings-close {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	padding: 0;
+	margin-bottom: 0.6rem;
+}
+.windowed .settings-close svg {
+	width: 1rem;
+	height: 1rem;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.6;
+	stroke-linecap: round;
+}
+.windowed .settings-inner > .settings-sample {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	padding: 1.2rem 0 0.8rem;
+	background: var(--bg-chrome);
+	border-bottom: 1px solid var(--line-soft);
+}
+.windowed .settings-sample .reading-preview {
+	margin: 0;
+}
+.windowed .settings-inner > .settings-sample + section {
+	border-top: 0;
+}
 /* The bar covers the top of the scroller: a jumped-to heading lands
 just below it. */
 .settings-inner section[id^="settings-"] {
@@ -1144,17 +1210,20 @@ visible space below it (see the slider's hit row). */
 }
 /* A typed value looks like the plain one until focused: same box,
 no field chrome; focus shows the ring and a text caret. */
-.settings-inner .step-input {
+.settings-inner .stepper input.step-input {
 	box-sizing: border-box;
 	height: 100%;
 	margin: 0;
+	padding: 0 0.15rem;
 	border: 0;
+	border-radius: 6px;
+	box-shadow: none;
 	background: transparent;
 	color: inherit;
 	font-family: inherit;
 	cursor: text;
 }
-.settings-inner .step-input:focus {
+.settings-inner .stepper input.step-input:focus {
 	outline: 2px solid var(--focus);
 	outline-offset: 3px;
 }

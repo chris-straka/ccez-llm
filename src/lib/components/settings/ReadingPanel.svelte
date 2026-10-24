@@ -14,14 +14,17 @@ is a stepper. -->
 		TEXT_SIZE_LADDER,
 		trimNumber
 	} from "$lib/settingSteps";
+	import SettingsSample from "./SettingsSample.svelte";
 	import Stepper from "./Stepper.svelte";
 	import "./panels.css";
 
 	interface Props {
 		settings: AppSettings;
+		/** The live sample on top (the window pins its own instead). */
+		sample?: boolean;
 	}
 
-	let { settings = $bindable() }: Props = $props();
+	let { settings = $bindable(), sample = true }: Props = $props();
 
 	const percent = (v: number): string => `${Math.round(v)}%`;
 	const pct = (scale: number | undefined): number =>
@@ -30,19 +33,9 @@ is a stepper. -->
 
 <section id="settings-reading" aria-labelledby="reading-heading">
 	<h2 id="reading-heading">Reading</h2>
-	<!-- Live sample: the message font, spacing, gap, and own-message
-	ink as they are now. Clipped, so giant sizes stay a preview. -->
-	<div
-		class="reading-preview"
-		aria-hidden="true"
-		data-own-ink={settings.ownInk}
-		style="--pv-font: {settings.fontScale}; --pv-line: {settings.lineHeight ??
-			LINE_HEIGHT_DEFAULT}; --pv-gap: {settings.messageGap ??
-			MESSAGE_GAP_DEFAULT}rem"
-	>
-		<p class="pv-own">Ça va ?</p>
-		<p>Oui, très bien, merci ! Et toi, tu as passé une bonne journée ?</p>
-	</div>
+	{#if sample}
+		<SettingsSample {settings} />
+	{/if}
 	<Stepper
 		typed
 		label="Text size"

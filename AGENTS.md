@@ -63,7 +63,7 @@ TTS/OCR/dictation, page fetch, Android background turns).
   workflow's prune deletes only `v*` releases; it once took this one.
 - Licenses (Settings → Licenses): `bun scripts/licenses.ts` regenerates
   `src/lib/licenses.generated.json` from node_modules and `cargo
-  metadata` after a dependency change (`licenses.test.ts` fails until
+metadata` after a dependency change (`licenses.test.ts` fails until
   it runs); data and font credits live in `src/lib/licenses.ts`.
 - Web: `bun run build:web` → `build/`. Cloudflare Pages project
   `personalized-llm-client` builds `main` on push and serves

@@ -3,9 +3,10 @@ on the right. Each press moves one rung of the ladder, so a stray
 click changes the value by one visible step and never by a drag's
 worth; the value is shown once, inside the control. Arrow keys,
 Page keys, Home and End work on the focused value. A `typed` stepper
-also takes a number typed into the value (Enter or leaving the field
-sets it, clamped to the ladder's ends): only for sizes that leave
-Settings itself alone, so a slip can't make it unreadable. -->
+also takes a number typed into the value (Enter sets it, clamped to
+the ladder's ends; leaving the field or Escape keeps the old one):
+only for sizes that leave Settings itself alone, so a slip can't make
+it unreadable. -->
 <script lang="ts">
 	import { canStep, stepLadder } from "$lib/settingSteps";
 
@@ -133,13 +134,14 @@ Settings itself alone, so a slip can't make it unreadable. -->
 					e.currentTarget.select();
 				}}
 				oninput={(e) => (draft = e.currentTarget.value)}
-				onblur={commitDraft}
+				onblur={() => (draft = null)}
 				onkeydown={(e) => {
 					if (e.key === "Enter") {
+						// Enter sets it and leaves the field; the next
+						// focus selects the new value whole.
 						e.preventDefault();
 						commitDraft();
-						draft = format(value);
-						e.currentTarget.select();
+						e.currentTarget.blur();
 						return;
 					}
 					if (e.key === "Escape") {
