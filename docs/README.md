@@ -13,6 +13,8 @@ Root keeps what every session needs: `README.md` (what the app is),
 - `design/plugins.md` — Tauri plugin inventory and skipped candidates.
 - `design/settings.md` — why settings is a wide docked panel, its
   groups, and which control each setting gets.
+- `design/word-cards.md` — word cards: dictionary first, notes short,
+  packs per language.
 - `design/listening.md` — listening drills: the loop and the native
   YouTube pipeline (desktop and phone).
 - `investigations/cjkdecomp-eval.md` — license and data verdict behind
