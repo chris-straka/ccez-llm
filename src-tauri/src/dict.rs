@@ -608,6 +608,9 @@ mod tests {
             );
             assert!(!hits.is_empty(), "{word}");
         }
+        // Packs carry each form's split: parl + é.
+        let parle = pack.lookup("parlé").unwrap();
+        assert!(parle.iter().any(|h| h.split == Some([0, 4, 0])));
     }
 
     /// The real release, end to end: manifest, download, checksum,
