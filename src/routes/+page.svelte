@@ -8,7 +8,6 @@
 	import "../app.css";
 	import {
 		createChatState,
-		formatTokens,
 		activeChat,
 		newChat,
 		selectChat,
@@ -36,8 +35,6 @@
 		truncateToMessage,
 		editMessageContent,
 		resendLast,
-		tokenTotal,
-		tokenSplit,
 		waypoints,
 		waypointIndexAt,
 		waypointOffsets,
@@ -193,6 +190,8 @@
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
 	import { dictManager, makeWordLookup } from "$lib/dictionary.svelte";
 	import DictionaryManager from "$lib/components/DictionaryManager.svelte";
+	import LicensesModal from "$lib/components/LicensesModal.svelte";
+	import { licensesView } from "$lib/overlays.svelte";
 	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
@@ -2711,7 +2710,10 @@
 	let settingsOpen = $state(false);
 	// The dictionary manager opens from Settings and closes with it.
 	$effect(() => {
-		if (!settingsOpen) dictManager.open = false;
+		if (!settingsOpen) {
+			dictManager.open = false;
+			licensesView.open = false;
+		}
 	});
 	/**
 	 * Opening/closing settings shifts layout under a stationary cursor,
@@ -4670,8 +4672,6 @@
 	);
 	const viewChat = $derived(previewChat ?? chat);
 	const previewing = $derived(previewChat !== null);
-	const total = $derived(tokenTotal(chatState));
-	const split = $derived(tokenSplit(chatState));
 	const points = $derived(waypoints(chatState));
 	const sourcesWanted = $derived(
 		sourcesAsked(
@@ -11357,9 +11357,10 @@
 		 * Callers preventDefault + stopPropagation around it.
 		 */
 		const dismissEscape = (inEditor: Element | null | undefined): void => {
-			if (dictManager.open) {
+			if (dictManager.open || licensesView.open) {
 				// Opened from Settings: Esc closes it, Settings stays.
 				dictManager.open = false;
+				licensesView.open = false;
 			} else if (shortcutsOpen || inspectChar) {
 				// A modal always wins Esc, even from inside the prompt.
 				shortcutsOpen = false;
@@ -15249,10 +15250,6 @@
 		open={settingsOpen}
 		bind:settings
 		{followVoice}
-		tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(
-			split.completion
-		)} out"
-		tokensTitle="{total} tokens total this chat"
 		android={androidUI}
 		bind:panelEl={settingsEl}
 		actions={{
@@ -15330,6 +15327,10 @@
 				close: () => flashcards.close()
 			}}
 		/>
+	{/if}
+
+	{#if licensesView.open && settingsOpen}
+		<LicensesModal onClose={() => (licensesView.open = false)} />
 	{/if}
 
 	{#if dictManager.open && settingsOpen}

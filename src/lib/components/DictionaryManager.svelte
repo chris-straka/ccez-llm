@@ -25,6 +25,7 @@ page renders it and gives Escape to it first. -->
 		listDictionaries,
 		removeDictionary
 	} from "$lib/dictionary.svelte";
+	import { DICTIONARY_CREDITS } from "$lib/licenses";
 	import ActionIcon from "./ActionIcon.svelte";
 	import Modal from "./Modal.svelte";
 
@@ -43,6 +44,9 @@ page renders it and gives Escape to it first. -->
 	let filterEl: HTMLInputElement | undefined = $state();
 
 	const groups = dictGroups();
+	const credits = DICTIONARY_CREDITS.map(
+		(c) => `${c.name} (${c.license})`
+	).join(" and ");
 
 	function refresh(): void {
 		void listDictionaries().then((list) => (installed = list));
@@ -186,6 +190,8 @@ page renders it and gives Escape to it first. -->
 	{:else}
 		<p class="dm-empty">No language matches “{query}”.</p>
 	{/each}
+
+	<p class="dm-credits">Dictionaries from {credits}.</p>
 
 	{#if installed.length > 1}
 		<div class="dm-foot">
@@ -387,6 +393,12 @@ page renders it and gives Escape to it first. -->
 	}
 	.dm-empty {
 		margin: 1.5rem 0;
+		color: var(--muted);
+	}
+	.dm-credits {
+		max-width: 70ch;
+		margin: 1.4rem 0 0;
+		font-size: 0.8rem;
 		color: var(--muted);
 	}
 	.dm-foot {

@@ -61,6 +61,10 @@ TTS/OCR/dictation, page fetch, Android background turns).
   prints what a built pack knows about a word. That release stays a prerelease never
   marked Latest: app updates read `/releases/latest`. The release
   workflow's prune deletes only `v*` releases; it once took this one.
+- Licenses (Settings → Licenses): `bun scripts/licenses.ts` regenerates
+  `src/lib/licenses.generated.json` from node_modules and `cargo
+  metadata` after a dependency change (`licenses.test.ts` fails until
+  it runs); data and font credits live in `src/lib/licenses.ts`.
 - Web: `bun run build:web` → `build/`. Cloudflare Pages project
   `personalized-llm-client` builds `main` on push and serves
   https://llm.ccez.uk (`docs/platforms/web-deploy.md`).

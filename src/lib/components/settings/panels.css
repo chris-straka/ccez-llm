@@ -27,29 +27,6 @@
 	user-select: none;
 	-webkit-user-select: none;
 }
-.settings-inner .panel-head h1 {
-	font-size: 1.15rem;
-	font-weight: 700;
-	margin: 0;
-}
-/* Active-chat tally right of the heading: quiet and copyable, and
-	clicking it must not close the panel like the rest of the strip. */
-.settings-inner .head-tokens {
-	margin-left: auto;
-	font-size: 0.75rem;
-	color: #6e6e73;
-	color: var(--muted);
-	white-space: nowrap;
-	user-select: text;
-	-webkit-user-select: text;
-	cursor: text;
-}
-/* Dark theme, gated on the resolved scheme (<html data-theme>)
-	instead of the OS query, so the settings switch can pin it. */
-html[data-theme="dark"] .settings-inner .head-tokens {
-	color: #98989f;
-	color: var(--muted);
-}
 .settings-inner .panel-head:focus-visible {
 	outline: 2px solid #1c1c1e;
 	outline: 2px solid var(--strong);
@@ -151,6 +128,21 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 	grid-area: 2 / 2;
 	justify-self: start;
 }
+.settings-inner
+	.keys-updates
+	> section[aria-labelledby="licenses-heading"]
+	> h2 {
+	grid-area: 3 / 1;
+	justify-self: start;
+	margin-top: 0.6rem;
+}
+.settings-inner
+	.keys-updates
+	> section[aria-labelledby="licenses-heading"]
+	> button {
+	grid-area: 4 / 1;
+	justify-self: start;
+}
 .settings-inner .keys-updates h2 {
 	margin: 0;
 }
@@ -170,6 +162,14 @@ SettingsDrawer.svelte); 17rem clears the two nowrap buttons + gap. */
 	.settings-inner
 		.keys-updates
 		> section[aria-labelledby="updates-heading"]
+		> button,
+	.settings-inner
+		.keys-updates
+		> section[aria-labelledby="licenses-heading"]
+		> h2,
+	.settings-inner
+		.keys-updates
+		> section[aria-labelledby="licenses-heading"]
 		> button {
 		grid-area: auto;
 	}

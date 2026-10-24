@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { licensesView } from "$lib/overlays.svelte";
 	import { activeProviderSettings, type AppSettings } from "$lib/settings";
 	import { getProviderDef } from "$lib/providers/registry";
 	import type { VoiceLangFollow } from "$lib/voiceTiers";
@@ -25,10 +26,6 @@
 		onShortcuts: () => void;
 		/** Game-line overlay toggle (page opens/closes the window). */
 		onGameLineToggle: () => void;
-		/** Active-chat token tally shown right of the heading. */
-		tokensLabel?: string | null;
-		/** Tooltip for the tally (exact total). */
-		tokensTitle?: string | null;
 		/** Phone UI: hover doesn't exist, so the hover toggles read as a note. */
 		androidUI?: boolean;
 		/** Follow-chat voice target (page pill state); omitted in
@@ -50,8 +47,6 @@
 		onCommit,
 		onShortcuts,
 		onGameLineToggle,
-		tokensLabel = null,
-		tokensTitle = null,
 		androidUI = false,
 		followVoice = null,
 		onToast,
@@ -207,19 +202,7 @@
 			onClose();
 		}
 	}}
->
-	<h1>Settings</h1>
-	{#if tokensLabel}
-		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-		<span
-			class="head-tokens"
-			title={tokensTitle}
-			onclick={(event) => event.stopPropagation()}
-		>
-			{tokensLabel}
-		</span>
-	{/if}
-</div>
+></div>
 <nav class="settings-nav" bind:this={navEl} aria-label="Settings sections">
 	{#each SECTIONS as [id, label] (id)}
 		<button
@@ -246,6 +229,12 @@
 		</button>
 	</section>
 	<UpdatesPanel {androidUI} {onToast} />
+	<section aria-labelledby="licenses-heading">
+		<h2 id="licenses-heading">Licenses</h2>
+		<button type="button" onclick={() => (licensesView.open = true)}>
+			Licenses
+		</button>
+	</section>
 </div>
 {#if showStamp}
 	<p class="build-stamp">

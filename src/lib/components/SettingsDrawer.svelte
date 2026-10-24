@@ -23,8 +23,6 @@ bookkeeping reads it). -->
 	interface Props {
 		open: boolean;
 		settings: AppSettings;
-		tokensLabel: string;
-		tokensTitle: string;
 		android: boolean;
 		/** Follow-chat voice target (page pill state); omitted in
 		unit renders, where the panel falls back to the current tag. */
@@ -37,8 +35,6 @@ bookkeeping reads it). -->
 	let {
 		open,
 		settings = $bindable(),
-		tokensLabel,
-		tokensTitle,
 		android,
 		followVoice = null,
 		panelEl = $bindable(),
@@ -76,8 +72,6 @@ bookkeeping reads it). -->
 			onShortcuts={actions.shortcuts}
 			onGameLineToggle={actions.gameLine}
 			onExpand={(event: MouseEvent) => actions.expand(event)}
-			{tokensLabel}
-			{tokensTitle}
 			androidUI={android}
 		/>
 	</div>
