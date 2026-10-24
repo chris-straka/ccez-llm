@@ -14814,6 +14814,9 @@
 		renamingId={renamingChatId}
 		bind:renameDraft
 		bind:renameEl
+		preview={chatState.chats.find(
+			(c) => c.id === (previewChatId ?? chatState.activeChatId)
+		) ?? null}
 		actions={{
 			startRename,
 			commitRename,

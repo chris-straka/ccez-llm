@@ -20,7 +20,8 @@ test("clicking the main chat collapses the chats sidebar", async ({ page }) => {
 	await toggleSidebar(page);
 	await expect(aside).not.toHaveClass(/collapsed/);
 
-	await page.locator(".empty-state h1").click();
+	// The list window sits centered over the chat: click beside it.
+	await page.mouse.click(60, 400);
 	await expect(aside).toHaveClass(/collapsed/);
 });
 

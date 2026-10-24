@@ -215,9 +215,10 @@ async function interfaceSizeFlow(
 	);
 	await page.screenshot({ path: `.screenshots/ui-250-${tag}-list.png` });
 	if (!phone) {
-		const grew = listBox250.width / listBox100.width;
-		expect(grew).toBeGreaterThanOrEqual(2.4);
-		expect(grew).toBeLessThanOrEqual(2.6);
+		// The desktop chat window grows with the zoom until it fills
+		// the screen (less its margin), and never leaves it.
+		expect(listBox250.width).toBeGreaterThanOrEqual(listBox100.width);
+		expect(listBox250.width).toBeGreaterThanOrEqual(vw - 80);
 	}
 	// Dialog: names grow (wrapping tolerates the capped box); the
 	// reciprocal cap holds the rendered box inside the veil.

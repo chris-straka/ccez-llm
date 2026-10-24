@@ -720,10 +720,11 @@ test("a video loads in the background: a new chat meanwhile is free, and the dri
 	await page.evaluate(() =>
 		(window as unknown as { __releaseFetch: () => void }).__releaseFetch()
 	);
-	// The drill lands in the chat it was started from, named for its video.
+	// The drill lands in the chat it was started from, named for its
+	// video (the closed list keeps its rows, just hidden).
 	await expect(
 		page.locator("aside:not(.settings-panel)").getByText(info.title)
-	).toBeVisible({ timeout: 10_000 });
+	).toHaveCount(1, { timeout: 10_000 });
 	await expect(page.locator(".clip")).toHaveCount(0);
 	await toggleSidebar(page);
 	await page

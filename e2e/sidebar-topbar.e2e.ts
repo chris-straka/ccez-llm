@@ -192,13 +192,18 @@ test("open find floats centered, outside press dismisses", async ({ page }) => {
 	expect(await prompt.getAttribute("class")).toBe(promptBefore);
 });
 
-/** Chat rows read day + 2-digit time, never a message count. */
-test("chat rows show 2-digit times with no message count", async ({ page }) => {
+/** Chat rows read their date under the day header (the time for
+today and yesterday), never a message count. */
+test("chat rows show their date with no message count", async ({ page }) => {
 	await openSidebar(page);
 	const rows = chatRows(page);
 	await expect(rows).toHaveCount(2);
+	await expect(page.locator("aside li[data-group]")).toHaveAttribute(
+		"data-group",
+		"Older"
+	);
 	for (let i = 0; i < 2; i++) {
-		await expect(rows.nth(i)).toContainText(/\d{2}:\d{2}/);
+		await expect(rows.nth(i)).toContainText(/[A-Z][a-z]{2} \d{1,2}/);
 		await expect(rows.nth(i)).not.toContainText("msg");
 	}
 });

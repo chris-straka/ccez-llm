@@ -1,5 +1,8 @@
-<!-- Chat-list drawer: search, rows (pick/export/delete), new-chat,
-and the phone settings entry. The page owns chat state, selection,
+<!-- Chat list: on desktop a window centered over the dimmed chat
+(owner, 2026-10-24) with the rows grouped by day on the left and the
+hovered chat's last messages on the right; on phones the slide-in
+drawer. Search, rows (pick/export/delete), new-chat, and the phone
+settings entry. The page owns chat state, selection,
 the search filter text, collapse persistence, and all behaviors;
 this component owns the drawer markup and its surfaces (Svelte
 scoping binds the CSS to this markup). The search box binds to the
@@ -13,7 +16,7 @@ only this drawer through scoping. -->
 	import type { Chat, ChatId } from "$lib/chat";
 	import ActionIcon from "./ActionIcon.svelte";
 	import { isImeKey } from "$lib/editContext";
-	import { chatTitle } from "$lib/sidebar";
+	import { chatGroup, chatTitle, previewText } from "$lib/sidebar";
 
 	/** Page-owned drawer behaviors (state and effects stay in the page). */
 	export interface SidebarActions {
@@ -64,6 +67,8 @@ only this drawer through scoping. -->
 		renamingId: ChatId | null;
 		renameDraft: string;
 		renameEl: HTMLInputElement | undefined;
+		/** The chat the desktop window previews (hovered, else open). */
+		preview?: Chat | null;
 		actions: SidebarActions;
 	}
 
@@ -81,8 +86,34 @@ only this drawer through scoping. -->
 		renamingId,
 		renameDraft = $bindable(""),
 		renameEl = $bindable(undefined),
+		preview = null,
 		actions
 	}: Props = $props();
+
+	/** Desktop: the centered window; phones keep the drawer. */
+	const windowed = $derived(!android);
+	/** Each row's day group, shown where it changes (window only). */
+	const groups = $derived(chats.map((c) => chatGroup(c.createdAt)));
+	/** A row's time under its day header: the time today and
+	yesterday, the date further back (the header says the day). */
+	function rowLabel(createdAt: number, group: string | undefined): string {
+		if (!windowed) return labelFor(createdAt);
+		const date = new Date(createdAt);
+		return group === "Today" || group === "Yesterday"
+			? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+			: date.toLocaleDateString([], { month: "short", day: "numeric" });
+	}
+	/** The preview's last few messages, oldest first. */
+	const previewMessages = $derived(
+		(preview?.messages ?? [])
+			.filter((m) => m.content.trim())
+			.slice(-6)
+			.map((m) => ({
+				id: m.id,
+				own: m.role === "user",
+				text: previewText(m.content)
+			}))
+	);
 
 	/** Phone rename: a still long-press on a row. The click that
 	follows the release must not also open the chat. */
@@ -103,8 +134,14 @@ only this drawer through scoping. -->
 	}
 </script>
 
+{#if windowed}
+	<!-- Dims only: a click goes through to the chat, whose click-back
+	closes the list, as it always has. -->
+	<div class="side-veil" class:shown={!collapsed} aria-hidden="true"></div>
+{/if}
 <aside
 	class:collapsed
+	class:windowed
 	inert={collapsed}
 	data-fade-scroll
 	ondblclick={(event) => {
@@ -151,14 +188,21 @@ only this drawer through scoping. -->
 		{/if}
 	</div>
 	<ul onmouseleave={() => actions.endPreview()} data-fade-scroll>
-		{#each chats as item (item.id)}
+		{#each chats as item, i (item.id)}
 			<!-- Preview hover lives on the row, not the label: moving
 			within the row (label to export/delete and back) must not
 			drop the preview for the hovered chat. Rows clear nothing
 			on leave — the gaps between rows would flash the active
 			chat while crossing; only leaving the whole list (the ul
 			handler below) drops the preview. -->
-			<li onmouseenter={() => actions.previewHover(item.id)}>
+			<!-- The first row of each day carries the day's name, drawn
+			above it (window only): the list stays chat rows only. -->
+			<li
+				onmouseenter={() => actions.previewHover(item.id)}
+				data-group={windowed && groups[i] !== groups[i - 1]
+					? groups[i]
+					: undefined}
+			>
 				{#if renamingId === item.id}
 					<!-- Inline rename: Enter or tapping away saves, Esc
 					cancels (the page's Esc ladder), blank goes back to
@@ -206,7 +250,10 @@ only this drawer through scoping. -->
 					>
 						<span class="side-title">{chatTitle(item)}</span>
 						<span class="side-time"
-							>{labelFor(item.createdAt)}{#if working.has(item.id)}<span
+							>{rowLabel(
+								item.createdAt,
+								groups[i]
+							)}{#if working.has(item.id)}<span
 									class="side-working tdots"
 									aria-hidden="true"
 									><span>.</span><span>.</span><span>.</span></span
@@ -253,6 +300,19 @@ only this drawer through scoping. -->
 			</li>
 		{/each}
 	</ul>
+	{#if windowed}
+		<section class="side-preview" aria-label="Chat preview">
+			{#if preview}
+				<h2 class="side-preview-title">{chatTitle(preview)}</h2>
+				<p class="side-preview-time">{labelFor(preview.createdAt)}</p>
+				{#each previewMessages as m (m.id)}
+					<p class="side-preview-msg" class:own={m.own} dir="auto">{m.text}</p>
+				{:else}
+					<p class="side-preview-empty">No messages yet.</p>
+				{/each}
+			{/if}
+		</section>
+	{/if}
 	<button
 		type="button"
 		class="new"
@@ -900,6 +960,150 @@ only this drawer through scoping. -->
 		font-size: 0.72em;
 		font-weight: 500;
 		line-height: 1.6;
+	}
+	/* Desktop window: centered over the dimmed chat, the list (search,
+	new chat, rows grouped by day) on the left, the preview on the
+	right. Closed, it fades out in place. */
+	:global(.app:not([data-android])) aside.windowed {
+		box-sizing: border-box;
+		inset: 0;
+		margin: auto;
+		width: min(60rem, calc((100vw - 4rem) * var(--ui-scale-inv, 1)));
+		height: min(42rem, calc((100dvh - 4rem) * var(--ui-scale-inv, 1)));
+		max-width: none;
+		z-index: 58;
+		display: grid;
+		grid-template-columns: minmax(15rem, 22rem) minmax(0, 1fr);
+		grid-template-rows: auto auto minmax(0, 1fr);
+		column-gap: 1.4rem;
+		row-gap: 0.55rem;
+		padding: 1rem;
+		overflow: hidden;
+		border: 1px solid var(--line-soft);
+		border-radius: 14px;
+		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+	}
+	/* Fade only: the list mounts windowed before the phone check
+	runs, and a scale here would carry into the drawer's first
+	slide. */
+	aside.windowed.collapsed {
+		transform: none;
+		opacity: 0;
+		visibility: hidden;
+	}
+	/* Visible at once on open (the next frame focuses the current
+	row, and a hidden row can't take focus), hidden only once the
+	close fade ends. */
+	aside.windowed[data-fade-scroll],
+	aside.windowed[data-fade-scroll]:global(.scrolling) {
+		transition:
+			transform 0.18s ease,
+			opacity 0.18s ease,
+			visibility 0s,
+			scrollbar-color 0.3s ease;
+	}
+	aside.windowed.collapsed[data-fade-scroll],
+	aside.windowed.collapsed[data-fade-scroll]:global(.scrolling) {
+		transition:
+			transform 0.18s ease,
+			opacity 0.18s ease,
+			visibility 0s 0.18s,
+			scrollbar-color 0.3s ease;
+	}
+	aside.windowed .side-head {
+		display: none;
+	}
+	aside.windowed .side-search-wrap {
+		grid-column: 1;
+		grid-row: 1;
+		margin: 0;
+	}
+	aside.windowed .new {
+		grid-column: 1;
+		grid-row: 2;
+	}
+	aside.windowed ul {
+		grid-column: 1;
+		grid-row: 3;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	aside.windowed li[data-group] {
+		margin-top: 1.7rem;
+	}
+	aside.windowed li[data-group]:first-child {
+		margin-top: 1.3rem;
+	}
+	aside.windowed li[data-group]::before {
+		content: attr(data-group);
+		position: absolute;
+		bottom: calc(100% + 0.25rem);
+		left: 0.85em;
+		font-size: 0.72em;
+		font-weight: 650;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--muted);
+		pointer-events: none;
+	}
+	.side-preview {
+		grid-column: 2;
+		grid-row: 1 / 4;
+		min-height: 0;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 0.2rem 0.2rem 0.6rem 1.4rem;
+		border-left: 1px solid var(--line-soft);
+	}
+	.side-preview-title {
+		margin: 0;
+		font-size: 1.05em;
+		font-weight: 650;
+	}
+	.side-preview-time {
+		margin: -0.4rem 0 0.4rem;
+		font-size: 0.8em;
+		color: var(--muted);
+	}
+	.side-preview-msg {
+		margin: 0;
+		max-width: 46ch;
+		font-size: 0.92em;
+		line-height: 1.45;
+		overflow-wrap: anywhere;
+	}
+	.side-preview-msg.own {
+		align-self: flex-end;
+		color: var(--muted);
+		text-align: end;
+	}
+	.side-preview-empty {
+		margin: 0;
+		color: var(--muted);
+	}
+	.side-veil {
+		position: fixed;
+		inset: 0;
+		z-index: 57;
+		pointer-events: none;
+		background: rgba(0, 0, 0, 0.35);
+		opacity: 0;
+		visibility: hidden;
+		transition:
+			opacity 0.18s ease,
+			visibility 0.18s;
+	}
+	.side-veil.shown {
+		opacity: 1;
+		visibility: visible;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.side-veil,
+		aside.windowed {
+			transition: none;
+		}
 	}
 	/* Close is a geometric X sized to the button's text: a text ×
 	sits low on its font bearings. */

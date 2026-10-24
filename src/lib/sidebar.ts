@@ -84,3 +84,38 @@ export function filterSidebarChats(chats: Chat[], query: string): Chat[] {
 		)
 	);
 }
+
+/**
+ * The date group a chat files under in the desktop chat window:
+ * Today, Yesterday, This week, Older (by calendar day, local time).
+ */
+export function chatGroup(createdAt: number, now = Date.now()): string {
+	const day = (ms: number): number => {
+		const d = new Date(ms);
+		return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+	};
+	const days = Math.round((day(now) - day(createdAt)) / 86_400_000);
+	if (days <= 0) return "Today";
+	if (days === 1) return "Yesterday";
+	if (days < 7) return "This week";
+	return "Older";
+}
+
+/**
+ * A message as preview text: markdown marks, code and links shed,
+ * whitespace folded, cut to `max` characters at a word.
+ */
+export function previewText(content: string, max = 280): string {
+	const text = content
+		.replace(/```[\s\S]*?```/g, " ")
+		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+		.replace(/^#{1,6}\s+/gm, "")
+		.replace(/[*_`~>]+/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (text.length <= max) return text;
+	const cut = text.slice(0, max);
+	const space = cut.lastIndexOf(" ");
+	return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}

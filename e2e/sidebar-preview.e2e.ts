@@ -80,9 +80,8 @@ test("sidebar hover shows the chat counts tip", async ({ page }) => {
 		boxes[1].y + boxes[1].height + 1
 	);
 	// Leaving drops hover; the row button also holds keyboard focus,
-	// so click out to clear focus-within too.
-	await page.mouse.move(600, 500);
-	await page.locator("article .rendered").first().click();
+	// so click out (on the window's preview pane) to clear focus-within.
+	await page.locator(".side-preview").click();
 	await expect(tip).toHaveCSS("opacity", "0");
 });
 

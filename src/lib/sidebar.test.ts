@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { chatLabel, chatTitle, filterSidebarChats, sideTip } from "./sidebar";
+import {
+	chatGroup,
+	chatLabel,
+	chatTitle,
+	filterSidebarChats,
+	previewText,
+	sideTip
+} from "./sidebar";
 import type { Chat, ChatId, ChatMsg, ChatMsgId } from "./chat";
 
 function msg(id: string, role: ChatMsg["role"], content: string): ChatMsg {
@@ -131,5 +138,29 @@ describe("chatTitle", () => {
 		);
 		expect(title.length).toBeLessThanOrEqual(81);
 		expect(title.endsWith("word…")).toBe(true);
+	});
+});
+
+describe("chatGroup", () => {
+	const now = new Date(2026, 9, 24, 15, 0).getTime();
+	it("files chats by calendar day", () => {
+		expect(chatGroup(new Date(2026, 9, 24, 0, 5).getTime(), now)).toBe("Today");
+		expect(chatGroup(new Date(2026, 9, 23, 23, 59).getTime(), now)).toBe(
+			"Yesterday"
+		);
+		expect(chatGroup(new Date(2026, 9, 19, 12).getTime(), now)).toBe(
+			"This week"
+		);
+		expect(chatGroup(new Date(2026, 8, 1).getTime(), now)).toBe("Older");
+	});
+});
+
+describe("previewText", () => {
+	it("sheds markdown and cuts at a word", () => {
+		expect(previewText("## Title\n**Bold** and [a link](https://x.y)")).toBe(
+			"Title Bold and a link"
+		);
+		expect(previewText("one two three four", 9)).toBe("one two…");
+		expect(previewText("```js\ncode()\n```\nafter")).toBe("after");
 	});
 });

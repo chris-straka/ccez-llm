@@ -542,6 +542,8 @@ test.describe("touch paths", () => {
 		const box = page.getByLabel("Search chats");
 		await box.fill("sushi");
 		const clear = page.getByLabel("Clear chat search");
+		// Phones keep the drawer, never the desktop window.
+		await expect(page.locator("aside.windowed")).toHaveCount(0);
 		const btn = (await clear.boundingBox())!;
 		const field = (await box.boundingBox())!;
 		expect(btn.width).toBeGreaterThanOrEqual(44);

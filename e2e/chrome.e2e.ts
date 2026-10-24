@@ -957,7 +957,8 @@ test("sidebar outside-click never summons the prompt", async ({ page }) => {
 	// From already-hidden: stays hidden.
 	await page.keyboard.press("Meta+Shift+[");
 	await expect(sidebar).not.toHaveClass(/collapsed/, { timeout: 5_000 });
-	await page.locator("article.assistant .rendered").nth(1).click();
+	// The chat list is a window over the chat: click the chat beside it.
+	await page.mouse.click(60, 400);
 	await expect(sidebar).toHaveClass(/collapsed/, { timeout: 5_000 });
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	// From visible: restore with the sanctioned keys-only path, then
@@ -967,7 +968,8 @@ test("sidebar outside-click never summons the prompt", async ({ page }) => {
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.keyboard.press("Meta+Shift+[");
 	await expect(sidebar).not.toHaveClass(/collapsed/, { timeout: 5_000 });
-	await page.locator("article.assistant .rendered").nth(1).click();
+	// The chat list is a window over the chat: click the chat beside it.
+	await page.mouse.click(60, 400);
 	await expect(sidebar).toHaveClass(/collapsed/, { timeout: 5_000 });
 	await expect(prompt).toHaveClass(/prompt-idle/);
 });
