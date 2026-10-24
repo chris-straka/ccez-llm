@@ -340,12 +340,13 @@ describe("cardWordRow", () => {
 });
 
 describe("shortGrammar", () => {
-	it("draws persons and number short, tenses as words", () => {
+	it("draws persons, number and tense short", () => {
 		expect(shortGrammar("present indicative, third-person singular")).toBe(
-			"present indicative, 3rd 👤"
+			"▶ indicative, 3rd 👤"
 		);
 		expect(shortGrammar("first-person plural")).toBe("1st 👨‍👨‍👧‍👦");
-		expect(shortGrammar("past participle")).toBe("past participle");
+		expect(shortGrammar("past participle")).toBe("⏪ participle");
+		expect(shortGrammar("present continuous")).toBe("▶ 🔁");
 		expect(shortGrammar("passé composé")).toBe("passé composé");
 	});
 });
