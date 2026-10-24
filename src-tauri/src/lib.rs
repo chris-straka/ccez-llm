@@ -463,6 +463,19 @@ pub fn run() {
             if let Some(window) = tauri::Manager::get_webview_window(_app.handle(), "main") {
                 trafficlights::watch(window);
             }
+            // Debug builds keep painting while covered: the drive bridge
+            // (scripts/drive.ts) snapshots a window that sits behind the
+            // owner's, and WebKit's occlusion check froze it blank there.
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            if let Some(window) = tauri::Manager::get_webview_window(_app, "main") {
+                let _ = window.with_webview(|webview| unsafe {
+                    let view = webview.inner() as *mut objc2::runtime::AnyObject;
+                    if let Some(view) = view.as_ref() {
+                        let _: () =
+                            objc2::msg_send![view, _setWindowOcclusionDetectionEnabled: false];
+                    }
+                });
+            }
             // Native menu bar on macOS and Linux. Windows gets none: an
             // in-window menu strip would restyle the app, and every
             // item has an in-app key or control already.

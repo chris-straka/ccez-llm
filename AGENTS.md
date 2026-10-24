@@ -42,6 +42,17 @@ TTS/OCR/dictation, page fetch, Android background turns).
   `src-tauri/.dev-secrets.json`, so rebuilds don't hit the Keychain.
 - MCP driver sessions: `tauri-plugin-mcp-bridge` is debug-only,
   desktop-only, localhost-bound; it loads after a dev-shell relaunch.
+- Driving the real Mac engine while the owner uses the machine:
+  `bun scripts/drive-app.ts` builds and opens "Ccez LLM Dev" in the
+  background (own identifier, so its own data and keys; no link
+  scheme, no updater). `bun scripts/drive.ts` then runs JavaScript,
+  clicks, keys and native snapshots through the bridge (`shot`,
+  `js`, `click`, `key`): no mouse, keyboard or focus. To relaunch,
+  quit it by its id `studio.ccez.app.dev` (osascript `quit`) and
+  wait for it to exit: opening a running copy brings it forward.
+  Debug builds turn off WKWebView occlusion, so a covered window
+  still paints. The bridge never ships in release builds (it would
+  let any local program read chats and keys).
 - `bun run test` (Vitest), `bun run check` (svelte-check strict),
   `bun run lint`, `bun run build`; CI runs all four. Agent worktrees
   under `.claude/` and `.muse/` are excluded from Vitest and ESLint
