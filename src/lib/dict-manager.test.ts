@@ -3,6 +3,7 @@ import {
 	DICT_LANGS,
 	dictGroups,
 	dictMatches,
+	dictOutdated,
 	dictPack,
 	dictSize,
 	dictSummary,
@@ -53,6 +54,13 @@ describe("dictTile", () => {
 				catalog
 			)
 		).toMatchObject({ state: "installed", size: "24 MB" });
+	});
+
+	it("marks a pack the release has a newer version of", () => {
+		const old = [{ lang: "fr", version: "0", bytes: 20_000_000 }];
+		expect(dictTile(fr, old, {}, catalog).state).toBe("outdated");
+		expect(dictOutdated(old, catalog)).toEqual(["fr"]);
+		expect(dictOutdated(old, null)).toEqual([]);
 	});
 
 	it("shows progress while downloading, over what's on disk", () => {

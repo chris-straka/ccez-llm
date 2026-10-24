@@ -10,52 +10,61 @@ import { seedChat } from "./helpers";
  */
 async function seedDictShell(
 	page: Page,
-	installed: Record<string, number>
+	installed: Record<string, number>,
+	newer: string[] = []
 ): Promise<void> {
-	await page.addInitScript((start: Record<string, number>) => {
-		const packs = { ...start };
-		const w = window as unknown as Record<string, unknown>;
-		w.__dictCalls = [];
-		w.__TAURI_INTERNALS__ = {
-			invoke: async (
-				cmd: string,
-				args: Record<string, unknown>
-			): Promise<unknown> => {
-				const lang = String(args["lang"] ?? "");
-				if (cmd.startsWith("dict_"))
-					(w.__dictCalls as string[]).push(`${cmd} ${lang}`.trim());
-				if (cmd === "dict_list")
-					return Object.entries(packs).map(([l, bytes]) => ({
-						lang: l,
-						version: "2026.10.24",
-						bytes
-					}));
-				if (cmd === "dict_catalog")
-					return {
-						fr: { bytes: 7_000_000, unpacked: 24_000_000, version: "1" },
-						es: { bytes: 15_100_000, unpacked: 52_800_000, version: "1" },
-						de: { bytes: 11_200_000, unpacked: 38_500_000, version: "1" }
-					};
-				if (cmd === "dict_remove") {
-					delete packs[lang];
-					return null;
-				}
-				if (cmd === "dict_install") {
-					await new Promise((r) => setTimeout(r, 400));
-					packs[lang] = 52_800_000;
-					return "2026.10.24";
-				}
-				if (cmd === "dict_installed")
-					return lang in packs ? "2026.10.24" : null;
-				if (cmd === "keychain_get") return null;
-				if (cmd === "keychain_set" || cmd === "keychain_delete") return null;
-				if (cmd === "plugin:event|listen") return 1;
-				throw new Error(`dict shell: unhandled ${cmd}`);
-			},
-			transformCallback: (): number => 0,
-			unregisterCallback: (): void => {}
-		};
-	}, installed);
+	await page.addInitScript(
+		({ start, newer }: { start: Record<string, number>; newer: string[] }) => {
+			const packs = { ...start };
+			const versions: Record<string, string> = {};
+			const w = window as unknown as Record<string, unknown>;
+			w.__dictCalls = [];
+			w.__TAURI_INTERNALS__ = {
+				invoke: async (
+					cmd: string,
+					args: Record<string, unknown>
+				): Promise<unknown> => {
+					const lang = String(args["lang"] ?? "");
+					if (cmd.startsWith("dict_"))
+						(w.__dictCalls as string[]).push(`${cmd} ${lang}`.trim());
+					if (cmd === "dict_list")
+						return Object.entries(packs).map(([l, bytes]) => ({
+							lang: l,
+							version: versions[l] ?? "2026.10.24",
+							bytes
+						}));
+					if (cmd === "dict_catalog") {
+						const v = (l: string) =>
+							newer.includes(l) ? "2026.10.25" : "2026.10.24";
+						return {
+							fr: { bytes: 7_000_000, unpacked: 24_000_000, version: v("fr") },
+							es: { bytes: 15_100_000, unpacked: 52_800_000, version: v("es") },
+							de: { bytes: 11_200_000, unpacked: 38_500_000, version: v("de") }
+						};
+					}
+					if (cmd === "dict_remove") {
+						delete packs[lang];
+						return null;
+					}
+					if (cmd === "dict_install") {
+						await new Promise((r) => setTimeout(r, 400));
+						packs[lang] = 52_800_000;
+						versions[lang] = newer.includes(lang) ? "2026.10.25" : "2026.10.24";
+						return versions[lang];
+					}
+					if (cmd === "dict_installed")
+						return lang in packs ? "2026.10.24" : null;
+					if (cmd === "keychain_get") return null;
+					if (cmd === "keychain_set" || cmd === "keychain_delete") return null;
+					if (cmd === "plugin:event|listen") return 1;
+					throw new Error(`dict shell: unhandled ${cmd}`);
+				},
+				transformCallback: (): number => 0,
+				unregisterCallback: (): void => {}
+			};
+		},
+		{ start: installed, newer }
+	);
 }
 
 async function openSettings(page: Page): Promise<void> {
@@ -137,6 +146,21 @@ test("settings sums up dictionaries; the manager filters, removes and downloads"
 	);
 	expect(calls).toContain("dict_remove fr");
 	expect(calls).toContain("dict_install es");
+});
+
+test("a pack with a newer version offers its update", async ({ page }) => {
+	await seedDictShell(page, { fr: 20_000_000, de: 31_000_000 }, ["de"]);
+	await openSettings(page);
+	await page.getByRole("button", { name: "Manage dictionaries" }).click();
+	const sheet = page.getByRole("dialog", { name: "Dictionaries" });
+	await expect(sheet.getByText("1 dictionary has an update.")).toBeVisible();
+	const german = sheet.locator(".dm-tile", {
+		has: page.getByText("German", { exact: true })
+	});
+	await expect(german).toHaveClass(/s-outdated/);
+	await sheet.getByRole("button", { name: "Update German dictionary" }).click();
+	await expect(german).toHaveClass(/s-installed/);
+	await expect(sheet.getByText("1 dictionary has an update.")).toHaveCount(0);
 });
 
 test("removing every dictionary asks first", async ({ page }) => {

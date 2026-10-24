@@ -13,6 +13,7 @@ page renders it and gives Escape to it first. -->
 		DICT_LANGS,
 		dictGroups,
 		dictMatches,
+		dictOutdated,
 		dictSummary,
 		dictTile,
 		type InstalledDictionary,
@@ -78,10 +79,19 @@ page renders it and gives Escape to it first. -->
 			.filter((g) => g.tiles.length > 0)
 	);
 
+	/** Languages whose last download or update failed (this sheet). */
+	let failed = $state<string[]>([]);
+
 	function download(lang: string): void {
 		settings.dictionarySkip = settings.dictionarySkip.filter((l) => l !== lang);
-		void installDictionary(lang).then(refresh);
+		failed = failed.filter((l) => l !== lang);
+		void installDictionary(lang).then((ok) => {
+			if (!ok) failed = [...failed, lang];
+			refresh();
+		});
 	}
+
+	const outdated = $derived(dictOutdated(installed, catalog));
 
 	async function remove(langs: string[]): Promise<void> {
 		settings.dictionarySkip = [
@@ -129,6 +139,21 @@ page renders it and gives Escape to it first. -->
 			<ActionIcon kind="close" />
 		</button>
 	</div>
+	{#if outdated.length > 0}
+		<div class="dm-updates">
+			<span
+				>{outdated.length === 1
+					? "1 dictionary has an update."
+					: `${outdated.length} dictionaries have updates.`}</span
+			>
+			<button
+				type="button"
+				class="dm-btn"
+				onclick={() => outdated.forEach((lang) => download(lang))}
+				>Update all</button
+			>
+		</div>
+	{/if}
 	<p class="dm-note">
 		A language downloads by itself the first time you look up a word in it,
 		unless you removed it here. Download one ahead and its word cards are
@@ -150,8 +175,20 @@ page renders it and gives Escape to it first. -->
 								<span class="dm-native" lang={tile.lang}>{tile.native}</span>
 							{/if}
 						</span>
-						<span class="dm-size">{tile.size}</span>
-						{#if tile.state === "installed"}
+						<span class="dm-size" class:failed={failed.includes(tile.lang)}
+							>{failed.includes(tile.lang)
+								? "Failed, try again"
+								: tile.size}</span
+						>
+						{#if tile.state === "installed" || tile.state === "outdated"}
+							{#if tile.state === "outdated"}
+								<button
+									type="button"
+									class="dm-update"
+									aria-label="Update {tile.name} dictionary"
+									onclick={() => download(tile.lang)}>Update</button
+								>
+							{/if}
 							<button
 								type="button"
 								class="dm-act"
@@ -331,7 +368,7 @@ page renders it and gives Escape to it first. -->
 	.dm-tile {
 		position: relative;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto 2.4rem;
+		grid-template-columns: minmax(0, 1fr) auto auto 2.4rem;
 		align-items: center;
 		gap: 0.5rem;
 		min-height: 3.2rem;
@@ -342,6 +379,7 @@ page renders it and gives Escape to it first. -->
 	}
 	/* On disk: a filled tile, so what's downloaded reads at a glance. */
 	.dm-tile.s-installed,
+	.dm-tile.s-outdated,
 	.dm-tile.s-downloading {
 		background: var(--selected-wash);
 		border-color: transparent;
@@ -355,7 +393,8 @@ page renders it and gives Escape to it first. -->
 	.dm-name {
 		overflow-wrap: anywhere;
 	}
-	.dm-tile.s-installed .dm-name {
+	.dm-tile.s-installed .dm-name,
+	.dm-tile.s-outdated .dm-name {
 		font-weight: 600;
 	}
 	.dm-native {
@@ -390,6 +429,33 @@ page renders it and gives Escape to it first. -->
 		.dm-bar::after {
 			transition: none;
 		}
+	}
+	/* Tiles without an Update button keep its column empty. */
+	.dm-tile:not(.s-outdated) .dm-size {
+		grid-column: 2 / 4;
+		justify-self: end;
+	}
+	.dm-update {
+		min-height: 2rem;
+		padding: 0 0.6rem;
+		font: inherit;
+		font-size: 0.8rem;
+		color: var(--accent);
+		background: none;
+		border: 1px solid currentColor;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+	.dm-size.failed {
+		color: var(--danger);
+	}
+	.dm-updates {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem 1rem;
+		margin: 0.8rem 0 0;
+		font-size: 0.9rem;
 	}
 	.dm-empty {
 		margin: 1.5rem 0;

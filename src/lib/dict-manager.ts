@@ -83,7 +83,7 @@ export function dictGroups(): DictGroup[] {
 	})).filter((g) => g.langs.length > 0);
 }
 
-export type DictState = "installed" | "downloading" | "available";
+export type DictState = "installed" | "outdated" | "downloading" | "available";
 
 export interface DictTile extends DictLanguage {
 	state: DictState;
@@ -109,8 +109,14 @@ export function dictTile(
 			progress
 		};
 	const have = installed.find((d) => d.lang === l.lang);
-	if (have) return { ...l, state: "installed", size: dictSize(have.bytes) };
 	const offer = catalog?.[l.lang];
+	if (have)
+		return {
+			...l,
+			// The release has a newer pack than the one on disk.
+			state: offer && offer.version !== have.version ? "outdated" : "installed",
+			size: dictSize(have.bytes)
+		};
 	return {
 		...l,
 		state: "available",
@@ -125,6 +131,19 @@ export function dictMatches(l: DictLanguage, query: string): boolean {
 	return [l.name, l.native ?? "", l.lang].some((s) =>
 		s.toLowerCase().includes(q)
 	);
+}
+
+/** How many installed packs the release has a newer version of. */
+export function dictOutdated(
+	installed: readonly InstalledDictionary[],
+	catalog: Readonly<Record<string, OfferedDictionary>> | null
+): string[] {
+	return installed
+		.filter((d) => {
+			const offer = catalog?.[d.lang];
+			return offer !== undefined && offer.version !== d.version;
+		})
+		.map((d) => d.lang);
 }
 
 /** "7 of 49 downloaded · 419 MB" or "None downloaded yet". */

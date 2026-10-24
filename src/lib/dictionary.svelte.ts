@@ -18,6 +18,7 @@ import type { WordLookup } from "./reading";
 import { tauriBackendAvailable } from "./secrets";
 
 import {
+	dictOutdated,
 	dictPack,
 	type InstalledDictionary,
 	type OfferedDictionary
@@ -100,6 +101,24 @@ export function installDictionary(lang: string): Promise<boolean> {
 export async function listDictionaries(): Promise<InstalledDictionary[]> {
 	if (!tauriBackendAvailable()) return [];
 	return invokeDict<InstalledDictionary[]>("dict_list", {}).catch(() => []);
+}
+
+/**
+ * Bring installed packs up to date with the release (launch, a little
+ * after first paint): each pack the release has a newer version of
+ * updates in the background, unless the language was removed or
+ * automatic downloads are off. Lookups still check once a session.
+ */
+export async function updateOutdatedDictionaries(
+	enabled: (lang: string) => boolean
+): Promise<void> {
+	if (!tauriBackendAvailable()) return;
+	const [list, catalog] = await Promise.all([
+		listDictionaries(),
+		dictionaryCatalog()
+	]);
+	for (const lang of dictOutdated(list, catalog))
+		if (enabled(lang)) await installDictionary(lang);
 }
 
 /** Delete a language's pack; its cards go back to the model alone. */

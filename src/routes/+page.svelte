@@ -188,7 +188,11 @@
 	import { escapeHtml } from "$lib/render-math";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
-	import { dictManager, makeWordLookup } from "$lib/dictionary.svelte";
+	import {
+		dictManager,
+		makeWordLookup,
+		updateOutdatedDictionaries
+	} from "$lib/dictionary.svelte";
 	import DictionaryManager from "$lib/components/DictionaryManager.svelte";
 	import LicensesModal from "$lib/components/LicensesModal.svelte";
 	import { licensesView, readyApk } from "$lib/overlays.svelte";
@@ -989,6 +993,20 @@
 	// (not inferred): the two controllers reference each other.
 	// Word cards look one-word notes up in the language's downloaded
 	// dictionary first (desktop and Android; see dictionary.svelte.ts).
+	// Packs update a little after launch (the lookups only check
+	// the languages you read in a session).
+	$effect(() => {
+		const timer = setTimeout(
+			() =>
+				void updateOutdatedDictionaries(
+					(lang) =>
+						settings.wordCardDictionaries &&
+						!settings.dictionarySkip.includes(lang)
+				),
+			8000
+		);
+		return () => clearTimeout(timer);
+	});
 	const wordLookup = makeWordLookup(
 		(lang) =>
 			settings.wordCardDictionaries && !settings.dictionarySkip.includes(lang)
