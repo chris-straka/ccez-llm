@@ -1179,7 +1179,15 @@ export async function annotationAnswer(
 		if (parsed) {
 			// The dictionary's split and gender stand; cleaned again so a
 			// base their labels already name drops out.
-			const facts = found && lang ? knownFacts(q.quote, found.hits, lang) : [];
+			const facts =
+				found && lang
+					? knownFacts(
+							q.quote,
+							found.hits,
+							lang,
+							known.length > 0 ? known : parsed.parts
+						)
+					: [];
 			const withParts =
 				((known.length > 0 || facts.length > 0) &&
 					cleanWordCard(

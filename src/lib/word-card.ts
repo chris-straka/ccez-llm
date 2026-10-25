@@ -725,7 +725,9 @@ export function isWordQuote(quote: string): boolean {
 	return DENSE_SCRIPT.test(inner) ? length <= 8 : length <= 40;
 }
 
-const MAX = { short: 80, label: 40, line: 320 } as const;
+// Labels leave room for a full grammar name ("present indicative,
+// third-person singular"): the card shortens it for display.
+const MAX = { short: 80, label: 64, line: 320 } as const;
 
 function text(raw: unknown, max: number): string | undefined {
 	if (typeof raw !== "string") return undefined;

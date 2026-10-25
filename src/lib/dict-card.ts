@@ -484,12 +484,26 @@ export function knownParts(
 	return made?.known ? made.card.parts : [];
 }
 
-/** The facts the dictionary knows (a noun's gender as its article). */
+/**
+ * The facts the dictionary knows (a noun's gender as its article).
+ * None when the model split the word as an inflection the dictionary
+ * also lists, while the dictionary's top reading is a headword: in
+ * "les rues se parent", parent is parer's "they adorn", and the noun
+ * le parent's gender would contradict the card.
+ */
 export function knownFacts(
 	quote: string,
 	hits: DictHit[],
-	lang: string
+	lang: string,
+	modelParts: readonly WordPart[] = []
 ): WordFact[] {
+	const best = bestHits(hits);
+	if (
+		modelParts.length > 1 &&
+		best[0]?.tags === "" &&
+		best.some((h) => h.tags !== "")
+	)
+		return [];
 	return dictionaryCard(quote, hits, lang, [], undefined)?.card.facts ?? [];
 }
 

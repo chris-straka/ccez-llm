@@ -6,6 +6,7 @@ import {
 	formatTags,
 	japaneseHead,
 	japaneseParts,
+	knownFacts,
 	lookupForms,
 	plainSpelling,
 	stemSplit,
@@ -674,5 +675,32 @@ describe("annotationAnswer with a dictionary", () => {
 			chat.mock.calls[0] as unknown as [Array<{ content: string }>]
 		)[0][0]!.content;
 		expect(system).not.toContain("Dictionary entries");
+	});
+});
+
+describe("knownFacts", () => {
+	const parentNoun: DictHit = {
+		tags: "",
+		entry: { w: "parent", p: "noun", g: "masculine", s: ["parent"] }
+	};
+	const parerForm: DictHit = {
+		tags: "indicative plural present third-person",
+		entry: { w: "parer", p: "verb", s: ["to adorn"] },
+		split: [0, 3, 0]
+	};
+	it("gives a noun's gender as its article", () => {
+		expect(knownFacts("parent", [parentNoun, parerForm], "fr")).toEqual([
+			{ text: "le parent", kind: "agree" }
+		]);
+	});
+	it("keeps it off a word the model read as another word's inflection", () => {
+		// "les rues se parent": parer's "they adorn", not the noun.
+		const split = [
+			{ text: "par", label: "parer", kind: "core" as const },
+			{ text: "ent", label: "present indicative", kind: "tense" as const }
+		];
+		expect(knownFacts("parent", [parentNoun, parerForm], "fr", split)).toEqual(
+			[]
+		);
 	});
 });

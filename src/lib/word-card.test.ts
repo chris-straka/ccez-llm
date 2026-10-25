@@ -90,6 +90,23 @@ describe("wordCardLang", () => {
 });
 
 describe("parseWordCard", () => {
+	it("keeps a full grammar name whole for the card to shorten", () => {
+		const repart = {
+			meaning: "leaves again",
+			parts: [
+				{ text: "repar", label: "repartir", kind: "core" },
+				{
+					text: "t",
+					label: "present indicative, third-person singular",
+					kind: "tense"
+				}
+			]
+		};
+		const label = parseWordCard(JSON.stringify(repart), "repart")?.parts[1]
+			?.label;
+		expect(label).toBe("present indicative, third-person singular");
+		expect(shortGrammar(label ?? "")).toBe("▶ indicative, 3rd 👤");
+	});
 	it("reads the object, fenced or bare", () => {
 		const json = JSON.stringify(franchi);
 		expect(parseWordCard(json, "franchi")?.parts).toHaveLength(2);
