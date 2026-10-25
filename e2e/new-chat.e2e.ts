@@ -63,6 +63,15 @@ test("row tip answers the row button, not its action buttons", async ({
 	const tip = row.locator(".side-tip");
 	// Drop the keyboard focus the sidebar-open lands on the row:
 	// :focus-visible would keep the tip lit through every hover below.
+	// It lands a frame after the open, so wait for it before the blur
+	// (an early blur let it land afterwards).
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => !!document.activeElement?.closest("aside button.side-chat")
+			)
+		)
+		.toBe(true);
 	await page.evaluate(() =>
 		(document.activeElement as HTMLElement | null)?.blur()
 	);

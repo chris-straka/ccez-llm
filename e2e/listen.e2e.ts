@@ -423,7 +423,10 @@ test("clicking the picture plays and pauses; restart plays from the top", async 
 		"aria-label",
 		"Pause"
 	);
-	expect(Number(await scrub.inputValue())).toBeLessThan(held);
+	// The seek back lands a beat later in WebKit: wait for it.
+	await expect
+		.poll(async () => Number(await scrub.inputValue()))
+		.toBeLessThan(held);
 
 	// r does the same from the keyboard, the pointer anywhere.
 	await expect
@@ -440,7 +443,9 @@ test("clicking the picture plays and pauses; restart plays from the top", async 
 		"aria-label",
 		"Pause"
 	);
-	expect(Number(await scrub.inputValue())).toBeLessThan(paused);
+	await expect
+		.poll(async () => Number(await scrub.inputValue()))
+		.toBeLessThan(paused);
 });
 
 test("keys: S slows the hovered clip, A shows the text, a moves on", async ({

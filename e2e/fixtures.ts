@@ -36,8 +36,20 @@ export const test = base.extend<{ pageErrors: string[] }>({
 			page.on("pageerror", (error) => {
 				if (!BENIGN.test(error.message)) errors.push(error.message);
 			});
+			// WebKit names no module in "Importing a module script
+			// failed": the failed requests say which one (CI only
+			// hits it, now and then).
+			const failed: string[] = [];
+			page.on("requestfailed", (request) => {
+				failed.push(
+					`${request.url()} (${request.failure()?.errorText ?? "failed"})`
+				);
+			});
 			await use(errors);
-			expect(errors, "uncaught page errors").toEqual([]);
+			const detail = errors.some((e) => /module script/.test(e))
+				? [...errors, ...failed.map((f) => `request failed: ${f}`)]
+				: errors;
+			expect(detail, "uncaught page errors").toEqual([]);
 		},
 		{ auto: true }
 	]

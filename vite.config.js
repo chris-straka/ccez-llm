@@ -67,7 +67,21 @@ export default defineConfig(() => ({
 		},
 		// Compile the app page at server start: a cold first load
 		// otherwise spends ~9s transforming the page's import graph,
-		// past the e2e specs' 10s first-render waits.
-		warmup: { clientFiles: ["./src/routes/+page.svelte"] }
+		// past the e2e specs' 10s first-render waits. The lazily
+		// imported modules too: a late first import on a loaded CI
+		// runner is the likeliest source of WebKit's "Importing a
+		// module script failed".
+		warmup: {
+			clientFiles: [
+				"./src/routes/+page.svelte",
+				"./src/lib/attachments.ts",
+				"./src/lib/news.ts",
+				"./src/lib/news-mode.svelte.ts",
+				"./src/lib/furigana.ts",
+				"./src/lib/dict-card.ts",
+				"./src/lib/settings.ts",
+				"./src/lib/secrets.ts"
+			]
+		}
 	}
 }));
