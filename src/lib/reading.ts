@@ -8,7 +8,8 @@ import {
 	knownParts,
 	type DictHit,
 	type JaPiece,
-	cardFromDictionary
+	cardFromDictionary,
+	oneBaseWord
 } from "./dict-card";
 import {
 	buildWordCardMessages,
@@ -1139,6 +1140,10 @@ export async function annotationAnswer(
 		let modelDone = false;
 		const showInstant = (hits: Awaited<ReturnType<WordLookup>>): void => {
 			if (!hits || !lang || modelDone) return;
+			// Two base words (le parent, or parer's "they adorn"): the
+			// instant card could show the wrong one, so the model's
+			// card, which reads the sentence, is the first one shown.
+			if (!oneBaseWord(hits.hits)) return;
 			const instant = cardFromDictionary(
 				q.quote,
 				hits.hits,

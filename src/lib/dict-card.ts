@@ -485,6 +485,16 @@ export function knownParts(
 }
 
 /**
+ * Whether every reading the dictionary has for a form comes from one
+ * base word. parent is both the noun parent and parer's "they adorn":
+ * only the sentence (the model) can tell which, so an instant card
+ * from the top reading may be the wrong word.
+ */
+export function oneBaseWord(hits: DictHit[]): boolean {
+	return new Set(bestHits(hits).map((h) => fold(h.entry.w))).size <= 1;
+}
+
+/**
  * The facts the dictionary knows (a noun's gender as its article).
  * None when the model split the word as an inflection the dictionary
  * also lists, while the dictionary's top reading is a headword: in

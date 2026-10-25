@@ -7,6 +7,7 @@ import {
 	japaneseHead,
 	japaneseParts,
 	knownFacts,
+	oneBaseWord,
 	lookupForms,
 	plainSpelling,
 	stemSplit,
@@ -587,6 +588,54 @@ describe("annotationAnswer with a dictionary", () => {
 		expect(system).toContain("past participle of franchir");
 	});
 
+	it("waits for the model when the form belongs to two base words", async () => {
+		// parent: the noun, or parer's "they adorn". An instant card from
+		// the top reading could show the wrong word.
+		const chat = vi.fn(async () => ({
+			content: JSON.stringify({
+				meaning: "adorn",
+				parts: [
+					{ text: "par", label: "parer", kind: "core" },
+					{ text: "ent", label: "present indicative", kind: "tense" }
+				],
+				facts: []
+			}),
+			usage: null
+		}));
+		const provider = { id: "s", chat, stream: chat } as unknown as ChatProvider;
+		const onPartial = vi.fn();
+		const reply = await annotationAnswer(
+			provider,
+			{
+				quote: "parent",
+				question: "",
+				context: "les rues se parent de lumières"
+			},
+			undefined,
+			{
+				lang: "fr",
+				lookup: async () => ({
+					hits: [
+						{
+							tags: "",
+							entry: { w: "parent", p: "noun", g: "masculine", s: ["parent"] }
+						},
+						{
+							tags: "indicative plural present third-person",
+							entry: { w: "parer", p: "verb", s: ["to adorn"] },
+							split: [0, 3, 0]
+						}
+					],
+					japanese: []
+				}),
+				onPartial
+			}
+		);
+		expect(onPartial).not.toHaveBeenCalled();
+		expect(reply.card?.meaning).toBe("adorn");
+		expect(reply.card?.facts).toEqual([]);
+	});
+
 	it("keeps the pack's split and asks the model only for notes", async () => {
 		// The model splits differently; the pack's split stands.
 		const chat = vi.fn(async () => ({
@@ -702,5 +751,25 @@ describe("knownFacts", () => {
 		expect(knownFacts("parent", [parentNoun, parerForm], "fr", split)).toEqual(
 			[]
 		);
+	});
+});
+
+describe("oneBaseWord", () => {
+	it("tells one word's forms from two words sharing a spelling", () => {
+		const noun = { w: "parent", p: "noun", s: ["parent"] };
+		const adj = { w: "parent", p: "adj", s: ["related"] };
+		const verb = { w: "parer", p: "verb", s: ["to adorn"] };
+		expect(
+			oneBaseWord([
+				{ tags: "", entry: noun },
+				{ tags: "", entry: adj }
+			])
+		).toBe(true);
+		expect(
+			oneBaseWord([
+				{ tags: "", entry: noun },
+				{ tags: "indicative plural present third-person", entry: verb }
+			])
+		).toBe(false);
 	});
 });
