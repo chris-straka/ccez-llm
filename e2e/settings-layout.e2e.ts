@@ -89,6 +89,16 @@ test.describe("desktop window", () => {
 		}
 	});
 
+	test("the message colors keep to one line", async ({ page }) => {
+		const tops = await page
+			.locator(".settings-panel .segmented.swatches button")
+			.evaluateAll((els) =>
+				els.map((el) => Math.round(el.getBoundingClientRect().top))
+			);
+		expect(tops.length).toBe(7);
+		expect(new Set(tops).size).toBe(1);
+	});
+
 	test("steppers share one width and one right edge", async ({ page }) => {
 		const boxes = await page
 			.locator(".settings-panel .stepper")

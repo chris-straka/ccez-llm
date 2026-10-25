@@ -803,7 +803,7 @@ grid with the list spanning every row keeps one scroll (find by
 eye still works) without changing the markup the sheet shares. */
 .windowed .settings-inner {
 	display: grid;
-	grid-template-columns: 10rem minmax(0, 40rem);
+	grid-template-columns: 10rem minmax(0, 36rem);
 	column-gap: 1.8rem;
 	align-items: start;
 }
@@ -1058,9 +1058,9 @@ as set into the card in either theme. */
 .settings-inner section[id^="settings-"] > :not(h2),
 .settings-inner .keys-updates > section {
 	box-sizing: border-box;
-	min-height: 2.9rem;
+	min-height: 2.65rem;
 	margin: 0;
-	padding: 0.6rem 1rem;
+	padding: 0.5rem 1rem;
 	border-top: 1px solid var(--line-soft);
 	background: var(--set-card);
 }
@@ -1262,4 +1262,11 @@ line under the name, and a thumb-sized hit row. */
 .settings-inner .keys-updates > section > button {
 	padding: 0.3rem 0.85rem;
 	font-size: 0.86rem;
+}
+/* The seven message colors keep to one line in the window column. */
+.settings-inner .segmented.swatches {
+	gap: 0.25rem;
+}
+.settings-inner .segmented.swatches button {
+	padding-inline: 0.55rem;
 }
