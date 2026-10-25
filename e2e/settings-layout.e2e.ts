@@ -42,7 +42,7 @@ async function openSettings(page: Page): Promise<void> {
 		const s = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 		localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ ...s, readerMode: "follow" })
+			JSON.stringify({ ...s, readerMode: "follow", promptIdleSec: -1 })
 		);
 	});
 	await page.goto("/");
@@ -129,6 +129,16 @@ test.describe("desktop window", () => {
 		expect(
 			Math.abs(height(after!.row) - height(before!.row))
 		).toBeLessThanOrEqual(1);
+	});
+
+	test("a stepper at its default shows no Reset", async ({ page }) => {
+		// Hide prompt after idle defaults to Always, ranked -Infinity.
+		const idle = page.locator(".settings-panel .stepper-setting", {
+			hasText: "Hide prompt after idle"
+		});
+		await expect(idle.locator(".step-value")).toHaveText("Always");
+		// The element, not its role: an offscreen row isn't rendered.
+		await expect(idle.locator(".setting-reset")).toHaveCount(0);
 	});
 
 	test("every name sits inside its own row", async ({ page }) => {

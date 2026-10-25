@@ -60,7 +60,10 @@ it unreadable. -->
 
 	const canDown = $derived(canStep(ladder, value, -1, rank));
 	const canUp = $derived(canStep(ladder, value, 1, rank));
-	const isDefault = $derived(Math.abs(rank(value) - rank(defaultValue)) < 1e-6);
+	// Equal values first: an infinite rank ("Always") subtracts to NaN.
+	const isDefault = $derived(
+		value === defaultValue || Math.abs(rank(value) - rank(defaultValue)) < 1e-6
+	);
 
 	function step(dir: 1 | -1, times = 1): void {
 		let next = value;
