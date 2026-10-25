@@ -67,7 +67,7 @@ test.describe("desktop window", () => {
 			"Color scheme",
 			"Thinking level",
 			"Fold older messages automatically",
-			"Show message buttons on hover"
+			"Message buttons on hover"
 		]) {
 			const parts = await rowParts(page, name);
 			expect(parts, name).not.toBeNull();

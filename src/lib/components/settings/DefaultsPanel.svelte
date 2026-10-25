@@ -148,7 +148,7 @@
 	{:else}
 		<!-- One row for both hover toggles: the label names the behavior once,
 		each box names whose buttons it covers. Desktop-only (this branch). -->
-		<SettingRow name="Show message buttons on hover">
+		<SettingRow name="Message buttons on hover">
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverUserActions} />
 				<span>My messages</span>
