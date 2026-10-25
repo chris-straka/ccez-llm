@@ -9015,6 +9015,9 @@
 		// past it, or a parked composer never takes the caret.
 		const from = document.activeElement;
 		editor?.focus();
+		// Landed at once: no retries, or a blur right after (Esc, a
+		// click away) would be undone by the next frame's refocus.
+		if (closestFromTarget(document.activeElement, ".prompt .ta-input")) return;
 		// The visible flip (including its visibility ramp) lands async:
 		// arriving from a hidden or parked composer, the sync focus
 		// above hits a hidden node and no-ops. Retry on frames until
