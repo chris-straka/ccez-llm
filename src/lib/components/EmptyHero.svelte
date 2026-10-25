@@ -53,6 +53,25 @@ pills become the top rail above the story cards. -->
 	:global(.app[data-titlebar="overlay"]) .empty-state.news-mode {
 		margin-top: calc(1.75rem + 1.15rem);
 	}
+	/* Extras under the pills (study modes, flashcards due) hang below
+	the centered block instead of growing it: the greeting holds its
+	place whether they show or not. The news rail keeps them in flow. */
+	.empty-state:not(.news-mode) {
+		position: relative;
+	}
+	.empty-state :global(.hero-extras) {
+		display: contents;
+	}
+	.empty-state:not(.news-mode) :global(.hero-extras) {
+		position: absolute;
+		top: calc(100% - 0.4rem);
+		left: 0;
+		right: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.6rem;
+	}
 	.hero {
 		margin: 0;
 		text-align: center;

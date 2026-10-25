@@ -289,43 +289,47 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				{previewing}
 				actions={langMenusActions}
 			/>
-			{#if !newsPanel && flashcardsDue > 0 && !previewing}
-				<!-- Quiet entry: shows only while cards are due, never
+			<!-- Extras under the pills hang below the centered hero, so
+			their arrival never moves the greeting (EmptyHero). -->
+			<div class="hero-extras">
+				{#if !newsPanel && flashcardsDue > 0 && !previewing}
+					<!-- Quiet entry: shows only while cards are due, never
 				as a badge or ping. -->
-				<button type="button" class="flashcards-open" onclick={onFlashcards}>
-					{flashcardsDue === 1
-						? "1 flashcard due"
-						: `${flashcardsDue} flashcards due`}
-				</button>
-			{/if}
-			{#if listen.modes && !previewing}
-				<!-- One language, two ways in: read its news or listen
+					<button type="button" class="flashcards-open" onclick={onFlashcards}>
+						{flashcardsDue === 1
+							? "1 flashcard due"
+							: `${flashcardsDue} flashcards due`}
+					</button>
+				{/if}
+				{#if listen.modes && !previewing}
+					<!-- One language, two ways in: read its news or listen
 				to videos in it. -->
-				<div class="study-modes" role="tablist" aria-label="Study with">
-					<button
-						type="button"
-						role="tab"
-						aria-selected={newsPanel !== null && !listen.mode.open}
-						onclick={(e) => {
-							// Focus never parks on the switch: bare keys
-							// (i summons the prompt) keep working.
-							e.currentTarget.blur();
-							listen.showNews();
-						}}>News</button
-					>
-					{#if listen.available}
+					<div class="study-modes" role="tablist" aria-label="Study with">
 						<button
 							type="button"
 							role="tab"
-							aria-selected={listen.mode.open}
+							aria-selected={newsPanel !== null && !listen.mode.open}
 							onclick={(e) => {
+								// Focus never parks on the switch: bare keys
+								// (i summons the prompt) keep working.
 								e.currentTarget.blur();
-								listen.showListen();
-							}}>Listen</button
+								listen.showNews();
+							}}>News</button
 						>
-					{/if}
-				</div>
-			{/if}
+						{#if listen.available}
+							<button
+								type="button"
+								role="tab"
+								aria-selected={listen.mode.open}
+								onclick={(e) => {
+									e.currentTarget.blur();
+									listen.showListen();
+								}}>Listen</button
+							>
+						{/if}
+					</div>
+				{/if}
+			</div>
 			{#if listen.mode.open && listen.mode.lang}
 				<ListenPanel
 					mode={listen.mode}

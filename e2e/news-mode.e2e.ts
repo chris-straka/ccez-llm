@@ -46,6 +46,22 @@ test("empty-chat News opens the picked language's news, close returns to welcome
 	await expect(page.locator(".empty-state h1")).toBeVisible();
 });
 
+/** Picking a language brings News and Listen in under the pills:
+the greeting holds its place instead of riding up. */
+test("the study tabs arriving never move the greeting", async ({ page }) => {
+	const hero = page.locator(".empty-state h1");
+	const top = () =>
+		hero.evaluate((el) => Math.round(el.getBoundingClientRect().top));
+	const before = await top();
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await page
+		.locator(".lang-list")
+		.getByRole("menuitem", { name: "French" })
+		.click();
+	await expect(page.locator(".study-modes")).toBeVisible();
+	expect(await top()).toBe(before);
+});
+
 test("fallback language never shows English headlines", async ({ page }) => {
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	const list = page.locator(".lang-list");
