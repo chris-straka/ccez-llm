@@ -81,7 +81,7 @@
 	<!-- Older messages fold as newer ones arrive; a fold opened by
 	hand stays open. Both off by default. -->
 	<fieldset class="hover-row">
-		<legend>Fold older messages automatically:</legend>
+		<legend>Fold older messages automatically</legend>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.autoFoldOwn} />
 			<span>My messages</span>
@@ -152,7 +152,7 @@
 		<!-- One row for both hover toggles: the label names the behavior once,
 		each box names whose buttons it covers. Desktop-only (this branch). -->
 		<fieldset class="hover-row">
-			<legend>Show message buttons on hover for:</legend>
+			<legend>Show message buttons on hover</legend>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverUserActions} />
 				<span>My messages</span>

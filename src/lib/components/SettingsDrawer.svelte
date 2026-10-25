@@ -209,7 +209,7 @@ bookkeeping reads it). -->
 		box-sizing: border-box;
 		inset: 0;
 		margin: auto;
-		width: min(64rem, calc((100vw - 4rem) * var(--ui-scale-inv, 1)));
+		width: min(56rem, calc((100vw - 4rem) * var(--ui-scale-inv, 1)));
 		height: min(48rem, calc((100dvh - 4rem) * var(--ui-scale-inv, 1)));
 		max-width: none;
 		z-index: 58;

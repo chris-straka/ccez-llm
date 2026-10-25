@@ -1324,3 +1324,249 @@ pushes the steppers down. */
 	width: 1.75rem;
 	height: 1.75rem;
 }
+/* Desktop window rows (owner, 2026-10-24): each group is a titled
+card of rows, the name on the left and its control on the right,
+in a column narrow enough that the two stay near each other.
+Steppers share one width so the controls line up; Reset sits
+beside the control, so a row never grows. Wide controls (theme
+tiles, colors, the Enable grid, fields) take the row under their
+name. */
+.settings-panel.windowed {
+	--set-card: color-mix(in srgb, var(--ink) 4.5%, var(--bg-chrome));
+	--set-radius: 12px;
+}
+.windowed .settings-inner {
+	grid-template-columns: 10rem minmax(0, 40rem);
+}
+.windowed .settings-inner section {
+	border-top: 0;
+	padding: 1.5rem 0 0.6rem;
+}
+.windowed .settings-inner section > h2 {
+	margin: 0 0 0.55rem 0.15rem;
+	font-size: 1.02rem;
+	font-weight: 650;
+}
+.windowed .settings-inner section[id^="settings-"] > :not(h2) {
+	box-sizing: border-box;
+	min-height: 2.9rem;
+	margin: 0;
+	padding: 0.6rem 1rem;
+	border-top: 1px solid var(--line-soft);
+	background: var(--set-card);
+}
+.windowed .settings-inner section[id^="settings-"] > h2 + * {
+	border-top: 0;
+	border-radius: var(--set-radius) var(--set-radius) 0 0;
+}
+.windowed .settings-inner section[id^="settings-"] > :last-child {
+	margin-bottom: 0;
+	border-radius: 0 0 var(--set-radius) var(--set-radius);
+}
+.windowed .settings-inner section[id^="settings-"] > h2 + :last-child {
+	border-radius: var(--set-radius);
+}
+/* Names read as names, not headings. */
+.windowed .settings-inner .setting-label,
+.windowed .settings-inner legend,
+.windowed .settings-inner label,
+.windowed .settings-inner .field {
+	font-size: 0.95rem;
+	font-weight: 500;
+}
+/* Stepper row: name, Reset, control. */
+.windowed .settings-inner .stepper-setting {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	align-items: center;
+	column-gap: 0.8rem;
+}
+.windowed .settings-inner .setting-name {
+	display: contents;
+}
+.windowed .settings-inner .stepper-setting .setting-label {
+	grid-column: 1;
+}
+.windowed .settings-inner .setting-reset {
+	grid-column: 2;
+	text-decoration: none;
+}
+.windowed .settings-inner .setting-reset:hover {
+	text-decoration: underline;
+}
+.windowed .settings-inner .stepper {
+	grid-column: 3;
+	width: 8.75rem;
+	margin: 0;
+	border-color: var(--line-soft);
+	background: var(--bg-chrome);
+}
+.windowed .settings-inner .step-btn {
+	width: 2.1rem;
+	height: 2.1rem;
+}
+.windowed .settings-inner .step-btn svg {
+	width: 0.85rem;
+	height: 0.85rem;
+}
+.windowed .settings-inner .step-value {
+	flex: 1 1 auto;
+	width: auto;
+	font-size: 0.92rem;
+	font-weight: 550;
+}
+/* Slider row: name, track, value. */
+.windowed .settings-inner .slider-setting {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 13rem 3.6rem;
+	align-items: center;
+	column-gap: 0.8rem;
+}
+.windowed .settings-inner .slider-setting .setting-label {
+	grid-area: 1 / 1;
+}
+.windowed .settings-inner .slider-setting .slider-hit {
+	grid-area: 1 / 2;
+	height: 2rem;
+	margin: 0;
+	padding: 0 0.6rem;
+}
+.windowed .settings-inner .slider-setting .slider-value {
+	grid-area: 1 / 3;
+	margin: 0;
+	text-align: end;
+	font-size: 0.92rem;
+	font-weight: 550;
+}
+.windowed .settings-inner .slider-track {
+	height: 0.3rem;
+}
+.windowed .settings-inner .thumb {
+	width: 1.2rem;
+	height: 1.2rem;
+}
+/* Pills: compact, on the window's own ground. */
+.windowed .settings-inner .segmented button,
+.windowed .settings-inner .provider-row button {
+	min-height: 1.95rem;
+	padding: 0.25rem 0.75rem;
+	font-size: 0.86rem;
+	font-weight: 400;
+	background: var(--bg-chrome);
+}
+.windowed .settings-inner .segmented button.selected,
+.windowed .settings-inner .provider-row button.selected {
+	font-weight: 600;
+	background: var(--selected-wash);
+}
+.windowed .settings-inner .segmented,
+.windowed .settings-inner .segmented.thinking {
+	gap: 0.35rem;
+	margin: 0;
+}
+/* Fieldsets: the legend's box goes (display: contents), so its name
+is plain text in the fieldset's grid. A rendered legend sits on the
+card's top edge, and WebKit keeps it there even floated. The name
+stacks over its control by default; a few pills, or a pair of
+checks, sit on the name's row instead. */
+.windowed .settings-inner fieldset {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	align-items: center;
+	gap: 0.55rem 1rem;
+	font-size: 0.95rem;
+	font-weight: 500;
+}
+.windowed .settings-inner fieldset > legend {
+	display: contents;
+}
+.windowed .settings-inner fieldset .note {
+	font-weight: 400;
+}
+.windowed
+	.settings-inner
+	fieldset:has(> legend + .segmented:last-child):not(:has(.swatches)) {
+	grid-template-columns: minmax(0, 1fr) auto;
+}
+.windowed
+	.settings-inner
+	fieldset:has(> legend + .segmented:last-child):not(:has(.swatches))
+	> .segmented {
+	justify-content: flex-end;
+}
+.windowed .settings-inner fieldset.hover-row {
+	grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.windowed .settings-inner fieldset.hover-row .check,
+.windowed .settings-inner fieldset.hover-row + .check,
+.windowed .settings-inner fieldset.hover-row + fieldset,
+.windowed .settings-inner .check + .check {
+	margin: 0;
+}
+/* The grid gap spaces a fieldset's rows: their own margins go. */
+.windowed .settings-inner fieldset > label,
+.windowed .settings-inner fieldset > .dict-row {
+	margin: 0;
+}
+.windowed .settings-inner .dict-manage {
+	min-height: 2rem;
+	padding: 0 0.85rem;
+	font-size: 0.86rem;
+	background: var(--bg-chrome);
+}
+/* Color scheme: the Light / Dark / System pills ride the name's row,
+the tiles span the card below. */
+.windowed .settings-inner fieldset.theme {
+	grid-template-columns: minmax(0, 1fr) auto;
+	row-gap: 0.7rem;
+}
+.windowed .settings-inner fieldset.theme > :not(legend):not(.segmented) {
+	grid-column: 1 / -1;
+}
+.windowed .settings-inner .toggle-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.6rem 1.2rem;
+}
+.windowed .settings-inner section > label > textarea,
+.windowed .settings-inner section > label > input {
+	margin-top: 0.45rem;
+}
+.windowed .settings-inner .provider-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+/* Shortcuts, Updates and Licenses: one card of rows, the name
+left, its button right. */
+.windowed .settings-inner .keys-updates {
+	display: block;
+	margin-top: 1.5rem;
+	padding: 0;
+	border-top: 0;
+	border-radius: var(--set-radius);
+	background: var(--set-card);
+}
+.windowed .settings-inner .keys-updates > section {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.8rem;
+	min-height: 2.9rem;
+	box-sizing: border-box;
+	padding: 0.5rem 1rem;
+}
+.windowed .settings-inner .keys-updates > section + section {
+	border-top: 1px solid var(--line-soft);
+}
+.windowed .settings-inner .keys-updates > section > h2 {
+	margin: 0;
+	font-size: 0.95rem;
+	font-weight: 500;
+}
+.windowed .settings-inner .keys-updates > section > button {
+	margin: 0;
+	padding: 0.3rem 0.85rem;
+	font-size: 0.86rem;
+	background: var(--bg-chrome);
+}
