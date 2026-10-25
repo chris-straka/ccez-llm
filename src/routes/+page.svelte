@@ -594,6 +594,8 @@
 	} from "$lib/viewportReflow";
 	import {
 		isPromptIdle,
+		alwaysReparkDue,
+		PROMPT_PRESS_GRACE_MS,
 		stageOwnedByOverlay,
 		pointInRect,
 		sendHoldAction,
@@ -3763,8 +3765,9 @@
 			// itself. Parking here would hide the composer and eat the
 			// press's click behind pointer-events:none — the button
 			// (or pill review toggle) never runs. Skip the hide; the
-			// idle ticker re-parks a genuinely unfocused composer
-			// within half a second, so an over-skip self-heals.
+			// idle ticker re-parks a genuinely unfocused composer once
+			// the press grace runs out (alwaysReparkDue), so an
+			// over-skip self-heals.
 			// A focusout from a detaching or freshly inert node
 			// (sidebar collapse inerting its focused row, modal
 			// teardown) is removal, not intent to leave: hiding on it
@@ -3779,7 +3782,7 @@
 			const next: EventTarget | null = event.relatedTarget ?? null;
 			if (
 				(next === null || next === document.body) &&
-				Date.now() - promptPressAt < 1500
+				Date.now() - promptPressAt < PROMPT_PRESS_GRACE_MS
 			) {
 				return;
 			}
@@ -3860,6 +3863,16 @@
 		// instead of showing a dead cloud provider.
 		if (typeof navigator !== "undefined" && !navigator.onLine) handleOffline();
 		const timer = window.setInterval(() => {
+			if (
+				alwaysReparkDue({
+					alwaysMode: setting === PROMPT_IDLE_ALWAYS,
+					idle: promptIdle,
+					sincePressMs: Date.now() - promptPressAt
+				})
+			) {
+				hideForAlways(document.activeElement);
+				return;
+			}
 			if (!isPromptIdle(lastInputAt, Date.now(), idleSec)) return;
 			if (
 				!shouldIdleHide({

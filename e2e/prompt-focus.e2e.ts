@@ -134,3 +134,23 @@ test("stepping chats while reading stays out of the prompt", async ({
 	await page.waitForTimeout(400);
 	expect(await promptFocused(page)).toBe(false);
 });
+
+/** Always-hide's backstop: a focusout skipped as a press in flight
+(WebKit blurs the editor to nowhere when a composer button is
+pressed) used to leave the composer up without focus for good; the
+ticker now re-hides it once the press grace runs out. */
+test("a composer left visible without focus hides again", async ({ page }) => {
+	await seedTwoChats(page);
+	await focusPrompt(page);
+	await page.evaluate(() => {
+		const prompt = document.querySelector(".prompt");
+		prompt?.dispatchEvent(
+			new PointerEvent("pointerdown", { bubbles: true, button: 0 })
+		);
+		(document.activeElement as HTMLElement | null)?.blur();
+	});
+	expect(await promptFocused(page)).toBe(false);
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 5_000
+	});
+});
