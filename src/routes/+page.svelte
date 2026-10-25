@@ -3079,10 +3079,9 @@
 		// One overlay at a time: the switcher yields to the list.
 		if (!settings.sidebarCollapsed) chatSwitcherOpen = false;
 		persistSettings();
-		// Touch draws one sidebar at a time: an opening chats list
-		// dismisses the settings panel (and vice versa below).
-		if (!settings.sidebarCollapsed && androidUI && settingsOpen)
-			settingsOpen = false;
+		// One window at a time: an opening chats list dismisses
+		// Settings (and vice versa in openSettingsPanel).
+		if (!settings.sidebarCollapsed && settingsOpen) settingsOpen = false;
 	}
 	// Phones: an opening chats list dismisses the keyboard — peeking
 	// at threads must not keep composer focus, and closing the list
@@ -3507,7 +3506,9 @@
 		// One overlay at a time: the switcher yields to settings.
 		chatSwitcherOpen = false;
 		settingsOpen = true;
-		if (androidUI && !settings.sidebarCollapsed) {
+		// One window at a time on desktop too: both sit centered over
+		// the chat now.
+		if (!settings.sidebarCollapsed) {
 			settings.sidebarCollapsed = true;
 			persistSettings();
 		}
@@ -11559,6 +11560,12 @@
 			} else if (renamingChatId) {
 				// A chat rename cancels, leaving the old name.
 				cancelRename();
+			} else if (!androidUI && !settings.sidebarCollapsed) {
+				// The desktop chat list is a window over the chat: Esc
+				// closes it like Settings (its search box included).
+				// The phone drawer keeps its swipes.
+				endPreview();
+				toggleSidebar();
 			} else if (captureStaged) {
 				// The weak-capture overlay dismisses from anywhere (its
 				// input included) and hands the caret back — the

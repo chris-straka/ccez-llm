@@ -25,6 +25,36 @@ test("clicking the main chat collapses the chats sidebar", async ({ page }) => {
 	await expect(aside).toHaveClass(/collapsed/);
 });
 
+/** The desktop list is a window over the chat: Esc closes it, from
+a row or from its search box. */
+test("Escape closes the chat list window", async ({ page }) => {
+	const aside = page.locator("aside").first();
+	await toggleSidebar(page);
+	await expect(aside).not.toHaveClass(/collapsed/);
+	await page.keyboard.press("Escape");
+	await expect(aside).toHaveClass(/collapsed/);
+
+	await toggleSidebar(page);
+	await expect(aside).not.toHaveClass(/collapsed/);
+	await page.getByLabel("Search chats").fill("zz");
+	await page.keyboard.press("Escape");
+	await expect(aside).toHaveClass(/collapsed/);
+});
+
+/** Both windows sit centered over the chat: one at a time. */
+test("the chat list and Settings never stack", async ({ page }) => {
+	const aside = page.locator("aside").first();
+	const panel = page.locator(".settings-panel");
+	await page.keyboard.press("Meta+,");
+	await expect(panel).not.toHaveClass(/closed/);
+	await toggleSidebar(page);
+	await expect(aside).not.toHaveClass(/collapsed/);
+	await expect(panel).toHaveClass(/closed/);
+	await page.keyboard.press("Meta+,");
+	await expect(panel).not.toHaveClass(/closed/);
+	await expect(aside).toHaveClass(/collapsed/);
+});
+
 test("clicking the main chat closes the settings panel", async ({ page }) => {
 	const panel = page.locator(".settings-panel");
 	await page.keyboard.press("Meta+,");

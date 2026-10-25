@@ -55,9 +55,26 @@ test("sidebar hover previews the chat and restores on leave", async ({
 	await expect(main).toContainText(BRAVO);
 	await expect(main).not.toContainText(ALPHA);
 
-	await page.mouse.move(600, 500);
+	// Leaving the window (not just the list) restores the active chat.
+	await page.mouse.move(20, 400);
 	await expect(main).toContainText(ALPHA);
 	await expect(main).not.toContainText(BRAVO);
+});
+
+/** The pointer can cross from a row into the window's preview pane
+to read it: the preview holds, and double-clicking its text picks a
+word instead of closing the window. */
+test("the preview pane holds the hovered chat and keeps double-clicks", async ({
+	page
+}) => {
+	await openSidebar(page);
+	await page.locator("aside ul li button.side-chat").nth(1).hover();
+	const pane = page.locator(".side-preview");
+	await expect(pane.locator(".side-preview-msg")).toHaveText(BRAVO);
+	await pane.locator(".side-preview-msg").hover();
+	await expect(pane.locator(".side-preview-msg")).toHaveText(BRAVO);
+	await pane.locator(".side-preview-msg").dblclick();
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 });
 
 /** Hovering a row pops its counts: messages plus the you/AI split.
@@ -102,7 +119,8 @@ test("preview holds the action row inert until the hover leaves", async ({
 	await expect(actions).toHaveCount(1);
 	await expect(actions).toHaveAttribute("inert", "");
 
-	await page.mouse.move(600, 500);
+	// Off the window (its preview pane keeps the hover).
+	await page.mouse.move(20, 400);
 	await expect(actions).toHaveCount(1);
 	await expect(actions).not.toHaveAttribute("inert", "");
 });

@@ -144,11 +144,13 @@ only this drawer through scoping. -->
 	class:windowed
 	inert={collapsed}
 	data-fade-scroll
+	onmouseleave={() => windowed && actions.endPreview()}
 	ondblclick={(event) => {
 		const target = event.target;
+		// The preview's text picks words on double-click like any text.
 		if (
 			target instanceof HTMLElement &&
-			target.closest("button, input, select, textarea, a")
+			target.closest("button, input, select, textarea, a, .side-preview")
 		)
 			return;
 		actions.collapse();
@@ -187,7 +189,10 @@ only this drawer through scoping. -->
 			>
 		{/if}
 	</div>
-	<ul onmouseleave={() => actions.endPreview()} data-fade-scroll>
+	<!-- The window drops the preview on leaving the whole window, so
+	the pointer can cross into the preview pane to read and scroll it;
+	the drawer drops it on leaving the list. -->
+	<ul onmouseleave={() => windowed || actions.endPreview()} data-fade-scroll>
 		{#each chats as item, i (item.id)}
 			<!-- Preview hover lives on the row, not the label: moving
 			within the row (label to export/delete and back) must not

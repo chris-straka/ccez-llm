@@ -163,4 +163,10 @@ describe("previewText", () => {
 		expect(previewText("one two three four", 9)).toBe("one two…");
 		expect(previewText("```js\ncode()\n```\nafter")).toBe("after");
 	});
+	it("leaves a reasoning model's thoughts out", () => {
+		expect(previewText("<think>Let me see.</think>The answer.")).toBe(
+			"The answer."
+		);
+		expect(previewText("Start <think>still thinking")).toBe("Start");
+	});
 });

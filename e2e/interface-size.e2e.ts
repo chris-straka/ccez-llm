@@ -114,8 +114,8 @@ async function interfaceSizeFlow(
 	);
 	// Baseline geometry at 100%. The toast comes first with no
 	// drawers open (the thread copy click matches the latex suite's
-	// proven context); the drawer and list then stay open on opposite
-	// sides, and only the modal veil must close before each copy click.
+	// proven context); Settings and the list then open one at a time,
+	// and only the modal veil must close before each copy click.
 	const msgText100 = await textHeight(page, "article .rendered");
 	const editorText100 = await textHeight(page, ".prompt .ta-input");
 	await openToast(page);
@@ -143,13 +143,11 @@ async function interfaceSizeFlow(
 	const modalText100 = await textHeight(page, ".modal .keys dt");
 	await boxInViewport(page, ".modal", vw, vh);
 	await page.keyboard.press("Escape");
-	// Phones draw one sidebar at a time, so the list folded settings
-	// above: reopen for the stepper + measurement.
-	if (phone) {
-		await page.keyboard.press("Meta+,");
-		await expect(drawer).not.toHaveClass(/closed/);
-		await settledOpen(page, ".settings-panel");
-	}
+	// One window at a time, so the list folded Settings above:
+	// reopen it for the stepper + measurement.
+	await page.keyboard.press("Meta+,");
+	await expect(drawer).not.toHaveClass(/closed/);
+	await settledOpen(page, ".settings-panel");
 	// Crank to 250% through the real stepper.
 	await setSettingValue(page, "Interface size percent", 250);
 	await expect
@@ -199,12 +197,10 @@ async function interfaceSizeFlow(
 	}
 	// Chat list: row text grows 2.5x (lower bound — a capped phone
 	// box may wrap a long title); the box never leaves the screen.
-	// The phone drawer reopen folded the list: summon it back.
-	if (phone) {
-		await toggleSidebar(page);
-		await expect(list).not.toHaveClass(/collapsed/);
-		await settledOpen(page, "aside:has(button.side-chat)");
-	}
+	// Reopening Settings folded the list: summon it back.
+	await toggleSidebar(page);
+	await expect(list).not.toHaveClass(/collapsed/);
+	await settledOpen(page, "aside:has(button.side-chat)");
 	const rowText250 = await textHeight(page, "aside ul li .side-chat");
 	expect(rowText250 / rowText100).toBeGreaterThanOrEqual(2.4);
 	const listBox250 = await boxInViewport(
@@ -243,20 +239,10 @@ async function interfaceSizeFlow(
 	await page.screenshot({ path: `.screenshots/ui-250-${tag}-modal.png` });
 	await page.keyboard.press("Escape");
 	// Toast: the pill grows with the text, stays centered and inside.
-	// Fold the drawers first (the zoomed desktop pair covers the
-	// thread; the phone holds only the list by now).
-	if (phone) {
-		await toggleSidebar(page);
-		await expect(list).toHaveClass(/collapsed/);
-		await settledClosed(page, "aside:has(button.side-chat)");
-	} else {
-		await page.keyboard.press("Meta+,");
-		await toggleSidebar(page);
-		await expect(drawer).toHaveClass(/closed/);
-		await expect(list).toHaveClass(/collapsed/);
-		await settledClosed(page, ".settings-panel");
-		await settledClosed(page, "aside:has(button.side-chat)");
-	}
+	// Fold the list first (only it is open by now).
+	await toggleSidebar(page);
+	await expect(list).toHaveClass(/collapsed/);
+	await settledClosed(page, "aside:has(button.side-chat)");
 	await openToast(page);
 	const toastBox250 = await boxInViewport(page, ".toast", vw, vh);
 	await page.screenshot({ path: `.screenshots/ui-250-${tag}-toast.png` });

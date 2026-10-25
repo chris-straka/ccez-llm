@@ -107,6 +107,9 @@ export function chatGroup(createdAt: number, now = Date.now()): string {
  */
 export function previewText(content: string, max = 280): string {
 	const text = content
+		// A reasoning model's thoughts aren't the reply (an unclosed
+		// tag, mid-stream, runs to the end).
+		.replace(/<think>[\s\S]*?(<\/think>|$)/gi, " ")
 		.replace(/```[\s\S]*?```/g, " ")
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
