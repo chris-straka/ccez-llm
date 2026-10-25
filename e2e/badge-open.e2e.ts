@@ -242,3 +242,47 @@ test("pressing a loading badge inks nothing above it", async ({ page }) => {
 	expect(await inked(page)).toEqual(["décédé", "son"]);
 	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
 });
+
+/** Sending the next message closes an open card: it belongs to the
+passage, and the thread moves on to the new turn. */
+test("sending a message closes an open word card", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "a1",
+						messageId: "e2e-m0",
+						quote: "décédé",
+						comment: "",
+						answer: "passed away",
+						card: {
+							meaning: "passed away",
+							lang: "fr",
+							parts: [
+								{ text: "décéd", label: "die", kind: "core" },
+								{ text: "é", label: "past participle", kind: "tense" }
+							],
+							facts: []
+						}
+					}
+				]
+			})
+		);
+	});
+	await seedChat(page, [{ role: "assistant", content: TEXT }]);
+	await page.goto("/");
+	const badge = page.locator('button.ccez-ann-badge[data-ann-badge="a1"]');
+	await expect(badge).toBeVisible({ timeout: 60_000 });
+	// Its lower half: the top edge can sit under the window's drag strip.
+	const box = (await badge.boundingBox())!;
+	await badge.click({ position: { x: box.width / 2, y: box.height * 0.8 } });
+	await expect(page.locator(".ann-answer")).toBeVisible();
+	await page.keyboard.press("i");
+	await page.keyboard.type("Merci !");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("article.user")).toContainText("Merci !");
+	await expect(page.locator(".ann-answer")).toHaveCount(0);
+});

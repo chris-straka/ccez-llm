@@ -8118,6 +8118,9 @@
 		highlightAnnId = null;
 		settleAnnPop();
 		annPop = null;
+		// An open word card belongs to the passage left behind: the
+		// thread moves on to the new turn, so the card goes too.
+		if (annotateMode.answerPop) annotateMode.closeAnswerPop();
 		// Origin chat object (stable by reference): the post-send reads
 		// below must not follow a chat switch mid-stream.
 		const sentFrom = chat;
