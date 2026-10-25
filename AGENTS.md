@@ -47,7 +47,10 @@ TTS/OCR/dictation, page fetch, Android background turns).
   background (own identifier, so its own data and keys; no link
   scheme, no updater). `bun scripts/drive.ts` then runs JavaScript,
   clicks, keys and native snapshots through the bridge (`shot`,
-  `js`, `click`, `key`): no mouse, keyboard or focus. To relaunch,
+  `js`, `click`, `key`): no mouse, keyboard or focus. `tour` shoots
+  a fixed review set (chat, chat list, every Settings page, a word
+  card) into `.screenshots/tour/`: run it after any UI change, since
+  WebKit-only layout bugs don't show in Chromium. To relaunch,
   quit it by its id `studio.ccez.app.dev` (osascript `quit`) and
   wait for it to exit: opening a running copy brings it forward.
   Debug builds turn off WKWebView occlusion, so a covered window

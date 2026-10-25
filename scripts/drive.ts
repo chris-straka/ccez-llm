@@ -12,12 +12,15 @@
  *   bun scripts/drive.ts click "<selector>"  click an element
  *   bun scripts/drive.ts key "<key>" [code]  press a key in the page
  *   bun scripts/drive.ts windows             list the app's windows
+ *   bun scripts/drive.ts tour [dir]          shoot a fixed set of screens
+ *                                            (chat, chat list, every page
+ *                                            of Settings, an open card)
  *
  * A debug app bundle that runs beside the installed app without
  * sharing its data: `bun scripts/drive-app.ts` builds and opens it.
  */
 import { Buffer } from "node:buffer";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import process from "node:process";
 
 interface Reply {
@@ -85,19 +88,113 @@ function script(body: string): string {
 	return `(async () => { ${body} })()`;
 }
 
+async function run(ws: WebSocket, body: string): Promise<unknown> {
+	const reply = await send(ws, "execute_js", { script: script(body) });
+	return reply.data ?? reply.result;
+}
+
+async function shot(ws: WebSocket, out: string): Promise<void> {
+	const reply = await send(ws, "capture_native_screenshot", {
+		format: "png"
+	});
+	const url = String(reply.data ?? "");
+	if (!reply.success || !url.startsWith("data:"))
+		throw new Error(`screenshot failed: ${JSON.stringify(reply.error)}`);
+	writeFileSync(out, Buffer.from(url.split(",")[1] ?? "", "base64"));
+}
+
+const pause = (ms: number): Promise<void> =>
+	new Promise((resolve) => setTimeout(resolve, ms));
+
+/** A key on the window, as the page's capture listener sees it. */
+function keyScript(init: KeyboardEventInit): string {
+	return `
+		(document.activeElement instanceof HTMLElement) && document.activeElement.blur();
+		window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...${JSON.stringify(init)} }));
+		return 1;
+	`;
+}
+
+/**
+ * The fixed review set, shot in the shell's own engine: the chat, the
+ * chat list, Settings page by page, and the first word card if the
+ * chat has one. Each screen closes before the next opens.
+ */
+async function tour(ws: WebSocket, dir: string): Promise<string[]> {
+	mkdirSync(dir, { recursive: true });
+	const shots: string[] = [];
+	const take = async (name: string): Promise<void> => {
+		await pause(700);
+		const out = `${dir}/${String(shots.length + 1).padStart(2, "0")}-${name}.png`;
+		await shot(ws, out);
+		shots.push(out);
+	};
+	const escape = async (): Promise<void> => {
+		for (let i = 0; i < 2; i++) {
+			await run(ws, keyScript({ key: "Escape", code: "Escape" }));
+			await pause(250);
+		}
+	};
+	await escape();
+	await take("chat");
+	const listOpen = async (): Promise<boolean> =>
+		Boolean(
+			await run(
+				ws,
+				`return !!document.querySelector("aside:not(.collapsed):has(.side-search)");`
+			)
+		);
+	await run(ws, keyScript({ key: "H", code: "KeyH", shiftKey: true }));
+	await take("chat-list");
+	// Shift+H toggles the list; Escape alone leaves it open.
+	for (let i = 0; i < 3 && (await listOpen()); i++) {
+		await run(ws, keyScript({ key: "H", code: "KeyH", shiftKey: true }));
+		await pause(400);
+	}
+	await run(ws, keyScript({ key: ",", code: "Comma", metaKey: true }));
+	await pause(500);
+	const pages = Number(
+		await run(
+			ws,
+			`const b = document.querySelector(".settings-panel");
+			return b ? Math.ceil(b.scrollHeight / (b.clientHeight * 0.9)) : 0;`
+		)
+	);
+	for (let i = 0; i < pages; i++) {
+		await run(
+			ws,
+			`const b = document.querySelector(".settings-panel");
+			b.scrollTo({ top: ${i} * b.clientHeight * 0.9, behavior: "instant" });
+			return 1;`
+		);
+		await take(`settings-${i + 1}`);
+	}
+	await escape();
+	const card = await run(
+		ws,
+		`const badge = document.querySelector("[data-ann-badge]");
+		if (!badge) return false;
+		badge.closest(".rendered")?.scrollIntoView({ block: "start" });
+		const r = badge.getBoundingClientRect();
+		const at = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true };
+		for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"])
+			badge.dispatchEvent(new (type.startsWith("pointer") ? PointerEvent : MouseEvent)(type, at));
+		return true;`
+	);
+	if (card) {
+		await take("word-card");
+		await escape();
+	}
+	return shots;
+}
+
 async function main(): Promise<void> {
 	const [cmd, ...rest] = process.argv.slice(2);
 	const ws = await connect();
 	try {
 		if (cmd === "shot") {
 			const out = rest[0] ?? ".screenshots/drive.png";
-			const reply = await send(ws, "capture_native_screenshot", {
-				format: "png"
-			});
-			const url = String(reply.data ?? "");
-			if (!reply.success || !url.startsWith("data:"))
-				throw new Error(`screenshot failed: ${JSON.stringify(reply.error)}`);
-			writeFileSync(out, Buffer.from(url.split(",")[1] ?? "", "base64"));
+			await shot(ws, out);
 			console.log(out);
 		} else if (cmd === "js") {
 			const reply = await send(ws, "execute_js", {
@@ -130,12 +227,15 @@ async function main(): Promise<void> {
 				`)
 			});
 			console.log(JSON.stringify(reply.data ?? reply));
+		} else if (cmd === "tour") {
+			const shots = await tour(ws, rest[0] ?? ".screenshots/tour");
+			console.log(shots.join("\n"));
 		} else if (cmd === "windows") {
 			const reply = await send(ws, "list_windows");
 			console.log(JSON.stringify(reply.data ?? reply, null, 2));
 		} else {
 			console.log(
-				"usage: bun scripts/drive.ts shot [out.png] | js <expr> | click <selector> | key <key> [code] | windows"
+				"usage: bun scripts/drive.ts shot [out.png] | js <expr> | click <selector> | key <key> [code] | tour [dir] | windows"
 			);
 		}
 	} finally {
