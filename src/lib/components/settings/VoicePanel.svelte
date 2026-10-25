@@ -21,6 +21,7 @@
 	} from "$lib/voiceTiers";
 	import ActionIcon from "../ActionIcon.svelte";
 	import { onMount } from "svelte";
+	import SettingRow from "./SettingRow.svelte";
 	import "./panels.css";
 
 	interface Props {
@@ -232,10 +233,12 @@
 	{#if !voiceLoadError}
 		<!-- Language first: the picker below lists voices for this tag,
 			and the empty note sits directly under it. -->
-		<div class="voice-pick">
-			<span class="voice-pick-label" id="voice-lang-label-android"
-				>Voice language</span
-			>
+		<SettingRow
+			name="Voice language"
+			layout="stacked"
+			class="voice-pick"
+			labelId="voice-lang-label-android"
+		>
 			<div class="voice-pick-row">
 				<select
 					value={voiceLangTag}
@@ -247,12 +250,14 @@
 					{/each}
 				</select>
 			</div>
-		</div>
+		</SettingRow>
 		{#if androidVoiceOptions.length > 0}
-			<div class="voice-pick">
-				<span class="voice-pick-label" id="system-voice-label-android"
-					>System voice ({voiceLangTag})</span
-				>
+			<SettingRow
+				name="System voice ({voiceLangTag})"
+				layout="stacked"
+				class="voice-pick"
+				labelId="system-voice-label-android"
+			>
 				<div class="voice-pick-row">
 					<select
 						value={settings.nativeVoiceId ?? ""}
@@ -284,7 +289,7 @@
 						<ActionIcon kind="rerun" />
 					</button>
 				</div>
-			</div>
+			</SettingRow>
 		{:else if voicesLoaded}
 			<p class="note voice-note voice-note-oneline">
 				No {voiceLangTag} voices installed. Uses system voice by default.
@@ -310,8 +315,7 @@
 		Messages group now, not buried here under the voice pickers. -->
 {/if}
 {#if nativeVoice && !androidUI}
-	<fieldset class="voice-engine">
-		<legend>System voice</legend>
+	<SettingRow name="System voice" layout="stacked" class="voice-engine">
 		<p class="note">
 			Messages always read with system voices (web voices only ever step in when
 			the native bridge is unavailable).
@@ -347,98 +351,98 @@
 				To install system voices, see the browser guidance below.
 			{/if}
 		</p>
-		{#if voiceLoadError}
-			<p class="note" role="alert">
-				Couldn't load the voice list: {voiceLoadError}
-			</p>
-		{/if}
-		{#if !voiceLoadError}
-			<!-- Language first: the picker below lists voices for this tag.
+	</SettingRow>
+	{#if voiceLoadError}
+		<p class="note" role="alert">
+			Couldn't load the voice list: {voiceLoadError}
+		</p>
+	{/if}
+	{#if !voiceLoadError}
+		<!-- Language first: the picker below lists voices for this tag.
 				Every option names an installed voice (or the follow-chat
 				target), so no tag ever needs typing. -->
-			<div class="voice-pick">
-				<span class="voice-pick-label" id="voice-lang-label"
-					>Voice language</span
+		<SettingRow
+			name="Voice language"
+			class="voice-pick"
+			labelId="voice-lang-label"
+		>
+			<div class="voice-pick-row">
+				<select
+					value={voiceLangTag}
+					aria-labelledby="voice-lang-label"
+					onchange={(e) => commitLangTag(e.currentTarget.value)}
 				>
+					{#each langOptions as option (option.value)}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+			</div>
+		</SettingRow>
+		{#if voiceOptions.length > 0}
+			<!-- A row, not a <label>: label clicks yank focus into
+					the select, which fights selecting this text. -->
+			<SettingRow
+				name="System voice ({voiceLangTag})"
+				class="voice-pick"
+				labelId="system-voice-label"
+			>
 				<div class="voice-pick-row">
 					<select
-						value={voiceLangTag}
-						aria-labelledby="voice-lang-label"
-						onchange={(e) => commitLangTag(e.currentTarget.value)}
+						value={settings.nativeVoiceId ?? ""}
+						aria-labelledby="system-voice-label"
+						onchange={(e) => {
+							settings.nativeVoiceId = e.currentTarget.value || null;
+						}}
 					>
-						{#each langOptions as option (option.value)}
-							<option value={option.value}>{option.label}</option>
+						<option value="">{autoLabel}</option>
+						{#each voiceOptions as option (option.id)}
+							<option value={option.id}>
+								{option.name}{option.lang.toLowerCase() ===
+								voiceLangTag.toLowerCase()
+									? ""
+									: ` · ${option.lang}`}
+							</option>
 						{/each}
 					</select>
-				</div>
-			</div>
-			{#if voiceOptions.length > 0}
-				<!-- Plain div + aria, not a <label>: label clicks yank focus
-					into the select, which fights selecting this text. -->
-				<div class="voice-pick">
-					<span class="voice-pick-label" id="system-voice-label"
-						>System voice ({voiceLangTag})</span
+					<button
+						type="button"
+						class="voice-refresh"
+						title={refreshingVoices ? "Checking…" : "Check for new voices"}
+						aria-label={refreshingVoices
+							? "Checking for new voices"
+							: "Check for new voices"}
+						onclick={() => void loadVoices(true)}
+						disabled={refreshingVoices}
 					>
-					<div class="voice-pick-row">
-						<select
-							value={settings.nativeVoiceId ?? ""}
-							aria-labelledby="system-voice-label"
-							onchange={(e) => {
-								settings.nativeVoiceId = e.currentTarget.value || null;
-							}}
-						>
-							<option value="">{autoLabel}</option>
-							{#each voiceOptions as option (option.id)}
-								<option value={option.id}>
-									{option.name}{option.lang.toLowerCase() ===
-									voiceLangTag.toLowerCase()
-										? ""
-										: ` · ${option.lang}`}
-								</option>
-							{/each}
-						</select>
-						<button
-							type="button"
-							class="voice-refresh"
-							title={refreshingVoices ? "Checking…" : "Check for new voices"}
-							aria-label={refreshingVoices
-								? "Checking for new voices"
-								: "Check for new voices"}
-							onclick={() => void loadVoices(true)}
-							disabled={refreshingVoices}
-						>
-							<ActionIcon kind="rerun" />
-						</button>
-					</div>
+						<ActionIcon kind="rerun" />
+					</button>
 				</div>
-			{:else if voicesLoaded}
-				{#if isWindowsShell || isLinuxShell}
-					<p class="note voice-note">
-						No {voiceLangName} voices installed — Auto uses the system default. Install
-						one following the steps above, then check again.
-					</p>
-				{:else}
-					<p class="note voice-note">
-						No premium or enhanced voices installed for {voiceLangTag} — Auto uses
-						your System Voice.
-					</p>
-				{/if}
+			</SettingRow>
+		{:else if voicesLoaded}
+			{#if isWindowsShell || isLinuxShell}
+				<p class="note voice-note">
+					No {voiceLangName} voices installed — Auto uses the system default. Install
+					one following the steps above, then check again.
+				</p>
+			{:else}
+				<p class="note voice-note">
+					No premium or enhanced voices installed for {voiceLangTag} — Auto uses your
+					System Voice.
+				</p>
 			{/if}
 		{/if}
-		{#if voiceRefreshNote !== ""}
-			<p class="note" role="status">{voiceRefreshNote}</p>
-		{/if}
-	</fieldset>
+	{/if}
+	{#if voiceRefreshNote !== ""}
+		<p class="note" role="status">{voiceRefreshNote}</p>
+	{/if}
 {:else if inShell && voiceLoadError && !androidUI}
-	<fieldset>
-		<legend>Voice engine</legend>
+	<SettingRow name="Voice engine" layout="stacked">
 		<p class="note" role="alert">
 			System voices are unavailable: {voiceLoadError}
 		</p>
-	</fieldset>
+	</SettingRow>
 {:else if !inShell && !androidUI}
-	<fieldset>
-		<legend>Voice engine</legend>
+	<SettingRow name="Voice engine" layout="stacked">
 		<p class="note">
 			This browser preview can only use web voices — browsers cannot install
 			voices themselves.
@@ -455,5 +459,5 @@
 				allow them).
 			{/if}
 		</p>
-	</fieldset>
+	</SettingRow>
 {/if}

@@ -5,6 +5,7 @@
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { micAvailable } from "$lib/voice";
 	import DictionariesSection from "./DictionariesSection.svelte";
+	import SettingRow from "./SettingRow.svelte";
 	import "./panels.css";
 
 	interface Props {
@@ -59,8 +60,7 @@
 		></textarea>
 	</label>
 	{#if thinkingSupport.options.length > 1}
-		<fieldset>
-			<legend>Thinking level</legend>
+		<SettingRow name="Thinking level">
 			<div
 				class="segmented thinking"
 				role="radiogroup"
@@ -76,12 +76,11 @@
 					>
 				{/each}
 			</div>
-		</fieldset>
+		</SettingRow>
 	{/if}
 	<!-- Older messages fold as newer ones arrive; a fold opened by
 	hand stays open. Both off by default. -->
-	<fieldset class="hover-row">
-		<legend>Fold older messages automatically</legend>
+	<SettingRow name="Fold older messages automatically">
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.autoFoldOwn} />
 			<span>My messages</span>
@@ -90,10 +89,9 @@
 			<input type="checkbox" bind:checked={settings.autoFoldAssistant} />
 			<span>AI replies</span>
 		</label>
-	</fieldset>
+	</SettingRow>
 	{#if androidUI}
-		<fieldset>
-			<legend>Messages</legend>
+		<SettingRow name="Messages" layout="stacked">
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hideButtons} />
 				<span>Show message buttons only when tapped</span>
@@ -105,14 +103,13 @@
 				/>
 				<span>Answer annotations in the passage's language</span>
 			</label>
-		</fieldset>
+		</SettingRow>
 		{#if dictionaries}
 			<DictionariesSection bind:settings />
 		{/if}
-		<!-- On/off features under one "Enable" legend, two columns where
+		<!-- On/off features under one "Enable" name, two columns where
 		the panel has room (one when narrow or zoomed). -->
-		<fieldset class="toggles">
-			<legend>Enable</legend>
+		<SettingRow name="Enable" layout="stacked" class="toggles">
 			<div class="toggle-grid">
 				<label class="check">
 					<input type="checkbox" bind:checked={settings.foldOnSwipe} />
@@ -147,12 +144,11 @@
 					<span>Microphone dictation</span>
 				</label>
 			</div>
-		</fieldset>
+		</SettingRow>
 	{:else}
 		<!-- One row for both hover toggles: the label names the behavior once,
 		each box names whose buttons it covers. Desktop-only (this branch). -->
-		<fieldset class="hover-row">
-			<legend>Show message buttons on hover</legend>
+		<SettingRow name="Show message buttons on hover">
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverUserActions} />
 				<span>My messages</span>
@@ -161,9 +157,8 @@
 				<input type="checkbox" bind:checked={settings.hoverAssistantActions} />
 				<span>LLM messages</span>
 			</label>
-		</fieldset>
-		<fieldset class="toggles">
-			<legend>Enable</legend>
+		</SettingRow>
+		<SettingRow name="Enable" layout="stacked" class="toggles">
 			<div class="toggle-grid">
 				<label class="check">
 					<input type="checkbox" bind:checked={settings.showMessageButtons} />
@@ -206,7 +201,7 @@
 					</label>
 				{/if}
 			</div>
-		</fieldset>
+		</SettingRow>
 		<label class="check">
 			<input
 				type="checkbox"

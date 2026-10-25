@@ -60,11 +60,11 @@ bookkeeping reads it). -->
 	inert={!open}
 	ondblclick={(e) => {
 		// Open space only: the tap must land on the panel's own
-		// padding (the aside, inner wrapper, or a section/fieldset
-		// box itself). Text, controls, and anything inside them
+		// padding (the aside, inner wrapper, or a section box
+		// itself). Text, controls, and anything inside them
 		// keep their behavior — including double-click text picks.
 		const t = e.target instanceof Element ? e.target : null;
-		if (t?.closest("aside, .settings-inner, section, fieldset") === t)
+		if (t?.closest("aside, .settings-inner, section") === t)
 			actions.drawerClose();
 	}}
 >

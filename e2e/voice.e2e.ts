@@ -283,15 +283,15 @@ test.describe("ios-voice", () => {
 	/** Message behavior sits in one Messages box, on/off features under
 	Enable; the bubble background is a look, so it lives in Look. */
 	test("message toggles grouped by kind", async ({ page }) => {
-		const box = page.locator(".settings-panel fieldset", {
+		const box = page.locator(".settings-panel .setting", {
 			hasText: "only when tapped"
 		});
-		await expect(box.locator("legend")).toHaveText("Messages");
+		await expect(box.locator(".setting-label")).toHaveText("Messages");
 		await expect(
 			box.getByText("Show message buttons only when tapped")
 		).toBeVisible();
-		const enable = page.locator(".settings-panel fieldset.toggles");
-		await expect(enable.locator("legend")).toHaveText("Enable");
+		const enable = page.locator(".settings-panel .setting.toggles");
+		await expect(enable.locator(".setting-label")).toHaveText("Enable");
 		await expect(enable.getByText("Haptic feedback")).toBeVisible();
 		await expect(
 			page.locator("#settings-look").getByText("Background on my messages")

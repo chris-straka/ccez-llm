@@ -1,5 +1,5 @@
-<!-- One continuous setting (volume, width): name and value on one
-line, a full-width track below. Only a press on the thumb moves it:
+<!-- One continuous setting (volume, width): the name, then the track
+and its value (under the name on a narrow sheet). Only a press on the thumb moves it:
 a click or tap elsewhere on the track does nothing (no jumps), and
 it never listens to the wheel, so scrolling past leaves it alone.
 Arrow keys step it when the thumb has focus. -->
@@ -9,6 +9,7 @@ Arrow keys step it when the thumb has focus. -->
 		sliderFraction,
 		sliderValueAt
 	} from "$lib/settingSteps";
+	import SettingRow from "./SettingRow.svelte";
 
 	interface Props {
 		label: string;
@@ -103,19 +104,15 @@ Arrow keys step it when the thumb has focus. -->
 	}
 </script>
 
-<div class="setting slider-setting">
-	<div class="setting-name">
-		<span class="setting-label">{label}</span>
-		{#if !isDefault}
-			<button
-				type="button"
-				class="setting-reset"
-				title={resetTitle}
-				onclick={() => onChange(defaultValue)}>Reset</button
-			>
-		{/if}
-		<span class="slider-value" aria-hidden="true">{format(value)}</span>
-	</div>
+<SettingRow name={label} class="slider-setting">
+	{#if !isDefault}
+		<button
+			type="button"
+			class="setting-reset"
+			title={resetTitle}
+			onclick={() => onChange(defaultValue)}>Reset</button
+		>
+	{/if}
 	<div
 		class="slider-hit"
 		class:dragging
@@ -141,4 +138,5 @@ Arrow keys step it when the thumb has focus. -->
 			></span>
 		</div>
 	</div>
-</div>
+	<span class="slider-value" aria-hidden="true">{format(value)}</span>
+</SettingRow>

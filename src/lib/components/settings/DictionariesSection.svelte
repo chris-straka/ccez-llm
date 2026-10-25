@@ -10,6 +10,7 @@
 		dictManager,
 		listDictionaries
 	} from "$lib/dictionary.svelte";
+	import SettingRow from "./SettingRow.svelte";
 
 	interface Props {
 		settings: AppSettings;
@@ -33,8 +34,7 @@
 <!-- Packs download per language on first use. With up to 49 of them
 the list lives in the manager (a wide sheet); Settings keeps the
 switch, a one-line summary and the way in. -->
-<fieldset class="dicts">
-	<legend>Dictionaries</legend>
+<SettingRow name="Dictionaries" layout="stacked" class="dicts">
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.wordCardDictionaries} />
 		<span>Download dictionaries automatically</span>
@@ -51,7 +51,7 @@ switch, a one-line summary and the way in. -->
 			onclick={() => (dictManager.open = true)}>Manage dictionaries</button
 		>
 	</div>
-</fieldset>
+</SettingRow>
 
 <style>
 	.dict-row {
@@ -60,7 +60,6 @@ switch, a one-line summary and the way in. -->
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem 1rem;
-		margin-top: 0.55rem;
 	}
 	.dict-sum {
 		font-size: 0.88rem;

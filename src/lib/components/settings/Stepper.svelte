@@ -1,5 +1,5 @@
-<!-- One stepped setting: name on the left, a large − value + control
-on the right. Each press moves one rung of the ladder, so a stray
+<!-- One stepped setting: name on the left, a − value + control on
+the right (Reset beside it when off the default). Each press moves one rung of the ladder, so a stray
 click changes the value by one visible step and never by a drag's
 worth; the value is shown once, inside the control. Arrow keys,
 Page keys, Home and End work on the focused value. A `typed` stepper
@@ -9,6 +9,7 @@ only for sizes that leave Settings itself alone, so a slip can't make
 it unreadable. -->
 <script lang="ts">
 	import { canStep, stepLadder } from "$lib/settingSteps";
+	import SettingRow from "./SettingRow.svelte";
 
 	interface Props {
 		/** Visible name. */
@@ -92,18 +93,15 @@ it unreadable. -->
 	}
 </script>
 
-<div class="setting stepper-setting">
-	<div class="setting-name">
-		<span class="setting-label">{label}</span>
-		{#if !isDefault}
-			<button
-				type="button"
-				class="setting-reset"
-				title={resetTitle}
-				onclick={() => onChange(defaultValue)}>Reset</button
-			>
-		{/if}
-	</div>
+<SettingRow name={label} class="stepper-setting">
+	{#if !isDefault}
+		<button
+			type="button"
+			class="setting-reset"
+			title={resetTitle}
+			onclick={() => onChange(defaultValue)}>Reset</button
+		>
+	{/if}
 	<div class="stepper">
 		<button
 			type="button"
@@ -184,4 +182,4 @@ it unreadable. -->
 			></button
 		>
 	</div>
-</div>
+</SettingRow>

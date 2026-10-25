@@ -76,6 +76,9 @@ export default defineConfig({
 				"**/prompt-focus.e2e.ts",
 				"**/margin-drag.e2e.ts",
 				"**/badge-open.e2e.ts",
+				// Settings rows: WebKit lays fieldset legends out unlike
+				// Chromium, so the row layout is pinned in both.
+				"**/settings-layout.e2e.ts",
 				// Drill playback: the shell's media element seeks unlike
 				// Chromium's (listen-mode's freshTrack).
 				"**/listen.e2e.ts"

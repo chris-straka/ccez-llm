@@ -12,6 +12,7 @@ ear); speed steps in 0.05× rungs. -->
 	import Slider from "./Slider.svelte";
 	import Stepper from "./Stepper.svelte";
 	import VoicePanel from "./VoicePanel.svelte";
+	import SettingRow from "./SettingRow.svelte";
 	import "./panels.css";
 
 	interface Props {
@@ -69,8 +70,7 @@ ear); speed steps in 0.05× rungs. -->
 		resetTitle="Reset to full volume"
 		onChange={(v: number) => (settings.listenVolume = v)}
 	/>
-	<fieldset>
-		<legend>Big-word reader</legend>
+	<SettingRow name="Big-word reader">
 		<div class="segmented" role="radiogroup" aria-label="Big-word reader">
 			{#each [["off", "Off"], ["follow", "Follows the voice"], ["tap", "Tap for next"]] as const as [mode, label] (mode)}
 				<button
@@ -82,18 +82,20 @@ ear); speed steps in 0.05× rungs. -->
 				>
 			{/each}
 		</div>
-		{#if settings.readerMode !== "off"}
-			<div class="segmented" role="radiogroup" aria-label="Words at a time">
-				{#each [[1, "1 word"], [2, "2"], [3, "3"], [0, "Auto"]] as const as [n, label] (n)}
-					<button
-						type="button"
-						role="radio"
-						aria-checked={settings.readerWords === n}
-						class:selected={settings.readerWords === n}
-						onclick={() => (settings.readerWords = n)}>{label}</button
-					>
-				{/each}
-			</div>
-		{/if}
-	</fieldset>
+		{#snippet below()}
+			{#if settings.readerMode !== "off"}
+				<div class="segmented" role="radiogroup" aria-label="Words at a time">
+					{#each [[1, "1 word"], [2, "2"], [3, "3"], [0, "Auto"]] as const as [n, label] (n)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={settings.readerWords === n}
+							class:selected={settings.readerWords === n}
+							onclick={() => (settings.readerWords = n)}>{label}</button
+						>
+					{/each}
+				</div>
+			{/if}
+		{/snippet}
+	</SettingRow>
 </section>

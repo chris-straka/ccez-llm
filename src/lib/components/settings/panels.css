@@ -75,130 +75,11 @@
 .settings-inner input[type="checkbox"]:hover {
 	box-shadow: 0 0 0 3px rgba(142, 142, 147, 0.45);
 }
-.settings-inner section {
-	border-top: 1px solid #e5e5ea;
-	border-top: 1px solid var(--line-soft);
-	padding: 1.1rem 0 2rem;
-}
-/* Every section ends the same way: its last control's own gap plus the
-	section's bottom padding, 3rem in all, a clear break before the
-	next group's divider. */
-.settings-inner section > :last-child {
-	margin-bottom: 1rem;
-}
-/* Touch gestures and Updates form a 2x2 grid: headings share the
-	top row, buttons share the row beneath. Sections go display:contents
-	so their children place directly on the grid. */
-.settings-inner .keys-updates {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 0.6rem 1.5rem;
-	align-items: center;
-	border-top: 1px solid #e5e5ea;
-	border-top: 1px solid var(--line-soft);
-	padding: 1.1rem 0;
-}
-.settings-inner .keys-updates > section {
-	display: contents;
-}
-.settings-inner .keys-updates > section:first-of-type > h2 {
-	grid-area: 1 / 1;
-	justify-self: start;
-}
-.settings-inner .keys-updates > section:first-of-type > button {
-	grid-area: 2 / 1;
-	justify-self: start;
-	/* Short label now: never wrap onto a second line. */
-	white-space: nowrap;
-}
-/* Scoped to the updates section (not :last-of-type): on web
-	builds the section stays out and the keys block must not slide
-	into column 2 by matching :last-of-type itself. */
-.settings-inner
-	.keys-updates
-	> section[aria-labelledby="updates-heading"]
-	> h2 {
-	grid-area: 1 / 2;
-	justify-self: start;
-}
-.settings-inner
-	.keys-updates
-	> section[aria-labelledby="updates-heading"]
-	> button {
-	grid-area: 2 / 2;
-	justify-self: start;
-}
-.settings-inner
-	.keys-updates
-	> section[aria-labelledby="licenses-heading"]
-	> h2 {
-	grid-area: 3 / 1;
-	justify-self: start;
-	margin-top: 0.6rem;
-}
-.settings-inner
-	.keys-updates
-	> section[aria-labelledby="licenses-heading"]
-	> button {
-	grid-area: 4 / 1;
-	justify-self: start;
-}
-.settings-inner .keys-updates h2 {
-	margin: 0;
-}
-/* Narrow sheet (zoomed phone, tiny window): the 2x2 footer no longer
-fits, so stack it in DOM order. The inner is the container (see
-SettingsDrawer.svelte); 17rem clears the two nowrap buttons + gap. */
-@container (max-width: 17rem) {
-	.settings-inner .keys-updates {
-		grid-template-columns: 1fr;
-	}
-	.settings-inner .keys-updates > section:first-of-type > h2,
-	.settings-inner .keys-updates > section:first-of-type > button,
-	.settings-inner
-		.keys-updates
-		> section[aria-labelledby="updates-heading"]
-		> h2,
-	.settings-inner
-		.keys-updates
-		> section[aria-labelledby="updates-heading"]
-		> button,
-	.settings-inner
-		.keys-updates
-		> section[aria-labelledby="licenses-heading"]
-		> h2,
-	.settings-inner
-		.keys-updates
-		> section[aria-labelledby="licenses-heading"]
-		> button {
-		grid-area: auto;
-	}
-	.settings-inner .keys-updates > section:first-of-type > button {
-		white-space: normal;
-	}
-}
-.settings-inner h2 {
-	font-size: 1.2rem;
-	font-weight: 650;
-	margin: 0 0 1rem;
-}
-.settings-inner label,
-.settings-inner .field,
-.settings-inner .voice-pick {
-	display: block;
-	font-size: 0.95rem;
-	font-weight: 550;
-	margin-bottom: 0.9rem;
-}
 /* The picker hangs below the install note with room to breathe, then
 	hands off tightly to Voice language (the fieldset adds its own 0.9rem). */
 .settings-inner .voice-pick {
 	margin-top: 0.9rem;
 	margin-bottom: 0.4rem;
-}
-.settings-inner .voice-pick-label {
-	display: block;
-	margin-bottom: 0.35rem;
 }
 /* Refresh rides on the picker row (beside the select, never a
 	paragraph of its own): a borderless ghost icon, so neither theme
@@ -265,15 +146,6 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 }
 .settings-inner details.note summary {
 	cursor: pointer;
-}
-.settings-inner details.note {
-	margin-top: 0.55rem;
-}
-/* Element-qualified: the `.note` margin shorthand below ties at
-	   class specificity but comes later, so a bare class loses and the
-	   gap collapses to zero. */
-.settings-inner details.note.provider-add {
-	margin-bottom: 1rem;
 }
 .settings-inner .provider-add form {
 	margin-top: 0.75rem;
@@ -402,7 +274,7 @@ select them. */
 	font-size: 0.84rem;
 	color: #6e6e73;
 	color: var(--muted);
-	margin: 0.2rem 0 0;
+	margin: 0;
 	/* Long error strings must wrap, never shove the panel sideways. */
 	overflow-wrap: anywhere;
 }
@@ -426,11 +298,6 @@ select them. */
 	color: #1c1c1e;
 	color: var(--ink);
 }
-/* Empty-inventory note: breathing room below before the next
-	control, and a quiet inline re-check action in the same voice. */
-.settings-inner .voice-note {
-	margin-bottom: 0.9rem;
-}
 /* Android empty-inventory note: one line, never wrapped. Slightly
 smaller so the full sentence fits a phone column; clips with an
 ellipsis on the narrowest screens instead of wrapping. */
@@ -440,20 +307,6 @@ ellipsis on the narrowest screens instead of wrapping. */
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-/* Add-voices blurb: breathing room below so it never touches the
-next label. */
-.settings-inner .voice-add {
-	margin-bottom: 0.9rem;
-}
-/* Voice language label breathes above its control (block: inline
-margins would not take). */
-.settings-inner .field > span {
-	display: block;
-	margin-bottom: 0.5rem;
-}
-.settings-inner .voice-pick-label {
-	margin-bottom: 0.5rem;
 }
 .settings-inner .key-state {
 	font-size: 0.87rem;
@@ -487,20 +340,8 @@ margins would not take). */
 .settings-inner .provider-row,
 .settings-inner .segmented {
 	display: flex;
-	gap: 0.5rem;
+	gap: 0.35rem;
 	flex-wrap: wrap;
-	margin-bottom: 1rem;
-}
-/* Thinking pills sit centered; the theme row keeps a tighter
-	footprint now that its heading carries the label. */
-.settings-inner .segmented.thinking {
-	justify-content: center;
-}
-.settings-inner .theme {
-	margin-bottom: 0.3rem;
-}
-.settings-inner .theme .segmented {
-	margin-bottom: 0.6rem;
 }
 /* Color-scheme tiles: each paints a thumbnail of its theme (page,
 drawer edge, own-message line, text lines, composer) from raw preview
@@ -749,43 +590,6 @@ a hollow dot (no color). */
 	cursor: not-allowed;
 	opacity: 1;
 }
-.settings-inner fieldset {
-	border: 0;
-	padding: 0;
-	margin: 0 0 1rem;
-}
-/* A group's pills end the group: the fieldset's own margin is the
-	gap below, never stacked on the pills' (30px against 16 elsewhere). */
-.settings-inner fieldset > .segmented:last-child {
-	margin-bottom: 0;
-}
-/* The voice engine block carries the tallest stack (segmented + note
-	+ picker): a breath more room before Voice language. */
-.settings-inner .voice-engine {
-	margin-bottom: 1.2rem;
-}
-/* Hover toggles share one legend row instead of repeating the label. */
-.settings-inner .hover-row {
-	display: flex;
-	gap: 1.2rem;
-	margin-bottom: 0.55rem;
-}
-.settings-inner .hover-row legend {
-	margin-bottom: 0.6rem;
-}
-.settings-inner legend {
-	font-size: 0.95rem;
-	font-weight: 550;
-	padding: 0;
-	margin-bottom: 0.4rem;
-}
-/* Fieldsets default to min-width:min-content, so one wide row would
-widen the whole sheet past a zoomed panel instead of wrapping
-inside it. Zero lets rows (checks, segmented, sliders) wrap in the
-available width; at 100% everything fits, so this never binds. */
-.settings-inner fieldset {
-	min-width: 0;
-}
 .settings-inner .check {
 	display: flex;
 	align-items: center;
@@ -802,49 +606,13 @@ this renders exactly as the bare text did. */
 	flex: 1;
 	min-width: 0;
 }
-/* Stacked checkboxes share one vertical rhythm whether they sit
-	in a fieldset or straight in the section: the box-to-text gap
-	above stays 0.5rem everywhere. */
-.settings-inner .check + .check {
-	margin-top: 0.55rem;
-}
-/* The hover toggles share one row (the legend names the behavior
-	once); the stacked rhythm above stays out of the row. The
-	fieldset carries no bottom margin itself, and neither do the
-	row's labels (the generic label margin would stretch the row,
-	leaving the boxes centered with slack below them inside the
-	box). The legend keeps its own gap above the row — it renders
-	as the fieldset's title line, not a row item. The gap below the
-	row comes from the check after it, sized to the section's
-	rendered rhythm: stacked checks collapse the generic 0.9rem
-	label margin with their 0.55rem top margin to 0.9rem, so the
-	row hands off the same. */
-.settings-inner fieldset.hover-row {
-	display: flex;
-	gap: 1.25rem;
-	align-items: center;
-	margin-bottom: 0;
-}
-.settings-inner fieldset.hover-row .check {
-	margin-bottom: 0;
-}
-.settings-inner fieldset.hover-row + .check,
-.settings-inner fieldset.hover-row + fieldset {
-	margin-top: 0.9rem;
-}
-/* On/off features: one "Enable" legend over a grid of checks, two
+/* On/off features: one "Enable" name over a grid of checks, two
 	columns where they fit (one when the panel is narrow or zoomed).
 	The grid gap replaces the stacked check rhythm. */
 .settings-inner .toggle-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(min(100%, 11.5rem), 1fr));
 	gap: 0.55rem 1.2rem;
-}
-.settings-inner .toggle-grid .check {
-	margin: 0;
-}
-.settings-inner fieldset.hover-row .check + .check {
-	margin-top: 0;
 }
 
 .settings-inner section > button {
@@ -884,10 +652,6 @@ this renders exactly as the bare text did. */
 	instead of the OS query, so the settings switch can pin it. */
 html[data-theme="dark"] .settings-inner .panel-head:focus-visible {
 	outline-color: #aeaeb2;
-}
-html[data-theme="dark"] .settings-inner section {
-	border-color: #38383a;
-	border-color: var(--line-soft);
 }
 html[data-theme="dark"] .settings-inner input[type="url"],
 html[data-theme="dark"] .settings-inner input[type="text"],
@@ -1039,7 +803,7 @@ grid with the list spanning every row keeps one scroll (find by
 eye still works) without changing the markup the sheet shares. */
 .windowed .settings-inner {
 	display: grid;
-	grid-template-columns: 11rem minmax(0, 1fr);
+	grid-template-columns: 10rem minmax(0, 40rem);
 	column-gap: 1.8rem;
 	align-items: start;
 }
@@ -1090,26 +854,6 @@ just below it. */
 .settings-inner section[id^="settings-"] {
 	scroll-margin-top: 3.5rem;
 }
-.settings-inner .settings-nav + section {
-	border-top: 0;
-}
-/* One setting per row. Steppers sit right of their name; sliders
-put name and value on one line over a full-width track. Rows are
-tall enough to hit with a thumb. Every row leaves the same 1rem of
-visible space below it (see the slider's hit row). */
-.settings-inner .setting {
-	margin: 0 0 1rem;
-}
-.settings-inner .setting-name {
-	display: flex;
-	align-items: baseline;
-	gap: 0.6rem;
-	min-width: 0;
-}
-.settings-inner .setting-label {
-	font-size: 0.95rem;
-	font-weight: 550;
-}
 .settings-inner .setting-reset {
 	padding: 0;
 	font: inherit;
@@ -1123,18 +867,6 @@ visible space below it (see the slider's hit row). */
 }
 .settings-inner .setting-reset:hover {
 	color: var(--ink);
-}
-.settings-inner .stepper-setting {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 0.4rem 0.8rem;
-	min-height: 2.75rem;
-}
-.settings-inner .stepper-setting .setting-name {
-	flex-direction: column;
-	gap: 0.1rem;
 }
 .settings-inner .stepper {
 	display: flex;
@@ -1218,25 +950,6 @@ no field chrome; focus shows the ring and a text caret. */
 .settings-inner .thumb:focus-visible {
 	outline: 2px solid var(--focus);
 	outline-offset: 3px;
-}
-.settings-inner .slider-value {
-	margin-left: auto;
-	font-size: 1rem;
-	font-weight: 600;
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-}
-/* Tall hit row, but only the thumb grabs (Slider.svelte); vertical
-strokes stay page scrolls on touch. */
-.settings-inner .slider-hit {
-	display: flex;
-	align-items: center;
-	height: 2.75rem;
-	padding: 0 0.8rem;
-	/* The hit row runs 10px past the thumb's bottom edge: tuck it
-	under the row below, so the visible gap matches the steppers'. */
-	margin-bottom: -0.625rem;
-	touch-action: pan-y;
 }
 .settings-inner .slider-track {
 	position: relative;
@@ -1324,30 +1037,26 @@ pushes the steppers down. */
 	width: 1.75rem;
 	height: 1.75rem;
 }
-/* Desktop window rows (owner, 2026-10-24): each group is a titled
-card of rows, the name on the left and its control on the right,
-in a column narrow enough that the two stay near each other.
-Steppers share one width so the controls line up; Reset sits
-beside the control, so a row never grows. Wide controls (theme
-tiles, colors, the Enable grid, fields) take the row under their
-name. */
-.settings-panel.windowed {
-	--set-card: color-mix(in srgb, var(--ink) 4.5%, var(--bg-chrome));
+/* Rows (owner, 2026-10-24): every group is a titled card of rows,
+on the phone sheet and in the desktop window alike. A row is a
+SettingRow (its name, then its control on the same line, or under
+it when stacked or when the sheet is too narrow), a lone checkbox,
+a field, or a note. Controls ride the raised ground, so they read
+as set into the card in either theme. */
+.settings-inner {
+	--set-card: color-mix(in srgb, var(--ink) 5%, transparent);
 	--set-radius: 12px;
 }
-.windowed .settings-inner {
-	grid-template-columns: 10rem minmax(0, 40rem);
+.settings-inner section {
+	padding: 1.4rem 0 0.4rem;
 }
-.windowed .settings-inner section {
-	border-top: 0;
-	padding: 1.5rem 0 0.6rem;
-}
-.windowed .settings-inner section > h2 {
+.settings-inner section > h2 {
 	margin: 0 0 0.55rem 0.15rem;
 	font-size: 1.02rem;
 	font-weight: 650;
 }
-.windowed .settings-inner section[id^="settings-"] > :not(h2) {
+.settings-inner section[id^="settings-"] > :not(h2),
+.settings-inner .keys-updates > section {
 	box-sizing: border-box;
 	min-height: 2.9rem;
 	margin: 0;
@@ -1355,218 +1064,202 @@ name. */
 	border-top: 1px solid var(--line-soft);
 	background: var(--set-card);
 }
-.windowed .settings-inner section[id^="settings-"] > h2 + * {
+.settings-inner section[id^="settings-"] > h2 + * {
 	border-top: 0;
 	border-radius: var(--set-radius) var(--set-radius) 0 0;
 }
-.windowed .settings-inner section[id^="settings-"] > :last-child {
-	margin-bottom: 0;
+.settings-inner section[id^="settings-"] > :last-child {
 	border-radius: 0 0 var(--set-radius) var(--set-radius);
 }
-.windowed .settings-inner section[id^="settings-"] > h2 + :last-child {
+.settings-inner section[id^="settings-"] > h2 + :last-child {
 	border-radius: var(--set-radius);
 }
-/* Names read as names, not headings. */
-.windowed .settings-inner .setting-label,
-.windowed .settings-inner legend,
-.windowed .settings-inner label,
-.windowed .settings-inner .field {
+/* Shortcuts, Updates and Licenses: one card, a row each (the web
+build has no Updates row, so the card rounds itself). */
+.settings-inner .keys-updates {
+	margin-top: 1.4rem;
+	border-radius: var(--set-radius);
+	overflow: hidden;
+}
+.settings-inner .keys-updates > section {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.8rem;
+	padding-block: 0.5rem;
+	border-top: 0;
+}
+.settings-inner .keys-updates > section + section {
+	border-top: 1px solid var(--line-soft);
+}
+.settings-inner .keys-updates > section > h2 {
+	margin: 0;
 	font-size: 0.95rem;
 	font-weight: 500;
 }
-/* Stepper row: name, Reset, control. */
-.windowed .settings-inner .stepper-setting {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto auto;
+.settings-inner .keys-updates > section > .note {
+	flex-basis: 100%;
+}
+/* A row: the name takes what's left, the control sits at the end and
+wraps under the name when the two don't fit side by side. */
+.settings-inner .setting {
+	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
-	column-gap: 0.8rem;
+	gap: 0.55rem 1rem;
 }
-.windowed .settings-inner .setting-name {
-	display: contents;
+.settings-inner .setting-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 0.95rem;
+	font-weight: 500;
 }
-.windowed .settings-inner .stepper-setting .setting-label {
-	grid-column: 1;
+.settings-inner .setting-control {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.45rem 0.8rem;
+	max-width: 100%;
+	margin-left: auto;
 }
-.windowed .settings-inner .setting-reset {
-	grid-column: 2;
+/* Stacked controls lay out as a one-column grid: a flex column would
+size an auto-fill grid inside it (Enable) at its narrowest. */
+.settings-inner .setting[data-layout="stacked"] > .setting-control,
+.settings-inner .setting-below {
+	flex: 1 1 100%;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0.55rem;
+	margin: 0;
+}
+.settings-inner .setting-below {
+	gap: 0.7rem;
+}
+.settings-inner .setting-below:empty {
+	display: none;
+}
+.settings-inner .setting-below > .segmented {
+	justify-content: flex-end;
+}
+.settings-inner section > label:not(.check) {
+	display: block;
+	font-size: 0.95rem;
+	font-weight: 500;
+}
+.settings-inner section > label > input,
+.settings-inner section > label > textarea,
+.settings-inner section > label > .model-row {
+	margin-top: 0.45rem;
+}
+.settings-inner .provider-add label {
+	display: block;
+	margin-top: 0.6rem;
+}
+.settings-inner .provider-add[open] summary {
+	margin-bottom: 0.2rem;
+}
+.settings-inner .setting-reset {
 	text-decoration: none;
 }
-.windowed .settings-inner .setting-reset:hover {
+.settings-inner .setting-reset:hover {
 	text-decoration: underline;
 }
-.windowed .settings-inner .stepper {
-	grid-column: 3;
+/* Steppers share one width so a column of them lines up. */
+.settings-inner .stepper {
 	width: 8.75rem;
 	margin: 0;
 	border-color: var(--line-soft);
-	background: var(--bg-chrome);
 }
-.windowed .settings-inner .step-btn {
+.settings-inner .step-btn {
 	width: 2.1rem;
 	height: 2.1rem;
 }
-.windowed .settings-inner .step-btn svg {
+.settings-inner .step-btn svg {
 	width: 0.85rem;
 	height: 0.85rem;
 }
-.windowed .settings-inner .step-value {
+.settings-inner .step-value {
 	flex: 1 1 auto;
 	width: auto;
 	font-size: 0.92rem;
 	font-weight: 550;
 }
-/* Slider row: name, track, value. */
-.windowed .settings-inner .slider-setting {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 13rem 3.6rem;
+.app[data-android] .settings-inner .stepper {
+	width: 10.5rem;
+}
+/* Slider: track, then value; a narrow sheet gives the pair the whole
+line under the name, and a thumb-sized hit row. */
+.settings-inner .slider-setting > .setting-control {
+	flex-wrap: nowrap;
+}
+.settings-inner .slider-hit {
+	display: flex;
 	align-items: center;
-	column-gap: 0.8rem;
-}
-.windowed .settings-inner .slider-setting .setting-label {
-	grid-area: 1 / 1;
-}
-.windowed .settings-inner .slider-setting .slider-hit {
-	grid-area: 1 / 2;
+	flex: none;
+	width: 13rem;
 	height: 2rem;
-	margin: 0;
 	padding: 0 0.6rem;
+	touch-action: pan-y;
 }
-.windowed .settings-inner .slider-setting .slider-value {
-	grid-area: 1 / 3;
-	margin: 0;
+.settings-inner .slider-value {
+	min-width: 3.4rem;
 	text-align: end;
 	font-size: 0.92rem;
 	font-weight: 550;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
 }
-.windowed .settings-inner .slider-track {
+.settings-inner .slider-track {
 	height: 0.3rem;
 }
-.windowed .settings-inner .thumb {
+.settings-inner .thumb {
 	width: 1.2rem;
 	height: 1.2rem;
 }
-/* Pills: compact, on the window's own ground. */
-.windowed .settings-inner .segmented button,
-.windowed .settings-inner .provider-row button {
+@container (max-width: 30rem) {
+	.settings-inner .slider-setting > .setting-control {
+		flex: 1 1 100%;
+	}
+	.settings-inner .slider-hit {
+		flex: 1 1 auto;
+		width: auto;
+		height: 2.75rem;
+	}
+}
+/* Pills: compact on desktop, thumb-sized on phones. */
+.settings-inner .segmented button,
+.settings-inner .provider-row button {
 	min-height: 1.95rem;
 	padding: 0.25rem 0.75rem;
 	font-size: 0.86rem;
-	font-weight: 400;
-	background: var(--bg-chrome);
 }
-.windowed .settings-inner .segmented button.selected,
-.windowed .settings-inner .provider-row button.selected {
-	font-weight: 600;
-	background: var(--selected-wash);
+.app[data-android] .settings-inner .segmented button,
+.app[data-android] .settings-inner .provider-row button {
+	min-height: 2.5rem;
+	padding: 0.35rem 0.85rem;
+	font-size: 0.92rem;
 }
-.windowed .settings-inner .segmented,
-.windowed .settings-inner .segmented.thinking {
-	gap: 0.35rem;
+.settings-inner .voice-pick .setting-control {
+	flex: 0 1 18rem;
+}
+.settings-inner .voice-pick[data-layout="stacked"] .setting-control {
+	flex: 1 1 100%;
+}
+.settings-inner .voice-pick-row select {
 	margin: 0;
 }
-/* Fieldsets: the legend's box goes (display: contents), so its name
-is plain text in the fieldset's grid. A rendered legend sits on the
-card's top edge, and WebKit keeps it there even floated. The name
-stacks over its control by default; a few pills, or a pair of
-checks, sit on the name's row instead. */
-.windowed .settings-inner fieldset {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr);
-	align-items: center;
-	gap: 0.55rem 1rem;
-	font-size: 0.95rem;
-	font-weight: 500;
+.settings-inner .toggle-grid {
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+	gap: 0.6rem 1.2rem;
 }
-.windowed .settings-inner fieldset > legend {
-	display: contents;
-}
-.windowed .settings-inner fieldset .note {
-	font-weight: 400;
-}
-.windowed
-	.settings-inner
-	fieldset:has(> legend + .segmented:last-child):not(:has(.swatches)) {
-	grid-template-columns: minmax(0, 1fr) auto;
-}
-.windowed
-	.settings-inner
-	fieldset:has(> legend + .segmented:last-child):not(:has(.swatches))
-	> .segmented {
-	justify-content: flex-end;
-}
-.windowed .settings-inner fieldset.hover-row {
-	grid-template-columns: minmax(0, 1fr) auto auto;
-}
-.windowed .settings-inner fieldset.hover-row .check,
-.windowed .settings-inner fieldset.hover-row + .check,
-.windowed .settings-inner fieldset.hover-row + fieldset,
-.windowed .settings-inner .check + .check {
-	margin: 0;
-}
-/* The grid gap spaces a fieldset's rows: their own margins go. */
-.windowed .settings-inner fieldset > label,
-.windowed .settings-inner fieldset > .dict-row {
-	margin: 0;
-}
-.windowed .settings-inner .dict-manage {
+.settings-inner .dict-manage {
 	min-height: 2rem;
 	padding: 0 0.85rem;
 	font-size: 0.86rem;
-	background: var(--bg-chrome);
 }
-/* Color scheme: the Light / Dark / System pills ride the name's row,
-the tiles span the card below. */
-.windowed .settings-inner fieldset.theme {
-	grid-template-columns: minmax(0, 1fr) auto;
-	row-gap: 0.7rem;
-}
-.windowed .settings-inner fieldset.theme > :not(legend):not(.segmented) {
-	grid-column: 1 / -1;
-}
-.windowed .settings-inner .toggle-grid {
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 0.6rem 1.2rem;
-}
-.windowed .settings-inner section > label > textarea,
-.windowed .settings-inner section > label > input {
-	margin-top: 0.45rem;
-}
-.windowed .settings-inner .provider-row {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.35rem;
-}
-/* Shortcuts, Updates and Licenses: one card of rows, the name
-left, its button right. */
-.windowed .settings-inner .keys-updates {
-	display: block;
-	margin-top: 1.5rem;
-	padding: 0;
-	border-top: 0;
-	border-radius: var(--set-radius);
-	background: var(--set-card);
-}
-.windowed .settings-inner .keys-updates > section {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.8rem;
-	min-height: 2.9rem;
-	box-sizing: border-box;
-	padding: 0.5rem 1rem;
-}
-.windowed .settings-inner .keys-updates > section + section {
-	border-top: 1px solid var(--line-soft);
-}
-.windowed .settings-inner .keys-updates > section > h2 {
-	margin: 0;
-	font-size: 0.95rem;
-	font-weight: 500;
-}
-.windowed .settings-inner .keys-updates > section > button {
-	margin: 0;
+.settings-inner .keys-updates > section > button {
 	padding: 0.3rem 0.85rem;
 	font-size: 0.86rem;
-	background: var(--bg-chrome);
 }

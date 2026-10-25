@@ -12,6 +12,7 @@
 		type SchemeSide,
 		type ThemeMode
 	} from "$lib/settings";
+	import SettingRow from "./SettingRow.svelte";
 	import "./panels.css";
 
 	interface Props {
@@ -97,8 +98,7 @@
 
 <section id="settings-look" aria-labelledby="look-heading">
 	<h2 id="look-heading">Look</h2>
-	<fieldset class="theme">
-		<legend>Color scheme</legend>
+	<SettingRow name="Color scheme" class="theme">
 		<div
 			class="segmented scheme-side"
 			role="radiogroup"
@@ -115,41 +115,42 @@
 				>
 			{/each}
 		</div>
-		{#each sides as side (side)}
-			{#if sides.length > 1}
-				<span class="tiles-side" aria-hidden="true">{SIDE_LABELS[side]}</span>
-			{/if}
-			<!-- Each tile is a small painting of its style (raw preview
-			hexes: the tokens only resolve for the active theme). -->
-			<div
-				class="theme-tiles"
-				role="group"
-				aria-label="{SIDE_LABELS[side]} style"
-			>
-				{#each stylesFor(side) as style (`${side}-${style}`)}
-					<button
-						type="button"
-						class="theme-tile"
-						data-tile="{side}-{style}"
-						aria-pressed={currentFor(side) === style}
-						title={meta(side, style)[1]}
-						onclick={() => apply(pickSchemeStyle(choice, side, style))}
-					>
-						<span class="theme-preview" aria-hidden="true">
-							<span class="tp-drawer"></span>
-							<span class="tp-line tp-own"></span>
-							<span class="tp-line"></span>
-							<span class="tp-line tp-short"></span>
-							<span class="tp-composer"></span>
-						</span>
-						<span class="theme-name">{meta(side, style)[0]}</span>
-					</button>
-				{/each}
-			</div>
-		{/each}
-	</fieldset>
-	<fieldset>
-		<legend>My message color</legend>
+		{#snippet below()}
+			{#each sides as side (side)}
+				{#if sides.length > 1}
+					<span class="tiles-side" aria-hidden="true">{SIDE_LABELS[side]}</span>
+				{/if}
+				<!-- Each tile is a small painting of its style (raw preview
+				hexes: the tokens only resolve for the active theme). -->
+				<div
+					class="theme-tiles"
+					role="group"
+					aria-label="{SIDE_LABELS[side]} style"
+				>
+					{#each stylesFor(side) as style (`${side}-${style}`)}
+						<button
+							type="button"
+							class="theme-tile"
+							data-tile="{side}-{style}"
+							aria-pressed={currentFor(side) === style}
+							title={meta(side, style)[1]}
+							onclick={() => apply(pickSchemeStyle(choice, side, style))}
+						>
+							<span class="theme-preview" aria-hidden="true">
+								<span class="tp-drawer"></span>
+								<span class="tp-line tp-own"></span>
+								<span class="tp-line"></span>
+								<span class="tp-line tp-short"></span>
+								<span class="tp-composer"></span>
+							</span>
+							<span class="theme-name">{meta(side, style)[0]}</span>
+						</button>
+					{/each}
+				</div>
+			{/each}
+		{/snippet}
+	</SettingRow>
+	<SettingRow name="My message color" layout="stacked">
 		<div
 			class="segmented swatches"
 			role="radiogroup"
@@ -170,7 +171,7 @@
 				>
 			{/each}
 		</div>
-	</fieldset>
+	</SettingRow>
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.ownBubble} />
 		<span>Background on my messages</span>

@@ -1784,9 +1784,9 @@ test.describe("touch", () => {
 		expect(
 			Math.abs(listWidth - Math.min(viewport * 0.78, 320))
 		).toBeLessThanOrEqual(2);
-		await expect(panel.locator('legend:has-text("Voice engine")')).toHaveCount(
-			0
-		);
+		await expect(
+			panel.getByRole("group", { name: "Voice engine" })
+		).toHaveCount(0);
 		// Phones never auto-read selections: no toggle, no behavior.
 		await expect(
 			panel.locator('label:has-text("Read selections aloud on release")')

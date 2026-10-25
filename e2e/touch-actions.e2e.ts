@@ -229,9 +229,7 @@ test("no overlay menu checkbox under Messages", async ({ page }) => {
 	await seedChat(page, {});
 	await swipeTwoFingerLeft(page);
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
-	const messages = page.locator("fieldset", {
-		has: page.locator("legend", { hasText: "Messages" })
-	});
+	const messages = page.getByRole("group", { name: "Messages", exact: true });
 	await expect(
 		messages.locator('label.check:has-text("overlay menu")')
 	).toHaveCount(0);
