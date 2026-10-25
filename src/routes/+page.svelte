@@ -453,6 +453,7 @@
 		isMathTarget,
 		isPromptEditorTarget,
 		isPromptTarget,
+		isComposerSurfaceTarget,
 		isScrollEnterOwnedTarget,
 		isSidebarTarget,
 		isSpaceInteractiveTarget,
@@ -594,7 +595,6 @@
 	} from "$lib/viewportReflow";
 	import {
 		isPromptIdle,
-		alwaysReparkDue,
 		PROMPT_PRESS_GRACE_MS,
 		stageOwnedByOverlay,
 		pointInRect,
@@ -3668,9 +3668,23 @@
 			const downTarget = event.target instanceof Element ? event.target : null;
 			if (event.button === 0) {
 				// Stamp composer presses for onFocusOutIdle's WebKit
-				// guard (see promptPressAt): a press inside the composer
-				// whose focusout lands nowhere is still in flight.
-				if (downTarget?.closest(".prompt")) promptPressAt = Date.now();
+				// guard (see promptPressAt): a press on the composer
+				// whose focusout lands nowhere is still in flight. A
+				// press anywhere else clears it: that focusout is the
+				// user leaving, so it hides.
+				const onComposer = isComposerSurfaceTarget(downTarget);
+				promptPressAt = onComposer ? Date.now() : 0;
+				// WebKit leaves focus on the page after a composer
+				// button press, so a later press elsewhere gets no
+				// focusout at all: under always-hide, that press is
+				// the departure.
+				if (
+					!onComposer &&
+					settings.promptIdleSec === PROMPT_IDLE_ALWAYS &&
+					!promptIdle &&
+					!isPromptTarget(document.activeElement)
+				)
+					hideForAlways(downTarget);
 			}
 			idleDown =
 				event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
@@ -3765,8 +3779,7 @@
 			// itself. Parking here would hide the composer and eat the
 			// press's click behind pointer-events:none — the button
 			// (or pill review toggle) never runs. Skip the hide; the
-			// idle ticker re-parks a genuinely unfocused composer once
-			// the press grace runs out (alwaysReparkDue), so an
+			// next press off the composer hides it (onIdleDown), so an
 			// over-skip self-heals.
 			// A focusout from a detaching or freshly inert node
 			// (sidebar collapse inerting its focused row, modal
@@ -3863,16 +3876,6 @@
 		// instead of showing a dead cloud provider.
 		if (typeof navigator !== "undefined" && !navigator.onLine) handleOffline();
 		const timer = window.setInterval(() => {
-			if (
-				alwaysReparkDue({
-					alwaysMode: setting === PROMPT_IDLE_ALWAYS,
-					idle: promptIdle,
-					sincePressMs: Date.now() - promptPressAt
-				})
-			) {
-				hideForAlways(document.activeElement);
-				return;
-			}
 			if (!isPromptIdle(lastInputAt, Date.now(), idleSec)) return;
 			if (
 				!shouldIdleHide({

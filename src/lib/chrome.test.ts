@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	alwaysReparkDue,
-	PROMPT_PRESS_GRACE_MS,
 	clampPromptIdleSec,
 	columnBounds,
 	formatIdleTimeout,
@@ -38,26 +36,6 @@ describe("isPromptIdle", () => {
 	it("restores the instant fresh input lands", () => {
 		const now = 100_000;
 		expect(isPromptIdle(now, now, 6)).toBe(false);
-	});
-});
-
-describe("alwaysReparkDue", () => {
-	const due = (o: Partial<Parameters<typeof alwaysReparkDue>[0]>) =>
-		alwaysReparkDue({
-			alwaysMode: true,
-			idle: false,
-			sincePressMs: PROMPT_PRESS_GRACE_MS,
-			...o
-		});
-	it("re-parks a visible composer once the press grace runs out", () => {
-		expect(due({})).toBe(true);
-	});
-	it("waits out a press still in flight", () => {
-		expect(due({ sincePressMs: PROMPT_PRESS_GRACE_MS - 1 })).toBe(false);
-	});
-	it("leaves a hidden composer and timed modes alone", () => {
-		expect(due({ idle: true })).toBe(false);
-		expect(due({ alwaysMode: false })).toBe(false);
 	});
 });
 

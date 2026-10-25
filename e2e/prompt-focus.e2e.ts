@@ -135,22 +135,47 @@ test("stepping chats while reading stays out of the prompt", async ({
 	expect(await promptFocused(page)).toBe(false);
 });
 
-/** Always-hide's backstop: a focusout skipped as a press in flight
-(WebKit blurs the editor to nowhere when a composer button is
-pressed) used to leave the composer up without focus for good; the
-ticker now re-hides it once the press grace runs out. */
-test("a composer left visible without focus hides again", async ({ page }) => {
+/** WebKit leaves focus on the page when a composer button is pressed
+(here: a press on the composer, then the editor blurring to
+nowhere). The composer stays up while it's in use, and the next
+press anywhere else hides it, focusout or not. */
+test("a press on the composer keeps it up; a press elsewhere hides it", async ({
+	page
+}) => {
+	await seedTwoChats(page);
+	await focusPrompt(page);
+	const press = (selector: string) =>
+		page.evaluate((selector) => {
+			document
+				.querySelector(selector)
+				?.dispatchEvent(
+					new PointerEvent("pointerdown", { bubbles: true, button: 0 })
+				);
+		}, selector);
+	await press(".prompt");
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur()
+	);
+	await page.waitForTimeout(2_000);
+	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/);
+	await press("article .rendered");
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/);
+});
+
+/** Clicking into the prompt and straight onto the text used to leave
+it up: the blur landed inside the composer press's grace and was
+skipped. The press on the text clears that grace. */
+test("clicking from the prompt straight onto the text hides it", async ({
+	page
+}) => {
 	await seedTwoChats(page);
 	await focusPrompt(page);
 	await page.evaluate(() => {
-		const prompt = document.querySelector(".prompt");
-		prompt?.dispatchEvent(
-			new PointerEvent("pointerdown", { bubbles: true, button: 0 })
-		);
+		const down = () =>
+			new PointerEvent("pointerdown", { bubbles: true, button: 0 });
+		document.querySelector(".prompt")?.dispatchEvent(down());
+		document.querySelector("article .rendered")?.dispatchEvent(down());
 		(document.activeElement as HTMLElement | null)?.blur();
 	});
-	expect(await promptFocused(page)).toBe(false);
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
-		timeout: 5_000
-	});
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/);
 });

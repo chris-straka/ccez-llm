@@ -172,6 +172,15 @@ export function isPromptTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, PROMPT_SELECTOR) !== null;
 }
 
+/** The composer and the surfaces it opens outside its own box: the
+reply-language menus, its attachment chips, the annotations review. */
+const COMPOSER_SURFACE_SELECTOR = `${PROMPT_SELECTOR}, .lang-menus, .attachments, .review`;
+
+/** True on the composer or one of its outside surfaces. */
+export function isComposerSurfaceTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, COMPOSER_SURFACE_SELECTOR) !== null;
+}
+
 /**
  * True for Shift+D's wider keep-out: fields, rich editors, buttons,
  * and links all keep their own keys.

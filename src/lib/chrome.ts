@@ -18,21 +18,6 @@ import {
 export const PROMPT_PRESS_GRACE_MS = 1500;
 
 /**
- * Always-hide's backstop, checked by the idle ticker: a composer left
- * visible after a focusout was skipped as a press in flight (or a
- * summon whose focus never landed) gets re-parked once the press
- * grace runs out. The caller then applies the same hide rules as a
- * focusout to wherever focus is now.
- */
-export function alwaysReparkDue(o: {
-	alwaysMode: boolean;
-	idle: boolean;
-	sincePressMs: number;
-}): boolean {
-	return o.alwaysMode && !o.idle && o.sincePressMs >= PROMPT_PRESS_GRACE_MS;
-}
-
-/**
  * Whether the prompt should hide: the last input was at least
  * `idleSec` seconds before `now` (epoch millis both). A non-positive
  * timeout disables hiding entirely.
