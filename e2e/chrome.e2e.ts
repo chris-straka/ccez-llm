@@ -509,11 +509,19 @@ test("clearing a highlight never summons the prompt", async ({ page }) => {
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	// Drag-select a word: the drag itself never summons (over 6px), the
 	// menu takes the highlight.
-	const body = page.locator("article.assistant .rendered").first();
-	const box = await body.boundingBox();
-	if (!box) throw new Error("message has no box");
-	// Along the first line: taller Linux font metrics push the middle
-	// of a long reply below the viewport.
+	// A line of whichever message sits mid-window: the chat opens at
+	// its end, and font metrics (Mac vs Linux) decide which reply that
+	// is and where its first line falls.
+	const line = await page.evaluate(() => {
+		const mid = innerHeight / 2;
+		for (const el of document.querySelectorAll("article .rendered")) {
+			const r = el.getBoundingClientRect();
+			if (r.top < mid && r.bottom > mid) return { x: r.left, y: mid };
+		}
+		return null;
+	});
+	if (!line) throw new Error("no message crosses the middle of the window");
+	const box = { x: line.x, y: line.y - 12 };
 	await page.mouse.move(box.x + 20, box.y + 12);
 	await page.mouse.down();
 	await page.mouse.move(box.x + 120, box.y + 12, { steps: 5 });

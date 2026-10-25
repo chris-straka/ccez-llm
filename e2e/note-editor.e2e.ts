@@ -29,9 +29,11 @@ async function geometry(page: Page, row: number): Promise<Geometry> {
 			[n]!.getBoundingClientRect();
 		const reg = (CSS as unknown as { highlights: Map<string, Iterable<Range>> })
 			.highlights;
-		const wash = [
-			...(reg.get("ccez-ann") ?? reg.get("ccez-ann-d1") ?? [])
-		] as Range[];
+		// The wash takes a deeper name where it overlaps other inks
+		// (ccez-ann-d1 … -d3): read whichever it has.
+		const wash = [...reg]
+			.filter(([name]) => /^ccez-ann(-d\d)?$/.test(name))
+			.flatMap(([, ranges]) => [...ranges]);
 		const quoteBottom = Math.max(
 			...wash.map((r) => r.getBoundingClientRect().bottom)
 		);
