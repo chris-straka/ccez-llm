@@ -132,6 +132,10 @@
 					<span>AI chat titles</span>
 				</label>
 				<label class="check">
+					<input type="checkbox" bind:checked={settings.correctByDefault} />
+					<span>Correct me in a language</span>
+				</label>
+				<label class="check">
 					<input type="checkbox" bind:checked={settings.hapticsEnabled} />
 					<span>Haptic feedback</span>
 				</label>
@@ -175,6 +179,10 @@
 				<label class="check">
 					<input type="checkbox" bind:checked={settings.aiTitles} />
 					<span>AI chat titles</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.correctByDefault} />
+					<span>Correct me in a language</span>
 				</label>
 				<label class="check">
 					<input type="checkbox" bind:checked={settings.replyNotifications} />

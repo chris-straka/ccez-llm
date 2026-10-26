@@ -9357,7 +9357,16 @@
 	installs its voice. Unknown codes never reach the field. */
 	function setReplyLang(code: string): void {
 		if (!replyLanguageFor(code)) return;
+		// A chat taking up a language starts correcting, when that's the
+		// default (Settings); switching between languages keeps the toggle.
+		const hadLang = activeChat(chatState).replyLang !== null;
 		setChatReplyLang(chatState, chatState.activeChatId, code);
+		if (!hadLang)
+			setChatCorrection(
+				chatState,
+				chatState.activeChatId,
+				settings.correctByDefault
+			);
 		openLangMenu = null;
 		const empty = activeChat(chatState).messages.length === 0;
 		// Desktop: a pick only sets the reply language (the send
@@ -9420,6 +9429,11 @@
 		const fallback = settings.replyLang;
 		if (fallback && replyLanguageFor(fallback)) {
 			setChatReplyLang(chatState, chatState.activeChatId, fallback);
+			setChatCorrection(
+				chatState,
+				chatState.activeChatId,
+				settings.correctByDefault
+			);
 			return fallback;
 		}
 		return null;
@@ -9435,7 +9449,7 @@
 		listenMode.close();
 	}
 
-	/** Correction toggle lives on the active chat; default off. */
+	/** Correction toggle lives on the active chat; a chat taking up a language starts with Settings' default. */
 	function toggleCorrection(): void {
 		const current = activeChat(chatState).correction ?? false;
 		setChatCorrection(chatState, chatState.activeChatId, !current);

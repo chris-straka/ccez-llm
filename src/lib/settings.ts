@@ -338,6 +338,12 @@ export interface AppSettings {
 	/** What an empty chat in a language opens: news or listening. */
 	emptyChatMode: "news" | "listen";
 	/**
+	 * Turn Correct on when a chat picks up a reply language (⌘1…, the
+	 * flag menus). On by default (owner, 2026-10-25); the chat's own
+	 * toggle still turns it off.
+	 */
+	correctByDefault: boolean;
+	/**
 	 * Name each chat with one short model call after its first reply
 	 * (renames always win). On by default; costs a few tokens per chat.
 	 */
@@ -610,6 +616,7 @@ export function defaultSettings(): AppSettings {
 		wordCardDictionaries: true,
 		dictionarySkip: [],
 		emptyChatMode: "news",
+		correctByDefault: true,
 		aiTitles: true
 	};
 }
@@ -867,6 +874,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			: [];
 		if (merged.emptyChatMode !== "news" && merged.emptyChatMode !== "listen")
 			merged.emptyChatMode = "news";
+		if (typeof merged.correctByDefault !== "boolean")
+			merged.correctByDefault = true;
 		if (typeof merged.annotationAnswersInPassageLang !== "boolean")
 			merged.annotationAnswersInPassageLang = false;
 		if (typeof merged.wordCardDictionaries !== "boolean")

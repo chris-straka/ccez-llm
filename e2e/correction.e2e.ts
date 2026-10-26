@@ -56,3 +56,32 @@ test("correction toggle hides without a reply language", async ({ page }) => {
 	});
 	await expect(page.locator(".prompt-tools .correct-btn")).toHaveCount(0);
 });
+
+// Owner, 2026-10-25: picking a language (⌘1 in the shell, a flag here: the same setReplyLang) starts correcting; Settings can turn that default off.
+for (const [on, pressed] of [
+	[undefined, "true"],
+	[false, "false"]
+] as const) {
+	test(`picking a language: Correct ${pressed === "true" ? "on by default" : "stays off with the default off"}`, async ({
+		page
+	}) => {
+		await seedChat(
+			page,
+			[],
+			null,
+			on === undefined ? {} : { correctByDefault: on }
+		);
+		await page.goto("/");
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
+		await expect(page.locator(".prompt-tools .correct-btn")).toHaveCount(0);
+		await page.locator('.lang-menu button:has-text("Europe")').click();
+		await page
+			.locator('.lang-list [role="menuitem"]', { hasText: "French" })
+			.click();
+		const toggle = page.locator(".prompt-tools .correct-btn");
+		await expect(toggle).toBeVisible();
+		await expect(toggle).toHaveAttribute("aria-pressed", pressed);
+	});
+}
