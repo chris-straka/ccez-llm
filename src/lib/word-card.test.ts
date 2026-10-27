@@ -392,6 +392,21 @@ describe("cardWordRow", () => {
 			"l'annonce"
 		);
 		expect(annonce).toMatchObject({ gender: "f.", facts: [] });
+		// A singular with a case ending keeps the article before it.
+		expect(
+			cardWordRow(
+				{
+					meaning: "exit ban",
+					parts: [
+						{ text: "Ausreise", label: "Ausreise", kind: "core" },
+						{ text: "verbot", label: "Verbot", kind: "core" },
+						{ text: "s", label: "genitive", kind: "role" }
+					],
+					facts: [{ text: "das Ausreiseverbot", kind: "agree" }]
+				},
+				"Ausreiseverbots"
+			)
+		).toMatchObject({ article: "das", gender: "", facts: [] });
 		// A fact about a form the split doesn't show stays a pill.
 		expect(
 			cardWordRow(

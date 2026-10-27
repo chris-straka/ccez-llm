@@ -949,9 +949,10 @@ const ARTICLE_GENDER: Record<string, string> = {
  * The word row without repeats: a label that only repeats its piece
  * goes (extension labeled extension), and a gender fact that is just
  * an article and this very word (une extension) becomes the ghost
- * article before the word instead of a pill. A gender fact for this
- * word's base (le lycéen for lycéens) becomes a gender letter under
- * the stem. A lone piece with nothing to add shows only to carry the
+ * article before the word instead of a pill, as does one for a
+ * singular word's base (das Ausreiseverbot for Ausreiseverbots). A
+ * gender fact for a plural's base (le lycéen for lycéens) becomes a
+ * gender letter under the stem. A lone piece with nothing to add shows only to carry the
  * article or the letter. Pure.
  */
 export function cardWordRow(card: WordCard, quote: string): WordRow {
@@ -961,6 +962,22 @@ export function cardWordRow(card: WordCard, quote: string): WordRow {
 			.filter((p) => p.kind === "core")
 			.flatMap((p) => [spelling(p.text), spelling(p.label)])
 	);
+	// A singular word with an ending (Ausreiseverbot + s): its pieces up
+	// to the last stem spell the base, and the article still reads
+	// right before it. A plural (lycéen + s) or a word that opens with
+	// its own article (l' + annonce) takes the letter instead.
+	const lastCore = card.parts.map((p) => p.kind).lastIndexOf("core");
+	const singularBase =
+		lastCore >= 0 &&
+		card.parts[0]?.kind === "core" &&
+		!card.parts.some((p) => /plural/i.test(p.label))
+			? spelling(
+					card.parts
+						.slice(0, lastCore + 1)
+						.map((p) => p.text)
+						.join("")
+				)
+			: "";
 	let article = "";
 	let gender = "";
 	const facts = card.facts.filter((f) => {
@@ -969,7 +986,7 @@ export function cardWordRow(card: WordCard, quote: string): WordRow {
 		if (!m) return true;
 		const said = m[1]!.trim();
 		const base = spelling(m[2]!);
-		if (base === word) {
+		if (base === word || base === singularBase) {
 			article = said;
 			return false;
 		}
