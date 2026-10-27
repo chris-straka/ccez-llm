@@ -1,3 +1,4 @@
+import { APP_HELP_URL } from "../app-help";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
 	OpenAICompatProvider,
@@ -563,6 +564,54 @@ describe("stream", () => {
 		expect(retracted).toBe(1);
 		expect(result.content).toBe("fetched!");
 		expect(seen.join("")).toBe("Looking that up. fetched!");
+	});
+
+	it("answers the app's help address with its guide, never the web", async () => {
+		const bodies: Array<{
+			messages: Array<{ role: string; content: string }>;
+		}> = [];
+		const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+			bodies.push(JSON.parse(init.body as string) as (typeof bodies)[number]);
+			if (fetchMock.mock.calls.length === 1)
+				return sseResponse([
+					`data: ${JSON.stringify({
+						choices: [
+							{
+								delta: {
+									tool_calls: [
+										{
+											index: 0,
+											id: "call_1",
+											function: {
+												name: "fetch_url",
+												arguments: JSON.stringify({ url: APP_HELP_URL })
+											}
+										}
+									]
+								}
+							}
+						]
+					})}\n\ndata: [DONE]\n\n`
+				]);
+			if ((bodies.at(-1) as { stream?: boolean }).stream === false)
+				return jsonResponse({
+					choices: [{ message: { content: "Select it, then A." } }]
+				});
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"Select it, then A."}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async () => "page text");
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const result = await provider.stream(
+			[{ role: "user", content: "how do I annotate again?" }],
+			{ onToken: () => {} }
+		);
+		expect(fetchPage).not.toHaveBeenCalled();
+		const tool = bodies.at(-1)?.messages.find((m) => m.role === "tool");
+		expect(tool?.content).toContain("## Annotating");
+		expect(result.content).toBe("Select it, then A.");
 	});
 
 	it("never retracts a plain turn with no tool calls", async () => {

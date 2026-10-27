@@ -8,6 +8,7 @@ import {
 	ProviderError
 } from "./types";
 import { thinkingFor, resolveThinkingId } from "./thinking";
+import { APP_HELP_URL, appHelpHere } from "../app-help";
 import { fetchToolDef, parseFetchCall } from "../tools";
 import { fetchPageText } from "../fetchPage";
 
@@ -227,6 +228,9 @@ export class OpenAICompatProvider implements ChatProvider {
 		call: { id: string; url: string },
 		signal: AbortSignal | undefined
 	): Promise<string> {
+		// The app's own guide answers its reserved address, never the
+		// network (app-help.ts).
+		if (call.url === APP_HELP_URL) return appHelpHere();
 		const run = this.deps.fetchPage ?? fetchPageText;
 		try {
 			return await run(call.url, signal);

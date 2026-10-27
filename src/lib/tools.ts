@@ -1,3 +1,5 @@
+import { APP_HELP_URL } from "./app-help";
+
 /**
  * Model-driven web lookup: the `fetch_url` tool the chat endpoint can
  * call mid-turn, so the MODEL fetches pages — the user never pastes
@@ -42,7 +44,9 @@ export function fetchToolDef(): FetchToolDef {
 				"Call it at once when you need a page — never write that you will fetch without calling. " +
 				"When a fetch fails, call again with a different URL instead of stopping. " +
 				`To search the web, fetch ${SEARCH_URL_PREFIX}<url-encoded query>: it returns the top results ` +
-				"as one line each with their URLs, so fetch the best result next instead of guessing a URL.",
+				"as one line each with their URLs, so fetch the best result next instead of guessing a URL. " +
+				"For questions about this app itself (how to annotate, its shortcuts, gestures or settings), " +
+				`fetch ${APP_HELP_URL} and answer from that guide.`,
 			parameters: {
 				type: "object",
 				properties: {

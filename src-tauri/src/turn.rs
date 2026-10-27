@@ -394,7 +394,7 @@ fn stream_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) ->
             "type": "function",
             "function": {
                 "name": "fetch_url",
-                "description": "Fetch a web page and return its readable text. Use this when the user asks about a URL or when current/external facts would answer better than training data. The user doesn't know it exists. Do not use it when no external information is required. It returns the page text (truncated when long) or a one-line error — never raw HTML. RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest headlines as one line each. Prefer a feed URL you know for the outlet asked about. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping. To search the web, fetch https://html.duckduckgo.com/html/?q=<url-encoded query>: it returns the top results as one line each with their URLs, so fetch the best result next instead of guessing a URL.",
+                "description": "Fetch a web page and return its readable text. Use this when the user asks about a URL or when current/external facts would answer better than training data. The user doesn't know it exists. Do not use it when no external information is required. It returns the page text (truncated when long) or a one-line error — never raw HTML. RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest headlines as one line each. Prefer a feed URL you know for the outlet asked about. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping. To search the web, fetch https://html.duckduckgo.com/html/?q=<url-encoded query>: it returns the top results as one line each with their URLs, so fetch the best result next instead of guessing a URL. For questions about this app itself (how to annotate, its shortcuts, gestures or settings), fetch https://ccez-llm.invalid/help and answer from that guide.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -417,6 +417,16 @@ fn plain_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) -> 
 
 fn wire_message(role: &str, content: &str) -> serde_json::Value {
     serde_json::json!({ "role": role, "content": content })
+}
+
+/// Questions about the app fetch this (`APP_HELP_URL` in app-help.ts).
+const APP_HELP_URL: &str = "https://ccez-llm.invalid/help";
+/// The phone's guide, generated from app-help.ts (`bun scripts/app-help.ts`).
+const APP_HELP: &str = include_str!("app_help_touch.md");
+
+/// The guide when a fetch asks for the app's own address.
+fn app_help_for(url: &str) -> Option<&'static str> {
+    (url == APP_HELP_URL).then_some(APP_HELP)
 }
 
 type PageFetch = Arc<
@@ -798,7 +808,12 @@ async fn run_fetch_batch(
         // as the TypeScript provider's onFetchStart/onFetchEnd, so
         // both engines drive one indicator.
         (ev.on_fetch)(true, call.url.clone());
-        let fetched = watched(page_fetch(call.url.clone()), &ev.stop, deadline).await;
+        // The app's own guide answers its reserved address, never
+        // the network (src/lib/app-help.ts; the phone's gestures).
+        let fetched = match app_help_for(&call.url) {
+            Some(guide) => Ok(Ok(guide.to_string())),
+            None => watched(page_fetch(call.url.clone()), &ev.stop, deadline).await,
+        };
         let Ok(fetched) = fetched else {
             (ev.on_fetch)(false, call.url.clone());
             return fetched.map(|_| ());
@@ -1571,6 +1586,13 @@ pub unsafe extern "C" fn Java_studio_ccez_app_MainActivity_nativeOnOpenChat(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_app_guide_answers_its_own_address() {
+        let guide = super::app_help_for("https://ccez-llm.invalid/help").unwrap();
+        assert!(guide.contains("Gestures (phone)"));
+        assert!(super::app_help_for("https://example.com/help").is_none());
+    }
+
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;

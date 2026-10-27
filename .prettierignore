@@ -14,3 +14,4 @@ coverage/
 # byte-for-byte as upstream / as captured.
 src-tauri/vendor/
 src-tauri/listen/tests/fixtures/
+src-tauri/src/app_help_touch.md

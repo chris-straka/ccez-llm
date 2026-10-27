@@ -61,6 +61,12 @@ TTS/OCR/dictation, page fetch, Android background turns).
   app mirrors its settings, keys blanked, to `settings.json` in its
   data folder and applies an edit there within a second, or at its
   next launch (`settings_file.rs`).
+- App help: the chat model answers questions about the app by
+  fetching `https://ccez-llm.invalid/help`, which both engines answer
+  from `src/lib/app-help.ts` (its flows, plus the shortcuts registry).
+  After changing the guide or the gestures, `bun scripts/app-help.ts`
+  regenerates the Android runner's copy (`app-help.test.ts` fails
+  until it does).
 - `bun run test` (Vitest), `bun run check` (svelte-check strict),
   `bun run lint`, `bun run build`; CI runs all four. Agent worktrees
   under `.claude/` and `.muse/` are excluded from Vitest and ESLint
