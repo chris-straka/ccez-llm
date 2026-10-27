@@ -66,7 +66,7 @@ test.describe("desktop window", () => {
 			"Big-word reader",
 			"Color scheme",
 			"Thinking level",
-			"Fold older messages automatically",
+			"Fold older messages",
 			"Message buttons on hover"
 		]) {
 			const parts = await rowParts(page, name);

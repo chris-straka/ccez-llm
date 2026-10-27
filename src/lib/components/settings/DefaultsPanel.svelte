@@ -80,7 +80,7 @@
 	{/if}
 	<!-- Older messages fold as newer ones arrive; a fold opened by
 	hand stays open. Both off by default. -->
-	<SettingRow name="Fold older messages automatically">
+	<SettingRow name="Fold older messages">
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.autoFoldOwn} />
 			<span>My messages</span>
