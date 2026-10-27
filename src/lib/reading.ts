@@ -977,7 +977,10 @@ export function buildAnnotationAnswerMessages(
 		`infinitive looks different, add the infinitive in parentheses: ` +
 		`"Crossed (franchir)." Skip it when it is the quote with only the ` +
 		`ending changed (prend, prendre). If a note cites the passage, ` +
-		`keep its words as they are.`;
+		`keep its words as they are. Name a tense, mood or form the way ` +
+		`English-language courses for the language name it, with how ` +
+		`it is built ("passé composé: avoir + past participle", ` +
+		`"Perfekt", "te-form"), never a generic "past tense".`;
 	const user = `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`;
 	if (asked) {
 		return [
