@@ -563,6 +563,20 @@ const MAKES: Record<string, string> = {
 	verb: "makes a verb"
 };
 
+/** Infinitive endings by language: on a verb's headword, a final
+ * suffix spelled like one is the infinitive (ranger: rang + -er), not
+ * a piece that makes a verb (moderniser's -iser still does). */
+const INFINITIVE: Record<string, RegExp> = {
+	fr: /^(?:er|ir|re|oir)$/,
+	es: /^(?:ar|er|ir)$/,
+	pt: /^(?:ar|er|ir|or)$/,
+	ca: /^(?:ar|er|ir|re)$/,
+	it: /^(?:are|ere|ire|rre)$/,
+	ro: /^(?:a|ea|e|i|î)$/,
+	de: /^e?n$/,
+	nl: /^e?n$/
+};
+
 /**
  * A headword's derivation pieces from its first affix, compound or
  * confix template, in the headword's own letters; undefined when
@@ -598,12 +612,17 @@ export function wordMorphemes(
 			(p.text.startsWith("-") && !p.text.endsWith("-")) ||
 			(i > 0 && /^-.*\p{L}$/u.test(p.gloss));
 		if (prefix) return [text, p.gloss, pos === "verb" ? "voice" : "derive"];
+		const last = i === pieces.length - 1;
+		const lang = t?.args?.["1"] ?? "";
+		if (
+			suffix &&
+			last &&
+			pos === "verb" &&
+			INFINITIVE[lang]?.test(p.text.replace(/^-/, ""))
+		)
+			return [text, "infinitive", "tense"];
 		if (suffix)
-			return [
-				text,
-				p.gloss || (i === pieces.length - 1 ? (MAKES[pos] ?? "") : ""),
-				"derive"
-			];
+			return [text, p.gloss || (last ? (MAKES[pos] ?? "") : ""), "derive"];
 		if (p.text.startsWith("-")) return [text, "", "derive"];
 		return [text, p.text, "core"];
 	});

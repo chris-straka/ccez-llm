@@ -344,6 +344,23 @@ describe("wordMorphemes", () => {
 		]);
 	});
 
+	it("labels a verb's infinitive ending as the infinitive", () => {
+		expect(
+			wordMorphemes("ranger", "verb", [
+				{ name: "af", args: { "1": "fr", "2": "rang", "3": "-er" } }
+			])
+		).toEqual([
+			["rang", "rang", "core"],
+			["er", "infinitive", "tense"]
+		]);
+		// A suffix that makes the verb keeps saying so.
+		expect(
+			wordMorphemes("moderniser", "verb", [
+				{ name: "af", args: { "1": "fr", "2": "moderne", "3": "-iser" } }
+			])?.[1]
+		).toEqual(["iser", "makes a verb", "derive"]);
+	});
+
 	it("gives nothing when the pieces don't spell the word", () => {
 		expect(
 			wordMorphemes("Gebäude", "noun", [
