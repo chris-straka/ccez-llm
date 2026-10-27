@@ -287,6 +287,15 @@ describe("buildMarksFor", () => {
 		// an answer waits, never neutral.
 		const waiting = buildMarksFor(list, m1, false, null);
 		expect(waiting[0]).toMatchObject({ answer: "waiting" });
+		// The dictionary's instant card keeps waiting until the model
+		// finishes the explanation.
+		const instant: Annotation = {
+			...answered,
+			card: { meaning: "student", parts: [], facts: [], partial: true }
+		};
+		expect(buildMarksFor([instant], m1, false, null)[0]).toMatchObject({
+			answer: "waiting"
+		});
 	});
 
 	it("paints waiting blue and ready orange, neutral unclassed", () => {
