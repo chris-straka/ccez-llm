@@ -296,6 +296,18 @@ describe("buildMarksFor", () => {
 		expect(buildMarksFor([instant], m1, false, null)[0]).toMatchObject({
 			answer: "waiting"
 		});
+		// So does a reply argued under the answer, until it's answered.
+		const replying: Annotation = { ...answered, thread: [{ q: "why?" }] };
+		expect(buildMarksFor([replying], m1, false, null)[0]).toMatchObject({
+			answer: "waiting"
+		});
+		const replied: Annotation = {
+			...answered,
+			thread: [{ q: "why?", a: "because" }]
+		};
+		expect(buildMarksFor([replied], m1, false, null)[0]).toMatchObject({
+			answer: "ready"
+		});
 	});
 
 	it("paints waiting blue and ready orange, neutral unclassed", () => {

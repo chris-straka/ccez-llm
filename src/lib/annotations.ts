@@ -327,8 +327,12 @@ function numberMarks(
 		quote: a.quote,
 		at: a.at ?? 0,
 		...(withAidScope && a.aidScope ? { aidScope: a.aidScope } : {}),
-		// The dictionary's instant card is still waiting on the model.
-		answer: a.answer && !a.card?.partial ? "ready" : "waiting"
+		// The dictionary's instant card, or a reply in the card's
+		// thread, is still waiting on the model.
+		answer:
+			a.answer && !a.card?.partial && !a.thread?.some((t) => !t.a)
+				? "ready"
+				: "waiting"
 	}));
 	if (pending && pendingHere) {
 		saved.push({
