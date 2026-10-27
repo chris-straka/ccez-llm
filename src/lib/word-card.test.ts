@@ -322,18 +322,20 @@ describe("cardWordRow", () => {
 		expect(cardWordRow(base, "extension")).toEqual({
 			article: "une",
 			parts: [{ text: "extension", label: "", kind: "core" }],
-			facts: []
+			facts: [],
+			gender: ""
 		});
 	});
 
-	it("keeps an elided article and a fact about another form", () => {
+	it("keeps an elided article, and the gender of another form", () => {
 		expect(
 			cardWordRow(
 				{ ...base, parts: [], facts: [{ text: "l'homme", kind: "agree" }] },
 				"homme"
 			)
 		).toMatchObject({ article: "l'", parts: [{ text: "homme" }] });
-		// calèches is not la calèche: the pill stays, the split shows.
+		// calèches is not la calèche: no ghost article, the split shows
+		// with the gender under its stem.
 		const row = cardWordRow(
 			{
 				meaning: "carriages",
@@ -346,9 +348,61 @@ describe("cardWordRow", () => {
 			"calèches"
 		);
 		expect(row.article).toBe("");
-		expect(row.facts).toHaveLength(1);
+		expect(row.gender).toBe("f.");
+		expect(row.facts).toHaveLength(0);
 		// Its stem's label only repeats the piece: dropped too.
 		expect(row.parts.map((p) => p.label)).toEqual(["", "plural"]);
+	});
+
+	it("marks the gender under the stem when the fact names its base", () => {
+		const row = cardWordRow(
+			{
+				meaning: "students at a lycée",
+				parts: [
+					{ text: "lycéen", label: "lycéen", kind: "core" },
+					{ text: "s", label: "plural", kind: "agree" }
+				],
+				facts: [{ text: "le lycéen", kind: "agree" }]
+			},
+			"lycéens"
+		);
+		expect(row).toMatchObject({ article: "", gender: "m.", facts: [] });
+		// A base unlike the stem's spelling still matches its label.
+		expect(
+			cardWordRow(
+				{
+					meaning: "eyes",
+					parts: [{ text: "yeux", label: "œil", kind: "core" }],
+					facts: [{ text: "un œil", kind: "agree" }]
+				},
+				"yeux"
+			)
+		).toMatchObject({ gender: "m.", facts: [], parts: [{ text: "yeux" }] });
+		// An elided article in the word: the gender goes under the stem,
+		// not under l'.
+		const annonce = cardWordRow(
+			{
+				meaning: "the announcement",
+				parts: [
+					{ text: "l'", label: "definite article", kind: "agree" },
+					{ text: "annonce", label: "annonce", kind: "core" }
+				],
+				facts: [{ text: "la annonce", kind: "agree" }]
+			},
+			"l'annonce"
+		);
+		expect(annonce).toMatchObject({ gender: "f.", facts: [] });
+		// A fact about a form the split doesn't show stays a pill.
+		expect(
+			cardWordRow(
+				{
+					meaning: "tables",
+					parts: [{ text: "Tische", label: "Tische", kind: "core" }],
+					facts: [{ text: "der Tisch", kind: "agree" }]
+				},
+				"Tische"
+			)
+		).toMatchObject({ gender: "", facts: [{ text: "der Tisch" }], parts: [] });
 	});
 
 	it("shows nothing for a lone piece with nothing to add", () => {

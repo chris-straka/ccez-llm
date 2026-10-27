@@ -104,6 +104,13 @@ where it was left. -->
 	const row = $derived(wordCard ? cardWordRow(wordCard, quote) : null);
 	const cardWord = $derived(row?.parts ?? []);
 	const cardReadings = $derived(cardWord.some((p) => p.reading));
+	/** The stem piece, which carries the gender letter. */
+	const stemAt = $derived(
+		Math.max(
+			0,
+			cardWord.findIndex((p) => p.kind === "core")
+		)
+	);
 	/** The card's language pack downloading right now (0 to 1). */
 	const downloading = $derived.by(() => {
 		const pack = wordCard?.lang ? dictPack(wordCard.lang) : null;
@@ -426,6 +433,11 @@ where it was left. -->
 													: shortGrammar(part.label)}</span
 											>
 										{/if}
+										{#if row?.gender && i === stemAt}
+											<!-- The gender, where the article would name another
+											form of the word (le lycéen above lycéens). -->
+											<span class="wc-label wc-gender">{row.gender}</span>
+										{/if}
 										{#if part.note}
 											<span class="wc-note" dir="auto">{part.note}</span>
 										{/if}
@@ -485,6 +497,13 @@ where it was left. -->
 					</p>
 				{/if}
 
+				{#if wordCard.partial}
+					<!-- The dictionary's instant card: the model is still
+					writing the rest. -->
+					<p class="ann-thread-wait" aria-label="Explaining">
+						<span></span><span></span><span></span>
+					</p>
+				{/if}
 				{#if downloading !== undefined && wordCard.lang}
 					<p class="wc-key wc-download">
 						Downloading the {WORD_PROFILES[wordCard.lang]?.name ?? ""} dictionary

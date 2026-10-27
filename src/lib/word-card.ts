@@ -918,36 +918,78 @@ export interface WordRow {
 	parts: WordPart[];
 	/** The facts left to draw as pills. */
 	facts: WordFact[];
+	/** The gender under the stem ("m.", "f.", "n."), when the gender
+	 * fact names another form of this word (le lycéen for lycéens). */
+	gender: string;
 }
+
+/** Articles that show a noun's gender, in the languages whose gender
+ * facts carry one (l' and plural articles hide it). */
+const ARTICLE_GENDER: Record<string, string> = {
+	le: "m.",
+	un: "m.",
+	der: "m.",
+	el: "m.",
+	il: "m.",
+	lo: "m.",
+	uno: "m.",
+	o: "m.",
+	um: "m.",
+	la: "f.",
+	une: "f.",
+	die: "f.",
+	una: "f.",
+	"un'": "f.",
+	a: "f.",
+	uma: "f.",
+	das: "n."
+};
 
 /**
  * The word row without repeats: a label that only repeats its piece
  * goes (extension labeled extension), and a gender fact that is just
  * an article and this very word (une extension) becomes the ghost
- * article before the word instead of a pill. A lone piece with
- * nothing to add shows only to carry that article. Pure.
+ * article before the word instead of a pill. A gender fact for this
+ * word's base (le lycéen for lycéens) becomes a gender letter under
+ * the stem. A lone piece with nothing to add shows only to carry the
+ * article or the letter. Pure.
  */
 export function cardWordRow(card: WordCard, quote: string): WordRow {
 	const word = spelling(quote);
+	const stems = new Set(
+		card.parts
+			.filter((p) => p.kind === "core")
+			.flatMap((p) => [spelling(p.text), spelling(p.label)])
+	);
 	let article = "";
+	let gender = "";
 	const facts = card.facts.filter((f) => {
-		if (article) return true;
+		if (article || gender) return true;
 		const m = /^(\p{L}{1,4}['’]|\p{L}{1,4}\s+)(.+)$/u.exec(f.text.trim());
-		if (!m || spelling(m[2]!) !== word) return true;
-		article = m[1]!.trim();
+		if (!m) return true;
+		const said = m[1]!.trim();
+		const base = spelling(m[2]!);
+		if (base === word) {
+			article = said;
+			return false;
+		}
+		const g = ARTICLE_GENDER[said.toLowerCase().replace("’", "'")];
+		if (!g || !stems.has(base)) return true;
+		gender = g;
 		return false;
 	});
 	const parts = card.parts.map((p) =>
 		p.label && spelling(p.label) === spelling(p.text) ? { ...p, label: "" } : p
 	);
 	const adds = parts.length > 1 || parts.some((p) => p.label !== "" || p.note);
-	if (adds) return { article, parts, facts };
-	if (!article) return { article, parts: [], facts };
+	if (adds) return { article, parts, facts, gender };
+	if (!article && !gender) return { article, parts: [], facts, gender };
 	const text = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
 	return {
 		article,
 		parts: parts.length === 1 ? parts : [{ text, label: "", kind: "core" }],
-		facts
+		facts,
+		gender
 	};
 }
 
@@ -1017,7 +1059,9 @@ export function buildWordCardMessages(
 				`derive (a piece that turns it into a noun, adjective or adverb).\n`) +
 		`"facts": where nouns take a gendered article, the noun's gender as ` +
 		`its base form with that article ("la calèche", "der Tisch"), never ` +
-		`as "feminine noun"; [] otherwise.\n` +
+		`as "feminine noun"; where the definite article elides and hides ` +
+		`the gender, the indefinite one ("une annonce", never "l'annonce" ` +
+		`or "la annonce"); [] otherwise.\n` +
 		`"base": the base form and its meaning as "base → meaning", a few ` +
 		`words ("épineux → thorny, spiky"), only when the base is spelled ` +
 		`unlike the word's core piece (épineuse from épineux, yeux from ` +

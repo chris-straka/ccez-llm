@@ -73,6 +73,42 @@ test("a one-word note files and renders a word card", async ({ page }) => {
 	]);
 });
 
+/** A gender fact that names this word's base (le lycéen for
+lycéens) draws as a letter under the stem, not a pill. */
+test("a plural noun shows its gender under the stem", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Ce qui va changer pour les lycéens." }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			"ccez-mock-reply",
+			JSON.stringify({
+				meaning: "students at a lycée",
+				parts: [
+					{ text: "lycéen", label: "lycéen", kind: "core" },
+					{ text: "s", label: "plural", kind: "agree" }
+				],
+				facts: [{ text: "le lycéen", kind: "agree" }]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 0, "lycéens");
+	await page.keyboard.press("a");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 10_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const card = page.locator(".ann-answer.placed");
+	await expect(card).toBeVisible();
+	await expect(card.locator(".k-core .wc-gender")).toHaveText("m.");
+	await expect(card.locator(".wc-fact")).toHaveCount(0);
+	await expect(card.locator(".wc-ghost")).toHaveCount(0);
+});
+
 /** Readings sit above the pieces where the script hides the sound,
 and right-to-left languages split right to left. */
 test("word cards carry readings and run right to left", async ({ page }) => {
