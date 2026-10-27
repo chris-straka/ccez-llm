@@ -391,6 +391,41 @@ export function printStudySheet(): boolean {
 	}
 }
 
+/** Window event the Rust side emits when settings.json changed from
+ * outside the app (`settings_file.rs`). */
+export const SETTINGS_EXTERNAL_EVENT = "settings-external";
+
+/** Mirror the settings to settings.json for the command line (keys
+ * already blanked by the caller). Never throws. */
+export async function writeSettingsFile(json: string): Promise<void> {
+	if (!tauriBackendAvailable()) return;
+	try {
+		await invoke("settings_file_write", { json });
+	} catch {
+		// Mobile shells and the browser keep no file; localStorage holds.
+	}
+}
+
+/**
+ * Hear outside edits to settings.json, then start the backend's watch
+ * and hand back what the file holds now (an edit made while the app
+ * was closed), or null with no file yet. Null outside the desktop
+ * shell too. Never throws.
+ */
+export async function watchSettingsFile(
+	callback: (json: string) => void
+): Promise<{ now: string | null } | null> {
+	if (!tauriBackendAvailable()) return null;
+	try {
+		await listen<string>(SETTINGS_EXTERNAL_EVENT, (event) =>
+			callback(event.payload)
+		);
+		return { now: await invoke<string | null>("settings_file_watch") };
+	} catch {
+		return null;
+	}
+}
+
 /**
  * Block OS sleep while speech or a reply streams (macOS `caffeinate`,
  * Win32 execution state, Linux `systemd-inhibit` — see `desktop.rs`).

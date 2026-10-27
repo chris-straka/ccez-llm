@@ -56,6 +56,11 @@ TTS/OCR/dictation, page fetch, Android background turns).
   Debug builds turn off WKWebView occlusion, so a covered window
   still paints. The bridge never ships in release builds (it would
   let any local program read chats and keys).
+- The owner's settings from a terminal: `bun scripts/settings.ts get
+[key]` / `set <key> <value>` (`--dev` for the dev app). The desktop
+  app mirrors its settings, keys blanked, to `settings.json` in its
+  data folder and applies an edit there within a second, or at its
+  next launch (`settings_file.rs`).
 - `bun run test` (Vitest), `bun run check` (svelte-check strict),
   `bun run lint`, `bun run build`; CI runs all four. Agent worktrees
   under `.claude/` and `.muse/` are excluded from Vitest and ESLint

@@ -692,6 +692,14 @@ function dropRetiredKeys(merged: AppSettings, keys: string[]): void {
 	for (const key of keys) delete record[key];
 }
 
+/** Settings from saved JSON, checked and clamped like a stored copy. */
+export function parseSettings(raw: string): AppSettings {
+	return loadSettings({
+		getItem: (k) => (k === STORAGE_KEY ? raw : null),
+		setItem: () => undefined
+	});
+}
+
 export function loadSettings(store?: KeyValueStore): AppSettings {
 	const backend = store ?? browserStore() ?? memoryStore;
 	const raw =

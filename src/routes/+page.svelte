@@ -86,6 +86,7 @@
 		PROMPT_IDLE_NEVER,
 		type AppSettings
 	} from "$lib/settings";
+	import { settingsFileEdit, settingsForFile } from "$lib/settings-file";
 	import { onSaveFailure } from "$lib/save-failure";
 	import { createSleepClaim } from "$lib/sleep-claim";
 	import { cycleThinkingId } from "$lib/providers/thinking";
@@ -698,6 +699,8 @@
 		shareOutcomeToast,
 		printStudySheet,
 		desktopSleepBlock,
+		watchSettingsFile,
+		writeSettingsFile,
 		desktopSleepUnblock,
 		exportStudySheet
 	} from "$lib/desktop";
@@ -7857,7 +7860,27 @@
 			saveSettings(
 				(await secretsSurviveReload()) ? withBlankedKeys(snapshot) : snapshot
 			);
+			void writeSettingsFile(settingsForFile(snapshot));
 		})();
+	}
+
+	/**
+	 * Settings edited from the command line (`scripts/settings.ts`):
+	 * the desktop shell mirrors every save to settings.json and hands
+	 * back outside edits, live or from while the app was closed. The
+	 * changed fields apply like any change, so they save themselves.
+	 */
+	async function wireSettingsFile(): Promise<void> {
+		const apply = (raw: string): void => {
+			const edit = settingsFileEdit(raw, $state.snapshot(settings));
+			if (edit) Object.assign(settings, edit);
+		};
+		const watched = await watchSettingsFile(apply);
+		if (!watched) return;
+		if (watched.now !== null) apply(watched.now);
+		// The file now matches the app (the backend skipped the saves
+		// made before this read).
+		saveSettingsNow();
 	}
 
 	function persistSettings() {
@@ -14483,6 +14506,7 @@
 		void listenMenuActions();
 		void listenGameLine();
 		void wireDeepLinks();
+		void wireSettingsFile();
 		// A chord the app consumed off a dead key must not leave the
 		// field composing its accent (see chord-composition.ts).
 		const chordComposition = createChordCompositionGuard(document);

@@ -43,6 +43,7 @@ mod promptmenu;
 mod secrets_android;
 #[cfg(target_os = "windows")]
 mod send_selection;
+mod settings_file;
 #[cfg(target_os = "macos")]
 mod trafficlights;
 mod tts;
@@ -389,6 +390,10 @@ pub fn run() {
             #[cfg(desktop)]
             desktop::desktop_export_study_sheet,
             desktop::desktop_drain_pending_link,
+            #[cfg(desktop)]
+            settings_file::settings_file_write,
+            #[cfg(desktop)]
+            settings_file::settings_file_watch,
             listen::listen_search,
             listen::listen_channel,
             listen::listen_videos,
