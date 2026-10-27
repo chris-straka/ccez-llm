@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	hanBreakdown,
 	decomposeChar,
 	decomposeText,
 	decomposeTree,
@@ -381,5 +382,28 @@ describe("speaksJapaneseSelection", () => {
 		expect(speaksJapaneseSelection("漢字を読む", "漢字を読む")).toBe(true);
 		expect(speaksJapaneseSelection("hello", "hello world")).toBe(false);
 		expect(speaksJapaneseSelection("漢字", "你好世界")).toBe(false);
+	});
+});
+
+describe("hanBreakdown", () => {
+	it("splits each character with meanings and its radical marked", () => {
+		expect(hanBreakdown("河")).toEqual([
+			{
+				char: "河",
+				parts: [
+					{ char: "氵", meaning: "water", radical: true },
+					{ char: "可", meaning: "may", radical: false }
+				]
+			}
+		]);
+		expect(hanBreakdown("語")[0]?.parts).toEqual([
+			{ char: "言", meaning: "words", radical: true },
+			{ char: "吾", meaning: "I", radical: false }
+		]);
+	});
+
+	it("leaves out kana, repeats and characters with no split", () => {
+		expect(hanBreakdown("一つ").map((b) => b.char)).toEqual([]);
+		expect(hanBreakdown("明明").map((b) => b.char)).toEqual(["明"]);
 	});
 });

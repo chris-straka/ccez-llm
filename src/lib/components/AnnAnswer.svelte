@@ -37,6 +37,7 @@ where it was left. -->
 		type WordCard
 	} from "$lib/word-card";
 	import { dictDownloads, dictPack } from "$lib/dictionary.svelte";
+	import { hanBreakdown } from "$lib/inspect";
 
 	interface Props {
 		answer: string;
@@ -104,6 +105,8 @@ where it was left. -->
 	const row = $derived(wordCard ? cardWordRow(wordCard, quote) : null);
 	const cardWord = $derived(row?.parts ?? []);
 	const cardReadings = $derived(cardWord.some((p) => p.reading));
+	/** Each Han character of the word with its parts (radical marked). */
+	const han = $derived(wordCard ? hanBreakdown(quote) : []);
 	/** The stem piece, which carries the gender letter. */
 	const stemAt = $derived(
 		Math.max(
@@ -442,6 +445,9 @@ where it was left. -->
 										{#if part.note}
 											<span class="wc-note" dir="auto">{part.note}</span>
 										{/if}
+										{#if part.meaning}
+											<span class="wc-meaning" dir="auto">{part.meaning}</span>
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -459,6 +465,33 @@ where it was left. -->
 								>
 							</div>
 						{/if}
+					</div>
+				{/if}
+				{#if han.length > 0}
+					<!-- Each character split into its parts, the radical in
+					the accent: what the character is built from, offline. -->
+					<div class="wc-han">
+						{#each han as h (h.char)}
+							<p class="wc-han-row">
+								<span class="wc-han-char" lang={wordCard.lang}>{h.char}</span>
+								<span class="wc-arrow" aria-hidden="true">→</span>
+								{#each h.parts as part, j (j)}
+									{#if j > 0}<span class="wc-han-plus" aria-hidden="true"
+											>+</span
+										>{/if}
+									<span class="wc-han-part" class:radical={part.radical}
+										><span class="wc-han-glyph" lang={wordCard.lang}
+											>{part.char}</span
+										>{#if part.meaning || part.radical}<span
+												class="wc-han-gloss"
+												>{[part.meaning, part.radical ? "radical" : ""]
+													.filter(Boolean)
+													.join(", ")}</span
+											>{/if}</span
+									>
+								{/each}
+							</p>
+						{/each}
 					</div>
 				{/if}
 				{#if row && row.facts.length > 0}
@@ -909,6 +942,46 @@ where it was left. -->
 	}
 	.wc-part.k-core .wc-label {
 		color: var(--muted);
+	}
+	.wc-meaning {
+		max-width: 12ch;
+		margin: 0 auto;
+		font-size: 0.72em;
+		line-height: 1.25;
+		text-align: center;
+		opacity: 0.85;
+	}
+	.wc-han {
+		margin: 0.5em 0 0;
+	}
+	.wc-han-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.15em 0.4em;
+		margin: 0.15em 0 0;
+	}
+	.wc-han-char {
+		font-size: 1.2em;
+	}
+	.wc-han-plus {
+		color: var(--muted);
+	}
+	.wc-han-part {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.25em;
+	}
+	.wc-han-glyph {
+		font-size: 1.1em;
+	}
+	.wc-han-gloss {
+		font-size: 0.8em;
+		color: var(--muted);
+	}
+	.wc-han-part.radical .wc-han-glyph,
+	.wc-han-part.radical .wc-han-gloss {
+		color: var(--accent);
 	}
 	.wc-note {
 		max-width: 10ch;

@@ -186,3 +186,81 @@ test("word cards carry readings and run right to left", async ({ page }) => {
 		.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
 	expect(xs[0]).toBeGreaterThan(xs[2]!);
 });
+
+/** A compound's pieces carry their own meanings, and a word in Han
+characters lists each character's parts with the radical marked. */
+test("word cards show piece meanings and character parts", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "die Nachrichtenagentur Reuters" },
+		{ role: "assistant", content: "詳しく説明します。" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-de",
+						messageId: "e2e-m0",
+						quote: "Nachrichtenagentur",
+						comment: "",
+						answer: "news agency",
+						card: {
+							meaning: "news agency",
+							lang: "de",
+							parts: [
+								{
+									text: "Nachrichten",
+									label: "Nachricht",
+									meaning: "news",
+									kind: "core"
+								},
+								{
+									text: "agentur",
+									label: "Agentur",
+									meaning: "agency",
+									kind: "core"
+								}
+							],
+							facts: [{ text: "die Nachrichtenagentur", kind: "agree" }]
+						}
+					},
+					{
+						id: "ann-ja",
+						messageId: "e2e-m1",
+						quote: "説明",
+						comment: "",
+						answer: "explanation",
+						card: {
+							meaning: "explanation",
+							lang: "ja",
+							parts: [
+								{ text: "説明", reading: "せつめい", label: "", kind: "core" }
+							],
+							facts: []
+						}
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	const badges = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(badges).toHaveCount(2, { timeout: 60_000 });
+	const card = page.locator(".ann-answer.placed");
+	await badges.nth(0).focus();
+	await page.keyboard.press("Enter");
+	await expect(card).toBeVisible();
+	await expect(card.locator(".wc-meaning")).toHaveText(["news", "agency"]);
+	await expect(card.locator(".wc-han")).toHaveCount(0);
+	await page.keyboard.press("Escape");
+	await expect(card).toHaveCount(0);
+	await badges.nth(1).focus();
+	await page.keyboard.press("Enter");
+	await expect(card).toBeVisible();
+	await expect(card.locator(".wc-han-char")).toHaveText(["説", "明"]);
+	await expect(card.locator(".wc-han-part.radical .wc-han-glyph")).toHaveText([
+		"言",
+		"日"
+	]);
+});

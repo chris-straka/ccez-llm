@@ -12,6 +12,7 @@ import {
 	wordCardDir,
 	wordCardLang,
 	wordCardText,
+	withPieceNotes,
 	type WordCard
 } from "./word-card";
 
@@ -434,5 +435,45 @@ describe("shortGrammar", () => {
 		expect(shortGrammar("past participle")).toBe("⏪ participle");
 		expect(shortGrammar("present continuous")).toBe("▶ 🔁");
 		expect(shortGrammar("passé composé")).toBe("passé composé");
+	});
+});
+
+describe("withPieceNotes", () => {
+	const known = [
+		{ text: "be", label: "", kind: "voice" as const },
+		{ text: "ziehen", label: "ziehen", kind: "core" as const }
+	];
+
+	it("adds the model's meanings and names an unnamed prefix", () => {
+		expect(
+			withPieceNotes(known, [
+				{ text: "be", label: "inseparable prefix", kind: "voice" },
+				{ text: "ziehen", label: "pull", meaning: "to pull", kind: "core" }
+			])
+		).toEqual([
+			{ text: "be", label: "inseparable prefix", kind: "voice" },
+			{ text: "ziehen", label: "ziehen", meaning: "to pull", kind: "core" }
+		]);
+	});
+
+	it("keeps the dictionary's split when the pieces don't match", () => {
+		expect(
+			withPieceNotes(known, [
+				{ text: "bezieh", label: "", meaning: "x", kind: "core" },
+				{ text: "en", label: "infinitive", kind: "tense" }
+			])
+		).toEqual(known);
+		expect(withPieceNotes(known, [])).toBe(known);
+	});
+});
+
+describe("buildWordCardMessages with a known split", () => {
+	it("asks for each known piece's meaning", () => {
+		const [system] = buildWordCardMessages(
+			{ quote: "beziehen", context: "Sie beziehen sich auf zwei Quellen." },
+			"de",
+			{ knownParts: true, knownPieces: ["be", "ziehen"] }
+		);
+		expect(system?.content).toContain("split the word as be + ziehen");
 	});
 });

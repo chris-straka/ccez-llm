@@ -285,3 +285,61 @@ export function speaksJapaneseSelection(quote: string, probe: string): boolean {
 		[...quote].some((ch) => isHanChar(ch)) && hanOverlayLangFor(probe) === "ja"
 	);
 }
+
+/** One part of a character in a word card's breakdown. */
+export interface HanPart {
+	char: string;
+	/** Its first sense, a word or two ("water"), or empty. */
+	meaning: string;
+	/** The character's Kangxi radical (氵 counts for 水). */
+	radical: boolean;
+}
+
+/** A character of a quote split into its parts. */
+export interface HanBreakdown {
+	char: string;
+	parts: HanPart[];
+}
+
+/** A component's first sense: radical bookkeeping dropped ("water;
+ * radical number 85" → "water"), the first of a list kept. */
+function partMeaning(definition: string | undefined): string {
+	const sense =
+		(definition ?? "")
+			.split(";")
+			.map((s) => s.trim())
+			.find((s) => s && !/radical/i.test(s)) ?? "";
+	const first = sense.split(",")[0]?.trim() ?? "";
+	return first === "i" ? "I" : first;
+}
+
+/**
+ * The Han characters of a word card's quote, each split into its
+ * parts with their meanings and the radical marked (語 → 言 words,
+ * radical · 吾 I), from the bundled decomposition and Unihan data; no
+ * model involved. Characters without a split are left out, at most
+ * `max` characters. Pure.
+ */
+export function hanBreakdown(quote: string, max = 4): HanBreakdown[] {
+	const out: HanBreakdown[] = [];
+	for (const { char, components } of decomposeText(quote)) {
+		if (out.length === max) break;
+		if (components.length < 2) continue;
+		const own = parseKangxi(UNIHAN[char]?.rs);
+		out.push({
+			char,
+			parts: components.map((c) => {
+				const kx = parseKangxi(UNIHAN[c]?.rs);
+				return {
+					char: c,
+					meaning: partMeaning(UNIHAN[c]?.d),
+					radical:
+						!!own &&
+						(c === own.radical ||
+							(kx?.radical === own.radical && kx.rest === 0))
+				};
+			})
+		});
+	}
+	return out;
+}

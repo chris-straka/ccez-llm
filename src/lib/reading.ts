@@ -18,6 +18,7 @@ import {
 	looksLikeJson,
 	parseWordCard,
 	wordCardLang,
+	withPieceNotes,
 	wordCardText,
 	WORD_PROFILES,
 	type WordCard
@@ -1174,7 +1175,9 @@ export async function annotationAnswer(
 				buildWordCardMessages(q, lang, {
 					...opts,
 					...(dictionary ? { dictionary } : {}),
-					...(known.length > 0 ? { knownParts: true } : {})
+					...(known.length > 0
+						? { knownParts: true, knownPieces: known.map((p) => p.text) }
+						: {})
 				}) as Array<{
 					role: "system" | "user" | "assistant";
 					content: string;
@@ -1202,7 +1205,9 @@ export async function annotationAnswer(
 					cleanWordCard(
 						{
 							...parsed,
-							...(known.length > 0 ? { parts: known } : {}),
+							...(known.length > 0
+								? { parts: withPieceNotes(known, parsed.parts) }
+								: {}),
 							...(facts.length > 0 ? { facts } : {})
 						},
 						q.quote

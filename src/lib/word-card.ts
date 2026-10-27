@@ -31,6 +31,9 @@ export interface WordPart {
 	label: string;
 	/** A second, quieter line under the label ("irregular"). */
 	note?: string;
+	/** The piece's own meaning, for a compound's parts and a prefixed
+	 * verb's stem ("news", "to pull"). */
+	meaning?: string;
 	kind: WordPartKind;
 }
 
@@ -770,11 +773,13 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 			if (!t) continue;
 			const reading = text(o.reading, MAX.label);
 			const note = text(o.note, MAX.label);
+			const meaning = text(o.meaning, MAX.label);
 			parts.push({
 				text: t,
 				...(reading ? { reading } : {}),
 				label: text(o.label, MAX.label) ?? "",
 				...(note ? { note } : {}),
+				...(meaning ? { meaning } : {}),
 				kind: kind(o.kind)
 			});
 		}
@@ -998,7 +1003,9 @@ export function cardWordRow(card: WordCard, quote: string): WordRow {
 	const parts = card.parts.map((p) =>
 		p.label && spelling(p.label) === spelling(p.text) ? { ...p, label: "" } : p
 	);
-	const adds = parts.length > 1 || parts.some((p) => p.label !== "" || p.note);
+	const adds =
+		parts.length > 1 ||
+		parts.some((p) => p.label !== "" || p.note || p.meaning);
 	if (adds) return { article, parts, facts, gender };
 	if (!article && !gender) return { article, parts: [], facts, gender };
 	const text = quote.trim().replace(/^\p{P}+|\p{P}+$/gu, "");
@@ -1008,6 +1015,28 @@ export function cardWordRow(card: WordCard, quote: string): WordRow {
 		facts,
 		gender
 	};
+}
+
+/**
+ * The dictionary's split with the model's notes on it: each piece's
+ * meaning, and a label where the dictionary named none (be-:
+ * inseparable prefix). The model's pieces must match the dictionary's
+ * one for one, else the split stays as it was. Pure.
+ */
+export function withPieceNotes(
+	known: WordPart[],
+	model: WordPart[]
+): WordPart[] {
+	if (model.length !== known.length) return known;
+	return known.map((k, i) => {
+		const m = model[i]!;
+		if (spelling(m.text) !== spelling(k.text)) return k;
+		return {
+			...k,
+			...(m.meaning ? { meaning: m.meaning } : {}),
+			...(!k.label && m.label && k.kind !== "core" ? { label: m.label } : {})
+		};
+	});
 }
 
 /** Text direction for a card's word and passage. */
@@ -1031,6 +1060,8 @@ export function buildWordCardMessages(
 		dictionary?: string;
 		/** The dictionary already split the word: no parts asked for. */
 		knownParts?: boolean;
+		/** That split's pieces: the model gives each one's meaning. */
+		knownPieces?: string[];
 	} = {}
 ): Array<{ role: string; content: string }> {
 	const profile = lang ? WORD_PROFILES[lang] : undefined;
@@ -1051,7 +1082,7 @@ export function buildWordCardMessages(
 		`in a passage they are reading. ${langLine} Reply with one JSON object ` +
 		`and nothing else, no markdown:\n` +
 		`{"meaning": "", "parts": [{"text": "", "reading": "", ` +
-		`"label": "", "kind": ""}], "facts": [{"text": "", "kind": ""}], ` +
+		`"label": "", "meaning": "", "kind": ""}], "facts": [{"text": "", "kind": ""}], ` +
 		`"base": "", "construction": {"name": "", "words": "", "gloss": ""}, ` +
 		`"phrase": {"words": "", "meaning": ""}, "watch": ""}\n` +
 		`Write every field in ${tongue}.\n` +
@@ -1059,21 +1090,31 @@ export function buildWordCardMessages(
 		`sense, in the same form where the language allows ("being ironic" ` +
 		`for a present participle, "crossed" for a past one), a few words. ` +
 		`Never the sense of an idiom or larger phrase it sits in.\n` +
-		(opts.knownParts
-			? `"parts": [] always: the dictionary already split the word.\n`
-			: `"parts": the word split into its meaningful pieces, in order; the ` +
-				`pieces joined must spell the word exactly as highlighted. A word ` +
-				`with no inner structure is one piece. ${reading} "label": for the ` +
-				`piece carrying the meaning, its base form ("ironiser"); for the ` +
-				`others, the short grammar name English-language courses for this ` +
-				`language use ("past participle", "passé composé", "te-form", ` +
-				`"dative"), never an abbreviation.\n` +
-				`"kind": core (the stem or root), tense (tense, aspect, mood, or a ` +
-				`form such as participle or infinitive), voice (passive, causative, ` +
-				`ability, negation, a prefix that changes the verb), role (case, ` +
-				`particles or prepositions attached: the word's job in the sentence), ` +
-				`agree (gender, number, person, politeness, an attached article), ` +
-				`derive (a piece that turns it into a noun, adjective or adverb).\n`) +
+		(opts.knownPieces?.length
+			? `"parts": the dictionary already split the word as ` +
+				`${opts.knownPieces.join(" + ")}: one entry per piece, in that ` +
+				`order, with only "text", "meaning", and "label" for a prefix ` +
+				`or particle ("inseparable prefix", "separable prefix").\n`
+			: opts.knownParts
+				? `"parts": [] always: the dictionary already split the word.\n`
+				: `"parts": the word split into its meaningful pieces, in order; the ` +
+					`pieces joined must spell the word exactly as highlighted. A word ` +
+					`with no inner structure is one piece. ${reading} "label": for the ` +
+					`piece carrying the meaning, its base form ("ironiser"); for the ` +
+					`others, the short grammar name English-language courses for this ` +
+					`language use ("past participle", "passé composé", "te-form", ` +
+					`"dative"), never an abbreviation.\n` +
+					`"kind": core (the stem or root), tense (tense, aspect, mood, or a ` +
+					`form such as participle or infinitive), voice (passive, causative, ` +
+					`ability, negation, a prefix that changes the verb), role (case, ` +
+					`particles or prepositions attached: the word's job in the sentence), ` +
+					`agree (gender, number, person, politeness, an attached article), ` +
+					`derive (a piece that turns it into a noun, adjective or adverb).\n`) +
+		`"meaning" on a piece: for each part of a compound and the stem of ` +
+		`a prefixed verb, that piece's own meaning in a word or two ` +
+		`(Nachrichten → "news", agentur → "agency", ziehen → "to pull"). ` +
+		`Leave it out on endings and grammar pieces, and where the piece's ` +
+		`own sense would mislead about the whole word.\n` +
 		`"facts": where nouns take a gendered article, the noun's gender as ` +
 		`its base form with that article ("la calèche", "der Tisch"), never ` +
 		`as "feminine noun"; where the definite article elides and hides ` +
@@ -1088,7 +1129,8 @@ export function buildWordCardMessages(
 		`"construction": only when the word is one part of a multi-word ` +
 		`grammatical form in this sentence (a helper verb with a participle ` +
 		`or infinitive: a perfect, passive or future; a verb with its ` +
-		`separated prefix; a reflexive pronoun): "name", the form's name ` +
+		`separated prefix; a reflexive pronoun; a verb's fixed preposition, ` +
+		`named as its pattern: "sich beziehen auf + accusative"): "name", the form's name ` +
 		`as English-language courses give it ("perfect tense", "passé ` +
 		`composé", "passive"); "words", only the form's own words (the ` +
 		`helper, prefix or pronoun and the highlighted word) as they stand, ` +
