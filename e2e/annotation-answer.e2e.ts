@@ -1117,9 +1117,15 @@ test("replies thread under the answer in the same card", async ({ page }) => {
 	await expect(card.getByRole("button", { name: "Reply" })).toHaveCount(0);
 	await page.keyboard.press("r");
 	await expect(field).toBeFocused();
+	// The card takes its width once; typing never stretches it.
+	// Layout width: the open ramp scales the box for its first frames.
+	const width = (): Promise<number> =>
+		card.evaluate((el) => (el as HTMLElement).offsetWidth);
+	const opened = await width();
 	// Letters that are shortcuts elsewhere (e edits, a annotates).
 	await page.keyboard.type("are you sure about that?");
 	await expect(field).toHaveValue("are you sure about that?");
+	expect(await width()).toBe(opened);
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".ann-answer")).toHaveCount(1);
 	await expect(card.locator(".ann-thread-q")).toHaveText(

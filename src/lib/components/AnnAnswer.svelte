@@ -383,6 +383,7 @@ where it was left. -->
 	class="ann-answer"
 	class:closing
 	class:above={place?.side === "above"}
+	class:replying
 	class:placed={place !== null}
 	style:left="{place?.x ?? 0}px"
 	style:top="{place?.y ?? 0}px"
@@ -1017,6 +1018,12 @@ where it was left. -->
 		.ann-thread-wait span {
 			animation-duration: 2.2s;
 		}
+	}
+	/* Replying takes the full reading measure at once: shrunk to the
+	note, the card grew sideways with every typed letter (the field
+	sizes to its text), and long replies wrap from here. */
+	.ann-answer.replying {
+		width: min(var(--ann-max-w, 32rem), 30em);
 	}
 	.ann-reply {
 		margin: 0;
