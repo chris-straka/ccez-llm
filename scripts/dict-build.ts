@@ -229,6 +229,11 @@ async function main(): Promise<void> {
 	const langs = args[0] === "all" ? [...Object.keys(KAIKKI), "ja"] : args;
 	if (langs.length === 0)
 		throw new Error("usage: bun scripts/dict-build.ts fr de ja");
+	// Before any pack is written: a pack written without its manifest
+	// entry no longer matches its checksum.
+	const unknown = langs.filter((l) => l !== "ja" && !KAIKKI[l]);
+	if (unknown.length > 0)
+		throw new Error(`no source for ${unknown.join(", ")}`);
 	mkdirSync(OUT, { recursive: true });
 	const manifestPath = `${OUT}/manifest.json`;
 	const manifest: { v: 1; packs: Record<string, ManifestPack> } = existsSync(
@@ -241,13 +246,7 @@ async function main(): Promise<void> {
 		: { v: 1, packs: {} };
 	for (const lang of langs) {
 		const { b, header } =
-			lang === "ja"
-				? await buildJmdict()
-				: KAIKKI[lang]
-					? await buildKaikki(lang)
-					: (() => {
-							throw new Error(`no source for ${lang}`);
-						})();
+			lang === "ja" ? await buildJmdict() : await buildKaikki(lang);
 		const raw = b.encode(header);
 		const packed = gzipSync(raw, { level: 9 });
 		const file = `${lang}.dict.gz`;
@@ -262,12 +261,12 @@ async function main(): Promise<void> {
 			sha256,
 			sources: header.sources
 		};
+		writeFileSync(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
 		console.log(
 			`${lang}: ${b.entries.length} entries, ${b.keyCount} forms, ` +
 				`${(raw.length / 1e6).toFixed(1)} MB, ${(statSync(`${OUT}/${file}`).size / 1e6).toFixed(1)} MB gzipped`
 		);
 	}
-	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
 }
 
 if (process.argv[2] === "--fetch") {

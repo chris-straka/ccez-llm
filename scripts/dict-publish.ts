@@ -10,6 +10,7 @@
  * the app never sees a version whose pack isn't up yet.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const TAG = "dictionaries";
@@ -27,10 +28,28 @@ const manifest = JSON.parse(readFileSync(`${OUT}/manifest.json`, "utf8")) as {
 		string,
 		{
 			file: string;
+			sha256: string;
 			sources: Array<{ name: string; license: string; url: string }>;
 		}
 	>;
 };
+
+// Every pack must be the file its manifest entry describes: a build
+// that died partway (an unknown language) once left new packs beside
+// old checksums, and the app refused those downloads.
+const stale = Object.entries(manifest.packs).filter(
+	([, p]) =>
+		createHash("sha256")
+			.update(readFileSync(`${OUT}/${p.file}`))
+			.digest("hex") !== p.sha256
+);
+if (stale.length > 0) {
+	console.error(
+		`Not publishing: ${stale.map(([lang]) => lang).join(", ")} differ from ` +
+			`manifest.json. Rebuild them (bun scripts/dict-build.ts <langs>).`
+	);
+	process.exit(1);
+}
 
 const credits = [
 	...new Map(
