@@ -1022,10 +1022,9 @@ export const ANNOTATION_FOLLOW_UP_WORDS = 90;
 /**
  * Messages for a follow-up in an answer card's thread: the original
  * ask and answer replayed, then each earlier reply and its answer, then
- * the new reply. The learner is often pushing back on the answer, so
- * the model weighs the objection against the passage, explains how its
- * words build the meaning, and says so plainly when the learner is
- * right. Pure.
+ * the new reply. The model answers just what the reply asks (never a
+ * walk through the whole sentence), checks a push-back against the
+ * passage, and says so plainly when the learner is right. Pure.
  */
 export function buildAnnotationFollowUpMessages(
 	q: AnnotationQuestion,
@@ -1036,11 +1035,13 @@ export function buildAnnotationFollowUpMessages(
 ): Array<{ role: string; content: string }> {
 	const [system, user] = buildAnnotationAnswerMessages(q, opts);
 	const followUp =
-		`The learner may reply to your answer, often to push back. Weigh ` +
-		`the reply against the passage itself: walk through how its words ` +
-		`build the meaning, piece by piece, closely rather than smoothly, ` +
-		`and if the learner is right, say so plainly and correct yourself. ` +
-		`Plain connected sentences, no markdown, at most ` +
+		`The learner may reply to your answer, with a question or to push ` +
+		`back. Answer exactly what the reply asks, about the quoted word ` +
+		`or the words the reply names, and stop: never translate or walk ` +
+		`through the rest of the sentence unless the reply asks about it. ` +
+		`Against a push-back, check the passage itself, and if the learner ` +
+		`is right, say so plainly and correct yourself. Plain connected ` +
+		`sentences, no markdown, as short as the answer allows, at most ` +
 		`${ANNOTATION_FOLLOW_UP_WORDS} words per reply.`;
 	const out: Array<{ role: string; content: string }> = [
 		{ role: "system", content: `${system?.content ?? ""} ${followUp}` },
