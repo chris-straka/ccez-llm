@@ -134,6 +134,49 @@ test.describe("desktop", () => {
 		expect(picked).toBe("First sentence here. Second sentence there.");
 	});
 
+	/** Presses of a multi-click leave the other messages selectable
+	(WebKit misdrew their underlines while they weren't), and the third
+	press on is held so the engine's own paragraph pick never flashes
+	before the release picks the sentence or paragraph. */
+	test("multi-click presses leave the other messages alone", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{
+				role: "assistant",
+				content:
+					"First sentence here. Second sentence there.\n\nNext paragraph follows."
+			},
+			{ role: "assistant", content: "Another message below." }
+		]);
+		await page.goto("/");
+		const para = page.locator("article .rendered p").first();
+		await expect(para).toBeVisible();
+		const box = await para.boundingBox();
+		if (!box) throw new Error("paragraph has no box");
+		await page.evaluate(() => {
+			const w = window as unknown as { held: number[] };
+			w.held = [];
+			window.addEventListener("mousedown", (e) => {
+				if (e.defaultPrevented) w.held.push(e.detail);
+			});
+		});
+		await page.mouse.move(box.x + 30, box.y + 8);
+		for (let n = 1; n <= 4; n++) {
+			await page.mouse.down({ clickCount: n });
+			await expect(page.locator("[data-drag-none]"), `press ${n}`).toHaveCount(
+				0
+			);
+			await page.mouse.up({ clickCount: n });
+		}
+		expect(
+			await page.evaluate(() => (window as unknown as { held: number[] }).held)
+		).toEqual([3, 4]);
+		expect(
+			await page.evaluate(() => window.getSelection()?.toString().trim())
+		).toBe("First sentence here. Second sentence there.");
+	});
+
 	/** A plain click on another message clears the in-flight highlight
 	and drops the menu: click-away always dismisses (controls,
 	composer, and message text alike — only menu presses, drags, and

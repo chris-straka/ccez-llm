@@ -13260,6 +13260,7 @@
 		const noteMovePoint = (event: MouseEvent): void => {
 			if (!selectingInMessage && !offChatDragArmed) return;
 			lastMoveClient = { x: event.clientX, y: event.clientY };
+			if (pressedArticle && movedSinceDown()) containDragTo(pressedArticle);
 			// Silent engine collapses (no selectionchange fires) get
 			// restored here, synchronously before paint; evented ones
 			// go through trimMessageDrag below. Plain lets only — no
@@ -13290,7 +13291,16 @@
 		// scoping): the engine clamps at the anchor article's edge
 		// instead of flipping, and mouseup's lock only ever sees one
 		// article. Always cleared on mouseup/blur — never a resting state.
+		// It arms only once the pointer travels (noteMovePoint): clicks
+		// never move, and every other message going unselectable under
+		// each press of a double or triple click made WebKit draw their
+		// underlines across the clicked message's first line.
 		let dragAnchorArticle: Element | null = null;
+		/** The message a press in message text landed in. */
+		let pressedArticle: Element | null = null;
+		/** The message the drag belongs to, contained yet or not. */
+		const dragArticle = (): Element | null =>
+			dragAnchorArticle ?? pressedArticle;
 		const containDragTo = (article: Element | null): void => {
 			if (dragAnchorArticle === article) return;
 			for (const el of document.querySelectorAll("[data-drag-none]")) {
@@ -13345,7 +13355,7 @@
 			const focusNode = live.focusNode;
 			if (!anchorNode || !focusNode) return;
 			const anchorArticle = annotateMode.articleOf(anchorNode);
-			if (anchorArticle && anchorArticle === dragAnchorArticle) {
+			if (anchorArticle && anchorArticle === dragArticle()) {
 				lastGoodDragRange = {
 					an: anchorNode,
 					ao: live.anchorOffset,
@@ -13359,7 +13369,7 @@
 			if (!movedSinceDown() || !lastGoodDragRange) return false;
 			// Dragging home to the anchor point cancels: only resurrect
 			// collapses stranded outside the anchor article.
-			if (annotateMode.articleOf(live.anchorNode) === dragAnchorArticle)
+			if (annotateMode.articleOf(live.anchorNode) === dragArticle())
 				return false;
 			// Collapses inside the prompt or a control are that
 			// gesture's business (editor selections), never the
@@ -13402,7 +13412,16 @@
 				event.button === 0 &&
 				!target?.closest(".messages .rendered");
 			lastGoodDragRange = null;
-			containDragTo(selectingInMessage ? annotateMode.articleOf(target) : null);
+			pressedArticle = selectingInMessage
+				? annotateMode.articleOf(target)
+				: null;
+			containDragTo(null);
+			// Third press on: WebKit picks the whole paragraph on the
+			// press, then the release swaps in the sentence (a paragraph
+			// flash). Holding the press keeps the last pick; the release
+			// picks from the point (onSelectEnd).
+			if (selectingInMessage && event.detail >= 3 && !androidUI)
+				event.preventDefault();
 		};
 		const trimMessageDrag = (): void => {
 			if (selectingInMessage) {
@@ -13634,6 +13653,7 @@
 			offChatDragArmed = false;
 			lastGoodDragRange = null;
 			lastMoveClient = null;
+			pressedArticle = null;
 			containDragTo(null);
 			// Compat mouseup trailing a touch-handled selection: the menu
 			// is already up, and the staleness check below would clear it
@@ -14281,6 +14301,7 @@
 			// containment so prose stays selectable on return.
 			lastGoodDragRange = null;
 			lastMoveClient = null;
+			pressedArticle = null;
 			containDragTo(null);
 		};
 		// Coming back to the window lands you in the prompt (pill box when
