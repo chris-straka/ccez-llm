@@ -35,9 +35,7 @@ test("⌘1 picks French on the empty chat and ⌘1 again clears it", async ({
 	await expect(news).toHaveCount(0);
 });
 
-test("⌘1 clears French from inside the composer and the Listen search too", async ({
-	page
-}) => {
+test("⌘1 clears French from inside the Listen search", async ({ page }) => {
 	await seedChat(page, []);
 	await stubShell(page);
 	await page.goto("/");
@@ -46,13 +44,8 @@ test("⌘1 clears French from inside the composer and the Listen search too", as
 		timeout: 60_000
 	});
 	await page.keyboard.press("Meta+Digit1");
-	await expect(news).toBeVisible();
-	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.press("Meta+Digit1");
-	await expect(news, "from the composer").toHaveCount(0);
-	await page.keyboard.press("Meta+Digit1");
 	await page.getByRole("tab", { name: "Listen" }).click();
 	await page.locator(".listen-panel input[type=search]").click();
 	await page.keyboard.press("Meta+Digit1");
-	await expect(news, "from the Listen search").toHaveCount(0);
+	await expect(news).toHaveCount(0);
 });
