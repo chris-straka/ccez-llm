@@ -205,7 +205,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			start: () => void;
 			source: SongSource | null;
 			pick: (song: Song) => void;
-			change: () => void;
 			leave: () => void;
 		};
 		/** Flashcards due now (0 hides the hero's entry). */
@@ -294,7 +293,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			song={music.chat.song}
 			chatId={music.chatId}
 			source={music.source}
-			actions={{ pick: music.pick, change: music.change, leave: music.leave }}
+			actions={{ pick: music.pick, leave: music.leave }}
 		/>
 	{:else if messages.length === 0}
 		<!-- Empty hero through `EmptyHero.svelte` (the pills slot under

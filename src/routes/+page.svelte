@@ -15224,7 +15224,6 @@
 					setMusicSong(chatState, chat.id, song);
 					void music.play(song, chat.id);
 				},
-				change: () => setMusicSong(chatState, chat.id, null),
 				leave: () => {
 					if (music.chatId === chat.id) music.close();
 					endMusicChat(chatState, chat.id);

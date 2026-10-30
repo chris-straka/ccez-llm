@@ -1,8 +1,9 @@
-<!-- A music chat: a video player for one song at a time. With no song
-yet it is a search box (a pasted YouTube link finds that video);
-with one, the video's picture plays muted in step with the app's one
-music player (`music`), so the sound keeps going when this chat is
-left and the top bar takes over. Loop is on unless turned off. -->
+<!-- A music chat: a search box over a video player for one song at a
+time. A pasted YouTube link plays that video at once; a search lists
+videos, and a pick replaces the song. The video's picture plays muted
+in step with the app's one music player (`music`), so the sound keeps
+going when this chat is left and the top bar takes over. Loop is on
+unless turned off. -->
 <script lang="ts">
 	import { formatDuration } from "$lib/listen";
 	import { music } from "$lib/music.svelte";
@@ -23,8 +24,6 @@ left and the top bar takes over. Loop is on unless turned off. -->
 		actions: {
 			/** Make `song` this chat's song and play it. */
 			pick: (song: Song) => void;
-			/** Back to picking a song. */
-			change: () => void;
 			/** Turn the chat back into a plain one. */
 			leave: () => void;
 		};
@@ -68,7 +67,7 @@ left and the top bar takes over. Loop is on unless turned off. -->
 			results = rows;
 			// A pasted link plays at once: it is the song.
 			const only = rows[0];
-			if (rows.length === 1 && only && q.includes("youtu")) actions.pick(only);
+			if (rows.length === 1 && only && q.includes("youtu")) choose(only);
 		} catch (e) {
 			if (n === seq) {
 				error = songErrorCopy(e);
@@ -77,6 +76,16 @@ left and the top bar takes over. Loop is on unless turned off. -->
 		} finally {
 			if (n === seq) searching = false;
 		}
+	}
+
+	/** Play a found song in this chat; the search clears for the player. */
+	function choose(found: Song): void {
+		seq++;
+		query = "";
+		results = null;
+		error = "";
+		searching = false;
+		actions.pick(found);
 	}
 
 	function onInput(value: string): void {
@@ -121,189 +130,183 @@ left and the top bar takes over. Loop is on unless turned off. -->
 </script>
 
 <section class="music" aria-label="Music">
-	{#if song}
-		<div class="player" in:fly={rise}>
+	<div class="stack" class:has-song={song !== null}>
+		<div class="search" in:fly={rise}>
+			<svg class="glass" viewBox="0 0 16 16" aria-hidden="true"
+				><circle cx="7" cy="7" r="4.2" /><path d="M10.2 10.2L13.5 13.5" /></svg
+			>
+			<input
+				bind:this={box}
+				type="search"
+				placeholder={song
+					? "Search for another song, or paste a link"
+					: "Paste a YouTube link, or search for a song"}
+				value={query}
+				oninput={(e) => onInput(e.currentTarget.value)}
+				onkeydown={(e) => {
+					if (e.key === "Enter") {
+						e.preventDefault();
+						void search();
+					} else if (e.key === "Escape" && query) {
+						e.preventDefault();
+						e.stopPropagation();
+						onInput("");
+					}
+				}}
+				aria-label="Find a song"
+			/>
 			<button
 				type="button"
-				class="frame"
-				aria-label={playing ? "Pause" : "Play"}
-				onclick={togglePlay}
+				class="tool"
+				aria-label="Close music"
+				title="Close music"
+				onclick={actions.leave}
 			>
-				{#if mine && music.picture}
-					<video
-						bind:this={vid}
-						src={music.picture}
-						muted
-						loop
-						playsinline
-						preload="auto"
-						in:fade={{ duration: 200 }}
-					></video>
-				{:else if song.thumbnail}
-					<img src={song.thumbnail} alt="" draggable="false" />
-				{/if}
-				{#if !playing}
-					<span class="big-play" transition:fade={{ duration: ms(150) }}>
-						{#if mine && music.status === "loading"}
-							<span class="spinner" aria-hidden="true"></span>
-						{:else}
-							<svg viewBox="0 0 16 16" aria-hidden="true"
-								><path d="M5.5 3.5l7 4.5-7 4.5z" /></svg
-							>
-						{/if}
-					</span>
-				{/if}
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><path d="M5 5l6 6M11 5l-6 6" /></svg
+				>
 			</button>
-			<div class="meta">
-				<div class="names">
-					<h2 class="title">{song.title}</h2>
-					{#if mine && music.status === "error"}
-						<p class="sub error" role="alert">{music.error}</p>
-					{:else}
-						<p class="sub">{song.channel}</p>
-					{/if}
-				</div>
-			</div>
-			<div class="controls">
-				<button
-					type="button"
-					class="play"
-					aria-label={playing ? "Pause" : "Play"}
-					disabled={mine && music.status === "loading"}
-					onclick={togglePlay}
-				>
-					<svg viewBox="0 0 16 16" aria-hidden="true">
-						{#if playing}
-							<path d="M5 3.5v9M11 3.5v9" />
-						{:else}
-							<path class="solid" d="M5.5 3.5l7 4.5-7 4.5z" />
+		</div>
+		{#if error}
+			<p class="note error" role="alert">{error}</p>
+		{:else if searching}
+			<p class="note">Searching…</p>
+		{:else if results && results.length === 0}
+			<p class="note">Nothing found.</p>
+		{:else if !results && !song}
+			<p class="note">
+				Plays the video with its sound, over and over, while you use the app.
+			</p>
+		{/if}
+		{#if results && results.length > 0}
+			<ul class="results">
+				{#each results as r, i (r.id)}
+					<li in:fly={{ y: 8, duration: ms(200), delay: ms(i * 25) }}>
+						<button
+							type="button"
+							class="row"
+							class:current={song?.id === r.id}
+							onclick={() => choose(r)}
+						>
+							{#if r.thumbnail}
+								<img
+									class="thumb"
+									src={r.thumbnail}
+									alt=""
+									loading="lazy"
+									draggable="false"
+								/>
+							{:else}
+								<span class="thumb"></span>
+							{/if}
+							<span class="row-text">
+								<span class="row-title">{r.title}</span>
+								<span class="row-sub"
+									>{r.channel}{r.duration
+										? ` · ${formatDuration(r.duration)}`
+										: ""}</span
+								>
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if song}
+			{#key song.id}
+				<div class="player" in:fly={rise}>
+					<button
+						type="button"
+						class="frame"
+						aria-label={playing ? "Pause" : "Play"}
+						onclick={togglePlay}
+					>
+						{#if mine && music.picture}
+							<video
+								bind:this={vid}
+								src={music.picture}
+								muted
+								loop
+								playsinline
+								preload="auto"
+								in:fade={{ duration: 200 }}
+							></video>
+						{:else if song.thumbnail}
+							<img src={song.thumbnail} alt="" draggable="false" />
 						{/if}
-					</svg>
-				</button>
-				<span class="clock">{formatDuration(mine ? music.time : 0)}</span>
-				<input
-					class="seek"
-					type="range"
-					min="0"
-					max={length || 1}
-					step="0.1"
-					value={mine ? music.time : 0}
-					disabled={!length}
-					aria-label="Position"
-					style:--fill={`${length ? ((mine ? music.time : 0) / length) * 100 : 0}%`}
-					oninput={(e) => music.seek(Number(e.currentTarget.value))}
-				/>
-				<span class="clock">{length ? formatDuration(length) : "–:––"}</span>
-				<button
-					type="button"
-					class="tool"
-					class:lit={music.loop}
-					aria-label="Loop"
-					aria-pressed={music.loop}
-					title={music.loop ? "Looping" : "Plays once"}
-					onclick={() => music.setLoop(!music.loop)}
-				>
-					<svg viewBox="0 0 16 16" aria-hidden="true"
-						><path
-							d="M3 7V6a2 2 0 0 1 2-2h7M10 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H4M6 14l-2-2 2-2"
-						/></svg
-					>
-				</button>
-				<button
-					type="button"
-					class="tool"
-					aria-label="Another song"
-					title="Another song"
-					onclick={() => {
-						query = "";
-						results = null;
-						actions.change();
-					}}
-				>
-					<svg viewBox="0 0 16 16" aria-hidden="true"
-						><circle cx="7" cy="7" r="4.2" /><path
-							d="M10.2 10.2L13.5 13.5"
-						/></svg
-					>
-				</button>
-			</div>
-		</div>
-	{:else}
-		<div class="pick" in:fly={rise}>
-			<div class="search">
-				<svg class="glass" viewBox="0 0 16 16" aria-hidden="true"
-					><circle cx="7" cy="7" r="4.2" /><path
-						d="M10.2 10.2L13.5 13.5"
-					/></svg
-				>
-				<input
-					bind:this={box}
-					type="search"
-					placeholder="Paste a YouTube link, or search for a song"
-					value={query}
-					oninput={(e) => onInput(e.currentTarget.value)}
-					onkeydown={(e) => {
-						if (e.key === "Enter") {
-							e.preventDefault();
-							void search();
-						}
-					}}
-					aria-label="Find a song"
-				/>
-				<button
-					type="button"
-					class="tool"
-					aria-label="Close music"
-					title="Close music"
-					onclick={actions.leave}
-				>
-					<svg viewBox="0 0 16 16" aria-hidden="true"
-						><path d="M5 5l6 6M11 5l-6 6" /></svg
-					>
-				</button>
-			</div>
-			{#if error}
-				<p class="note error" role="alert">{error}</p>
-			{:else if searching}
-				<p class="note">Searching…</p>
-			{:else if results && results.length === 0}
-				<p class="note">Nothing found.</p>
-			{:else if !results}
-				<p class="note">
-					Plays the video with its sound, over and over, while you use the app.
-				</p>
-			{/if}
-			{#if results && results.length > 0}
-				<ul class="results">
-					{#each results as r, i (r.id)}
-						<li in:fly={{ y: 8, duration: ms(200), delay: ms(i * 25) }}>
-							<button type="button" class="row" onclick={() => actions.pick(r)}>
-								{#if r.thumbnail}
-									<img
-										class="thumb"
-										src={r.thumbnail}
-										alt=""
-										loading="lazy"
-										draggable="false"
-									/>
+						{#if !playing}
+							<span class="big-play" transition:fade={{ duration: ms(150) }}>
+								{#if mine && music.status === "loading"}
+									<span class="spinner" aria-hidden="true"></span>
 								{:else}
-									<span class="thumb"></span>
-								{/if}
-								<span class="row-text">
-									<span class="row-title">{r.title}</span>
-									<span class="row-sub"
-										>{r.channel}{r.duration
-											? ` · ${formatDuration(r.duration)}`
-											: ""}</span
+									<svg viewBox="0 0 16 16" aria-hidden="true"
+										><path d="M5.5 3.5l7 4.5-7 4.5z" /></svg
 									>
-								</span>
-							</button>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
-	{/if}
+								{/if}
+							</span>
+						{/if}
+					</button>
+					<div class="meta">
+						<div class="names">
+							<h2 class="title">{song.title}</h2>
+							{#if mine && music.status === "error"}
+								<p class="sub error" role="alert">{music.error}</p>
+							{:else}
+								<p class="sub">{song.channel}</p>
+							{/if}
+						</div>
+					</div>
+					<div class="controls">
+						<button
+							type="button"
+							class="play"
+							aria-label={playing ? "Pause" : "Play"}
+							disabled={mine && music.status === "loading"}
+							onclick={togglePlay}
+						>
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								{#if playing}
+									<path d="M5 3.5v9M11 3.5v9" />
+								{:else}
+									<path class="solid" d="M5.5 3.5l7 4.5-7 4.5z" />
+								{/if}
+							</svg>
+						</button>
+						<span class="clock">{formatDuration(mine ? music.time : 0)}</span>
+						<input
+							class="seek"
+							type="range"
+							min="0"
+							max={length || 1}
+							step="0.1"
+							value={mine ? music.time : 0}
+							disabled={!length}
+							aria-label="Position"
+							style:--fill={`${length ? ((mine ? music.time : 0) / length) * 100 : 0}%`}
+							oninput={(e) => music.seek(Number(e.currentTarget.value))}
+						/>
+						<span class="clock">{length ? formatDuration(length) : "–:––"}</span
+						>
+						<button
+							type="button"
+							class="tool"
+							class:lit={music.loop}
+							aria-label="Loop"
+							aria-pressed={music.loop}
+							title={music.loop ? "Looping" : "Plays once"}
+							onclick={() => music.setLoop(!music.loop)}
+						>
+							<svg viewBox="0 0 16 16" aria-hidden="true"
+								><path
+									d="M3 7V6a2 2 0 0 1 2-2h7M10 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H4M6 14l-2-2 2-2"
+								/></svg
+							>
+						</button>
+					</div>
+				</div>
+			{/key}
+		{/if}
+	</div>
 </section>
 
 <style>
@@ -313,17 +316,27 @@ left and the top bar takes over. Loop is on unless turned off. -->
 		max-width: min(100%, 52rem);
 		box-sizing: border-box;
 		/* Clear of the drag strip and the music bar above it. */
-		padding: 4.25rem 0.5rem 1rem;
+		padding: 3.5rem 0.5rem 1rem;
 		color: var(--ink);
 	}
-	/* As wide as a 16:9 picture half the window tall can be, so the
-	title and controls always sit above the composer. */
+	/* Search over player, one column: as wide as a 16:9 picture
+	44% of the window tall can be (the title and controls stay above
+	the composer), and a reading width before a song is picked. */
+	.stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.8rem;
+		width: min(100%, 40rem);
+		margin: 0 auto;
+	}
+	.stack.has-song {
+		width: min(100%, calc(44dvh * 16 / 9));
+	}
 	.player {
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
-		width: min(100%, calc(50dvh * 16 / 9));
-		margin: 0 auto;
+		margin-top: 0.4rem;
 	}
 	.frame {
 		position: relative;
@@ -525,13 +538,6 @@ left and the top bar takes over. Loop is on unless turned off. -->
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	.pick {
-		display: flex;
-		flex-direction: column;
-		gap: 0.8rem;
-		max-width: 40rem;
-		margin: 0 auto;
-	}
 	.search {
 		display: flex;
 		align-items: center;
@@ -592,6 +598,9 @@ left and the top bar takes over. Loop is on unless turned off. -->
 	}
 	.row:hover {
 		background: var(--hover-wash);
+	}
+	.row.current .row-title {
+		color: var(--accent);
 	}
 	.thumb {
 		flex: none;

@@ -58,7 +58,18 @@ async function mockMusicShell(page: Page): Promise<void> {
 				invoke: async (cmd: string): Promise<unknown> => {
 					if (cmd === "listen_videos") return [video];
 					if (cmd === "listen_search")
-						return [{ kind: "video", ...video, channel_url: "" }];
+						return [
+							{ kind: "video", ...video, channel_url: "" },
+							{
+								kind: "video",
+								...video,
+								id: "abcdefghijk",
+								title: "Une autre chanson",
+								channel: "Quelqu'un",
+								duration: 201,
+								channel_url: ""
+							}
+						];
 					if (cmd === "listen_song") return "audio/wav";
 					if (cmd === "listen_song_audio") return silentWav(12);
 					if (cmd === "listen_video") throw new Error("listen-no-video");
@@ -171,4 +182,26 @@ test("deleting the music chat stops its song and takes the bar away", async ({
 			}
 	);
 	expect(saved.song).toBeNull();
+});
+
+test("the search above the player swaps in another song", async ({ page }) => {
+	await seedChat(page, []);
+	await mockMusicShell(page);
+	await page.goto("/");
+	await page.getByRole("tab", { name: "Music" }).click({ timeout: 60_000 });
+	const box = page.getByRole("searchbox", { name: "Find a song" });
+	await box.fill(LINK);
+	await box.press("Enter");
+	const title = page.locator(".music .player .title");
+	await expect(title).toHaveText("SUM-80 (OST Sumathi Theme)");
+	// Still there over the player, empty again for the next search.
+	await expect(box).toHaveValue("");
+	await box.fill("autre chanson");
+	await box.press("Enter");
+	await page.getByRole("button", { name: /Une autre chanson/ }).click();
+	await expect(title).toHaveText("Une autre chanson");
+	await expect(page.locator(".music .results")).toHaveCount(0);
+	await expect(
+		page.locator(".music .player").getByRole("button", { name: "Pause" }).last()
+	).toBeVisible();
 });
