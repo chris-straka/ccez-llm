@@ -424,6 +424,7 @@ everything else is theme tokens, never raw hex. -->
 		gap: calc(0.55 * var(--u, 1rem));
 		width: calc(100% - calc(2.4 * var(--u, 1rem)));
 		padding-bottom: calc(1 * var(--u, 1rem));
+		animation: news-in 0.32s 0.06s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 		/* Chrome, not content: nothing here selects on a click. */
 		user-select: none;
 		-webkit-user-select: none;
@@ -794,6 +795,24 @@ everything else is theme tokens, never raw hex. -->
 		}
 		.skel-card .news-text {
 			min-height: 0;
+		}
+	}
+
+	@keyframes news-in {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+	}
+	/* Reduce Motion: fade in where it would rise. */
+	@keyframes news-fade {
+		from {
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.news-panel {
+			animation: news-fade 0.22s ease both;
 		}
 	}
 

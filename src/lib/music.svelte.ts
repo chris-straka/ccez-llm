@@ -6,54 +6,14 @@
  * launches; a remembered song comes back paused, never playing.
  */
 
-import { listenErrorCopy } from "./listen";
 import type { ListenBackend } from "./listenBackend";
+import { cleanSong, songErrorCopy, type Song } from "./songs";
 
-export interface Song {
-	id: string;
-	title: string;
-	channel: string;
-	thumbnail: string;
-}
+export { youtubeVideoId, type Song } from "./songs";
 
 export type MusicStatus = "idle" | "loading" | "playing" | "paused" | "error";
 
 const KEY = "ccez-llm-music-v1";
-
-/**
- * The video id in a YouTube link (watch, youtu.be, shorts, live,
- * embed, music.youtube.com), or a bare 11-character id; null for
- * anything else.
- */
-export function youtubeVideoId(text: string): string | null {
-	const t = text.trim();
-	if (/^[A-Za-z0-9_-]{11}$/.test(t)) return t;
-	let url: URL;
-	try {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- parsed once, never rendered.
-		url = new URL(/^[a-z]+:\/\//i.test(t) ? t : `https://${t}`);
-	} catch {
-		return null;
-	}
-	const host = url.hostname.replace(/^(www|m|music)\./, "");
-	let id: string | null = null;
-	if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? null;
-	else if (host === "youtube.com" || host === "youtube-nocookie.com") {
-		id =
-			url.searchParams.get("v") ??
-			/^\/(?:shorts|live|embed|v)\/([^/?#]+)/.exec(url.pathname)?.[1] ??
-			null;
-	}
-	return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
-}
-
-/** "That didn't load" copy for a song (no language to name). */
-export function songErrorCopy(error: unknown): string {
-	const message = error instanceof Error ? error.message : String(error);
-	if (message.includes("listen-no-track"))
-		return "That video has no sound to play.";
-	return listenErrorCopy(error, "");
-}
 
 interface Saved {
 	song: Song | null;
@@ -65,16 +25,7 @@ function load(): Saved {
 		const raw = JSON.parse(localStorage.getItem(KEY) ?? "null") as unknown;
 		if (raw && typeof raw === "object") {
 			const r = raw as Partial<Saved>;
-			const s = r.song;
-			const song =
-				s && typeof s.id === "string" && youtubeVideoId(s.id) === s.id
-					? {
-							id: s.id,
-							title: String(s.title ?? ""),
-							channel: String(s.channel ?? ""),
-							thumbnail: String(s.thumbnail ?? "")
-						}
-					: null;
+			const song = cleanSong(r.song);
 			return { song, loop: r.loop !== false };
 		}
 	} catch {
@@ -89,6 +40,13 @@ export class MusicPlayer {
 	/** Play the song over and over (on unless turned off). */
 	loop = $state(true);
 	error = $state("");
+	/** Playhead and length of the song loaded (seconds; 0 until known). */
+	time = $state(0);
+	duration = $state(0);
+	/** The video's picture for the music chat (no sound; a blob URL),
+	 * once asked for; null while it loads or when there is none. */
+	picture = $state<string | null>(null);
+	private pictureFor: string | null = null;
 	private backend: () => ListenBackend | null = () => null;
 	private el: HTMLAudioElement | null = null;
 	private url: string | null = null;
@@ -150,6 +108,13 @@ export class MusicPlayer {
 			el.onpause = () => {
 				if (this.el === el && this.status === "playing") this.status = "paused";
 			};
+			el.ontimeupdate = () => {
+				if (this.el === el) this.time = el.currentTime;
+			};
+			el.onloadedmetadata = () => {
+				if (this.el === el && Number.isFinite(el.duration))
+					this.duration = el.duration;
+			};
 			this.el = el;
 			await this.start(el);
 		} catch (error) {
@@ -180,6 +145,36 @@ export class MusicPlayer {
 		else void this.play();
 	}
 
+	/** Jump to `t` seconds in the song loaded. */
+	seek(t: number): void {
+		if (!this.el) return;
+		const at = Math.max(0, Math.min(t, this.duration || t));
+		this.el.currentTime = at;
+		this.time = at;
+	}
+
+	/** The playhead right now (the element's own, finer than `time`). */
+	now(): number {
+		return this.el?.currentTime ?? this.time;
+	}
+
+	/** Fetch the current song's picture once (a miss leaves none). */
+	async loadPicture(): Promise<void> {
+		const id = this.song?.id;
+		const backend = this.backend();
+		if (!id || !backend || this.pictureFor === id) return;
+		this.pictureFor = id;
+		try {
+			const bytes = await backend.video(id);
+			if (this.pictureFor !== id) return;
+			this.picture = URL.createObjectURL(
+				new Blob([bytes], { type: "video/mp4" })
+			);
+		} catch {
+			if (this.pictureFor === id) this.pictureFor = null;
+		}
+	}
+
 	setLoop(on: boolean): void {
 		this.loop = on;
 		if (this.el) this.el.loop = on;
@@ -201,6 +196,11 @@ export class MusicPlayer {
 		this.loadedFor = null;
 		if (this.url) URL.revokeObjectURL(this.url);
 		this.url = null;
+		if (this.picture) URL.revokeObjectURL(this.picture);
+		this.picture = null;
+		this.pictureFor = null;
+		this.time = 0;
+		this.duration = 0;
 	}
 
 	private save(): void {

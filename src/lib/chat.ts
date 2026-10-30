@@ -7,6 +7,7 @@ import type {
 import { messageText } from "./providers/types";
 import { LOWEST_THINKING } from "./providers/thinking";
 import type { ClipState, ListenSession } from "./listen";
+import { cleanSong, type Song } from "./songs";
 import type { Attachment } from "./attachments";
 import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
@@ -110,6 +111,9 @@ export interface Chat {
 	titleBy?: "user" | "ai";
 	/** Listening drill: the video and its clips (see `listen.ts`). */
 	listen?: ListenSession;
+	/** Music chat: a video player for one song at a time (see
+	 * `musicChat.ts`); `song` is null until one is picked. */
+	music?: { song: Song | null };
 }
 
 /**
@@ -1722,6 +1726,12 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					if (typeof c.correction !== "boolean") c.correction = false;
 					// Pre-overlay chats are never the game chat.
 					if (typeof c.game !== "boolean") c.game = false;
+					// A music chat keeps a well-formed song or none.
+					if (c.music !== undefined) {
+						if (c.music && typeof c.music === "object")
+							c.music = { song: cleanSong(c.music.song) };
+						else delete c.music;
+					}
 					// Drill clips once carried their translation and notes in
 					// the body; they fold under the clip now, so the body is
 					// just the transcript.
@@ -1778,7 +1788,8 @@ export function planChatStep(
 	const next = at + direction;
 	if (next < 0) return { kind: "none" };
 	if (next >= chats.length) {
-		return chats[at]?.messages.length === 0
+		const here = chats[at];
+		return here?.messages.length === 0 && !here.music
 			? { kind: "stay" }
 			: { kind: "mint" };
 	}

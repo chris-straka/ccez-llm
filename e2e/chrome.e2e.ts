@@ -1423,7 +1423,7 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await expect(send).toContainText("🇧🇬", { timeout: 10_000 });
 	// A desktop pick only sets the language; News opens the panel.
 	await expect(panel).toHaveCount(0);
-	await page.locator('.study-modes button:has-text("News")').click();
+	await page.locator('.study-modes button[aria-label="News"]').click();
 	await expect(panel).toContainText("Български", { timeout: 10_000 });
 	expect(await focusedComposer()).toBe(false);
 	// Re-pick without ever touching the prompt: the badge swaps at once.

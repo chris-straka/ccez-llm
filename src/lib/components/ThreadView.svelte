@@ -36,6 +36,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	import ListenSteps from "./ListenSteps.svelte";
 	import ListenEnd from "./ListenEnd.svelte";
 	import ListenPanel from "./ListenPanel.svelte";
+	import MusicView from "./MusicView.svelte";
+	import type { Song, SongSource } from "$lib/songs";
 	import type { DrillSummary, ListenChannel, ListenSession } from "$lib/listen";
 	import type { ListenMode } from "$lib/listen-mode.svelte";
 	import EmptyHero from "./EmptyHero.svelte";
@@ -195,6 +197,16 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			/** Touch UI: the drill's step button stands in for Space. */
 			touch: boolean;
 		};
+		/** Music chats: this chat's (null: a plain chat), the front
+		page's music button, and where songs are found. */
+		music: {
+			chat: { song: Song | null } | null;
+			start: () => void;
+			source: SongSource | null;
+			pick: (song: Song) => void;
+			change: () => void;
+			leave: () => void;
+		};
 		/** Flashcards due now (0 hides the hero's entry). */
 		flashcardsDue: number;
 		onFlashcards: () => void;
@@ -250,6 +262,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsImages,
 		newsActions,
 		listen,
+		music,
 		flashcardsDue,
 		onFlashcards,
 		scrollBox = $bindable<HTMLElement | undefined>(undefined),
@@ -275,7 +288,13 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	ontouchend={() => actions.releaseScroll()}
 	ontouchcancel={() => actions.releaseScroll()}
 >
-	{#if messages.length === 0}
+	{#if music.chat}
+		<MusicView
+			song={music.chat.song}
+			source={music.source}
+			actions={{ pick: music.pick, change: music.change, leave: music.leave }}
+		/>
+	{:else if messages.length === 0}
 		<!-- Empty hero through `EmptyHero.svelte` (the pills slot under
 		the welcome text on every platform); the page keeps emptiness
 		and the pill state. In news mode the welcome text goes away
@@ -301,30 +320,50 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 							: `${flashcardsDue} flashcards due`}
 					</button>
 				{/if}
-				{#if listen.modes && !previewing}
-					<!-- One language, two ways in: read its news or listen
-				to videos in it. -->
+				{#if (listen.modes || music.source) && !previewing}
+					<!-- Ways in, as emoji: the language's news, listening to
+				videos in it (both need a language), and music (any
+				video, played as a song; the app only). -->
 					<div class="study-modes" role="tablist" aria-label="Study with">
-						<button
-							type="button"
-							role="tab"
-							aria-selected={newsPanel !== null && !listen.mode.open}
-							onclick={(e) => {
-								// Focus never parks on the switch: bare keys
-								// (i summons the prompt) keep working.
-								e.currentTarget.blur();
-								listen.showNews();
-							}}>News</button
-						>
-						{#if listen.available}
+						{#if listen.modes}
 							<button
 								type="button"
 								role="tab"
-								aria-selected={listen.mode.open}
+								aria-label="News"
+								title="News"
+								aria-selected={newsPanel !== null && !listen.mode.open}
+								onclick={(e) => {
+									// Focus never parks on the switch: bare keys
+									// (i summons the prompt) keep working.
+									e.currentTarget.blur();
+									listen.showNews();
+								}}><span aria-hidden="true">📰</span></button
+							>
+							{#if listen.available}
+								<button
+									type="button"
+									role="tab"
+									aria-label="Listen"
+									title="Listen"
+									aria-selected={listen.mode.open}
+									onclick={(e) => {
+										e.currentTarget.blur();
+										listen.showListen();
+									}}><span aria-hidden="true">🎧</span></button
+								>
+							{/if}
+						{/if}
+						{#if music.source}
+							<button
+								type="button"
+								role="tab"
+								aria-label="Music"
+								title="Music"
+								aria-selected={false}
 								onclick={(e) => {
 									e.currentTarget.blur();
-									listen.showListen();
-								}}>Listen</button
+									music.start();
+								}}><span aria-hidden="true">🎵</span></button
 							>
 						{/if}
 					</div>
@@ -800,30 +839,42 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	no fade — the next chat replaces the current one in place. */
 	.study-modes {
 		display: flex;
-		margin-top: 0.2rem;
-		border: 1px solid var(--line-soft);
-		border-radius: 999px;
-		overflow: hidden;
+		gap: 0.5rem;
+		margin-top: 0.35rem;
 	}
 	.study-modes button {
-		border: none;
+		display: grid;
+		place-items: center;
+		width: 3rem;
+		height: 3rem;
+		border: 1px solid var(--line-soft);
+		border-radius: 50%;
 		background: transparent;
-		color: var(--muted);
 		font: inherit;
-		font-size: 0.9rem;
-		padding: 0.4rem 1.1rem;
-		min-height: 2.3rem;
+		font-size: 1.35rem;
+		line-height: 1;
 		cursor: pointer;
 		transition:
-			color 0.15s ease,
-			background-color 0.15s ease;
+			background-color 0.15s ease,
+			border-color 0.15s ease,
+			transform 0.15s ease;
+	}
+	.study-modes button span {
+		/* Emoji sit a hair low in most fonts. */
+		translate: 0 -0.04em;
 	}
 	.study-modes button[aria-selected="true"] {
 		background: var(--hover-wash);
-		color: var(--ink);
+		border-color: var(--ink);
 	}
 	.study-modes button:hover {
-		color: var(--ink);
+		background: var(--hover-wash);
+		transform: translateY(-1px);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.study-modes button:hover {
+			transform: none;
+		}
 	}
 	.flashcards-open {
 		margin-top: 0.4rem;

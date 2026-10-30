@@ -32,7 +32,7 @@ test("empty-chat News opens the picked language's news, close returns to welcome
 	await expect(list).toBeVisible();
 	await list.getByRole("menuitem", { name: "French" }).click();
 	// A desktop pick only sets the language; News opens the panel.
-	await page.locator('.study-modes button:has-text("News")').click();
+	await page.locator('.study-modes button[aria-label="News"]').click();
 	// Welcome text goes away, the panel rails under the pills.
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
@@ -68,7 +68,7 @@ test("fallback language never shows English headlines", async ({ page }) => {
 	await expect(list).toBeVisible();
 	await list.getByRole("menuitem", { name: "Danish" }).click();
 	// A desktop pick only sets the language; News opens the panel.
-	await page.locator('.study-modes button:has-text("News")').click();
+	await page.locator('.study-modes button[aria-label="News"]').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	// Fallback regions translate; the English note is gone. No
@@ -87,7 +87,7 @@ test("news mode lists from the top: uncentered pane, strip clearance, tail room"
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
-	await page.locator('.study-modes button:has-text("News")').click();
+	await page.locator('.study-modes button[aria-label="News"]').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	// The thread stops being a centered hero: full-height list.
@@ -137,7 +137,7 @@ test("picking a second language switches the panel over", async ({ page }) => {
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
-	await page.locator('.study-modes button:has-text("News")').click();
+	await page.locator('.study-modes button[aria-label="News"]').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toContainText("français", { timeout: 10_000 });
 	await page.locator('.lang-menu button:has-text("Asia")').click();
@@ -156,7 +156,7 @@ test("headlines park the composer; summon brings it back over them", async ({
 		.locator(".lang-list")
 		.getByRole("menuitem", { name: "French" })
 		.click();
-	await page.locator('.study-modes button:has-text("News")').click();
+	await page.locator('.study-modes button[aria-label="News"]').click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	const prompt = page.locator(".prompt");
@@ -196,7 +196,7 @@ test.describe("mock shell feed", () => {
 			.locator(".lang-list")
 			.getByRole("menuitem", { name: "French" })
 			.click();
-		await page.locator('.study-modes button:has-text("News")').click();
+		await page.locator('.study-modes button[aria-label="News"]').click();
 	}
 
 	test("headlines render from the mock feed", async ({ page }) => {

@@ -7,6 +7,7 @@ through the hero. In news mode the welcome text goes away and the
 pills become the top rail above the story cards. -->
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { fade } from "svelte/transition";
 
 	interface Props {
 		mock: boolean;
@@ -15,11 +16,54 @@ pills become the top rail above the story cards. -->
 	}
 
 	let { mock, newsMode, children }: Props = $props();
+
+	let root = $state<HTMLDivElement | null>(null);
+	const reduceMotion =
+		typeof matchMedia === "function" &&
+		matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+	// Entering or leaving news/listen moves the pills between the
+	// centered greeting and the top rail: glide them there (measure
+	// before the change, then play the difference back to zero) so
+	// the panel's arrival never reads as a jump.
+	let pillsTop: number | null = null;
+	const pills = (): Element | null =>
+		root?.querySelector(".lang-menus") ?? root?.firstElementChild ?? null;
+	$effect.pre(() => {
+		void newsMode;
+		pillsTop = pills()?.getBoundingClientRect().top ?? null;
+	});
+	$effect(() => {
+		void newsMode;
+		const before = pillsTop;
+		const after = pills()?.getBoundingClientRect().top;
+		if (!root || before === null || after === undefined) return;
+		const dy = before - after;
+		if (Math.abs(dy) < 2 || typeof root.animate !== "function") return;
+		// Reduce Motion: the same change as a short fade, nothing moves.
+		root.animate(
+			reduceMotion
+				? [{ opacity: 0.35 }, { opacity: 1 }]
+				: [{ transform: `translateY(${dy}px)` }, { transform: "none" }],
+			{
+				duration: reduceMotion ? 220 : 340,
+				easing: "cubic-bezier(0.2, 0.8, 0.2, 1)"
+			}
+		);
+	});
 </script>
 
-<div class="empty-state" class:news-mode={newsMode}>
+<div class="empty-state" class:news-mode={newsMode} bind:this={root}>
 	{#if !newsMode}
-		<h1 class="hero">What can I do for you?</h1>
+		<h1
+			class="hero"
+			in:fade={{
+				duration: 220,
+				delay: reduceMotion ? 0 : 120
+			}}
+		>
+			What can I do for you?
+		</h1>
 	{/if}
 	{#if mock}
 		<p class="mock-note"><strong>Mock provider active.</strong></p>

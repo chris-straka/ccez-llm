@@ -42,7 +42,7 @@ import {
 	type Token
 } from "./listenClips";
 import { heardTimes, type HeardWord } from "./listenHeard";
-import { youtubeVideoId } from "./music.svelte";
+import { youtubeVideoId } from "./songs";
 import type { ChatProvider } from "./providers/types";
 
 export interface ListenModeDeps {

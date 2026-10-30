@@ -13,7 +13,6 @@ channel or start a video. State lives in `ListenMode`. -->
 	} from "$lib/listen";
 	import type { ListenMode } from "$lib/listen-mode.svelte";
 	import { slide } from "svelte/transition";
-	import { music } from "$lib/music.svelte";
 
 	interface Props {
 		mode: ListenMode;
@@ -64,81 +63,46 @@ channel or start a video. State lives in `ListenMode`. -->
 	{@const info = mode.videoInfo(v.id, lang)}
 	{@const probing = mode.probing.has(`${lang}|${v.id}`)}
 	{@const ok = drillable(info)}
-	{@const current = music.song?.id === v.id}
-	<div class="video-line">
-		<button
-			type="button"
-			class="video"
-			class:unavailable={info !== undefined && !ok}
-			disabled={(info !== undefined && !ok) || mode.starting !== null}
-			onclick={() => void mode.start(v.id)}
-		>
-			{#if v.thumbnail}
-				<img
-					class="thumb"
-					src={v.thumbnail}
-					alt=""
-					loading="lazy"
-					draggable="false"
-				/>
-			{:else}
-				<span class="thumb"></span>
-			{/if}
-			<span class="video-text">
-				<span class="video-title">{v.title}</span>
-				<span class="video-meta">
-					{v.channel}{v.duration ? ` · ${formatDuration(v.duration)}` : ""}
-					{#if mode.starting === v.id}
-						· <span class="busy">Loading…</span>
-					{:else if info}
-						· <span class:avail={ok}>{availabilityLabel(info, langName)}</span>
-					{:else if probing}
-						· <span class="busy">checking…</span>
-					{/if}
-				</span>
+	<button
+		type="button"
+		class="video"
+		class:unavailable={info !== undefined && !ok}
+		disabled={(info !== undefined && !ok) || mode.starting !== null}
+		onclick={() => void mode.start(v.id)}
+	>
+		{#if v.thumbnail}
+			<img
+				class="thumb"
+				src={v.thumbnail}
+				alt=""
+				loading="lazy"
+				draggable="false"
+			/>
+		{:else}
+			<span class="thumb"></span>
+		{/if}
+		<span class="video-text">
+			<span class="video-title">{v.title}</span>
+			<span class="video-meta">
+				{v.channel}{v.duration ? ` · ${formatDuration(v.duration)}` : ""}
+				{#if mode.starting === v.id}
+					· <span class="busy">Loading…</span>
+				{:else if info}
+					· <span class:avail={ok}>{availabilityLabel(info, langName)}</span>
+				{:else if probing}
+					· <span class="busy">checking…</span>
+				{/if}
 			</span>
-		</button>
-		<!-- Play as music: the video's own sound, looped, any language. -->
-		<button
-			type="button"
-			class="song"
-			class:on={current && music.status !== "paused"}
-			aria-label={current && music.status === "playing"
-				? `Pause ${v.title}`
-				: `Play ${v.title} as music`}
-			title={current && music.status === "playing" ? "Pause" : "Play as music"}
-			onclick={() =>
-				current
-					? music.toggle()
-					: void music.play({
-							id: v.id,
-							title: v.title,
-							channel: v.channel,
-							thumbnail: v.thumbnail
-						})}
-		>
-			{#if current && music.status === "loading"}
-				<span class="song-dots" aria-hidden="true">…</span>
-			{:else if current && music.status === "playing"}
-				<svg viewBox="0 0 16 16" aria-hidden="true"
-					><path d="M5 3.5v9M11 3.5v9" /></svg
-				>
-			{:else}
-				<svg viewBox="0 0 16 16" aria-hidden="true"
-					><path d="M6 12.5V3.5l7-1.5v9" /><circle
-						cx="4.5"
-						cy="12.5"
-						r="1.6"
-					/><circle cx="11.5" cy="11" r="1.6" /></svg
-				>
-			{/if}
-		</button>
-	</div>
+		</span>
+	</button>
 {/snippet}
 
 <section class="listen-panel" aria-label="Listen">
 	<div class="search">
 		<span class="box">
+			<svg class="glass" viewBox="0 0 16 16" aria-hidden="true"
+				><circle cx="7" cy="7" r="4.2" /><path d="M10.2 10.2L13.5 13.5" /></svg
+			>
 			<input
 				bind:this={searchBox}
 				type="search"
@@ -248,7 +212,10 @@ channel or start a video. State lives in `ListenMode`. -->
 
 	<h3>Your channels</h3>
 	{#if channels.length === 0}
-		<p class="quiet">Search for a channel you watch, then add it here.</p>
+		<p class="no-channels">
+			<span aria-hidden="true">🎧</span>
+			Search for a channel you watch, then add it here.
+		</p>
 	{/if}
 	{#each channels as c (c.url)}
 		{@const view = mode.channelViews.get(c.url)}
@@ -329,17 +296,23 @@ channel or start a video. State lives in `ListenMode`. -->
 		padding-bottom: calc(1.5 * var(--u, 1rem));
 		user-select: none;
 		-webkit-user-select: none;
-		animation: listen-in 0.22s ease both;
+		animation: listen-in 0.32s 0.06s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	}
 	@keyframes listen-in {
 		from {
 			opacity: 0;
-			transform: translateY(6px);
+			transform: translateY(10px);
+		}
+	}
+	/* Reduce Motion: fade in where it would rise. */
+	@keyframes listen-fade {
+		from {
+			opacity: 0;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.listen-panel {
-			animation: none;
+			animation: listen-fade 0.22s ease both;
 		}
 	}
 	h3 {
@@ -389,16 +362,31 @@ channel or start a video. State lives in `ListenMode`. -->
 		min-width: 0;
 		font: inherit;
 		font-size: calc(1 * var(--u, 1rem));
-		padding: calc(0.6 * var(--u, 1rem)) calc(2.4 * var(--u, 1rem))
-			calc(0.6 * var(--u, 1rem)) calc(0.8 * var(--u, 1rem));
+		padding: calc(0.75 * var(--u, 1rem)) calc(2.4 * var(--u, 1rem))
+			calc(0.75 * var(--u, 1rem)) calc(2.6 * var(--u, 1rem));
 		border: 1px solid var(--line-soft);
-		border-radius: calc(0.7 * var(--u, 1rem));
-		background: transparent;
+		border-radius: 999px;
+		background: var(--bg-raised);
 		color: var(--ink);
+		box-shadow: 0 6px 22px rgb(0 0 0 / 0.12);
+		transition: border-color 0.15s ease;
 	}
 	.search input:focus {
 		outline: none;
 		border-color: var(--focus);
+	}
+	.glass {
+		position: absolute;
+		left: calc(0.95 * var(--u, 1rem));
+		top: 50%;
+		translate: 0 -50%;
+		width: calc(1.05 * var(--u, 1rem));
+		height: calc(1.05 * var(--u, 1rem));
+		fill: none;
+		stroke: var(--muted);
+		stroke-width: 1.6;
+		stroke-linecap: round;
+		pointer-events: none;
 	}
 	.search input::-webkit-search-cancel-button {
 		-webkit-appearance: none;
@@ -444,26 +432,53 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.kinds {
 		display: flex;
+		gap: calc(0.2 * var(--u, 1rem));
+		padding: calc(0.2 * var(--u, 1rem));
 		border: 1px solid var(--line-soft);
 		border-radius: 999px;
-		overflow: hidden;
+		background: var(--bg-raised);
 		flex: 0 0 auto;
 	}
 	.kinds button {
 		border: none;
+		border-radius: 999px;
 		background: transparent;
 		color: var(--muted);
 		font: inherit;
 		font-size: calc(0.85 * var(--u, 1rem));
-		padding: calc(0.5 * var(--u, 1rem)) calc(0.8 * var(--u, 1rem));
-		min-height: calc(2.4 * var(--u, 1rem));
+		padding: calc(0.45 * var(--u, 1rem)) calc(0.95 * var(--u, 1rem));
+		min-height: calc(2.2 * var(--u, 1rem));
 		cursor: pointer;
+		transition:
+			background-color 0.15s ease,
+			color 0.15s ease;
 	}
-	.kinds button[aria-checked="true"] {
-		background: var(--hover-wash);
+	.kinds button:hover {
 		color: var(--ink);
 	}
+	.kinds button[aria-checked="true"] {
+		background: var(--ink);
+		color: var(--bg);
+	}
+	.no-channels {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: calc(0.4 * var(--u, 1rem));
+		margin: 0;
+		padding: calc(1.6 * var(--u, 1rem)) calc(1 * var(--u, 1rem));
+		border: 1px dashed var(--line-soft);
+		border-radius: calc(1 * var(--u, 1rem));
+		color: var(--muted);
+		font-size: calc(0.9 * var(--t, 1rem));
+		text-align: center;
+	}
+	.no-channels span {
+		font-size: calc(1.6 * var(--u, 1rem));
+	}
 	.filter {
+		accent-color: var(--accent);
+		padding-left: calc(0.9 * var(--u, 1rem));
 		display: flex;
 		align-items: center;
 		gap: calc(0.45 * var(--u, 1rem));
@@ -497,46 +512,6 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.video {
 		cursor: pointer;
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-	.video-line {
-		display: flex;
-		align-items: center;
-		gap: calc(0.2 * var(--u, 1rem));
-	}
-	.song {
-		flex: none;
-		display: grid;
-		place-items: center;
-		width: calc(2.4 * var(--u, 1rem));
-		height: calc(2.4 * var(--u, 1rem));
-		border: none;
-		border-radius: 50%;
-		background: transparent;
-		color: var(--muted);
-		font: inherit;
-		cursor: pointer;
-		transition:
-			background-color 0.15s ease,
-			color 0.15s ease;
-	}
-	.song:hover,
-	.song.on {
-		background: var(--hover-wash);
-		color: var(--accent);
-	}
-	.song svg {
-		width: calc(1.1 * var(--u, 1rem));
-		height: calc(1.1 * var(--u, 1rem));
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 1.5;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-	}
-	.song circle {
-		fill: currentColor;
 	}
 	.video:hover:not(:disabled) {
 		background: var(--hover-wash);

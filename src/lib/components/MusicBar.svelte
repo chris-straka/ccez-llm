@@ -1,5 +1,5 @@
 <!-- The song playing (or paused): a small pill at the top of the
-window, on every screen, so music started from Listen keeps going and
+window, on every screen, so music started in a music chat keeps going and
 stays one tap from pause. Play / pause, loop (on by default: a song
 plays over and over), and × to stop and forget it. State lives in
 `music` (module state), so it outlives every panel. -->
@@ -7,12 +7,19 @@ plays over and over), and × to stop and forget it. State lives in
 	import { music } from "$lib/music.svelte";
 	import { fly } from "svelte/transition";
 
+	interface Props {
+		/** The music chat on screen shows this song's full player. */
+		hidden?: boolean;
+	}
+
+	let { hidden = false }: Props = $props();
+
 	const reduceMotion =
 		typeof matchMedia === "function" &&
 		matchMedia("(prefers-reduced-motion: reduce)").matches;
 </script>
 
-{#if music.song}
+{#if music.song && !hidden}
 	{@const song = music.song}
 	<div
 		class="music-bar"

@@ -205,7 +205,8 @@
 	import StudySheet from "$lib/components/StudySheet.svelte";
 	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
 	import MusicBar from "$lib/components/MusicBar.svelte";
-	import { music } from "$lib/music.svelte";
+	import { music, type Song } from "$lib/music.svelte";
+	import { endMusicChat, setMusicSong, startMusicChat } from "$lib/musicChat";
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
 	import Waypoints from "$lib/components/Waypoints.svelte";
@@ -14999,7 +15000,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 	<!-- Click-off closes the settings panel (keyboard users get Esc and ⌘,). -->
 	<main
-		class:empty={viewChat.messages.length === 0}
+		class:empty={viewChat.messages.length === 0 && !viewChat.music}
 		class:news={newsMode.news !== null || listenMode.open}
 		class:hide-messages={settings.hideMessages}
 		class:hide-buttons={settings.hideButtons}
@@ -15201,6 +15202,20 @@
 					settings.listenVolume = Math.min(2, Math.max(0, volume));
 					persistSettings();
 				}
+			}}
+			music={{
+				chat: chat.music ?? null,
+				start: () => {
+					listenMode.close();
+					startMusicChat(chatState, chat.id);
+				},
+				source: listenBackend(),
+				pick: (song: Song) => {
+					setMusicSong(chatState, chat.id, song);
+					void music.play(song);
+				},
+				change: () => setMusicSong(chatState, chat.id, null),
+				leave: () => endMusicChat(chatState, chat.id)
 			}}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}
@@ -15556,7 +15571,12 @@
 		/>
 	{/if}
 
-	<MusicBar />
+	<!-- The music chat playing its own song shows the full player:
+	the bar would only repeat it. -->
+	<MusicBar
+		hidden={viewChat.music?.song?.id !== undefined &&
+			viewChat.music.song.id === music.song?.id}
+	/>
 
 	<!-- Settings drawer through `SettingsDrawer.svelte` (double-click
 	on open space closes the panel; keyboard users keep Meta+,): the
