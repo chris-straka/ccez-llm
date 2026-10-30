@@ -379,6 +379,28 @@ pub fn pick_audio(player: &Value, target: &str) -> Option<AudioPick> {
     })
 }
 
+/// The track to play a video as music: its own sound (never a dub),
+/// mp4 first (plays in every webview), then the richest bitrate, so a
+/// song keeps its quality where a drill takes the smallest speech track.
+pub fn pick_song(player: &Value) -> Option<(String, u64, String)> {
+    let best = audio_formats(player)
+        .into_iter()
+        .filter(|f| matches!(acont(f).as_str(), "" | "original"))
+        .filter(|f| str_at(f, &["url"]).starts_with("https://"))
+        .min_by_key(|f| {
+            let not_mp4 = !str_at(f, &["mimeType"]).starts_with("audio/mp4") as u8;
+            (not_mp4, u64::MAX - bitrate(f).min(u64::MAX - 1))
+        })?;
+    let mime = str_at(best, &["mimeType"])
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let len = str_at(best, &["contentLength"]).parse().unwrap_or(0);
+    Some((str_at(best, &["url"]).to_string(), len, mime))
+}
+
 /// Pick captions that transcribe the picked track.
 pub fn pick_captions(player: &Value, audio: &AudioPick) -> Option<CaptionPick> {
     let want = base_lang(&audio.lang);
@@ -808,6 +830,20 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn a_song_plays_its_own_richest_mp4_track() {
+        let f = |itag: u32, mime: &str, rate: u64| serde_json::json!({ "itag": itag, "mimeType": mime, "bitrate": rate, "contentLength": "9", "url": format!("https://a/{itag}") });
+        let player = serde_json::json!({ "streamingData": { "adaptiveFormats": [
+            f(139, "audio/mp4; codecs=\"mp4a.40.5\"", 48_000),
+            f(140, "audio/mp4; codecs=\"mp4a.40.2\"", 130_000),
+            f(251, "audio/webm; codecs=\"opus\"", 160_000)
+        ] } });
+        assert_eq!(
+            pick_song(&player),
+            Some(("https://a/140".into(), 9, "audio/mp4".into()))
+        );
+    }
 
     fn fixture(name: &str) -> Value {
         let path = format!("{}/tests/fixtures/{name}.json", env!("CARGO_MANIFEST_DIR"));

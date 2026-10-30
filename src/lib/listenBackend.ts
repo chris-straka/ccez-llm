@@ -27,6 +27,10 @@ export interface ListenBackend {
 	/** Piece `n` of the words a speech recognizer hears in the track,
 	 * timed (Mac only; rejects elsewhere). */
 	heard: (id: string, lang: string, n: number) => Promise<HeardChunk>;
+	/** Download the video's own sound as music (cached); its MIME type. */
+	song: (id: string) => Promise<string>;
+	/** The song's bytes (call after `song`). */
+	songAudio: (id: string) => Promise<ArrayBuffer>;
 }
 
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
@@ -44,6 +48,8 @@ export function shellBackend(invoke: Invoke): ListenBackend {
 		envelope: (id, lang) =>
 			invoke<ArrayBuffer>("listen_envelope", { id, lang }),
 		video: (id) => invoke<ArrayBuffer>("listen_video", { id }),
-		heard: (id, lang, n) => invoke<HeardChunk>("listen_heard", { id, lang, n })
+		heard: (id, lang, n) => invoke<HeardChunk>("listen_heard", { id, lang, n }),
+		song: (id) => invoke<string>("listen_song", { id }),
+		songAudio: (id) => invoke<ArrayBuffer>("listen_song_audio", { id })
 	};
 }

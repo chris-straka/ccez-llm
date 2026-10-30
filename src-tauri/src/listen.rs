@@ -99,3 +99,18 @@ pub async fn listen_heard(
         })
         .await
 }
+
+/// Download a video's own sound to play as music (once; cached), and
+/// say its MIME type.
+#[tauri::command]
+pub async fn listen_song(app: AppHandle, id: String) -> Result<String, String> {
+    Ok(listen(&app)?.song(&id).await?.1)
+}
+
+/// The song's bytes, raw (call after `listen_song`).
+#[tauri::command]
+pub async fn listen_song_audio(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
+    let (path, _) = listen(&app)?.song(&id).await?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    Ok(tauri::ipc::Response::new(bytes))
+}

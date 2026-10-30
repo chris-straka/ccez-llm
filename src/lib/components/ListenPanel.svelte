@@ -13,6 +13,7 @@ channel or start a video. State lives in `ListenMode`. -->
 	} from "$lib/listen";
 	import type { ListenMode } from "$lib/listen-mode.svelte";
 	import { slide } from "svelte/transition";
+	import { music } from "$lib/music.svelte";
 
 	interface Props {
 		mode: ListenMode;
@@ -63,38 +64,76 @@ channel or start a video. State lives in `ListenMode`. -->
 	{@const info = mode.videoInfo(v.id, lang)}
 	{@const probing = mode.probing.has(`${lang}|${v.id}`)}
 	{@const ok = drillable(info)}
-	<button
-		type="button"
-		class="video"
-		class:unavailable={info !== undefined && !ok}
-		disabled={(info !== undefined && !ok) || mode.starting !== null}
-		onclick={() => void mode.start(v.id)}
-	>
-		{#if v.thumbnail}
-			<img
-				class="thumb"
-				src={v.thumbnail}
-				alt=""
-				loading="lazy"
-				draggable="false"
-			/>
-		{:else}
-			<span class="thumb"></span>
-		{/if}
-		<span class="video-text">
-			<span class="video-title">{v.title}</span>
-			<span class="video-meta">
-				{v.channel}{v.duration ? ` · ${formatDuration(v.duration)}` : ""}
-				{#if mode.starting === v.id}
-					· <span class="busy">Loading…</span>
-				{:else if info}
-					· <span class:avail={ok}>{availabilityLabel(info, langName)}</span>
-				{:else if probing}
-					· <span class="busy">checking…</span>
-				{/if}
+	{@const current = music.song?.id === v.id}
+	<div class="video-line">
+		<button
+			type="button"
+			class="video"
+			class:unavailable={info !== undefined && !ok}
+			disabled={(info !== undefined && !ok) || mode.starting !== null}
+			onclick={() => void mode.start(v.id)}
+		>
+			{#if v.thumbnail}
+				<img
+					class="thumb"
+					src={v.thumbnail}
+					alt=""
+					loading="lazy"
+					draggable="false"
+				/>
+			{:else}
+				<span class="thumb"></span>
+			{/if}
+			<span class="video-text">
+				<span class="video-title">{v.title}</span>
+				<span class="video-meta">
+					{v.channel}{v.duration ? ` · ${formatDuration(v.duration)}` : ""}
+					{#if mode.starting === v.id}
+						· <span class="busy">Loading…</span>
+					{:else if info}
+						· <span class:avail={ok}>{availabilityLabel(info, langName)}</span>
+					{:else if probing}
+						· <span class="busy">checking…</span>
+					{/if}
+				</span>
 			</span>
-		</span>
-	</button>
+		</button>
+		<!-- Play as music: the video's own sound, looped, any language. -->
+		<button
+			type="button"
+			class="song"
+			class:on={current && music.status !== "paused"}
+			aria-label={current && music.status === "playing"
+				? `Pause ${v.title}`
+				: `Play ${v.title} as music`}
+			title={current && music.status === "playing" ? "Pause" : "Play as music"}
+			onclick={() =>
+				current
+					? music.toggle()
+					: void music.play({
+							id: v.id,
+							title: v.title,
+							channel: v.channel,
+							thumbnail: v.thumbnail
+						})}
+		>
+			{#if current && music.status === "loading"}
+				<span class="song-dots" aria-hidden="true">…</span>
+			{:else if current && music.status === "playing"}
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><path d="M5 3.5v9M11 3.5v9" /></svg
+				>
+			{:else}
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><path d="M6 12.5V3.5l7-1.5v9" /><circle
+						cx="4.5"
+						cy="12.5"
+						r="1.6"
+					/><circle cx="11.5" cy="11" r="1.6" /></svg
+				>
+			{/if}
+		</button>
+	</div>
 {/snippet}
 
 <section class="listen-panel" aria-label="Listen">
@@ -458,6 +497,46 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.video {
 		cursor: pointer;
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.video-line {
+		display: flex;
+		align-items: center;
+		gap: calc(0.2 * var(--u, 1rem));
+	}
+	.song {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: calc(2.4 * var(--u, 1rem));
+		height: calc(2.4 * var(--u, 1rem));
+		border: none;
+		border-radius: 50%;
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		cursor: pointer;
+		transition:
+			background-color 0.15s ease,
+			color 0.15s ease;
+	}
+	.song:hover,
+	.song.on {
+		background: var(--hover-wash);
+		color: var(--accent);
+	}
+	.song svg {
+		width: calc(1.1 * var(--u, 1rem));
+		height: calc(1.1 * var(--u, 1rem));
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.song circle {
+		fill: currentColor;
 	}
 	.video:hover:not(:disabled) {
 		background: var(--hover-wash);

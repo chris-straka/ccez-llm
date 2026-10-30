@@ -42,6 +42,7 @@ import {
 	type Token
 } from "./listenClips";
 import { heardTimes, type HeardWord } from "./listenHeard";
+import { youtubeVideoId } from "./music.svelte";
 import type { ChatProvider } from "./providers/types";
 
 export interface ListenModeDeps {
@@ -110,6 +111,9 @@ export class ListenMode {
 	onlyAvailable = $state(true);
 	searching = $state(false);
 	results = $state<ListenEntry[] | null>(null);
+	/** The results are one pasted link's video: shown whatever audio
+	 * it has (a song is played, not drilled). */
+	linked = $state(false);
 	/** Channel searches: each result's own recent-video status. */
 	channelViews = new SvelteMap<string, ChannelView>();
 	/** Per-language availability by `lang|id`. */
@@ -269,6 +273,7 @@ export class ListenMode {
 		this.browseSeq++;
 		this.searching = false;
 		this.results = null;
+		this.linked = false;
 		this.error = "";
 	}
 
@@ -285,11 +290,28 @@ export class ListenMode {
 		const seq = ++this.browseSeq;
 		this.searching = true;
 		this.error = "";
+		// A pasted YouTube link finds that one video (songs included:
+		// it shows whatever audio it has).
+		const linked = youtubeVideoId(q);
+		this.linked = linked !== null;
 		try {
-			const rows = await this.needBackend().search(q, this.searchKind);
+			const backend = this.needBackend();
+			const rows = linked
+				? (await backend.videos([linked], this.lang)).map((v): ListenEntry => ({
+						kind: "video",
+						id: v.id,
+						title: v.title,
+						channel: v.channel,
+						channel_url: v.channel_url,
+						duration: v.duration,
+						thumbnail: v.thumbnail
+					}))
+				: await backend.search(q, this.searchKind);
 			if (seq !== this.browseSeq) return;
+			if (linked && rows.length === 0) throw new Error("listen-unavailable");
 			this.results = rows;
-			if (this.searchKind === "video") await this.probe(rows.map((r) => r.id));
+			if (this.searchKind === "video" || linked)
+				await this.probe(rows.map((r) => r.id));
 			else for (const r of rows.slice(0, 8)) void this.loadChannel(r.id);
 		} catch (error) {
 			if (seq !== this.browseSeq) return;
@@ -307,7 +329,7 @@ export class ListenMode {
 	shownResults(): ListenEntry[] {
 		const rows = this.results ?? [];
 		const lang = this.lang ?? "";
-		if (this.searchKind === "channel") {
+		if (this.searchKind === "channel" && !this.linked) {
 			if (!this.onlyAvailable) return rows;
 			return rows.filter((r) => {
 				const view = this.channelViews.get(r.id);
@@ -319,7 +341,7 @@ export class ListenMode {
 		const info: Record<string, ListenVideo | undefined> = {};
 		for (const r of rows) info[r.id] = this.info.get(infoKey(r.id, lang));
 		const ranked = rankVideos(rows, info);
-		if (!this.onlyAvailable) return ranked;
+		if (!this.onlyAvailable || this.linked) return ranked;
 		return ranked.filter((r) => {
 			const v = info[r.id];
 			return v === undefined || drillable(v);

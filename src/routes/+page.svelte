@@ -204,6 +204,8 @@
 
 	import StudySheet from "$lib/components/StudySheet.svelte";
 	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
+	import MusicBar from "$lib/components/MusicBar.svelte";
+	import { music } from "$lib/music.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
 	import Waypoints from "$lib/components/Waypoints.svelte";
@@ -2504,6 +2506,10 @@
 				(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
 		);
 	}
+	// Music (Listen's Play as music) downloads through the same backend
+	// and plays at the Video volume, capped at full.
+	music.connect(listenBackend);
+	$effect(() => music.setVolume(settings.listenVolume));
 	const listenMode = new ListenMode({
 		getChatState: () => chatState,
 		backend: listenBackend,
@@ -15549,6 +15555,8 @@
 			}}
 		/>
 	{/if}
+
+	<MusicBar />
 
 	<!-- Settings drawer through `SettingsDrawer.svelte` (double-click
 	on open space closes the panel; keyboard users keep Meta+,): the

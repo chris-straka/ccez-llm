@@ -16,7 +16,7 @@ use serde_json::Value;
 use crate::client::Yt;
 use crate::heard::{chunk_bounds, HeardChunk, HeardWord};
 use crate::youtube::{
-    audio_source, base_lang, caption_url, channel_id_of, channel_page, channel_url,
+    audio_source, base_lang, caption_url, channel_id_of, channel_page, channel_url, pick_song,
     playability_error, search_entries, storyboard, valid_video_id, video_info, video_source,
     CaptionKind, ChannelPage, Entry, Storyboard, VideoInfo,
 };
@@ -453,6 +453,44 @@ impl Listen {
         let bytes = serde_json::to_vec(&chunk).map_err(|e| e.to_string())?;
         write_atomic(&path, &bytes)?;
         Ok(chunk)
+    }
+
+    /// A video's own sound as music (no captions or language needed),
+    /// downloaded once into the media cache: its path and MIME type.
+    /// A stream URL YouTube turns down re-asks for a fresh player once.
+    pub async fn song(&self, id: &str) -> Result<(PathBuf, String)> {
+        if !valid_video_id(id) {
+            return Err("listen-bad-id".into());
+        }
+        let dir = self.cache.join("media").join(id);
+        let lock = video_lock(&format!("{id}/song"));
+        let _guard = lock.lock().await;
+        for (ext, mime) in [("m4a", "audio/mp4"), ("webm", "audio/webm")] {
+            let path = dir.join(format!("song.{ext}"));
+            if path.is_file() {
+                return Ok((path, mime.into()));
+            }
+        }
+        let mut player = self.player(id, URL_TTL).await?;
+        for attempt in 0..2 {
+            if let Some(code) = playability_error(&player) {
+                return Err(code);
+            }
+            let (url, len, mime) = pick_song(&player).ok_or("listen-no-track")?;
+            let ext = if mime == "audio/webm" { "webm" } else { "m4a" };
+            let path = dir.join(format!("song.{ext}"));
+            match self.yt.download(&url, len, &path).await {
+                Err(e)
+                    if attempt == 0
+                        && (e == "listen-http-403" || e == "listen-download-failed") =>
+                {
+                    player = self.player(id, Duration::ZERO).await?;
+                }
+                Err(e) => return Err(e),
+                Ok(()) => return Ok((path, mime)),
+            }
+        }
+        Err("listen-download-failed".into())
     }
 
     /// Where a fetched track's audio sits (call after `fetch`).

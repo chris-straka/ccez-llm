@@ -153,7 +153,7 @@ describe("search box", () => {
 	};
 
 	/** A browse screen whose searches resolve when `land` is called. */
-	function browse() {
+	function browse(videos: ListenBackend["videos"] = () => Promise.resolve([])) {
 		const pending: ((rows: ListenEntry[]) => void)[] = [];
 		const queries: string[] = [];
 		const backend = {
@@ -162,12 +162,14 @@ describe("search box", () => {
 				return new Promise<ListenEntry[]>((resolve) => pending.push(resolve));
 			},
 			channel: () => new Promise<never>(() => {}),
-			videos: () => Promise.resolve([]),
+			videos,
 			fetch: () => new Promise<never>(() => {}),
 			audio: () => new Promise<never>(() => {}),
 			envelope: () => new Promise<never>(() => {}),
 			video: () => new Promise<never>(() => {}),
-			heard: () => new Promise<never>(() => {})
+			heard: () => new Promise<never>(() => {}),
+			song: () => new Promise<never>(() => {}),
+			songAudio: () => new Promise<never>(() => {})
 		} satisfies ListenBackend;
 		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
 		const state = createChatState(store);
@@ -191,6 +193,27 @@ describe("search box", () => {
 			calls: () => queries
 		};
 	}
+
+	it("a pasted link finds that video, shown even with no French audio", async () => {
+		const song = {
+			id: "1f583cw0FOk",
+			title: "Une chanson",
+			channel: "Quelqu'un",
+			channel_url: "",
+			duration: 200,
+			thumbnail: "",
+			original_lang: "en",
+			audio: null,
+			captions: null
+		};
+		const { mode, calls } = browse(() => Promise.resolve([song]));
+		mode.setQuery("https://www.youtube.com/watch?v=1f583cw0FOk");
+		await mode.search();
+		expect(calls()).toEqual([]);
+		expect(mode.shownResults().map((r) => [r.kind, r.id])).toEqual([
+			["video", "1f583cw0FOk"]
+		]);
+	});
 
 	it("emptying the box drops the results", async () => {
 		const { mode, land } = browse();
@@ -284,6 +307,8 @@ describe("starting a drill", () => {
 			envelope: () => Promise.reject(new Error("none")),
 			video: () => new Promise<never>(() => {}),
 			heard: () => Promise.reject(new Error("listen-heard-unsupported")),
+			song: () => new Promise<never>(() => {}),
+			songAudio: () => new Promise<never>(() => {}),
 			...more
 		} satisfies ListenBackend;
 		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
