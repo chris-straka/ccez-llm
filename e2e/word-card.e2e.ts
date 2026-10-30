@@ -272,7 +272,8 @@ test("a word's pieces stay on one row at phone width", async ({ page }) => {
 	await seedChat(page, [
 		{
 			role: "assistant",
-			content: "autour des interventions très médiatisées de deux anciens présidents"
+			content:
+				"autour des interventions très médiatisées de deux anciens présidents"
 		}
 	]);
 	await page.addInitScript(() => {
