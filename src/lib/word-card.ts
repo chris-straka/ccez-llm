@@ -35,6 +35,10 @@ export interface WordPart {
 	 * verb's stem ("news", "to pull"). */
 	meaning?: string;
 	kind: WordPartKind;
+	/** The dictionary reads this piece as several forms: the label
+	 * shows only what they share until the model's card names the
+	 * one the sentence uses. */
+	unsettled?: boolean;
 }
 
 /** The multi-word form a word is one part of in its sentence. */
@@ -1034,7 +1038,9 @@ export function withPieceNotes(
 		return {
 			...k,
 			...(m.meaning ? { meaning: m.meaning } : {}),
-			...(!k.label && m.label && k.kind !== "core" ? { label: m.label } : {})
+			...((!k.label || k.unsettled) && m.label && k.kind !== "core"
+				? { label: m.label }
+				: {})
 		};
 	});
 }
@@ -1062,6 +1068,9 @@ export function buildWordCardMessages(
 		knownParts?: boolean;
 		/** That split's pieces: the model gives each one's meaning. */
 		knownPieces?: string[];
+		/** Pieces the dictionary reads as several forms: the model
+		names the one the sentence uses. */
+		openPieces?: string[];
 	} = {}
 ): Array<{ role: string; content: string }> {
 	const profile = lang ? WORD_PROFILES[lang] : undefined;
@@ -1094,7 +1103,14 @@ export function buildWordCardMessages(
 			? `"parts": the dictionary already split the word as ` +
 				`${opts.knownPieces.join(" + ")}: one entry per piece, in that ` +
 				`order, with only "text", "meaning", and "label" for a prefix ` +
-				`or particle ("inseparable prefix", "separable prefix").\n`
+				`or particle ("inseparable prefix", "separable prefix")` +
+				(opts.openPieces?.length
+					? ` and for ${opts.openPieces.map((p) => `"${p}"`).join(", ")}, ` +
+						`which the dictionary reads as several forms: the one form ` +
+						`this sentence uses, as courses name it ("present ` +
+						`subjunctive, third-person singular")`
+					: "") +
+				`.\n`
 			: opts.knownParts
 				? `"parts": [] always: the dictionary already split the word.\n`
 				: `"parts": the word split into its meaningful pieces, in order; the ` +

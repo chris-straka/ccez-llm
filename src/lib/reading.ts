@@ -1176,7 +1176,11 @@ export async function annotationAnswer(
 					...opts,
 					...(dictionary ? { dictionary } : {}),
 					...(known.length > 0
-						? { knownParts: true, knownPieces: known.map((p) => p.text) }
+						? {
+								knownParts: true,
+								knownPieces: known.map((p) => p.text),
+								openPieces: known.filter((p) => p.unsettled).map((p) => p.text)
+							}
 						: {})
 				}) as Array<{
 					role: "system" | "user" | "assistant";

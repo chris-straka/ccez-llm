@@ -264,3 +264,44 @@ test("word cards show piece meanings and character parts", async ({ page }) => {
 		"日"
 	]);
 });
+
+/** Long labels wrap under their own piece instead of widening it,
+so a three-piece word stays on one row at phone width. */
+test("a word's pieces stay on one row at phone width", async ({ page }) => {
+	await page.setViewportSize({ width: 412, height: 915 });
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content: "autour des interventions très médiatisées de deux anciens présidents"
+		}
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			"ccez-mock-reply",
+			JSON.stringify({
+				meaning: "publicized",
+				parts: [
+					{ text: "médiatis", label: "médiatiser", kind: "core" },
+					{ text: "é", label: "past participle", kind: "tense" },
+					{ text: "es", label: "feminine plural", kind: "agree" }
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 0, "médiatisées");
+	await page.keyboard.press("a");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 10_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const pieces = page.locator(".ann-answer.placed .wc-piece");
+	await expect(pieces).toHaveText(["médiatis", "é", "es"]);
+	const tops = await pieces.evaluateAll((els) =>
+		els.map((e) => Math.round(e.getBoundingClientRect().top))
+	);
+	expect(new Set(tops).size).toBe(1);
+});

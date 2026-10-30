@@ -10,6 +10,7 @@ import {
 	oneBaseWord,
 	lookupForms,
 	plainSpelling,
+	settledTags,
 	stemSplit,
 	type DictHit,
 	type JaPiece
@@ -40,6 +41,50 @@ describe("formatTags", () => {
 		expect(formatTags("inessive singular")).toBe("inessive singular");
 		expect(formatTags("alternative")).toBe("alternative form");
 		expect(formatTags("")).toBe("");
+	});
+});
+
+describe("settledTags", () => {
+	it("drops a category the reading holds two values of", () => {
+		expect(
+			settledTags(
+				"indicative subjunctive present first-person third-person singular"
+			)
+		).toBe("present singular");
+		expect(settledTags("participle past")).toBe("participle past");
+	});
+});
+
+describe("cardFromDictionary with several readings", () => {
+	it("shows only what they share, marked for the model to settle", () => {
+		const cristalliser = {
+			w: "cristalliser",
+			p: "verb",
+			s: ["to crystallize"]
+		};
+		expect(
+			cardFromDictionary(
+				"cristallise",
+				[
+					{
+						tags: "first-person indicative present singular",
+						entry: cristalliser
+					},
+					{
+						tags: "indicative present singular third-person",
+						entry: cristalliser
+					},
+					{
+						tags: "first-person present singular subjunctive",
+						entry: cristalliser
+					}
+				],
+				"fr"
+			)!.parts
+		).toEqual([
+			{ text: "cristallis", label: "cristalliser", kind: "core" },
+			{ text: "e", label: "present, singular", kind: "tense", unsettled: true }
+		]);
 	});
 });
 

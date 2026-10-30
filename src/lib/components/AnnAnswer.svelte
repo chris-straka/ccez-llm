@@ -931,9 +931,13 @@ where it was left. -->
 		text-align: center;
 		color: var(--muted);
 	}
+	/* As wide as its longest word, or its piece: a long name ("past
+	participle") wraps instead of widening the piece, so the pieces
+	stay on one row where they fit. */
 	.wc-label {
-		max-width: 10ch;
-		margin: 0 auto;
+		width: min-content;
+		min-width: 100%;
+		box-sizing: border-box;
 		padding: 0.25em 0.2em 0;
 		font-size: 0.78em;
 		line-height: 1.25;

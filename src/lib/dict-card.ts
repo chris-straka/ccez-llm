@@ -122,6 +122,23 @@ export function formatTags(tags: string): string {
 	return parts.join(", ");
 }
 
+/**
+ * The tags one reading is sure of: a category that holds two values
+ * (cristallise is first- or third-person, indicative or subjunctive)
+ * drops out until the sentence settles it. "indicative subjunctive
+ * present first-person third-person singular" keeps "present
+ * singular".
+ */
+export function settledTags(tags: string): string {
+	const list = tags.split(/\s+/).filter(Boolean);
+	const open = new Set(
+		[TENSES, MOODS, CASES, GENDERS, PERSONS, NUMBERS]
+			.filter((cat) => cat.filter((t) => list.includes(t)).length > 1)
+			.flat()
+	);
+	return list.filter((t) => !open.has(t)).join(" ");
+}
+
 /** What an ending marks: case reads as role, bare agreement as agree. */
 function endingKind(tags: string): WordPartKind {
 	const set = new Set(tags.split(/\s+/));
@@ -415,10 +432,12 @@ function packParts(form: string, hit: DictHit, endingName: string): WordPart[] {
 	const marker = num ? MARKERS.find((m) => tags.includes(m)) : undefined;
 	const endName = marker
 		? formatTags(
-				tags
-					// A noun's gender is its own fact, as in endingName.
-					.filter((t) => t !== marker && !(hit.entry.g && GENDER_TAGS.has(t)))
-					.join(" ")
+				settledTags(
+					tags
+						// A noun's gender is its own fact, as in endingName.
+						.filter((t) => t !== marker && !(hit.entry.g && GENDER_TAGS.has(t)))
+						.join(" ")
+				)
 			)
 		: endingName;
 	const parts: WordPart[] = [];
@@ -525,8 +544,23 @@ function dictionaryCard(
 	matched: string | undefined
 ): { card: WordCard; known: boolean } | null {
 	const best = bestHits(hits);
-	const top = best[0];
-	if (!top) return null;
+	const first = best[0];
+	if (!first) return null;
+	// Every reading of the top word at once (cristallise is first- or
+	// third-person, indicative or subjunctive): the card shows what
+	// they share, never one picked at random.
+	const readings = hits.filter(
+		(h) => h.tags !== "" && entryKey(h.entry) === entryKey(first.entry)
+	);
+	const top =
+		first.tags !== "" && readings.length > 1
+			? {
+					...first,
+					tags: [...new Set(readings.flatMap((h) => h.tags.split(/\s+/)))].join(
+						" "
+					)
+				}
+			: first;
 	const whole = quote
 		.normalize("NFC")
 		.trim()
@@ -544,33 +578,44 @@ function dictionaryCard(
 				}
 			]
 		: [];
-	const tagName = formatTags(top.tags);
 	const isHeadword = fold(top.entry.w) === fold(form);
 	// A noun's gender is its own fact, not its ending's.
-	const endingName = top.entry.g
-		? formatTags(
-				top.tags
-					.split(/\s+/)
-					.filter((t) => !GENDER_TAGS.has(t))
-					.join(" ")
-			)
-		: tagName;
+	const endingTags = top.entry.g
+		? top.tags
+				.split(/\s+/)
+				.filter((t) => !GENDER_TAGS.has(t))
+				.join(" ")
+		: top.tags;
+	// Only what this reading is sure of shows: the sentence (the
+	// model's card) names the rest.
+	const settled = settledTags(endingTags);
+	const unsettled =
+		settled !== endingTags.split(/\s+/).filter(Boolean).join(" ");
+	const endingName = formatTags(settled);
+	// Whether the form has a grammar name at all, settled or not.
+	const named = formatTags(endingTags) !== "";
 	let parts: WordPart[] = [];
 	const sameLetters =
 		matched === undefined ||
 		[...fold(matched)].length === [...fold(form)].length;
 	if (japanese.length > 1) parts = japaneseParts(japanese);
 	else if (isHeadword) parts = morphemeParts(form, top.entry);
-	else if (sameLetters && endingName) parts = packParts(form, top, endingName);
+	else if (sameLetters && named) parts = packParts(form, top, endingName);
 	const known = parts.length > 1;
 	if (!known && !isHeadword && japanese.length <= 1) {
 		const split = stemSplit(form, top.entry.w);
-		if (split && endingName)
+		if (split && named)
 			parts = [
 				{ text: split[0], label: top.entry.w, kind: "core" },
 				{ text: split[1], label: endingName, kind: endingKind(top.tags) }
 			];
 	}
+	// An ending the sentence still has to settle: the model's card
+	// names it.
+	if (unsettled && !isHeadword && japanese.length <= 1)
+		parts = parts.map((p) =>
+			p.kind === "core" ? p : { ...p, unsettled: true }
+		);
 	if (lead.length > 0)
 		parts = [
 			...lead,

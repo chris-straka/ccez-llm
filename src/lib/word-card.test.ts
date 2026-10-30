@@ -476,4 +476,43 @@ describe("buildWordCardMessages with a known split", () => {
 		);
 		expect(system?.content).toContain("split the word as be + ziehen");
 	});
+
+	it("asks the sentence's form for a piece the dictionary can't settle", () => {
+		const [system] = buildWordCardMessages(
+			{ quote: "cristallise", context: "La campagne se cristallise." },
+			"fr",
+			{
+				knownParts: true,
+				knownPieces: ["cristallis", "e"],
+				openPieces: ["e"]
+			}
+		);
+		expect(system?.content).toContain(
+			'and for "e", which the dictionary reads as several forms'
+		);
+	});
+});
+
+describe("withPieceNotes on an unsettled piece", () => {
+	it("takes the model's label for it", () => {
+		const known = [
+			{ text: "cristallis", label: "cristalliser", kind: "core" as const },
+			{
+				text: "e",
+				label: "present, singular",
+				kind: "tense" as const,
+				unsettled: true
+			}
+		];
+		expect(
+			withPieceNotes(known, [
+				{ text: "cristallis", label: "ignored", kind: "core" },
+				{
+					text: "e",
+					label: "present indicative, third-person singular",
+					kind: "tense"
+				}
+			])[1]?.label
+		).toBe("present indicative, third-person singular");
+	});
 });
