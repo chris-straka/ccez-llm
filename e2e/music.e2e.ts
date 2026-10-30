@@ -205,3 +205,19 @@ test("the search above the player swaps in another song", async ({ page }) => {
 		page.locator(".music .player").getByRole("button", { name: "Pause" }).last()
 	).toBeVisible();
 });
+
+test("double-clicking right of the music player opens Settings", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1200, height: 760 });
+	await seedChat(page, []);
+	await mockMusicShell(page);
+	await page.goto("/");
+	await page.getByRole("tab", { name: "Music" }).click({ timeout: 60_000 });
+	const box = page.getByRole("searchbox", { name: "Find a song" });
+	await box.fill(LINK);
+	await box.press("Enter");
+	await expect(page.locator(".music .player .title")).toBeVisible();
+	await page.mouse.dblclick(1150, 420);
+	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
+});

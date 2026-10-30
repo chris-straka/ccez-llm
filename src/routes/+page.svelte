@@ -9980,9 +9980,10 @@
 			return;
 		}
 		const bounds = columnBounds(
-			[...scrollBox.querySelectorAll("article, .empty-state")].map((el) =>
-				el.getBoundingClientRect()
-			)
+			// A music chat has no messages: its player is the column.
+			[
+				...scrollBox.querySelectorAll("article, .empty-state, .music .stack")
+			].map((el) => el.getBoundingClientRect())
 		);
 		if (!bounds) return;
 		const side = gutterSide(event.clientX, bounds.left, bounds.right);
