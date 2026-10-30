@@ -226,7 +226,9 @@ export interface AnswerPlacement {
  * scroll. Centered on the word (on the pointer inside wide quotes),
  * clamped inside the viewport; the tail points back at that x. The
  * card's button row hangs outside it on the far side from the word
- * (`outside`, px), so that side's room shrinks by it.
+ * (`outside`, px), so that side's room shrinks by it. With `home`, the
+ * side and height cap come from the word's spot at open, so a scroll
+ * never flips the card or changes how much of it shows.
  */
 export function placeAnswerPopover(facts: {
 	anchor: AnchorRect;
@@ -248,6 +250,9 @@ export function placeAnswerPopover(facts: {
 	so a short last line near the column's edge never swings the card
 	out past the text. */
 	column?: NoteColumn;
+	/** Where the word sat when the card opened: the side and height
+	are decided there, so scrolling only carries the card along. */
+	home?: AnchorRect;
 }): AnswerPlacement {
 	const m = facts.margin ?? 8;
 	const { anchor, cardWidth: w } = facts;
@@ -271,8 +276,11 @@ export function placeAnswerPopover(facts: {
 	const tailX = Math.min(Math.max(target - x, tailInset), w - tailInset);
 	const reach = facts.gap + facts.tail;
 	const out = facts.outside ?? 0;
-	const below = facts.viewportHeight - m - out - (anchor.bottom + reach);
-	const above = Math.min(anchor.top, facts.clearTop) - reach - m - out;
+	const home = facts.home ?? anchor;
+	// The badge sits the same distance above the word wherever it scrolls.
+	const homeClear = facts.clearTop - anchor.top + home.top;
+	const below = facts.viewportHeight - m - out - (home.bottom + reach);
+	const above = Math.min(home.top, homeClear) - reach - m - out;
 	const h = Math.max(1, Math.ceil(facts.cardHeight));
 	const side: "below" | "above" =
 		h <= below || (h > above && below >= above) ? "below" : "above";

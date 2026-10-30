@@ -704,6 +704,35 @@ describe("follow-up thread", () => {
 		expect(drafts.list[0]?.thread).toHaveLength(2);
 	});
 
+	it("a reply the background cut off sends again on return", async () => {
+		let tries = 0;
+		let fail: (e: Error) => void = () => undefined;
+		const { drafts, calls } = harness({
+			phone: true,
+			followUp: () => {
+				tries++;
+				if (tries > 1) return Promise.resolve("back");
+				return new Promise<string>((_, reject) => {
+					fail = reject;
+				});
+			}
+		});
+		const q = note({ answer: "first" });
+		drafts.setList([q]);
+		const sent = drafts.askFollowUp(q.id, "and?");
+		await vi.waitFor(() => expect(tries).toBe(1));
+		drafts.suspend();
+		fail(new Error("socket closed"));
+		await Promise.resolve();
+		// Still away: the reply waits in the thread, nothing reported.
+		expect(drafts.list[0]?.thread).toEqual([{ q: "and?" }]);
+		drafts.resume();
+		expect(await sent).toBe(true);
+		expect(tries).toBe(2);
+		expect(drafts.list[0]?.thread).toEqual([{ q: "and?", a: "back" }]);
+		expect(calls.errors).toEqual([]);
+	});
+
 	it("a failed reply leaves the thread and reports", async () => {
 		const { drafts, calls } = harness({
 			phone: true,

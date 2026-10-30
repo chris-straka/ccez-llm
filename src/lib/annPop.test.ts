@@ -323,6 +323,19 @@ describe("placeAnswerPopover", () => {
 		expect(p.y + 200).toBeLessThanOrEqual(688 - 11);
 		expect(p.y).toBeGreaterThanOrEqual(8);
 	});
+	it("keeps its open side and height while the word scrolls", () => {
+		// Opened mid-screen (below, 461px of room); scrolled until the
+		// word sits near the bottom, it would otherwise flip above.
+		const p = placeAnswerPopover({
+			...base,
+			anchor: { left: 400, top: 700, right: 460, bottom: 720 },
+			clearTop: 688,
+			home: base.anchor
+		});
+		expect(p.side).toBe("below");
+		expect(p.maxHeight).toBe(461);
+		expect(p.y).toBe(731);
+	});
 	it("caps the height on the roomier side when neither fits", () => {
 		const p = placeAnswerPopover({
 			...base,

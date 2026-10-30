@@ -242,9 +242,23 @@ where it was left. -->
 		floor !== null && floor > anchor.bottom + 24 ? floor : vh
 	);
 
+	/** The word's spot when this note opened (or the window last
+	changed size): side and height are decided there, so scrolling
+	carries the card along without flipping or trimming it. */
+	let home = $state<AnchorRect>(untrack(() => ({ ...anchor })));
+	$effect(() => {
+		void badgeId;
+		void vw;
+		void vh;
+		untrack(() => {
+			home = { ...anchor };
+		});
+	});
+
 	const place = $derived(
 		size
 			? placeAnswerPopover({
+					home,
 					anchor,
 					clearTop,
 					pointX,
@@ -595,6 +609,19 @@ where it was left. -->
 						void sendReply();
 					}
 				}}></textarea>
+			{#if replyButton}
+				<!-- Phones: the keyboard's enter key only breaks the line,
+				so a send button sits at the field's end (the composer's
+				up arrow). It breathes while the answer is on its way. -->
+				<button
+					type="submit"
+					class="ann-reply-send"
+					class:waiting
+					aria-label={waiting ? "Answering" : "Send reply"}
+					disabled={waiting || reply.trim() === ""}
+					onmousedown={(e) => e.preventDefault()}>↑</button
+				>
+			{/if}
 		</form>
 	{/if}
 	{#if onToggleSave || (onReply && replyButton)}
@@ -1126,6 +1153,47 @@ where it was left. -->
 	.ann-reply textarea:focus {
 		outline: none;
 		border-color: var(--accent);
+	}
+	.ann-reply:has(.ann-reply-send) {
+		display: flex;
+		align-items: flex-end;
+		gap: 0.45em;
+	}
+	.ann-reply:has(.ann-reply-send) textarea {
+		flex: 1;
+		min-width: 0;
+	}
+	.ann-reply-send {
+		flex: none;
+		width: 2.2em;
+		height: 2.2em;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: var(--accent);
+		color: #fff;
+		font: inherit;
+		font-weight: 600;
+		line-height: 1;
+		cursor: pointer;
+		transition: opacity 0.15s ease;
+	}
+	.ann-reply-send:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.ann-reply-send.waiting {
+		animation: ann-reply-breathe 1.1s ease-in-out infinite;
+	}
+	@keyframes ann-reply-breathe {
+		50% {
+			opacity: 0.85;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.ann-reply-send.waiting {
+			animation: none;
+		}
 	}
 	.ann-answer-head + .ann-answer-text {
 		margin-top: 0.3em;

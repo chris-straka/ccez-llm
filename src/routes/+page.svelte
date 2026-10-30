@@ -1067,8 +1067,8 @@
 			null,
 		answerContextFor: (ann) =>
 			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
-		answerFollowUp: (provider, q, answer, thread, reply) =>
-			annotationFollowUp(provider, q, answer, thread, reply, undefined, {
+		answerFollowUp: (provider, q, answer, thread, reply, signal) =>
+			annotationFollowUp(provider, q, answer, thread, reply, signal, {
 				inPassageLang: settings.annotationAnswersInPassageLang
 			}),
 		notifyBanner: (message) => showNotice(notices, "banner", message),
@@ -1590,6 +1590,9 @@
 		window.addEventListener("touchmove", trackAnnTouchMove, {
 			passive: true
 		});
+		window.addEventListener("touchend", trackAnnTouchEnd, {
+			passive: true
+		});
 		// Fresh boot after a kill never fires visibilitychange (it
 		// starts visible), so reconcile on mount too — a turn that
 		// died with the process restarts here (dots again, reply
@@ -1608,6 +1611,7 @@
 			unlistenGrades();
 			window.removeEventListener("touchstart", trackAnnTouchStart);
 			window.removeEventListener("touchmove", trackAnnTouchMove);
+			window.removeEventListener("touchend", trackAnnTouchEnd);
 		};
 	});
 	/**
@@ -1617,10 +1621,16 @@
 	 * or save — scrolling around keeps the draft as left.
 	 */
 	let annTouchStart: { x: number; y: number } | null = null;
+	let annTouchMoved = false;
 	let lastAnnScrollAt = 0;
+	/** Last tap (a touch that never moved past the slop). On phones a
+	typed note closes only on a tap away: a scroll, the keyboard's
+	own hide key, or any other blur keeps it open as left. */
+	let lastAnnTapAt = 0;
 	function trackAnnTouchStart(event: TouchEvent): void {
 		const t = event.changedTouches[0];
 		annTouchStart = t ? { x: t.clientX, y: t.clientY } : null;
+		annTouchMoved = false;
 	}
 	function trackAnnTouchMove(event: TouchEvent): void {
 		const t = event.changedTouches[0];
@@ -1628,7 +1638,25 @@
 		if (!t || !s) return;
 		if (touchPastSlop(s.x, s.y, t.clientX, t.clientY, 12)) {
 			lastAnnScrollAt = Date.now();
+			annTouchMoved = true;
 		}
+	}
+	function trackAnnTouchEnd(event: TouchEvent): void {
+		if (annTouchMoved) return;
+		lastAnnTapAt = Date.now();
+		// A tap away from a typed note whose box already lost focus
+		// (kept open by a scroll or the keyboard's hide key): no blur
+		// will come, so it saves here.
+		const target = event.target instanceof Element ? event.target : null;
+		if (
+			androidUI &&
+			annPop &&
+			!annPopClosing &&
+			annDraft.trim() !== "" &&
+			document.activeElement !== annPopBox &&
+			!target?.closest(".ann-pop")
+		)
+			saveAnnPop();
 	}
 	let menuBtnTouchStart: { x: number; y: number } | null = null;
 	/** Selection-menu drag: touch anchor plus the menu spot it
@@ -6045,6 +6073,9 @@
 		// A scroll stroke just blurred the box: keep the draft open
 		// for the return tap instead of canceling or filing it.
 		if (Date.now() - lastAnnScrollAt < 800) return;
+		// Phones: typed text closes only on a tap away (see lastAnnTapAt).
+		if (androidUI && annDraft.trim() !== "" && Date.now() - lastAnnTapAt > 800)
+			return;
 		if (annPopBlurAction(annDraft) === "cancel") cancelAnnPop();
 		else saveAnnPop();
 	}

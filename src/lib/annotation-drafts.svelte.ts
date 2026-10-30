@@ -47,7 +47,8 @@ export interface AnnotationDraftsDeps {
 		q: AnnotationQuestion,
 		answer: string,
 		thread: ReadonlyArray<{ q: string; a?: string }>,
-		reply: string
+		reply: string,
+		signal?: AbortSignal
 	) => Promise<string>;
 	notifyBanner: (message: string) => void;
 	clearBanner: () => void;
@@ -104,6 +105,14 @@ export class AnnotationDrafts {
 	/** Requests that died in the background, re-asked on return. */
 	private retryOnReturn = new SvelteSet<string>();
 	private away = false;
+	/** In-flight replies (follow-ups) by note id, and the ones the
+	background caught: those send again on return, never drop. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
+	private followControllers = new Map<string, AbortController>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
+	private followInterrupted = new Set<string>();
+	/** Waiting for the app to come back to the foreground. */
+	private backWaiters: Array<() => void> = [];
 
 	constructor(deps: AnnotationDraftsDeps) {
 		this.deps = deps;
@@ -248,17 +257,34 @@ export class AnnotationDrafts {
 		try {
 			const provider = await this.deps.resolveProvider();
 			if (!provider) throw new Error("Set an API key first — open Settings.");
-			const answer = await this.deps.answerFollowUp(
-				provider,
-				{
-					quote: ann.quote,
-					question: ann.comment,
-					context: this.deps.answerContextFor(ann)
-				},
-				ann.answer,
-				prior,
-				text
-			);
+			let answer: string;
+			// A reply the background cut off sends again once the app
+			// is back, like a note's first ask (see interrupted).
+			for (;;) {
+				const controller = new AbortController();
+				this.followControllers.set(id, controller);
+				try {
+					answer = await this.deps.answerFollowUp(
+						provider,
+						{
+							quote: ann.quote,
+							question: ann.comment,
+							context: this.deps.answerContextFor(ann)
+						},
+						ann.answer,
+						prior,
+						text,
+						controller.signal
+					);
+					break;
+				} catch (error) {
+					if (!this.followInterrupted.delete(id)) throw error;
+					await this.whenBack();
+				} finally {
+					if (this.followControllers.get(id) === controller)
+						this.followControllers.delete(id);
+				}
+			}
 			// Stored drafts keep answered replies only: after a chat
 			// switch the reply goes back in beside its answer.
 			this.landInChat(chatId, (list) =>
@@ -421,6 +447,14 @@ export class AnnotationDrafts {
 	suspend(): void {
 		this.away = true;
 		for (const id of this.asking) this.interrupted.add(id);
+		for (const id of this.followControllers.keys())
+			this.followInterrupted.add(id);
+	}
+
+	/** Resolves once the app is in the foreground. */
+	private whenBack(): Promise<void> {
+		if (!this.away) return Promise.resolve();
+		return new Promise((done) => this.backWaiters.push(done));
 	}
 
 	/**
@@ -431,6 +465,16 @@ export class AnnotationDrafts {
 	 */
 	resume(graceMs = RESUME_GRACE_MS): void {
 		this.away = false;
+		for (const done of this.backWaiters.splice(0)) done();
+		// A reply still hanging after the grace period restarts.
+		for (const id of this.followInterrupted) {
+			const controller = this.followControllers.get(id);
+			if (!controller) continue;
+			setTimeout(() => {
+				if (this.followControllers.get(id) === controller && !this.away)
+					controller.abort();
+			}, graceMs);
+		}
 		const lost = [...this.retryOnReturn];
 		this.retryOnReturn.clear();
 		for (const id of lost) this.reaskLost(id);
