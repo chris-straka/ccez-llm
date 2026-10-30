@@ -40,6 +40,57 @@ test.describe("voice-data", () => {
 	});
 });
 
+test("Settings' Test voice reads a sample line, and again stops it", async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		const spoken: string[] = [];
+		(window as unknown as { spoken: string[] }).spoken = spoken;
+		const voice = {
+			name: "Test Voice",
+			lang: "en-US",
+			voiceURI: "test",
+			default: true,
+			localService: true
+		};
+		Object.defineProperty(SpeechSynthesis.prototype, "getVoices", {
+			value: () => [voice],
+			configurable: true
+		});
+	});
+	await seedChat(page, [{ role: "assistant", content: "hello" }], null, {
+		voiceEngine: "web",
+		voiceLang: "en-US"
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	// The fixture's silent speak is writable: spy on it here.
+	await page.evaluate(() => {
+		const spoken = (window as unknown as { spoken: string[] }).spoken;
+		speechSynthesis.speak = (u: SpeechSynthesisUtterance) => {
+			spoken.push(u.text);
+		};
+	});
+	const play = page
+		.locator(".settings-panel")
+		.getByRole("button", { name: "Play sample" });
+	await play.click();
+	await expect
+		.poll(() =>
+			page.evaluate(() => (window as unknown as { spoken: string[] }).spoken)
+		)
+		.toContainEqual(expect.stringContaining("This is how I sound"));
+	const stop = page
+		.locator(".settings-panel")
+		.getByRole("button", { name: "Stop" });
+	await expect(stop).toHaveAttribute("aria-pressed", "true");
+	await stop.click();
+	await expect(play).toBeVisible();
+});
+
 test.describe("voice-error", () => {
 	/** Lab speech never fails at runtime (utterances queue silently), so these
 	specs stub `speak` to throw: `speakMultilingual` catches it and reports

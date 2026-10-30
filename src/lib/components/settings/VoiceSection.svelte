@@ -9,6 +9,7 @@ ear); speed steps in 0.05× rungs. -->
 	} from "$lib/settings";
 	import { VOICE_SPEED_LADDER, trimNumber } from "$lib/settingSteps";
 	import type { VoiceLangFollow } from "$lib/voiceTiers";
+	import ActionIcon from "../ActionIcon.svelte";
 	import Slider from "./Slider.svelte";
 	import Stepper from "./Stepper.svelte";
 	import VoicePanel from "./VoicePanel.svelte";
@@ -19,12 +20,19 @@ ear); speed steps in 0.05× rungs. -->
 		settings: AppSettings;
 		androidUI: boolean;
 		followVoice?: VoiceLangFollow | null;
+		/** Read a sample line with the current voice, speed and
+		volume (or stop it); absent hides the row. */
+		onTestVoice?: (() => void) | undefined;
+		/** The sample is playing (the button reads Stop). */
+		voiceTesting?: boolean;
 	}
 
 	let {
 		settings = $bindable(),
 		androidUI,
-		followVoice = null
+		followVoice = null,
+		onTestVoice,
+		voiceTesting = false
 	}: Props = $props();
 
 	const percent = (v: number): string => `${Math.round(v * 100)}%`;
@@ -33,6 +41,19 @@ ear); speed steps in 0.05× rungs. -->
 <section id="settings-voice" aria-labelledby="voice-heading">
 	<h2 id="voice-heading">Voice</h2>
 	<VoicePanel bind:settings {androidUI} {followVoice} />
+	{#if onTestVoice}
+		<SettingRow name="Test voice">
+			<button
+				type="button"
+				class="voice-test"
+				aria-pressed={voiceTesting}
+				onclick={onTestVoice}
+			>
+				<ActionIcon kind="speak" />
+				{voiceTesting ? "Stop" : "Play sample"}
+			</button>
+		</SettingRow>
+	{/if}
 	<Stepper
 		label="Voice speed"
 		ariaLabel="Voice speed"
@@ -99,3 +120,27 @@ ear); speed steps in 0.05× rungs. -->
 		{/snippet}
 	</SettingRow>
 </section>
+
+<style>
+	.voice-test {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		padding: 0.35em 0.85em;
+		border: 1px solid var(--line-soft);
+		border-radius: 999px;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+		transition: border-color 0.15s ease;
+	}
+	.voice-test:hover,
+	.voice-test[aria-pressed="true"] {
+		border-color: var(--accent);
+	}
+	.voice-test :global(svg) {
+		width: 1.05em;
+		height: 1.05em;
+	}
+</style>

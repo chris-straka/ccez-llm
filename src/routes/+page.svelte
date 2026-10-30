@@ -613,6 +613,7 @@
 		speakMultilingual,
 		speechText,
 		latinFallback,
+		voiceSampleFor,
 		speechAttemptable,
 		messageSpeakableFor,
 		isMessageSpeaking,
@@ -7130,6 +7131,18 @@
 		stopSpeaking();
 		stopNative();
 		resetVoice();
+	}
+
+	/** Settings → Voice → Test voice: a sample line in the voice
+	language, with the picked voice, speed and volume; again stops. */
+	const VOICE_TEST_ID = "voice-test";
+	function testVoice(): void {
+		if (speakingId === VOICE_TEST_ID) {
+			stopVoice();
+			return;
+		}
+		const lang = latinFallback(settings.voiceLang);
+		startSpeech(VOICE_TEST_ID, voiceSampleFor(lang), lang);
 	}
 
 	/** Deleting the message that's playing stops its audio — a reply
@@ -15529,8 +15542,10 @@
 			drawerClose: () => {
 				settingsOpen = false;
 			},
-			gameLine: () => void toggleGameLine()
+			gameLine: () => void toggleGameLine(),
+			testVoice
 		}}
+		voiceTesting={speakingId === VOICE_TEST_ID}
 	/>
 
 	{#if !androidUI}

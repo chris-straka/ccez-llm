@@ -41,6 +41,10 @@
 		shift) instead of an inline popup. Falls back to inline text
 		when the page passes none. */
 		onToast?: (message: string) => void;
+		/** Read the voice sample (Voice → Test voice), or stop it. */
+		onTestVoice?: (() => void) | undefined;
+		/** The voice sample is playing. */
+		voiceTesting?: boolean;
 	}
 
 	let {
@@ -54,7 +58,9 @@
 		followVoice = null,
 		onToast,
 		onExpand,
-		windowed = false
+		windowed = false,
+		onTestVoice,
+		voiceTesting = false
 	}: Props = $props();
 	/** What covers the top of the scroller: the jump bar on the sheet
 	(the window's groups list sits beside the groups instead). */
@@ -234,7 +240,13 @@
 	{/each}
 </nav>
 <ReadingPanel bind:settings sample={!windowed} />
-<VoiceSection bind:settings {androidUI} {followVoice} />
+<VoiceSection
+	bind:settings
+	{androidUI}
+	{followVoice}
+	{onTestVoice}
+	{voiceTesting}
+/>
 <LayoutPanel bind:settings {androidUI} />
 <AppearancePanel bind:settings />
 <DefaultsPanel bind:settings {androidUI} gameLineToggle={onGameLineToggle} />

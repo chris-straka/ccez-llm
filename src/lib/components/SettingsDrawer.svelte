@@ -20,6 +20,7 @@ bookkeeping reads it). -->
 		expand: (event: MouseEvent) => void;
 		drawerClose: () => void;
 		gameLine: () => void;
+		testVoice: () => void;
 	}
 
 	interface Props {
@@ -32,6 +33,8 @@ bookkeeping reads it). -->
 		/** Panel node (page focus bookkeeping reads it). */
 		panelEl?: HTMLElement | undefined;
 		actions: SettingsDrawerActions;
+		/** The Voice section's sample is playing. */
+		voiceTesting?: boolean;
 	}
 
 	let {
@@ -40,7 +43,8 @@ bookkeeping reads it). -->
 		android,
 		followVoice = null,
 		panelEl = $bindable(),
-		actions
+		actions,
+		voiceTesting = false
 	}: Props = $props();
 </script>
 
@@ -80,6 +84,8 @@ bookkeeping reads it). -->
 			onShortcuts={actions.shortcuts}
 			onGameLineToggle={actions.gameLine}
 			onExpand={(event: MouseEvent) => actions.expand(event)}
+			onTestVoice={actions.testVoice}
+			{voiceTesting}
 			androidUI={android}
 			windowed={!android}
 		/>

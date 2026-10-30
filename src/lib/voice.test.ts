@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	voiceSampleFor,
 	currentSpeechRate,
 	setSpeechRate,
 	setSpeechVolume,
@@ -543,5 +544,13 @@ describe("webSpeechErrorCopy", () => {
 		expect(webSpeechErrorCopy("Something else.", false)).toBe(
 			"Something else."
 		);
+	});
+});
+
+describe("voiceSampleFor", () => {
+	it("reads the voice language's line, English when it has none", () => {
+		expect(voiceSampleFor("fr-FR")).toMatch(/^Bonjour/);
+		expect(voiceSampleFor("de")).toMatch(/^Hallo/);
+		expect(voiceSampleFor("xx-YY")).toMatch(/^Hello/);
 	});
 });

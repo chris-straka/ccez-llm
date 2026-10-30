@@ -273,6 +273,41 @@ export function splitSpeechSegments(
 	return out;
 }
 
+/** The Settings test line, per language: short, natural, and with
+a question's rise so the voice's range shows. */
+const VOICE_SAMPLES: Record<string, string> = {
+	en: "Hello! This is how I sound. Is the speed right for you?",
+	fr: "Bonjour ! Voici ma voix. Est-ce que la vitesse vous convient ?",
+	de: "Hallo! So klinge ich. Passt dir das Tempo?",
+	es: "¡Hola! Así suena mi voz. ¿Te va bien la velocidad?",
+	pt: "Olá! É assim que eu soo. A velocidade está boa para si?",
+	it: "Ciao! Questa è la mia voce. La velocità va bene?",
+	nl: "Hallo! Zo klink ik. Is het tempo goed zo?",
+	sv: "Hej! Så här låter jag. Passar tempot dig?",
+	da: "Hej! Sådan lyder jeg. Passer tempoet dig?",
+	nb: "Hei! Slik høres jeg ut. Passer tempoet for deg?",
+	no: "Hei! Slik høres jeg ut. Passer tempoet for deg?",
+	fi: "Hei! Tältä minä kuulostan. Sopiiko tämä nopeus?",
+	pl: "Cześć! Tak brzmi mój głos. Czy tempo ci odpowiada?",
+	cs: "Ahoj! Takhle zní můj hlas. Vyhovuje ti tempo?",
+	ru: "Привет! Вот так звучит мой голос. Вам подходит скорость?",
+	uk: "Привіт! Ось так звучить мій голос. Вам підходить швидкість?",
+	el: "Γεια σας! Έτσι ακούγεται η φωνή μου. Σας ταιριάζει η ταχύτητα;",
+	tr: "Merhaba! Sesim böyle. Hız size uygun mu?",
+	ja: "こんにちは。これが私の声です。速さはちょうどいいですか？",
+	zh: "你好！这就是我的声音。这个语速合适吗？",
+	ko: "안녕하세요! 제 목소리는 이렇습니다. 속도가 괜찮으세요?",
+	ar: "مرحبًا! هكذا يبدو صوتي. هل السرعة مناسبة لك؟",
+	hi: "नमस्ते! मेरी आवाज़ ऐसी है। क्या गति ठीक है?"
+};
+
+/** What the Settings test button reads in a voice language (its
+base tag's line; English for one with none). */
+export function voiceSampleFor(tag: string): string {
+	const base = tag.trim().toLowerCase().split(/[-_]/)[0] ?? "";
+	return VOICE_SAMPLES[base] ?? VOICE_SAMPLES.en!;
+}
+
 /** Latin-script fallback voice locale: the pinned voice language, else US English. */
 export function latinFallback(voiceLang: string | null | undefined): string {
 	return voiceLang?.trim() || "en-US";
