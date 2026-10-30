@@ -213,6 +213,30 @@ test.describe("mock shell feed", () => {
 		await expect(cards.nth(0).locator("img.news-img")).toBeVisible();
 	});
 
+	test("a phone at big text stacks the picked story's picture over its headline", async ({
+		page
+	}) => {
+		await page.setViewportSize({ width: 412, height: 915 });
+		await page.addInitScript(() => {
+			const key = "ccez-llm-settings-v1";
+			const saved = JSON.parse(localStorage.getItem(key) ?? "{}") as object;
+			localStorage.setItem(key, JSON.stringify({ ...saved, fontScale: 2 }));
+		});
+		await page.reload();
+		await expect(page.locator(".empty-state h1")).toBeVisible({
+			timeout: 60_000
+		});
+		await openFrenchNews(page);
+		await page.locator(".news-panel button.news-card").nth(0).click();
+		const stage = page.locator(".news-stage");
+		await expect(stage).toBeVisible();
+		const thumb = await stage.locator(".stage-thumb").boundingBox();
+		const text = await stage.locator(".stage-text").boundingBox();
+		// The headline runs under the picture, the card's full width.
+		expect(text!.y).toBeGreaterThanOrEqual(thumb!.y + thumb!.height);
+		expect(text!.width).toBeGreaterThan(thumb!.width * 0.9);
+	});
+
 	test("a picked story moves into the chat with its session choices", async ({
 		page
 	}) => {

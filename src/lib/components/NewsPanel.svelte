@@ -800,6 +800,10 @@ everything else is theme tokens, never raw hex. -->
 	/* Staged story: one session card where the story lands, choices
 	in reading order, one Start. */
 	.news-stage {
+		/* Query container sized in the text unit, so big type on a
+		phone stacks the card below (em here is --u). */
+		font-size: var(--u, 1rem);
+		container-type: inline-size;
 		display: flex;
 		justify-content: center;
 		padding-top: calc(0.75 * var(--u, 1rem));
@@ -869,6 +873,29 @@ everything else is theme tokens, never raw hex. -->
 	.stage-x:hover:not(:disabled) {
 		color: #1c1c1e;
 		color: var(--ink);
+	}
+	/* Narrow or giant text: picture on top, the headline across the
+	whole card below it instead of squeezed into a sliver beside it. */
+	@container (width < 26em) {
+		.stage-card {
+			grid-template-columns: 1fr;
+			align-items: start;
+			padding: calc(0.85 * var(--u, 1rem));
+		}
+		.stage-thumb {
+			aspect-ratio: 16 / 9;
+			max-height: calc(11 * var(--u, 1rem));
+		}
+		.stage-text .news-headline {
+			-webkit-line-clamp: 3;
+			line-clamp: 3;
+		}
+		.stage-x {
+			top: calc(1.25 * var(--u, 1rem));
+			right: calc(1.25 * var(--u, 1rem));
+			background: rgb(0 0 0 / 0.45);
+			color: #fff;
+		}
 	}
 	.stage-opts {
 		display: flex;
