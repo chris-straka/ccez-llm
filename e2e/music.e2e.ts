@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /**
  * Music chats through the app's backend (`listen_videos`,
@@ -137,4 +137,38 @@ test("the bar shows the song in other chats and its title goes back to the playe
 		"SUM-80 (OST Sumathi Theme)"
 	);
 	await expect(bar).toHaveCount(0);
+});
+
+test("deleting the music chat stops its song and takes the bar away", async ({
+	page
+}) => {
+	await seedChat(page, []);
+	await mockMusicShell(page);
+	await page.goto("/");
+	await page.getByRole("tab", { name: "Music" }).click({ timeout: 60_000 });
+	const box = page.getByRole("searchbox", { name: "Find a song" });
+	await box.fill(LINK);
+	await box.press("Enter");
+	await expect(page.locator(".music .player .title")).toBeVisible();
+	await page.keyboard.press("Meta+KeyN");
+	await expect(page.locator(".music-bar")).toBeVisible();
+	await toggleSidebar(page);
+	const sidebar = page.locator("aside").first();
+	await expect(sidebar).not.toHaveClass(/collapsed/);
+	// The music chat is the first row (the new one sits below it).
+	const row = sidebar.locator('[data-chat-id="e2e-chat"]');
+	await row.hover();
+	await row
+		.locator("..")
+		.locator('button[aria-label="Delete chat"]')
+		.first()
+		.click();
+	await expect(page.locator(".music-bar")).toHaveCount(0);
+	const saved = await page.evaluate(
+		() =>
+			JSON.parse(localStorage.getItem("ccez-llm-music-v1") ?? "{}") as {
+				song?: unknown;
+			}
+	);
+	expect(saved.song).toBeNull();
 });

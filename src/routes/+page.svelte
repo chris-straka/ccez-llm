@@ -2510,6 +2510,13 @@
 	// Music (Listen's Play as music) downloads through the same backend
 	// and plays at the Video volume, capped at full.
 	music.connect(listenBackend);
+	// A remembered song whose music chat is gone (deleted, or picked
+	// before songs had chats) is dropped, not left in the bar.
+	if (
+		music.song &&
+		!chatState.chats.some((c) => c.id === music.chatId && c.music)
+	)
+		music.close();
 	$effect(() => music.setVolume(settings.listenVolume));
 	const listenMode = new ListenMode({
 		getChatState: () => chatState,
@@ -9671,6 +9678,8 @@
 		// gestures, keyboard — so call sites carry no haptic of their own.
 		buzzBeat("done", androidUI);
 		stopVoice();
+		// A music chat's song goes with it (the bar would point nowhere).
+		if (music.chatId === id) music.close();
 		if (id === chatState.activeChatId) {
 			// The open chat's news panel (and any story launch still
 			// fetching) goes with it, as on a chat switch.
@@ -15216,7 +15225,10 @@
 					void music.play(song, chat.id);
 				},
 				change: () => setMusicSong(chatState, chat.id, null),
-				leave: () => endMusicChat(chatState, chat.id)
+				leave: () => {
+					if (music.chatId === chat.id) music.close();
+					endMusicChat(chatState, chat.id);
+				}
 			}}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}
