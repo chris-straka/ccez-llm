@@ -468,6 +468,10 @@ impl Listen {
         for (ext, mime) in [("m4a", "audio/mp4"), ("webm", "audio/webm")] {
             let path = dir.join(format!("song.{ext}"));
             if path.is_file() {
+                // Songs kept before they were remuxed get it once here.
+                if ext == "m4a" {
+                    plain_mp4(&path);
+                }
                 return Ok((path, mime.into()));
             }
         }
@@ -487,7 +491,15 @@ impl Listen {
                     player = self.player(id, Duration::ZERO).await?;
                 }
                 Err(e) => return Err(e),
-                Ok(()) => return Ok((path, mime)),
+                Ok(()) => {
+                    // YouTube's mp4 audio comes fragmented, which WebKit
+                    // reads as twice its length: the song went silent
+                    // halfway through every loop. A plain mp4 plays true.
+                    if ext == "m4a" {
+                        plain_mp4(&path);
+                    }
+                    return Ok((path, mime));
+                }
             }
         }
         Err("listen-download-failed".into())
