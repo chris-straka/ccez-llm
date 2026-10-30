@@ -8,6 +8,7 @@ pills become the top rail above the story cards. -->
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import { fade } from "svelte/transition";
+	import { music } from "$lib/music.svelte";
 
 	interface Props {
 		mock: boolean;
@@ -53,7 +54,12 @@ pills become the top rail above the story cards. -->
 	});
 </script>
 
-<div class="empty-state" class:news-mode={newsMode} bind:this={root}>
+<div
+	class="empty-state"
+	class:news-mode={newsMode}
+	class:under-music={music.song !== null}
+	bind:this={root}
+>
 	{#if !newsMode}
 		<h1
 			class="hero"
@@ -96,6 +102,10 @@ pills become the top rail above the story cards. -->
 	}
 	:global(.app[data-titlebar="overlay"]) .empty-state.news-mode {
 		margin-top: calc(1.75rem + 1.15rem);
+	}
+	/* The music bar sits over the top: the rail starts under it. */
+	.empty-state.news-mode.under-music {
+		margin-top: calc(1.75rem + 3.5rem);
 	}
 	/* Extras under the pills (study modes, flashcards due) hang below
 	the centered block instead of growing it: the greeting holds its

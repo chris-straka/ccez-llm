@@ -16,6 +16,8 @@ left and the top bar takes over. Loop is on unless turned off. -->
 
 	interface Props {
 		song: Song | null;
+		/** This chat (the bar opens it while its song plays). */
+		chatId: string;
 		/** Where songs are found (null on the web build). */
 		source: SongSource | null;
 		actions: {
@@ -28,7 +30,7 @@ left and the top bar takes over. Loop is on unless turned off. -->
 		};
 	}
 
-	let { song, source, actions }: Props = $props();
+	let { song, chatId, source, actions }: Props = $props();
 
 	const reduceMotion =
 		typeof matchMedia === "function" &&
@@ -92,7 +94,7 @@ left and the top bar takes over. Loop is on unless turned off. -->
 	function togglePlay(): void {
 		if (!song) return;
 		if (mine) music.toggle();
-		else void music.play(song);
+		else void music.play(song, chatId);
 	}
 
 	// The picture follows the sound: fetched once, played muted, and
@@ -310,7 +312,8 @@ left and the top bar takes over. Loop is on unless turned off. -->
 		width: 100%;
 		max-width: min(100%, 52rem);
 		box-sizing: border-box;
-		padding: calc(1.5rem + 1.75rem) 0.5rem 1rem;
+		/* Clear of the drag strip and the music bar above it. */
+		padding: 4.25rem 0.5rem 1rem;
 		color: var(--ink);
 	}
 	/* As wide as a 16:9 picture half the window tall can be, so the

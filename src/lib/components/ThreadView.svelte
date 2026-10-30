@@ -201,6 +201,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		page's music button, and where songs are found. */
 		music: {
 			chat: { song: Song | null } | null;
+			chatId: string;
 			start: () => void;
 			source: SongSource | null;
 			pick: (song: Song) => void;
@@ -291,6 +292,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	{#if music.chat}
 		<MusicView
 			song={music.chat.song}
+			chatId={music.chatId}
 			source={music.source}
 			actions={{ pick: music.pick, change: music.change, leave: music.leave }}
 		/>

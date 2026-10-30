@@ -18,6 +18,8 @@ const KEY = "ccez-llm-music-v1";
 interface Saved {
 	song: Song | null;
 	loop: boolean;
+	/** The music chat the song plays in (its bar opens it). */
+	chatId?: string | null;
 }
 
 function load(): Saved {
@@ -26,7 +28,11 @@ function load(): Saved {
 		if (raw && typeof raw === "object") {
 			const r = raw as Partial<Saved>;
 			const song = cleanSong(r.song);
-			return { song, loop: r.loop !== false };
+			return {
+				song,
+				loop: r.loop !== false,
+				chatId: typeof r.chatId === "string" ? r.chatId : null
+			};
 		}
 	} catch {
 		// Blocked or corrupt storage: start empty.
@@ -36,6 +42,8 @@ function load(): Saved {
 
 export class MusicPlayer {
 	song = $state<Song | null>(null);
+	/** The music chat the song was picked in (null: none). */
+	chatId = $state<string | null>(null);
 	status = $state<MusicStatus>("idle");
 	/** Play the song over and over (on unless turned off). */
 	loop = $state(true);
@@ -58,6 +66,7 @@ export class MusicPlayer {
 		const saved = load();
 		this.song = saved.song;
 		this.loop = saved.loop;
+		this.chatId = saved.chatId ?? null;
 		if (saved.song) this.status = "paused";
 	}
 
@@ -72,8 +81,13 @@ export class MusicPlayer {
 		if (this.el) this.el.volume = this.volume;
 	}
 
-	/** Play `song` (or resume the current one). */
-	async play(song?: Song): Promise<void> {
+	/** Play `song` (or resume the current one), picked in `chatId`'s
+	 * music chat. */
+	async play(song?: Song, chatId?: string): Promise<void> {
+		if (chatId !== undefined && chatId !== this.chatId) {
+			this.chatId = chatId;
+			this.save();
+		}
 		if (song && song.id !== this.song?.id) {
 			this.release();
 			this.song = song;
@@ -185,6 +199,7 @@ export class MusicPlayer {
 	close(): void {
 		this.release();
 		this.song = null;
+		this.chatId = null;
 		this.status = "idle";
 		this.error = "";
 		this.save();
@@ -207,7 +222,11 @@ export class MusicPlayer {
 		try {
 			localStorage.setItem(
 				KEY,
-				JSON.stringify({ song: this.song, loop: this.loop } satisfies Saved)
+				JSON.stringify({
+					song: this.song,
+					loop: this.loop,
+					chatId: this.chatId
+				} satisfies Saved)
 			);
 		} catch {
 			// Storage blocked: the song plays, it just isn't remembered.

@@ -116,3 +116,25 @@ test("the music button makes the chat a player that loops a pasted link", async 
 	);
 	expect(saved[0]?.music?.song?.id).toBe("1f583cw0FOk");
 });
+
+test("the bar shows the song in other chats and its title goes back to the player", async ({
+	page
+}) => {
+	await seedChat(page, []);
+	await mockMusicShell(page);
+	await page.goto("/");
+	await page.getByRole("tab", { name: "Music" }).click({ timeout: 60_000 });
+	const box = page.getByRole("searchbox", { name: "Find a song" });
+	await box.fill(LINK);
+	await box.press("Enter");
+	await expect(page.locator(".music .player .title")).toBeVisible();
+	await page.keyboard.press("Meta+KeyN");
+	const bar = page.locator(".music-bar");
+	await expect(bar).toBeVisible();
+	await expect(page.locator(".music .player")).toHaveCount(0);
+	await bar.getByRole("button", { name: /Open .*'s chat/ }).click();
+	await expect(page.locator(".music .player .title")).toHaveText(
+		"SUM-80 (OST Sumathi Theme)"
+	);
+	await expect(bar).toHaveCount(0);
+});

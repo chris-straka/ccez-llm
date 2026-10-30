@@ -10,9 +10,11 @@ plays over and over), and × to stop and forget it. State lives in
 	interface Props {
 		/** The music chat on screen shows this song's full player. */
 		hidden?: boolean;
+		/** Open the song's music chat; absent when it has none. */
+		onOpen?: (() => void) | undefined;
 	}
 
-	let { hidden = false }: Props = $props();
+	let { hidden = false, onOpen }: Props = $props();
 
 	const reduceMotion =
 		typeof matchMedia === "function" &&
@@ -31,8 +33,15 @@ plays over and over), and × to stop and forget it. State lives in
 		{#if song.thumbnail}
 			<img class="art" src={song.thumbnail} alt="" draggable="false" />
 		{/if}
-		<span class="text">
-			<span class="title" title={song.title}>{song.title}</span>
+		<button
+			type="button"
+			class="text"
+			disabled={!onOpen}
+			title={onOpen ? "Open its chat" : song.title}
+			aria-label={onOpen ? `Open ${song.title}'s chat` : song.title}
+			onclick={() => onOpen?.()}
+		>
+			<span class="title">{song.title}</span>
 			{#if music.status === "error"}
 				<span class="sub error" role="alert">{music.error}</span>
 			{:else if music.status === "loading"}
@@ -40,7 +49,7 @@ plays over and over), and × to stop and forget it. State lives in
 			{:else if song.channel}
 				<span class="sub">{song.channel}</span>
 			{/if}
-		</span>
+		</button>
 		<button
 			type="button"
 			class="tool"
@@ -91,7 +100,8 @@ plays over and over), and × to stop and forget it. State lives in
 <style>
 	.music-bar {
 		position: fixed;
-		top: calc(env(safe-area-inset-top, 0px) + 0.5 * var(--u, 1rem));
+		/* Below the window's drag strip, clear of the very edge. */
+		top: calc(env(safe-area-inset-top, 0px) + 1.1 * var(--u, 1rem));
 		left: 50%;
 		translate: -50% 0;
 		z-index: 40;
@@ -130,12 +140,28 @@ plays over and over), and × to stop and forget it. State lives in
 	.text {
 		display: flex;
 		flex-direction: column;
+		align-items: flex-start;
 		min-width: 0;
-		padding-inline: calc(0.2 * var(--u, 1rem));
+		padding: calc(0.1 * var(--u, 1rem)) calc(0.45 * var(--u, 1rem));
+		border: none;
+		border-radius: calc(0.6 * var(--u, 1rem));
+		background: transparent;
+		color: inherit;
+		font: inherit;
 		line-height: 1.25;
+		text-align: left;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+	.text:hover:not(:disabled) {
+		background: var(--hover-wash);
+	}
+	.text:disabled {
+		cursor: default;
 	}
 	.title,
 	.sub {
+		max-width: 100%;
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;

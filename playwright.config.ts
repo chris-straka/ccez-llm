@@ -64,6 +64,10 @@ export default defineConfig({
 			// Mac shell's engine as well as Chromium.
 			testMatch: [
 				"**/sel-menu.e2e.ts",
+				// The Mac app's keys and media: ⌘1 language chords, and
+				// songs (WebKit misread fragmented mp4 audio lengths).
+				"**/quick-lang.e2e.ts",
+				"**/music.e2e.ts",
 				"**/scroll-field.e2e.ts",
 				"**/lang-pills.e2e.ts",
 				"**/annotations-ux.e2e.ts",

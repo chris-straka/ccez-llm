@@ -15205,6 +15205,7 @@
 			}}
 			music={{
 				chat: chat.music ?? null,
+				chatId: chat.id,
 				start: () => {
 					listenMode.close();
 					startMusicChat(chatState, chat.id);
@@ -15212,7 +15213,7 @@
 				source: listenBackend(),
 				pick: (song: Song) => {
 					setMusicSong(chatState, chat.id, song);
-					void music.play(song);
+					void music.play(song, chat.id);
 				},
 				change: () => setMusicSong(chatState, chat.id, null),
 				leave: () => endMusicChat(chatState, chat.id)
@@ -15576,6 +15577,13 @@
 	<MusicBar
 		hidden={viewChat.music?.song?.id !== undefined &&
 			viewChat.music.song.id === music.song?.id}
+		onOpen={music.chatId !== null &&
+		chatState.chats.some((c) => c.id === music.chatId && c.music)
+			? () => {
+					const id = chatState.chats.find((c) => c.id === music.chatId)?.id;
+					if (id && id !== chatState.activeChatId) transitionToChat(id);
+				}
+			: undefined}
 	/>
 
 	<!-- Settings drawer through `SettingsDrawer.svelte` (double-click
