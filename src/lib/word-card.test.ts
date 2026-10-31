@@ -261,6 +261,19 @@ describe("buildWordCardMessages", () => {
 		expect(french!.content).toContain('"reading": leave it out.');
 	});
 
+	it("asks Watch for traps inside the language, never English ones", () => {
+		const [german] = buildWordCardMessages(q, "de");
+		expect(german!.content).toContain('"watch": traps inside German itself');
+		expect(german!.content).toContain("look-alike German word");
+		expect(german!.content).toContain("Never compare it with English.");
+		const [unknown] = buildWordCardMessages(q, null);
+		expect(unknown!.content).toContain("traps inside the passage's language");
+		for (const lang of ["fr", null])
+			expect(buildWordCardMessages(q, lang)[0]!.content).not.toContain(
+				"false friends with English"
+			);
+	});
+
 	it("writes in the passage's language when asked", () => {
 		const [system] = buildWordCardMessages(q, "fr", { inPassageLang: true });
 		expect(system!.content).toContain(

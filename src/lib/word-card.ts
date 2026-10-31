@@ -112,7 +112,8 @@ export const WORD_PROFILES: Record<string, WordProfile> = {
 			"object pronouns y, en, le, lui and their order",
 			"contractions: du, au, des",
 			"suffixes that make nouns (-ment, -tion, -age) or adverbs (-ment)",
-			"false friends with English"
+			"verbs whose meaning changes with the word after them (disposer de, tenir à)",
+			"look-alike French words (disposer, déposer, proposer)"
 		]
 	},
 	de: {
@@ -681,7 +682,8 @@ const GENERIC_CHECKLIST = [
 	"gender and agreement",
 	"prefixes and suffixes that change the meaning",
 	"idioms and fixed expressions",
-	"false friends with English"
+	"words whose meaning changes with the word after them",
+	"look-alike words in the same language"
 ];
 
 const SCRIPT_LANGS: ReadonlyArray<[RegExp, string]> = [
@@ -734,7 +736,7 @@ export function isWordQuote(quote: string): boolean {
 
 // Labels leave room for a full grammar name ("present indicative,
 // third-person singular"): the card shortens it for display.
-const MAX = { short: 80, label: 64, line: 320 } as const;
+const MAX = { short: 80, label: 64, line: 320, watch: 480 } as const;
 
 function text(raw: unknown, max: number): string | undefined {
 	if (typeof raw !== "string") return undefined;
@@ -829,7 +831,7 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 	const pMeaning = field(r.phrase, "meaning");
 	const phrase =
 		pWords && pMeaning ? { words: pWords, meaning: pMeaning } : undefined;
-	const watch = text(r.watch, MAX.line);
+	const watch = text(r.watch, MAX.watch);
 	const lang = text(r.lang, 12);
 	const partial = r.partial === true;
 	return {
@@ -1083,6 +1085,7 @@ export function buildWordCardMessages(
 	const reading = profile?.reading
 		? `"reading": ${profile.reading}, on the pieces that need it; leave it out elsewhere.`
 		: `"reading": leave it out.`;
+	const watchLang = profile?.name ?? "the passage's language";
 	const checklist = (profile?.checklist ?? GENERIC_CHECKLIST)
 		.map((c) => `- ${c}`)
 		.join("\n");
@@ -1160,10 +1163,14 @@ export function buildWordCardMessages(
 		`means here in plain words, as few as do ("we strolled", "it's ` +
 		`pouring"). Leave it out when the stretch would be the word alone. ` +
 		`Say only what the passage says.\n` +
-		`"watch": one short sentence, only for a trap learners really fall ` +
-		`into with this word (a false friend, a form or gender commonly ` +
-		`got wrong), saying nothing the facts already say. Most words have ` +
-		`none: then leave it out.\n` +
+		`"watch": traps inside ${watchLang} itself with this word, one short ` +
+		`sentence each, only the ones that really apply: a construction ` +
+		`that changes its meaning, a form learners get wrong, or a ` +
+		`look-alike ${watchLang} word it gets mixed up with. In French, for ` +
+		`"disposant": "disposer de" is to have at hand, plain "disposer" is ` +
+		`to arrange; the -ant form never agrees ("disposante" is wrong); ` +
+		`not "déposer" or "proposer". Never compare it with English. Say nothing the facts ` +
+		`already say. Most words have none: then leave it out.\n` +
 		`Checklist:\n${checklist}` +
 		(opts.dictionary
 			? `\nDictionary entries for the word. Trust their forms and base ` +
