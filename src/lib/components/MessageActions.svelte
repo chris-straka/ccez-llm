@@ -94,6 +94,7 @@ keep working); phones always render it — no shortcuts exist to
 cover an off state. -->
 <div
 	class="actions"
+	class:compact={folded}
 	role="group"
 	aria-label="Message actions"
 	inert={previewing}
@@ -588,6 +589,19 @@ cover an off state. -->
 	1.05rem height otherwise, so larger text leaves tiny icons. */
 	:global(main.scale-actions) .actions .icon-btn :global(.action-glyph) {
 		height: calc(1.05rem * (1 + (min(var(--font-scale, 1), 4) - 1) * 0.8));
+	}
+	/* A folded message's row holds the resting size at any text
+	size: the folded preview line never scales, so tracking buttons
+	would tower over it. */
+	.actions.compact button,
+	:global(main.scale-actions) .actions.compact button.aid-btn {
+		font-size: calc(0.92rem * 0.85);
+	}
+	:global(main.scale-actions)
+		.actions.compact
+		.icon-btn
+		:global(.action-glyph) {
+		height: 1.05rem;
 	}
 	/* Loading buttons hold their look while the dots pulse. */
 	.actions button:disabled {

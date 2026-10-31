@@ -1166,6 +1166,36 @@ test("message icon glyphs scale past double type", async ({ page }) => {
 	expect(h).toBeLessThan(50);
 });
 
+/** A folded message's row holds the resting size at any text size:
+its one-line preview never scales, so tracking icons towered over it. */
+test("folded message rows keep resting-size buttons", async ({ page }) => {
+	await openWithMessages(page, [
+		{ role: "user", content: "hi" },
+		{ role: "assistant", content: "hello there" }
+	]);
+	await openSettings(page);
+	await setSettingValue(page, "Text size percent", 300);
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".settings-panel")).toBeHidden();
+	const article = page.locator("article.assistant").first();
+	await article.hover();
+	await article.getByRole("button", { name: "Fold this message" }).click();
+	await expect(article).toHaveClass(/folded-msg/);
+	const sizes = await article.evaluate((el) => ({
+		glyph: parseFloat(
+			getComputedStyle(
+				el.querySelector(".actions .icon-btn .action-glyph") as Element
+			).height
+		),
+		button: parseFloat(
+			getComputedStyle(el.querySelector(".actions button") as Element).fontSize
+		)
+	}));
+	// 1.05rem ≈ 16.8px and 0.92rem × 0.85 ≈ 12.5px, as at 100%.
+	expect(sizes.glyph).toBeLessThan(18);
+	expect(sizes.button).toBeLessThan(13);
+});
+
 /** Language buttons never overlap the hero on an empty chat. */
 test("empty-state language buttons sit clear of the hero", async ({ page }) => {
 	await openWithMessages(page, []);
