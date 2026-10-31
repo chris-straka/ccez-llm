@@ -251,6 +251,7 @@
 		BADGE_HOLD_DELETE_MS,
 		canHoldDeleteBadge,
 		buildMarksFor,
+		buildNewsMarks,
 		aidedTextForMsg,
 		seedAnnotationsFromRefs,
 		annotationCopyText,
@@ -1110,6 +1111,8 @@
 	 * already address the annotation it will become.
 	 */
 	let pendingAnn = $state<Annotation | null>(null);
+	/** Headline badges by story link (filed + pending preview). */
+	const newsMarks = $derived(buildNewsMarks(drafts.list, pendingAnn));
 	/** Whether the annotations review drawer is open. */
 	let reviewOpen = $state(false);
 	/** Pill node for the composer's pillEl bind (the staged pill is
@@ -15220,6 +15223,10 @@
 			newsBusy={newsMode.newsBusy}
 			newsImages={newsMode.newsImages}
 			newsActions={newsMode.actions}
+			{newsMarks}
+			newsBadge={(id: AnnotationId, x: number, y: number) =>
+				annotateMode.openBadgeClick(id, { x, y })}
+			newsBadgeHover={(id: string | null) => (annotateMode.hoverBadgeId = id)}
 			listen={{
 				mode: listenMode,
 				session: chat.listen ?? null,

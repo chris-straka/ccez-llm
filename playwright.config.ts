@@ -73,6 +73,7 @@ export default defineConfig({
 				"**/annotations-ux.e2e.ts",
 				"**/annotation-furigana.e2e.ts",
 				"**/news-ink.e2e.ts",
+				"**/news-headline-ask.e2e.ts",
 				"**/note-editor.e2e.ts",
 				"**/composer-tools.e2e.ts",
 				"**/paste-preview.e2e.ts",

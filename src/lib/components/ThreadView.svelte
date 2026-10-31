@@ -161,6 +161,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsStaged: NewsStaged | null;
 		newsBusy: string | null;
 		newsImages: Record<string, string | null>;
+		/** Headline badges by story link (see buildNewsMarks). */
+		newsMarks: Record<string, AnnotationMark[]>;
+		newsBadge: (id: AnnotationId, x: number, y: number) => void;
+		newsBadgeHover: (id: string | null) => void;
 		// Mirrors NewsPanel actions (structural, same rule as above).
 		newsActions: {
 			region: (gl: string) => void;
@@ -261,6 +265,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsBusy,
 		newsImages,
 		newsActions,
+		newsMarks,
+		newsBadge,
+		newsBadgeHover,
 		listen,
 		music,
 		flashcardsDue,
@@ -384,6 +391,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					staged={newsStaged}
 					busy={newsBusy}
 					images={newsImages}
+					marks={newsMarks}
+					washId={washId ?? null}
+					onBadge={newsBadge}
+					onBadgeHover={newsBadgeHover}
 					actions={newsActions}
 				/>
 			{/if}

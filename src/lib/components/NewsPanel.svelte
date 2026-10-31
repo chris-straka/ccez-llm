@@ -7,6 +7,10 @@ it. Session start buttons are emoji-only by the owner's call;
 everything else is theme tokens, never raw hex. -->
 <script lang="ts">
 	import { fly, fade } from "svelte/transition";
+	import { tick } from "svelte";
+	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
+	import { applyMarks } from "$lib/annotations-stamp";
+	import { badgeHover } from "$lib/hoverWash";
 	import { replyLanguageFor } from "$lib/languages";
 	import {
 		CEFR_LEVELS,
@@ -27,6 +31,13 @@ everything else is theme tokens, never raw hex. -->
 		staged: NewsStaged | null;
 		busy: string | null;
 		images: Record<string, string | null>;
+		/** Headline badges by story link (see buildNewsMarks): hover a
+		 * headline word and press A to ask about it, no article needed. */
+		marks?: Record<string, AnnotationMark[]>;
+		/** The one annotation whose quote also washes (shared id). */
+		washId?: string | null;
+		onBadge?: (id: AnnotationId, x: number, y: number) => void;
+		onBadgeHover?: (id: string | null) => void;
 		actions: {
 			region: (gl: string) => void;
 			pick: (link: string) => void;
@@ -40,7 +51,42 @@ everything else is theme tokens, never raw hex. -->
 		};
 	}
 
-	let { panel, staged, busy, images, actions }: Props = $props();
+	let {
+		panel,
+		staged,
+		busy,
+		images,
+		marks = {},
+		washId = null,
+		onBadge,
+		onBadgeHover,
+		actions
+	}: Props = $props();
+	// Marks stamp after Svelte flushes the cards (see applyMarks):
+	// one root per headline, same call as message bodies.
+	let panelEl: HTMLElement | undefined = $state();
+	$effect(() => {
+		const byLink = marks;
+		const wash = washId;
+		void panel.stories;
+		void panel.status;
+		void tick().then(() => {
+			if (!panelEl) return;
+			for (const card of panelEl.querySelectorAll(".news-open")) {
+				const link = (card as HTMLElement).dataset.storyLink;
+				const title = card.querySelector(".news-card-title");
+				if (!link || !(title instanceof HTMLElement)) continue;
+				applyMarks(title, byLink[link] ?? [], false, wash);
+			}
+		});
+	});
+	/** Badge owning an event target, or null. Badge presses open
+	 * their answer card, never the story. */
+	function badgeOf(target: EventTarget | null): HTMLElement | null {
+		const badge =
+			target instanceof Element ? target.closest("[data-ann-badge]") : null;
+		return badge instanceof HTMLElement ? badge : null;
+	}
 
 	const lang = $derived(replyLanguageFor(panel.code));
 	const activeRegion = $derived(
@@ -86,6 +132,18 @@ everything else is theme tokens, never raw hex. -->
 	let leaving = $state<string | null>(null);
 	let flipFrom: DOMRect | null = null;
 	function pickCard(event: MouseEvent, story: NewsStory): void {
+		const hit = badgeOf(event.target);
+		if (hit) {
+			const rect = hit.getBoundingClientRect();
+			// Stamped from AnnotationMark ids (applyMarks); dataset
+			// erases the brand, so cast it back at this boundary.
+			onBadge?.(
+				(hit.dataset.annBadge ?? "") as AnnotationId,
+				rect.left + rect.width / 2,
+				rect.bottom
+			);
+			return;
+		}
 		if (panel.status !== "ready" || leaving || busy) return;
 		flipFrom = (event.currentTarget as HTMLElement).getBoundingClientRect();
 		leaving = story.link;
@@ -116,11 +174,26 @@ everything else is theme tokens, never raw hex. -->
 	}
 </script>
 
+<!-- svelte-ignore a11y_mouse_events_have_key_events -->
+<!-- Badge wash is hover-only by decision (see MessageBody): Tab reaches markers, never highlights. -->
 <div
 	class="news-panel"
 	class:is-staged={stagedStory !== null}
 	role="region"
 	aria-label="{panel.langName} news"
+	bind:this={panelEl}
+	onmouseover={(e) => {
+		if (onBadgeHover)
+			badgeHover(onBadgeHover, badgeOf(e.target)?.dataset.annBadge ?? null);
+	}}
+	onmouseout={(e) => {
+		if (!onBadgeHover) return;
+		const to =
+			e.relatedTarget instanceof Element
+				? e.relatedTarget.closest("[data-ann-badge]")
+				: null;
+		badgeHover(onBadgeHover, null, { toBadge: to !== null });
+	}}
 >
 	<div class="news-bar">
 		{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
@@ -341,7 +414,9 @@ everything else is theme tokens, never raw hex. -->
 				>
 					<button
 						type="button"
-						class="news-card"
+						class="news-card news-open"
+						class:has-marks={(marks[story.link]?.length ?? 0) > 0}
+						data-story-link={story.link}
 						disabled={translating}
 						aria-label={translating ? "Headline translating" : story.title}
 						onclick={(e) => pickCard(e, story)}
@@ -379,7 +454,7 @@ everything else is theme tokens, never raw hex. -->
 								<span class="skel-line short"></span>
 							{:else}
 								<span
-									class="news-headline"
+									class="news-headline news-card-title"
 									in:fade={{ duration: motionMs(220) }}>{story.title}</span
 								>
 							{/if}
@@ -721,6 +796,12 @@ everything else is theme tokens, never raw hex. -->
 		/* Three lines reserved: rows line up and nothing jumps
 		when translated titles arrive. */
 		min-height: calc(1.32em * 3);
+	}
+	/* Annotated cards grow a badge lane above the title: badges
+	float a line above their quote and the clamp would eat them.
+	Same dampened scale as the badge itself. */
+	.news-card.has-marks .news-headline {
+		padding-top: calc(1.25rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
 	}
 	.news-source {
 		font-size: calc(0.76 * var(--t, 1rem));
