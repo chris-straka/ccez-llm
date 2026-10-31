@@ -33,7 +33,7 @@ TTS/OCR/dictation, page fetch, Android background turns).
 
 ## Commands
 
-- `bun run dev` — browser-only preview at http://127.0.0.1:5200/. No Tauri
+- `bun run dev` — browser-only preview at http://127.0.0.1:1420/. No Tauri
   APIs; everything must degrade cleanly here.
 - `scripts/tauri-dev.sh` (`bun run tauri:dev`) — the only supported full
   shell launch on macOS: builds, signs with the local self-signed
