@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { seedChat, setSettingValue, settingValue } from "./helpers";
+import { seedMockShell } from "./mock-shell";
 
 /** Settings panel: five thinking pills share one row, labels stay terse. */
 test.beforeEach(async ({ page }) => {
@@ -174,7 +175,7 @@ test("sliders ignore track clicks and the wheel, move by thumb drag", async ({
 /** The jump bar scrolls a group under itself and marks it current. */
 test("section bar jumps between groups", async ({ page }) => {
 	const nav = page.locator(".settings-panel .settings-nav");
-	// All six pills fit one row at the default window size.
+	// Every pill fits one row at the default window size.
 	expect(await nav.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(
 		true
 	);
@@ -193,6 +194,24 @@ test("section bar jumps between groups", async ({ page }) => {
 		.toBeLessThan(40);
 	await nav.getByRole("button", { name: "Reading" }).click();
 	await expect(page.locator("#reading-heading")).toBeInViewport();
+	// No updater in the browser preview: no Updates jump either.
+	await expect(nav.getByRole("button", { name: "Updates" })).toHaveCount(0);
+});
+
+/** The app shell's Updates group sits at the bottom: the sidebar
+reaches it in one click, no scrolling. */
+test("sidebar jumps to updates in the app shell", async ({ page }) => {
+	await seedMockShell(page);
+	await page.reload();
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	const nav = page.locator(".settings-panel .settings-nav");
+	const updates = nav.getByRole("button", { name: "Updates" });
+	await updates.click();
+	await expect(page.locator("#updates-heading")).toBeInViewport();
+	await expect(updates).toHaveAttribute("aria-current", "true");
 });
 
 /** The desktop window has no reading sample: the chat around it shows
@@ -572,7 +591,7 @@ test.describe("phone", () => {
 			track.y + track.height / 2
 		);
 		expect(await settingValue(page, name)).toBe(1);
-		// All six section pills fit the phone row.
+		// Every section pill fits the phone row.
 		const nav = page.locator(".settings-panel .settings-nav");
 		expect(
 			await nav.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)

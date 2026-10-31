@@ -4,6 +4,8 @@
 	import { getProviderDef } from "$lib/providers/registry";
 	import type { VoiceLangFollow } from "$lib/voiceTiers";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import { updateRouteFor } from "$lib/updates";
+	import { isIOSUserAgent } from "$lib/platform";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { onMount } from "svelte";
 	import ProviderPanel from "./settings/ProviderPanel.svelte";
@@ -98,9 +100,26 @@
 		["layout", "Layout"],
 		["look", "Look"],
 		["chat", "Chat"],
-		["model", "Model"]
+		["model", "Model"],
+		["updates", "Updates"]
 	] as const;
 	type SectionId = (typeof SECTIONS)[number][0];
+	/** Updates sits at the bottom, under Model: the sidebar reaches it
+	in one click wherever the updater exists (the phone pill row stays
+	at six). */
+	const sections = $derived(
+		SECTIONS.filter(
+			([id]) =>
+				id !== "updates" ||
+				(!androidUI &&
+					updateRouteFor(
+						false,
+						tauriBackendAvailable(),
+						import.meta.env.DEV,
+						isIOSUserAgent(navigator.userAgent)
+					).kind !== "none")
+		)
+	);
 	let navEl: HTMLElement | undefined = $state();
 	let current = $state<SectionId>("reading");
 	function scroller(): HTMLElement | null {
@@ -144,13 +163,13 @@
 				? box.getBoundingClientRect().top + coverHeight() + 12
 				: nav.getBoundingClientRect().bottom + 12;
 			let seen: SectionId = SECTIONS[0][0];
-			for (const [id] of SECTIONS) {
+			for (const [id] of sections) {
 				const el = document.getElementById(`settings-${id}`);
 				if (el && el.getBoundingClientRect().top <= line) seen = id;
 			}
 			// Scrolled to the end: the last group wins even if short.
 			if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2)
-				seen = SECTIONS[SECTIONS.length - 1]![0];
+				seen = sections[sections.length - 1]![0];
 			current = seen;
 		};
 		box.addEventListener("scroll", spy, { passive: true });
@@ -230,7 +249,7 @@
 			></button
 		>
 	{/if}
-	{#each SECTIONS as [id, label] (id)}
+	{#each sections as [id, label] (id)}
 		<button
 			type="button"
 			class:current={current === id}
@@ -251,7 +270,7 @@
 <AppearancePanel bind:settings />
 <DefaultsPanel bind:settings {androidUI} gameLineToggle={onGameLineToggle} />
 <ProviderPanel bind:settings {onCommit} />
-<div class="keys-updates">
+<div class="keys-updates" id="settings-updates">
 	<section aria-labelledby="keys-heading">
 		<h2 id="keys-heading">
 			{androidUI ? "Touch gestures" : "Keyboard shortcuts"}
