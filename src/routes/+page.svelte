@@ -14114,6 +14114,42 @@
 		// native menu: no preventDefault here, so Copy stays
 		// available beside speech.
 		// (Android long-press never starts audio — it summons the menu.)
+		/**
+		 * Right-click in an answer card reads the word under the
+		 * cursor. The card explains a foreign word in the user's own
+		 * language, so the voice follows the word, not its sentence:
+		 * card pieces carry their language, and a word the annotated
+		 * message also holds reads in that message's voice (tâche
+		 * inside an English note); anything else reads in its own
+		 * sentence's.
+		 */
+		function speakAnswerWord(event: MouseEvent, answerBody: Element): void {
+			const word = wordUnderCursor(event, answerBody);
+			if (!word) return;
+			const ann = drafts.list.find((a) => a.id === annotateMode.answerPop?.id);
+			if (!ann) return;
+			const key = annSpeakKey(ann);
+			const at = event.target instanceof Element ? event.target : answerBody;
+			const tagged = at.closest("[lang]");
+			const cardLang =
+				tagged && answerBody.contains(tagged)
+					? tagged.getAttribute("lang")
+					: null;
+			if (cardLang) {
+				void speakQuote(word, key, false, word, cardLang);
+				return;
+			}
+			const msg = ann.messageId
+				? chat.messages.find((m) => m.id === ann.messageId)
+				: undefined;
+			const source = msg ? speechText(msg.content) : ann.quote;
+			if (sentenceForQuote(source, word) !== null) {
+				void speakQuote(word, key, false, source);
+				return;
+			}
+			const block = at.closest("p, li") ?? answerBody;
+			void speakQuote(word, key, false, block.textContent ?? word);
+		}
 		const onContextMenu = (event: MouseEvent) => {
 			const target = event.target instanceof Element ? event.target : null;
 			// The native menu never appears on desktop: right-click
@@ -14141,6 +14177,12 @@
 				return;
 			}
 			if (androidUI) return;
+			const answerBody = target?.closest(".ann-answer-body");
+			if (answerBody) {
+				if (!target?.closest("button, input, textarea, a"))
+					speakAnswerWord(event, answerBody);
+				return;
+			}
 			const body = target?.closest(".messages .rendered, .news-card-title");
 			if (!body) return;
 			// Code comes before the control check below on purpose: the
