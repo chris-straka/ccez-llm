@@ -991,6 +991,12 @@ describe("session prompts", () => {
 		expect(short).toContain("80 words");
 		expect(short).toContain("CEFR B1");
 		expect(short).toContain("Intermediate");
+		// The reply opens on the summary, never "Here is a summary…".
+		expect(short).toContain("no intro line");
+		expect(parseNewsLaunch(short)).toMatchObject({
+			level: "B1",
+			size: "short"
+		});
 		expect(newsSummaryInstruction(story, "long", "C1", "French")).toContain(
 			"450 words"
 		);

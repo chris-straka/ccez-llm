@@ -1367,7 +1367,8 @@ export function newsSummaryInstruction(
 	return (
 		`📰 "${story.title}"${byline}\n` +
 		`Summarize the pasted article in ${langName} at CEFR ${level} (${tag}), ` +
-		`about ${words} words.`
+		`about ${words} words. Start with the summary itself: no intro line ` +
+		`saying what it is.`
 	);
 }
 
