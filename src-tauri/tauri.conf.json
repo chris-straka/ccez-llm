@@ -49,6 +49,9 @@
 		"category": "Education",
 		"shortDescription": "BYOK desktop chatbot with language-learner aids",
 		"longDescription": "Ccez LLM is a Tauri + SvelteKit desktop chatbot with language-learner aids.",
+		"macOS": {
+			"hardenedRuntime": false
+		},
 		"linux": {
 			"appimage": {
 				"bundleMediaFramework": false

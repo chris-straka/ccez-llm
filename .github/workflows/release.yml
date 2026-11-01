@@ -19,8 +19,12 @@ name: release
 #     ANDROID_KEYSTORE_BASE64  (`base64 -i ~/upload-keystore.jks | pbcopy`)
 #     ANDROID_KEYSTORE_PASSWORD
 #     ANDROID_KEY_ALIAS          (e.g. `upload`)
-# No Apple Developer account needed: the macOS bundle is ad-hoc signed, so
-# the first launch on another Mac needs right-click -> Open. The APK
+#   macOS signing (self-signed "Ccez LLM Self-Signed" cert, kept with the
+#   updater key as ~/.tauri/ccez-macos-signing.p12):
+#     MACOS_SIGNING_P12           (`base64 -i ~/.tauri/ccez-macos-signing.p12`)
+#     MACOS_SIGNING_P12_PASSWORD  (~/.tauri/ccez-macos-signing.p12.password)
+# No Apple Developer account needed: the cert is not Apple-issued, so the
+# first launch on another Mac still needs right-click -> Open. The APK
 # installs directly from the Releases page (allow unknown sources once).
 #
 # ORDERING (parallel builders, exactly-one writer): v0.2.2 proved that
@@ -179,6 +183,30 @@ jobs:
           keyAlias=$ANDROID_KEY_ALIAS
           password=$ANDROID_KEYSTORE_PASSWORD
           EOF
+      # macOS legs sign with the self-signed cert. Ad-hoc signatures pin the
+      # Keychain's trust to that one build's hash, so every update asked for
+      # the login password again before it could read the API keys; one
+      # fixed cert keeps the app's identity the same across releases.
+      # Tauri's own APPLE_CERTIFICATE import only accepts Apple-issued cert
+      # names, so import it here and hand Tauri just the identity.
+      - name: Import macOS signing cert
+        if: startsWith(matrix.name, 'macos-')
+        env:
+          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
+          MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KCP="$(openssl rand -hex 16)"
+          echo "$MACOS_SIGNING_P12" | base64 -d > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$KCP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCP" "$KC"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KC" -P "$MACOS_SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KCP" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/signing.p12"
+          security find-identity -p codesigning "$KC" | grep -q "Ccez LLM Self-Signed"
+          echo "APPLE_SIGNING_IDENTITY=Ccez LLM Self-Signed" >> "$GITHUB_ENV"
       # Desktop legs build with the Tauri CLI directly. The CLI only writes
       # to the local target dir; the upload-artifact step below is the only
       # network write this job performs (workflow artifacts, not the draft).
