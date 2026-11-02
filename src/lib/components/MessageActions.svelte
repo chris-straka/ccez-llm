@@ -484,8 +484,12 @@ cover an off state. -->
 	/* Folded messages show no row: the pill would float over the next
 	message's text. Tapping the folded body unfolds (see
 	toggleMessageActions) — the only press path, since the fold button
-	lives in the hidden row. */
-	:global(.app[data-android]) :global(article.folded-msg) .actions {
+	lives in the hidden row. A news opener keeps its row: it rests
+	folded as a full card, not a one-line preview, and without the
+	row its buttons were gone and the reply butted against it. */
+	:global(.app[data-android])
+		:global(article.folded-msg:not(.news-opener))
+		.actions {
 		display: none;
 	}
 	/* Phones sit the row tighter under the text. */

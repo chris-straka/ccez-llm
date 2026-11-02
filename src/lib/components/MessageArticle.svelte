@@ -269,6 +269,7 @@ where the text sat, like the composer's promptEl pattern). -->
 	class:assistant={msg.role === "assistant"}
 	class:selected
 	class:folded-msg={folded}
+	class:news-opener={launch !== null}
 	class:speaking={speakingNow}
 	class:speaking-sel={speakingSel}
 	class:aid-loading={aidLoading}
