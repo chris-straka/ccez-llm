@@ -735,6 +735,14 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		width: 1.8em;
 		height: 1.8em;
 	}
+	/* The create pill's mic is exactly one field line tall (line
+	height plus the field's 0.1em padding each side). At 1.8em it
+	outgrew the empty field, so the pill was taller with the mic
+	showing and the bottom-aligned caret jumped up on the first
+	letter, when the mic hides. */
+	.ann-pop.note.fresh .ann-tool {
+		height: calc(var(--msg-line-height, 1.5) * 1em + 0.2em);
+	}
 	.ann-pop.note .ann-tool :global(.action-glyph) {
 		width: 0.95em;
 		height: 0.95em;

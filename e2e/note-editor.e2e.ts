@@ -153,3 +153,40 @@ test("edit card opens below its quote in the same bubble", async ({ page }) => {
 	expect(look).toEqual({ radius: "14px", tail: '""' });
 	await page.keyboard.press("Escape");
 });
+
+test("typing the first letter does not move the caret or resize the pill", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await seedArticle(page);
+	// Large type and tight lines, where the mic button outgrew one
+	// line of the field.
+	await page.evaluate(() => {
+		const app = document.querySelector<HTMLElement>(".app")!;
+		app.style.setProperty("--annpop-scale", "2.5");
+		app.style.setProperty("--msg-line-height", "1.2");
+	});
+	const pop = await openCreate(page, 1, "a succédé", "article .rendered");
+	await expect(
+		pop.locator('button[aria-label="Dictate annotation"]')
+	).toBeVisible();
+	const measure = () =>
+		page.evaluate(() => {
+			const card = document.querySelector(".ann-pop")!.getBoundingClientRect();
+			const field = document
+				.querySelector(".ann-pop textarea")!
+				.getBoundingClientRect();
+			return { height: card.height, fieldTop: field.top };
+		});
+	const empty = await measure();
+	await pop.screenshot({ path: "test-results/pill-empty.png" });
+	await page.keyboard.type("j");
+	await expect(
+		pop.locator('button[aria-label="Dictate annotation"]')
+	).toBeHidden();
+	const typed = await measure();
+	await pop.screenshot({ path: "test-results/pill-typed.png" });
+	expect(Math.abs(typed.height - empty.height)).toBeLessThan(1);
+	expect(Math.abs(typed.fieldTop - empty.fieldTop)).toBeLessThan(1);
+	await page.keyboard.press("Escape");
+});
