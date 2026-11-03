@@ -158,6 +158,11 @@ test("typing the first letter does not move the caret or resize the pill", async
 	page
 }) => {
 	await page.setViewportSize({ width: 1280, height: 900 });
+	// The mic shows only where the browser can dictate: Linux WebKit (CI) can't, so stand one in.
+	await page.addInitScript(() => {
+		const w = window as unknown as Record<string, unknown>;
+		w.webkitSpeechRecognition ??= class {};
+	});
 	await seedArticle(page);
 	// Large type and tight lines, where the mic button outgrew one
 	// line of the field.
