@@ -19,6 +19,24 @@ import {
 } from "./sel-geometry";
 
 describe("snapOffsetsToWordEdges", () => {
+	it("takes a hyphenated word whole from either half", () => {
+		const t = "le scrutin en rendez-vous existentiel";
+		const at = (w: string) => t.indexOf(w);
+		const whole = { start: at("rendez"), end: at("rendez") + 11 };
+		expect(
+			snapOffsetsToWordEdges(t, at("rendez") + 1, at("rendez") + 3)
+		).toEqual(whole);
+		expect(snapOffsetsToWordEdges(t, at("vous"), at("vous") + 4)).toEqual(
+			whole
+		);
+		// A hyphen with no word on one side joins nothing.
+		expect(snapOffsetsToWordEdges("a - b", 0, 1)).toEqual({ start: 0, end: 1 });
+		expect(snapOffsetsToWordEdges("pré- et post-op", 0, 2)).toEqual({
+			start: 0,
+			end: 3
+		});
+	});
+
 	it("leaves a Hangul syllable block alone inside its eojeol", () => {
 		// 들 picked out of 들은: a syllable is a unit of its own.
 		expect(snapOffsetsToWordEdges("학생들은 왔다", 2, 3)).toEqual({

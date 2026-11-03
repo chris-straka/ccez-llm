@@ -15,6 +15,7 @@ import {
 	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
 	isWordChar,
+	joinsWord,
 	splitSafeOffset
 } from "./sel-geometry";
 import {
@@ -1837,23 +1838,13 @@ function wordEdgeBounds(
 		if (scN instanceof Text) {
 			const text = scN.textContent ?? "";
 			let s = Math.max(0, Math.min(so, text.length));
-			while (
-				s > 0 &&
-				isWordChar(text[s - 1] ?? "") &&
-				isWordChar(text[s] ?? "")
-			)
-				s -= 1;
+			while (s > 0 && joinsWord(text, s)) s -= 1;
 			so = s;
 		}
 		if (ecN instanceof Text) {
 			const text = ecN.textContent ?? "";
 			let e = Math.max(0, Math.min(eo, text.length));
-			while (
-				e < text.length &&
-				isWordChar(text[e - 1] ?? "") &&
-				isWordChar(text[e] ?? "")
-			)
-				e += 1;
+			while (e < text.length && joinsWord(text, e)) e += 1;
 			eo = e;
 		}
 		let guard = 0;

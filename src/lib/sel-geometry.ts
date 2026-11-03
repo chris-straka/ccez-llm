@@ -25,6 +25,23 @@ export function isWordChar(ch: string): boolean {
 	return WORD_CHAR_RE.test(ch) && !SPACELESS_RE.test(ch);
 }
 
+const HYPHEN_RE = /[-\u2010\u2011]/;
+
+/**
+ * Whether the gap before `text[i]` sits inside one word: word
+ * characters on both sides, or a hyphen joining two (rendez-vous,
+ * porte-parole are one word to a learner, though a double-click stops
+ * at the hyphen and filed only "rendez": owner, 2026-11-03). Pure.
+ */
+export function joinsWord(text: string, i: number): boolean {
+	const a = text[i - 1] ?? "";
+	const b = text[i] ?? "";
+	if (isWordChar(a) && isWordChar(b)) return true;
+	if (HYPHEN_RE.test(a)) return isWordChar(text[i - 2] ?? "") && isWordChar(b);
+	if (HYPHEN_RE.test(b)) return isWordChar(a) && isWordChar(text[i + 1] ?? "");
+	return false;
+}
+
 /**
  * Split-safe offset into `nodeText`: a node split must never leave a
  * combining mark or a low surrogate first on the right side, so
@@ -113,14 +130,8 @@ export function snapOffsetsToWordEdges(
 	let e = Math.max(0, Math.min(end, len));
 	if (s > e) [s, e] = [e, s];
 	if (s < e) {
-		while (s > 0 && isWordChar(text[s - 1] ?? "") && isWordChar(text[s] ?? ""))
-			s -= 1;
-		while (
-			e < len &&
-			isWordChar(text[e - 1] ?? "") &&
-			isWordChar(text[e] ?? "")
-		)
-			e += 1;
+		while (s > 0 && joinsWord(text, s)) s -= 1;
+		while (e < len && joinsWord(text, e)) e += 1;
 	}
 	return { start: s, end: e };
 }

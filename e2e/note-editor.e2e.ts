@@ -195,3 +195,47 @@ test("typing the first letter does not move the caret or resize the pill", async
 	expect(Math.abs(typed.fieldTop - empty.fieldTop)).toBeLessThan(1);
 	await page.keyboard.press("Escape");
 });
+
+test("a double-click on half a hyphenated word annotates the whole word", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await seedArticle(page);
+	// The middle of "parole" in "porte-parole".
+	const at = await page.evaluate(() => {
+		const root = document.querySelectorAll("article .rendered")[1]!;
+		const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+		for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+			const i = n.textContent!.indexOf("porte-parole");
+			if (i < 0) continue;
+			const r = document.createRange();
+			r.setStart(n, i + 7);
+			r.setEnd(n, i + 9);
+			const b = r.getBoundingClientRect();
+			return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+		}
+		throw new Error("no porte-parole");
+	});
+	await page.mouse.dblclick(at.x, at.y);
+	await expect
+		.poll(() => page.evaluate(() => getSelection()?.toString()))
+		.toBe("porte-parole");
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	const pop = page.locator(".ann-pop.note.placed");
+	await expect(pop.locator("textarea")).toBeFocused();
+	await page.keyboard.type("x");
+	await page.keyboard.press("Enter");
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				Object.values(
+					JSON.parse(
+						localStorage.getItem("ccez-llm-annotations-v1") ?? "{}"
+					) as Record<string, { quote: string }[]>
+				)
+					.flat()
+					.map((a) => a.quote)
+			)
+		)
+		.toContain("porte-parole");
+});
