@@ -26,7 +26,7 @@
 		"security": {
 			"csp": null
 		},
-		"withGlobalTauri": true
+		"withGlobalTauri": false
 	},
 	"plugins": {
 		"deep-link": {

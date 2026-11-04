@@ -10052,6 +10052,9 @@
 	onMount(() => {
 		// What other apps starred or knew since last time.
 		void wordList.sync();
+		// Chats and the key that unlocks the API keys stay: Safari
+		// clears a site's storage after a week away unless it's asked.
+		void navigator.storage?.persist?.().catch(() => {});
 		// A failed save keeps working in memory: say so once per
 		// kind, before a relaunch loses what didn't save.
 		const saveWarned: string[] = [];
