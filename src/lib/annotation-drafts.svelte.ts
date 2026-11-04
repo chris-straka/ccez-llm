@@ -276,6 +276,8 @@ export class AnnotationDrafts {
 						text,
 						controller.signal
 					);
+					// Came through after all: a later real failure banners.
+					this.followInterrupted.delete(id);
 					break;
 				} catch (error) {
 					if (!this.followInterrupted.delete(id)) throw error;
@@ -347,16 +349,24 @@ export class AnnotationDrafts {
 		this.list = deleteAnnotation(this.list, id);
 	}
 
-	/** An answered word note with the same quote and no question: this
-	chat's first, then the other chats', the newest first. */
+	/** An answered word card with the same quote, in the same language,
+	and no question: this chat's first, then the other chats', the
+	newest first. Cards only: a card can be marked as still writing,
+	plain prose would read as this sentence's own answer. */
 	earlierAnswer(ann: Annotation): Annotation | undefined {
 		const fold = (q: string) => q.trim().toLocaleLowerCase();
 		const want = fold(ann.quote);
+		const base = (l: string | null | undefined) =>
+			l?.split(/[-_]/)[0]?.toLowerCase() || null;
+		const lang = base(this.deps.langFor?.(ann));
 		const fits = (a: Annotation) =>
 			a.id !== ann.id &&
 			!a.comment.trim() &&
 			!!a.answer?.trim() &&
-			!a.card?.partial &&
+			!!a.card &&
+			!a.card.partial &&
+			// "die", "chat", "pain": the German or French card is no use here.
+			(!lang || !a.card.lang || base(a.card.lang) === lang) &&
 			fold(a.quote) === want;
 		const here = this.list.filter(fits);
 		if (here.length) return here[here.length - 1];
@@ -405,13 +415,11 @@ export class AnnotationDrafts {
 			// that card shows at once, marked as still writing, until this
 			// sentence's own answer lands (owner, 2026-11-04).
 			const earlier = ann.comment.trim() ? undefined : this.earlierAnswer(ann);
-			if (earlier)
-				this.attachAnswer(
-					chatId,
-					ann.id,
-					earlier.answer!,
-					earlier.card ? { ...earlier.card, partial: true } : undefined
-				);
+			if (earlier?.card)
+				this.attachAnswer(chatId, ann.id, earlier.answer!, {
+					...earlier.card,
+					partial: true
+				});
 			const reply = await this.deps.answerQuestion(
 				provider,
 				{
