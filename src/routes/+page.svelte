@@ -8303,6 +8303,7 @@
 		}
 		// TypeScript resends resolve the provider (Keychain on first
 		// use); the native branch above never gets here.
+		const resentFrom = chat;
 		if (await blockUnreadyOnDevice()) return;
 		const provider = await providerKeys.resolveActive();
 		if (!provider) {
@@ -8310,7 +8311,9 @@
 			return;
 		}
 		providerKeys.missing = false;
-		const resentFrom = chat;
+		// Another chat opened while the Keychain asked: the retry was
+		// for the first one, never the chat now on screen.
+		if (chatState.activeChatId !== resentFrom.id) return;
 		await resendLast(
 			chatState,
 			provider,
