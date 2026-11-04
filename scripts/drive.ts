@@ -20,7 +20,13 @@
  * sharing its data: `bun scripts/drive-app.ts` builds and opens it.
  */
 import { Buffer } from "node:buffer";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -84,7 +90,6 @@ async function send(
 		ws.send(JSON.stringify({ id, command, args }));
 	});
 }
-
 
 /**
  * Run `body` in the page. The bridge's execute_js waits for a reply
@@ -221,7 +226,10 @@ async function main(): Promise<void> {
 		} else if (cmd === "js") {
 			// An expression, or a body that returns.
 			const body = rest.join(" ");
-			const value = await run(ws, /\breturn\b/.test(body) ? body : `return (${body});`);
+			const value = await run(
+				ws,
+				/\breturn\b/.test(body) ? body : `return (${body});`
+			);
 			console.log(JSON.stringify(value, null, 2));
 		} else if (cmd === "click") {
 			const sel = JSON.stringify(rest[0] ?? "");
