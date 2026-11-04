@@ -3018,7 +3018,20 @@ test.describe("always-visible prompt", () => {
 		const box = await panel.boundingBox();
 		if (!box) throw new Error("no settings panel");
 		const cx = box.x + box.width / 2;
-		const cy = box.y + box.height / 2;
+		// Off any field (fields keep their fingers): with no key the
+		// panel opens on Model, whose middle can be the Base URL box.
+		const cy = await page.evaluate(
+			([x, top, bottom]) => {
+				const field = (px: number, py: number) =>
+					document
+						.elementFromPoint(px, py)
+						?.closest("input, textarea, select") != null;
+				for (let y = (top + bottom) / 2; y > top; y -= 8)
+					if (!field(x - 40, y) && !field(x + 40, y)) return y;
+				throw new Error("no spot in settings off a field");
+			},
+			[cx, box.y + 120, box.y + box.height]
+		);
 		const scale = () =>
 			page.evaluate(
 				() =>
