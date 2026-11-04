@@ -3011,6 +3011,10 @@ test.describe("always-visible prompt", () => {
 		});
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
+		// Measured once it has slid in: mid-slide its middle is off-screen.
+		await expect
+			.poll(async () => Math.round((await panel.boundingBox())?.x ?? -1))
+			.toBe(0);
 		const box = await panel.boundingBox();
 		if (!box) throw new Error("no settings panel");
 		const cx = box.x + box.width / 2;
