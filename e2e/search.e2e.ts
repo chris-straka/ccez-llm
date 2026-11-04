@@ -1,13 +1,20 @@
 import { test, expect, type Page } from "./fixtures";
 import { requireShell, toggleSidebar } from "./helpers";
+import { seedMockShell } from "./mock-shell";
 
 /**
  * Search-mobile bucket: the Ctrl+P / Cmd+P command palette (Worker
  * index, IndexedDB snapshot, in-memory fallback), the sidebar search
  * box behind the left-to-right swipe, and the touch paste-images
- * button. Written, not run, per the bucket brief (shared dev-server
- * port) — run with `bun run test:e2e e2e/search.e2e.ts`.
+ * button.
  */
+
+// The palette and find chords are the shell's: the stand-in shell makes
+// these run here (without it every one of them skipped).
+// "web pass-through" checks the plain browser, without it.
+test.beforeEach(async ({ page }, info) => {
+	if (!info.titlePath.includes("web pass-through")) await seedMockShell(page);
+});
 
 async function seedThreeChats(page: Page): Promise<void> {
 	await page.addInitScript(() => {
