@@ -31,6 +31,7 @@ give without taking the owner's focus (a native click in the page, menu
 keys while the page has the keyboard, video full screen, downloads).
 
 ### Opening and closing
+
 - [x] A toolbar button opens and closes it, and ⌘⇧B (the menu's View → Browser); it remembers whether it was open.
 - [x] Opening it puts the cursor in the address bar of a new tab; reopening shows the tabs as they were.
 - [x] Closing the last tab closes the pane; closing the pane keeps its tabs for next time.
@@ -38,6 +39,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [x] Links in chat replies open in the pane while it's open (⌘-click: a new tab), in the system browser when it's closed.
 
 ### The split
+
 - [x] A divider between the chat and the pane: a thin line, a wide grab area (8px), the resize cursor, a highlight on hover and while dragging.
 - [x] Dragging is smooth: the page doesn't tear or lag behind the divider (its snapshot stands in while dragging; the room past it takes the page's own background colour).
 - [x] The chat keeps at least 320px, the pane at least 360px; a window too narrow for both shows the pane expanded with a way back.
@@ -48,6 +50,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [ ] Resizing the window: the page keeps up (no gap at its edge, no stale size after).
 
 ### Tabs
+
 - [x] A strip of tabs: favicon, title, × on the active tab and on hover; a + at the end.
 - [x] Many tabs shrink to a minimum width, then the strip scrolls sideways; the active tab is kept in view.
 - [x] A loading tab spins where its favicon goes.
@@ -57,6 +60,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [x] Closing a tab activates its neighbour (the right one, else the left).
 
 ### Address bar
+
 - [ ] Back, forward, reload (stop while loading); back and forward greyed when there's nowhere to go.
 - [x] The URL shown plainly (the host darker), the whole URL while editing; a click selects it all.
 - [x] Enter goes: a URL as typed (https added), anything else searched (DuckDuckGo).
@@ -67,6 +71,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [x] Plain http shows "Not secure"; a page that fails to load says so with Try again.
 
 ### Focus and keys
+
 - [ ] Clicking the page gives it the keyboard; clicking the chat gives it back. The app's own keys never fire while you type in a page.
 - [ ] While the page has focus: ⌘T, ⌘W, ⌘L, ⌘R, ⌘[ ⌘], ⌘= ⌘- ⌘0 (the page's zoom, not the app's text size), ⌘F find in page, ⌘, Settings still work (menu keys).
 - [ ] Esc in a page goes to the page (videos leave full screen, dialogs close), never closes the pane.
@@ -74,12 +79,14 @@ keys while the page has the keyboard, video full screen, downloads).
 - [ ] The app's shortcuts that open things over the window (Settings, shortcuts, search) step the page aside instead of drawing under it.
 
 ### Overlays (native page over HTML)
+
 - [x] Settings, the shortcuts list, licenses, search palette, flashcards, reader: the page steps aside (its snapshot under the veil).
 - [ ] Toasts and banners sit over the chat, not under the page.
 - [x] Menus and word cards that reach past the divider: the page steps aside while they're open.
 - [ ] Nothing of the app's is ever hidden under the page.
 
 ### Pages
+
 - [x] Pages get their own cookies and storage (logins kept between launches), apart from the app's.
 - [ ] Downloads save to Downloads and say so.
 - [x] Dark pages and light pages both look right next to the app in both themes (the pane's chrome follows the app).
@@ -88,6 +95,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [ ] A page that asks for the camera, microphone or location: refused quietly.
 
 ### Never
+
 - [ ] Never a flash of white when opening a tab in dark mode.
 - [ ] Never two panes, never a page at a stale size or place, never a page left behind after its tab closed.
 - [x] Never the app's keys or commands reachable from a page.

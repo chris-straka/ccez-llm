@@ -10,10 +10,15 @@ import { seedMockShell } from "./mock-shell";
  */
 
 // The palette and find chords are the shell's: the stand-in shell makes
-// these run here (without it every one of them skipped).
-// "web pass-through" checks the plain browser, without it.
+// their tests run here (without it every one of them skipped). Only
+// theirs: the rest check the plain page (Shift+F types, the browser keeps
+// Ctrl+P), and the stand-in changes how the page starts.
+const SHELL_GROUPS = ["search palette", "palette focus order", "find in chat"];
 test.beforeEach(async ({ page }, info) => {
-	if (!info.titlePath.includes("web pass-through")) await seedMockShell(page);
+	const shell =
+		info.titlePath.some((t) => SHELL_GROUPS.includes(t)) &&
+		!info.title.startsWith("Shift+F");
+	if (shell) await seedMockShell(page);
 });
 
 async function seedThreeChats(page: Page): Promise<void> {
