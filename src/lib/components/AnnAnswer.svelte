@@ -116,6 +116,8 @@ where it was left. -->
 	 * sent its last piece to a second line): drawn smaller, down to two
 	 * thirds, until they fit the card; only a word longer than that wraps.
 	 */
+	// The key (the pieces' text) only tells Svelte when to fit again.
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function fitRow(el: HTMLElement, _key: string) {
 		let last = -1;
 		const fit = (): void => {
