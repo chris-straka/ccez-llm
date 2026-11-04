@@ -1217,7 +1217,19 @@ export async function annotationAnswer(
 						q.quote
 					)) ||
 				parsed;
-			const card = lang ? { ...withParts, lang } : withParts;
+			// The dictionary's part of speech stays on the model's card (a tag at the top).
+			const pos =
+				found && lang && oneBaseWord(found.hits)
+					? cardFromDictionary(
+							q.quote,
+							found.hits,
+							lang,
+							found.japanese,
+							found.form
+						)?.pos
+					: undefined;
+			const typed = pos ? { ...withParts, pos } : withParts;
+			const card = lang ? { ...typed, lang } : typed;
 			return { answer: wordCardText(card), card };
 		}
 		if (!looksLikeJson(reply.content)) {

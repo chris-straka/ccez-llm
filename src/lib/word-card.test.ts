@@ -6,6 +6,7 @@ import {
 	buildWordCardMessages,
 	cardWordRow,
 	isWordQuote,
+	posTag,
 	shortGrammar,
 	parseWordCard,
 	WORD_PROFILES,
@@ -527,5 +528,14 @@ describe("withPieceNotes on an unsettled piece", () => {
 				}
 			])[1]?.label
 		).toBe("present indicative, third-person singular");
+	});
+});
+
+describe("posTag", () => {
+	it("shortens a part of speech as ccez-tube's card does", () => {
+		expect(posTag("verb")).toBe("v");
+		expect(posTag("adj")).toBe("adj");
+		expect(posTag("noun")).toBe("n");
+		expect(posTag("proper noun")).toBe("name");
 	});
 });

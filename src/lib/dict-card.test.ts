@@ -626,6 +626,9 @@ describe("annotationAnswer with a dictionary", () => {
 		});
 		expect(reply.card?.meaning).toBe("crossed");
 		expect(reply.card?.partial).toBeUndefined();
+		// The dictionary's part of speech, on the instant card and kept on the model's (a tag).
+		expect(partials[0]).toMatchObject({ pos: "verb" });
+		expect(reply.card?.pos).toBe("verb");
 		const system = (
 			chat.mock.calls[0] as unknown as [Array<{ content: string }>]
 		)[0][0]!.content;

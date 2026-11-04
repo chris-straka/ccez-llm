@@ -84,6 +84,7 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 			"ccez-mock-reply",
 			JSON.stringify({
 				meaning: "students at a lycée",
+				pos: "noun",
 				parts: [
 					{ text: "lycéen", label: "lycéen", kind: "core" },
 					{ text: "s", label: "plural", kind: "agree" }
@@ -105,6 +106,9 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 	const card = page.locator(".ann-answer.placed");
 	await expect(card).toBeVisible();
 	await expect(card.locator(".k-core .wc-gender")).toHaveText("m.");
+	// Its kind, a small tag top right (as ccez-tube's card).
+	await expect(card.locator(".wc-pos")).toHaveText("n");
+	await card.screenshot({ path: "test-results/word-card-pos.png" });
 	await expect(card.locator(".wc-fact")).toHaveCount(0);
 	await expect(card.locator(".wc-ghost")).toHaveCount(0);
 });

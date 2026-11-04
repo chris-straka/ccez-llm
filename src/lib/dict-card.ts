@@ -641,6 +641,7 @@ function dictionaryCard(
 			parts,
 			facts,
 			...(base ? { base } : {}),
+			...(top.entry.p ? { pos: top.entry.p } : {}),
 			partial: true,
 			lang
 		},

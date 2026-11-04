@@ -31,6 +31,7 @@ where it was left. -->
 	import type { AnnotationFollowUp } from "$lib/annotations";
 	import {
 		cardWordRow,
+		posTag,
 		shortGrammar,
 		WORD_PROFILES,
 		wordCardDir,
@@ -420,9 +421,16 @@ where it was left. -->
 			sits in and what that means close the card (older cards: Here,
 			In this sentence). -->
 			<div class="wc">
-				<p class="ann-answer-text ann-answer-head" dir="auto">
-					{wordCard.meaning}
-				</p>
+				<!-- What kind of word, a small tag top right (as ccez-tube's
+				card: owner, 2026-11-04). -->
+				<div class="wc-head">
+					<p class="ann-answer-text ann-answer-head" dir="auto">
+						{wordCard.meaning}
+					</p>
+					{#if wordCard.pos}
+						<span class="wc-pos">{posTag(wordCard.pos)}</span>
+					{/if}
+				</div>
 				{#if cardWord.length > 0 || wordCard.construction}
 					<div class="wc-top">
 						{#if cardWord.length > 0}
@@ -861,6 +869,25 @@ where it was left. -->
 	}
 	.ann-answer-head {
 		font-weight: 600;
+	}
+	.wc-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+	}
+	.wc-head .ann-answer-head {
+		flex: 1;
+		min-width: 0;
+	}
+	.wc-pos {
+		flex: none;
+		margin-top: 0.2em;
+		padding: 0 6px;
+		border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+		border-radius: 6px;
+		color: var(--muted);
+		font-size: 0.78em;
+		line-height: 1.6;
 	}
 	/* Word card. Each piece's kind has one hue in every language,
 	mixed into the card's own surface and ink so it reads in light

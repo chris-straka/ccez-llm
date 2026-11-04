@@ -86,6 +86,52 @@ export interface WordCard {
 	lang?: string;
 	/** The dictionary's instant card, while the model writes the rest. */
 	partial?: boolean;
+	/** The base word's part of speech from the dictionary ("verb"), shown as a small tag. */
+	pos?: string;
+}
+
+/** A part of speech as a short tag, as ccez-tube's card has them ("verb" v, "adjective" adj). */
+export function posTag(pos: string): string {
+	const p = pos.trim().toLowerCase();
+	const short: Record<string, string> = {
+		noun: "n",
+		"proper noun": "name",
+		name: "name",
+		verb: "v",
+		adjective: "adj",
+		adj: "adj",
+		adverb: "adv",
+		adv: "adv",
+		pronoun: "pron",
+		pron: "pron",
+		preposition: "prep",
+		prep: "prep",
+		conjunction: "conj",
+		conj: "conj",
+		interjection: "interj",
+		intj: "interj",
+		particle: "part",
+		auxiliary: "aux",
+		"auxiliary verb": "aux",
+		numeral: "num",
+		num: "num",
+		number: "num",
+		determiner: "det",
+		det: "det",
+		article: "art",
+		suffix: "suffix",
+		prefix: "prefix",
+		counter: "counter",
+		expression: "phrase",
+		phrase: "phrase",
+		idiom: "idiom",
+		contraction: "contr"
+	};
+	if (short[p]) return short[p];
+	const end = Object.entries(short).find(
+		([k]) => p.endsWith(` ${k}`) || p.endsWith(`-${k}`)
+	);
+	return end ? p.slice(0, p.length - end[0].length) + end[1] : p;
 }
 
 export interface WordProfile {
@@ -833,6 +879,7 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 		pWords && pMeaning ? { words: pWords, meaning: pMeaning } : undefined;
 	const watch = text(r.watch, MAX.watch);
 	const lang = text(r.lang, 12);
+	const pos = text(r.pos, 24);
 	const partial = r.partial === true;
 	return {
 		meaning,
@@ -845,6 +892,7 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 		...(here ? { here } : {}),
 		...(watch ? { watch } : {}),
 		...(lang ? { lang } : {}),
+		...(pos ? { pos } : {}),
 		...(partial ? { partial } : {})
 	};
 }
@@ -1168,8 +1216,8 @@ export function buildWordCardMessages(
 		`that changes its meaning, a form learners get wrong, or a ` +
 		`look-alike ${watchLang} word it gets mixed up with. In French, for ` +
 		`"disposant": "disposer de" is to have at hand, plain "disposer" is ` +
-		`to arrange; the -ant form never agrees ("disposante" is wrong); ` +
-		`not "déposer" or "proposer". Never compare it with English. Say nothing the facts ` +
+		`to arrange; not "déposer" or "proposer". Never a general grammar ` +
+		`rule the word merely follows (endings, agreement). Never compare it with English. Say nothing the facts ` +
 		`already say. Most words have none: then leave it out.\n` +
 		`Checklist:\n${checklist}` +
 		(opts.dictionary
