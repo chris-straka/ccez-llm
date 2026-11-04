@@ -219,6 +219,24 @@ describe("markdown rendering", () => {
 	});
 });
 
+describe("model HTML that could fool or restyle the app", () => {
+	const html = (md: string) => renderMessage(md, false).html;
+	it("drops style sheets, forms and fields, keeps a task list's checkbox", () => {
+		const out = html(
+			'<style>body{display:none}</style><form action="https://x"><input type="password"><textarea></textarea></form>\n\n- [x] done'
+		);
+		expect(out).not.toMatch(/<style|<form|<textarea|password|action=/);
+		expect(out).toMatch(/type="checkbox"/);
+	});
+	it("drops ids and styles that pin something over the app", () => {
+		const out = html(
+			'<div id="app" style="position:fixed;inset:0">Enter your key</div> <span style="color:red">red</span>'
+		);
+		expect(out).not.toMatch(/id="app"|position/);
+		expect(out).toMatch(/color:\s*red/);
+	});
+});
+
 describe("sent-message tags", () => {
 	const img: AttachTagModel = {
 		id: "img-1",

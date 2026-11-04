@@ -397,7 +397,26 @@ export function sanitize(dirty: string): string {
 		// Non-DOM context (SSR/prerender): escape everything, no markup.
 		return `<p dir="auto">${escapeHtml(dirty)}</p>`;
 	}
-	purifier ??= DOMPurify(window);
+	if (!purifier) {
+		purifier = DOMPurify(window);
+		// A reply is text to read: no checkbox but a task list's, and no
+		// inline style that pins something over the app (a fake "enter
+		// your key" box).
+		purifier.addHook("uponSanitizeElement", (node, data) => {
+			if (
+				data.tagName === "input" &&
+				(node as Element).getAttribute("type") !== "checkbox"
+			)
+				node.parentNode?.removeChild(node);
+		});
+		purifier.addHook("uponSanitizeAttribute", (_node, data) => {
+			if (
+				data.attrName === "style" &&
+				/position\s*:\s*(fixed|absolute|sticky)|z-index/i.test(data.attrValue)
+			)
+				data.keepAttr = false;
+		});
+	}
 	return resolveBidi(
 		purifier.sanitize(dirty, {
 			ADD_TAGS: ["details", "summary", "button", "ruby", "rt", "rp"],
@@ -417,7 +436,10 @@ export function sanitize(dirty: string): string {
 				"data-paste-fold",
 				"type",
 				"dir"
-			]
+			],
+			// A reply restyling the app or asking for anything: never.
+			FORBID_TAGS: ["style", "form", "textarea", "select", "option"],
+			FORBID_ATTR: ["id", "name", "action", "formaction"]
 		})
 	);
 }
