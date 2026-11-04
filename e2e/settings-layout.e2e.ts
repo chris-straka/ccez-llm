@@ -79,6 +79,32 @@ test.describe("desktop window", () => {
 		}
 	});
 
+	test("the big-word reader is a switch: its ways only while it's on", async ({
+		page
+	}) => {
+		const sw = page.getByRole("switch", { name: "Big-word reader" });
+		const ways = page.getByRole("radiogroup", { name: "How it moves on" });
+		await sw.scrollIntoViewIfNeeded();
+		await expect(sw).toHaveAttribute("aria-checked", "true");
+		await page.getByRole("radio", { name: "Tap for next" }).click();
+		await page.waitForTimeout(250);
+		await page
+			.locator(".reader-setting")
+			.screenshot({ path: ".screenshots/reader-switch-on.png" });
+		await sw.click();
+		await expect(sw).toHaveAttribute("aria-checked", "false");
+		await expect(ways).toHaveCount(0);
+		await page.waitForTimeout(250);
+		await page
+			.locator(".reader-setting")
+			.screenshot({ path: ".screenshots/reader-switch-off.png" });
+		// Back on: the way it had.
+		await sw.click();
+		await expect(
+			page.getByRole("radio", { name: "Tap for next" })
+		).toHaveAttribute("aria-checked", "true");
+	});
+
 	test("stacked rows put the control under the name", async ({ page }) => {
 		for (const name of ["My msg color", "Enable"]) {
 			const parts = await rowParts(page, name);
