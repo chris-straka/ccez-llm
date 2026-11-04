@@ -66,8 +66,8 @@ test.describe("desktop window", () => {
 			"Big-word reader",
 			"Color scheme",
 			"Thinking level",
-			"Fold older messages",
-			"Message buttons on hover"
+			"Fold older msgs",
+			"Msg buttons on hover"
 		]) {
 			const parts = await rowParts(page, name);
 			expect(parts, name).not.toBeNull();
@@ -80,7 +80,7 @@ test.describe("desktop window", () => {
 	});
 
 	test("stacked rows put the control under the name", async ({ page }) => {
-		for (const name of ["My message color", "Enable"]) {
+		for (const name of ["My msg color", "Enable"]) {
 			const parts = await rowParts(page, name);
 			expect(parts, name).not.toBeNull();
 			expect(parts!.control.top, name).toBeGreaterThanOrEqual(

@@ -195,6 +195,7 @@
 		<h2 id="updates-heading">Updates</h2>
 		<button
 			type="button"
+			class="row-go"
 			onclick={() => void checkUpdates()}
 			disabled={checkingUpdate}
 		>

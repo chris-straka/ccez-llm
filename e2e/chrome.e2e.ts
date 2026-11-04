@@ -162,7 +162,7 @@ test("double-click closes the settings panel", async ({ page }) => {
 	// nothing and closes nothing (it toggles the box twice).
 	await openSettings(page);
 	await expect(panel).not.toHaveClass(/closed/);
-	await panel.getByText("Background on my messages").dblclick();
+	await panel.getByText("Background on my msgs").dblclick();
 	await expect(panel).not.toHaveClass(/closed/);
 });
 
@@ -831,7 +831,7 @@ test("page background stays opaque", async ({ page }) => {
 });
 
 /** Message buttons track text size outright (85% of message size);
-"Scale message icons with text size" grows only the icon glyphs,
+"Scale msg icons with text size" grows only the icon glyphs,
 live: toggling the checkbox applies on the spot — no reload, no save. */
 test("scale icons with text size applies immediately", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
@@ -861,7 +861,7 @@ test("scale icons with text size applies immediately", async ({ page }) => {
 	expect(await px()).toBeGreaterThan(16);
 	await page.keyboard.press("Meta+,");
 	const check = page.locator(
-		'.settings-panel label:has-text("Scale message icons with text size") input'
+		'.settings-panel label:has-text("Scale msg icons with text size") input'
 	);
 	await expect(check).toBeVisible({ timeout: 5_000 });
 	// Deterministic baseline first: the opt-in ships on by default.
@@ -1136,7 +1136,7 @@ test("message buttons scale with text size when enabled", async ({ page }) => {
 		.locator("article.assistant .actions .icon-btn .action-glyph")
 		.first();
 	const opt = page.locator(
-		'.settings-panel label:has-text("Scale message icons with text size") input'
+		'.settings-panel label:has-text("Scale msg icons with text size") input'
 	);
 	// Deterministic states, not a toggle: the opt-in ships on by default.
 	await opt.uncheck();

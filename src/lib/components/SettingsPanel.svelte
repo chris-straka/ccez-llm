@@ -122,6 +122,26 @@
 	);
 	let navEl: HTMLElement | undefined = $state();
 	let current = $state<SectionId>("reading");
+	// The tab for the section in view stays in sight on a narrow sheet
+	// (Model was cut off at the end of the row).
+	$effect(() => {
+		const tab = navEl?.querySelector<HTMLElement>(
+			`button[aria-current="true"]`
+		);
+		void current;
+		// The strip alone scrolls (scrollIntoView would also move the
+		// page and cut short the jump to the section).
+		const nav = navEl;
+		if (!tab || !nav) return;
+		const left = tab.offsetLeft - nav.offsetLeft;
+		if (left < nav.scrollLeft)
+			nav.scrollTo({ left: left - 8, behavior: "smooth" });
+		else if (left + tab.offsetWidth > nav.scrollLeft + nav.clientWidth)
+			nav.scrollTo({
+				left: left + tab.offsetWidth - nav.clientWidth + 8,
+				behavior: "smooth"
+			});
+	});
 	function scroller(): HTMLElement | null {
 		return navEl?.closest<HTMLElement>(".settings-panel") ?? null;
 	}
@@ -130,15 +150,17 @@
 		const box = scroller();
 		if (!target || !box || !navEl) return;
 		current = id;
-		const top =
-			target.getBoundingClientRect().top -
-			box.getBoundingClientRect().top +
-			box.scrollTop -
-			coverHeight();
 		const reduce = window.matchMedia?.(
 			"(prefers-reduced-motion: reduce)"
 		).matches;
-		box.scrollTo({ top, behavior: reduce || instant ? "auto" : "smooth" });
+		// The browser places it, under the tab bar: rect maths against
+		// scrollTop overshot under the interface size's zoom (the jump
+		// to Chat landed past it at 130%).
+		target.style.scrollMarginTop = `${coverHeight()}px`;
+		target.scrollIntoView({
+			block: "start",
+			behavior: reduce || instant ? "auto" : "smooth"
+		});
 	}
 	/** Nothing sends without a key, so an opening that lacks one
 	starts on the key field instead of Reading. */
@@ -275,15 +297,19 @@
 		<h2 id="keys-heading">
 			{androidUI ? "Touch gestures" : "Keyboard shortcuts"}
 		</h2>
-		<button type="button" onclick={onShortcuts}>
-			{androidUI ? "Show all gestures" : "Shortcuts"}
+		<button type="button" class="row-go" onclick={onShortcuts}>
+			<span class="vh">{androidUI ? "Show all gestures" : "Shortcuts"}</span>
 		</button>
 	</section>
 	<UpdatesPanel {androidUI} {onToast} />
 	<section aria-labelledby="licenses-heading">
 		<h2 id="licenses-heading">Licenses</h2>
-		<button type="button" onclick={() => (licensesView.open = true)}>
-			Licenses
+		<button
+			type="button"
+			class="row-go"
+			onclick={() => (licensesView.open = true)}
+		>
+			<span class="vh">Licenses</span>
 		</button>
 	</section>
 </div>

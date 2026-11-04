@@ -327,7 +327,7 @@ test.describe("ios-voice", () => {
 		await expect(
 			page
 				.locator(".settings-panel")
-				.getByText("Show message buttons only when tapped")
+				.getByText("Show msg buttons only when tapped")
 		).toBeVisible();
 	});
 
@@ -339,13 +339,13 @@ test.describe("ios-voice", () => {
 		});
 		await expect(box.locator(".setting-label")).toHaveText("Messages");
 		await expect(
-			box.getByText("Show message buttons only when tapped")
+			box.getByText("Show msg buttons only when tapped")
 		).toBeVisible();
 		const enable = page.locator(".settings-panel .setting.toggles");
 		await expect(enable.locator(".setting-label")).toHaveText("Enable");
 		await expect(enable.getByText("Haptic feedback")).toBeVisible();
 		await expect(
-			page.locator("#settings-look").getByText("Background on my messages")
+			page.locator("#settings-look").getByText("Background on my msgs")
 		).toBeVisible();
 	});
 

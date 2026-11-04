@@ -131,7 +131,7 @@ test("my message color swatch repaints own messages", async ({ page }) => {
 	});
 	await page.keyboard.press("Meta+,");
 	await page
-		.locator('.settings-panel [aria-label="My message color"]')
+		.locator('.settings-panel [aria-label="My msg color"]')
 		.getByRole("radio", { name: "Blue" })
 		.click();
 	await expect(page.locator("article.user .bubble").first()).toHaveCSS(
@@ -241,7 +241,7 @@ for (const t of THEMES) {
 		await page.keyboard.press("Meta+,");
 		await page
 			.locator(".settings-panel")
-			.getByText("Background on my messages")
+			.getByText("Background on my msgs")
 			.click();
 		await expect(page.locator("article.user .bubble").first()).toHaveCSS(
 			"background-color",

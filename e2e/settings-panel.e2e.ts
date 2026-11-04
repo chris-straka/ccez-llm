@@ -24,11 +24,11 @@ test("thinking pills fit on one line", async ({ page }) => {
 	expect(new Set(tops).size).toBe(1);
 });
 
-test("own-bubble toggle reads as Background on my messages, under Enable", async ({
+test("own-bubble toggle reads as Background on my msgs, under Enable", async ({
 	page
 }) => {
 	await expect(
-		page.locator(".settings-panel").getByText("Background on my messages")
+		page.locator(".settings-panel").getByText("Background on my msgs")
 	).toBeVisible();
 });
 
@@ -221,12 +221,12 @@ test("the desktop window shows no reading sample", async ({ page }) => {
 	await expect(page.locator(".settings-panel .reading-preview")).toHaveCount(0);
 });
 
-/** Background on my messages is a look, not a feature: it sits in Look. */
+/** Background on my msgs is a look, not a feature: it sits in Look. */
 test("own-bubble checkbox sits in the Look group", async ({ page }) => {
 	await expect(
 		page
 			.locator("#settings-look label.check")
-			.filter({ hasText: "Background on my messages" })
+			.filter({ hasText: "Background on my msgs" })
 	).toHaveCount(1);
 });
 
@@ -382,7 +382,7 @@ test("no hide-buttons checkbox on desktop", async ({ page }) => {
 	await expect(
 		page
 			.locator(".settings-panel")
-			.getByText("Show message buttons only when tapped")
+			.getByText("Show msg buttons only when tapped")
 	).toHaveCount(0);
 });
 
@@ -416,7 +416,7 @@ test("own-bubble switch keeps left alignment, background follows", async ({
 	await expect(bubble).toHaveCSS("text-align", "left");
 	await page
 		.locator(".settings-panel")
-		.getByText("Background on my messages")
+		.getByText("Background on my msgs")
 		.click();
 	await expect(bubble).toHaveCSS("background-color", "rgb(241, 241, 244)");
 	await expect(bubble).toHaveCSS("text-align", "left");

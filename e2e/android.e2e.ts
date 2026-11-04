@@ -2673,7 +2673,7 @@ test.describe("touch", () => {
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
 		const box = page.locator(
-			'label.check:has-text("Show message buttons only when tapped") input'
+			'label.check:has-text("Show msg buttons only when tapped") input'
 		);
 		await expect(box).toBeChecked();
 	});

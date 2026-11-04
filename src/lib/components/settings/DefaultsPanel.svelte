@@ -35,6 +35,9 @@
 	/** This model's thinking dial (native knob or prompt hints); hidden
 	 * when a single level exists. Recomputes from the model field, so a
 	 * newer/cheaper model id picks up its own dial as soon as it is typed. */
+	/** Short names, so every level fits one row on a phone (owner,
+	 * 2026-11-04: Max wrapped to a second line). */
+	const SHORT_LEVEL: Record<string, string> = { Minimal: "Min", Medium: "Med" };
 	const thinkingSupport = $derived(
 		thinkingFor(settings.activeProviderId, active.model)
 	);
@@ -72,7 +75,10 @@
 						role="radio"
 						aria-checked={thinkingId === option.id}
 						class:selected={thinkingId === option.id}
-						onclick={() => setThinking(option.id)}>{option.label}</button
+						aria-label={option.label}
+						title={option.label}
+						onclick={() => setThinking(option.id)}
+						>{SHORT_LEVEL[option.label] ?? option.label}</button
 					>
 				{/each}
 			</div>
@@ -80,10 +86,10 @@
 	{/if}
 	<!-- Older messages fold as newer ones arrive; a fold opened by
 	hand stays open. Both off by default. -->
-	<SettingRow name="Fold older messages">
+	<SettingRow name="Fold older msgs">
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.autoFoldOwn} />
-			<span>My messages</span>
+			<span>My msgs</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.autoFoldAssistant} />
@@ -94,7 +100,7 @@
 		<SettingRow name="Messages" layout="stacked">
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hideButtons} />
-				<span>Show message buttons only when tapped</span>
+				<span>Show msg buttons only when tapped</span>
 			</label>
 			<label class="check">
 				<input
@@ -152,14 +158,14 @@
 	{:else}
 		<!-- One row for both hover toggles: the label names the behavior once,
 		each box names whose buttons it covers. Desktop-only (this branch). -->
-		<SettingRow name="Message buttons on hover">
+		<SettingRow name="Msg buttons on hover">
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverUserActions} />
-				<span>My messages</span>
+				<span>My msgs</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverAssistantActions} />
-				<span>LLM messages</span>
+				<span>LLM msgs</span>
 			</label>
 		</SettingRow>
 		<SettingRow name="Enable" layout="stacked" class="toggles">

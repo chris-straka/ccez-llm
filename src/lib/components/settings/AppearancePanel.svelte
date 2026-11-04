@@ -150,12 +150,8 @@
 			{/each}
 		{/snippet}
 	</SettingRow>
-	<SettingRow name="My message color" layout="stacked">
-		<div
-			class="segmented swatches"
-			role="radiogroup"
-			aria-label="My message color"
-		>
+	<SettingRow name="My msg color" layout="stacked">
+		<div class="segmented swatches" role="radiogroup" aria-label="My msg color">
 			{#each OWN_INK_CHOICES as choice (choice)}
 				<button
 					type="button"
@@ -174,6 +170,6 @@
 	</SettingRow>
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.ownBubble} />
-		<span>Background on my messages</span>
+		<span>Background on my msgs</span>
 	</label>
 </section>

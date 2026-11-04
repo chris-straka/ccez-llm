@@ -1270,3 +1270,167 @@ line under the name, and a thumb-sized hit row. */
 .settings-inner .segmented.swatches button {
 	padding-inline: 0.55rem;
 }
+
+/* Whitespace, not boxes (owner, 2026-11-04: "rely on whitespace more").
+A section is its heading and its rows on the page itself: no card, no
+lines between rows; room between rows and more between sections does
+the grouping. */
+.settings-inner section {
+	padding: 2.2rem 0 0;
+}
+.settings-inner section > h2 {
+	margin: 0 0 0.4rem;
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+.settings-inner section[id^="settings-"] > :not(h2),
+.settings-inner .keys-updates > section {
+	min-height: 0;
+	padding: 0.85rem 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+}
+.settings-inner section[id^="settings-"] > h2 + *,
+.settings-inner section[id^="settings-"] > :last-child,
+.settings-inner section[id^="settings-"] > h2 + :last-child {
+	border-radius: 0;
+}
+/* The sample keeps its own panel: it's a picture of the chat. */
+.settings-inner section[id^="settings-"] > .reading-preview {
+	margin-bottom: 0.4rem;
+	border-radius: var(--set-radius);
+	background: var(--set-card);
+}
+.settings-inner .setting {
+	gap: 0.7rem 1rem;
+}
+
+/* Choices keep to one line (owner, 2026-11-04: Max and OpenCode Zen
+dropped to a second row): a row that scrolls sideways, its ends
+fading where more waits. */
+.settings-inner .segmented:not(.swatches) {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	scrollbar-width: none;
+	max-width: 100%;
+	padding-block: 2px;
+}
+.settings-inner .segmented::-webkit-scrollbar {
+	display: none;
+}
+/* Compact and sharing the row, so every choice shows at once; only
+when they can't all fit does the row scroll. */
+.settings-inner .segmented:not(.swatches) {
+	gap: 0.2rem;
+}
+.settings-inner .segmented:not(.swatches) button,
+.app[data-android] .settings-inner .segmented:not(.swatches) button {
+	flex: 1 1 0;
+	min-width: fit-content;
+	padding-inline: 0.45rem;
+	font-size: 0.86rem;
+}
+.settings-inner .provider-row {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.settings-inner .provider-row button {
+	flex: none;
+}
+
+/* Gestures, Updates, Licenses: rows like the rest, the whole row the
+button, a chevron at its end; no boxed buttons (owner, 2026-11-04). */
+.settings-inner .keys-updates {
+	margin-top: 2.2rem;
+	border-radius: 0;
+	overflow: visible;
+}
+.settings-inner .keys-updates > section {
+	position: relative;
+	flex-wrap: nowrap;
+	padding: 0.95rem 0;
+}
+.settings-inner .keys-updates > section + section {
+	border-top: 0;
+}
+.settings-inner .keys-updates > section > h2 {
+	margin: 0;
+	font-size: 0.95rem;
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--ink);
+}
+.settings-inner .keys-updates > section > button.row-go {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+.settings-inner .keys-updates > section > button.row-go::after {
+	content: "›";
+	font-size: 1.3em;
+	line-height: 1;
+	color: var(--muted);
+}
+/* The whole row takes the tap. */
+.settings-inner .keys-updates > section > button.row-go::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+.settings-inner .keys-updates > section > button.row-go:hover {
+	color: var(--ink);
+}
+.settings-inner .vh {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* The tab bar: solid up to the screen's top edge on phones, so nothing
+scrolls behind the clock above it. The tab for the section in view
+scrolls into sight (SettingsPanel). */
+.settings-inner .settings-nav {
+	box-shadow: 0 calc(-1 * env(safe-area-inset-top, 0px) - 1.2rem) 0 0
+		var(--bg-chrome);
+	border-bottom: 0;
+}
+
+/* Steppers on one edge: on a narrow sheet each sits under its name,
+right-aligned, with Reset before it, never some beside and some under
+(the mix read as ragged); wide, beside. */
+@container (max-width: 30rem) {
+	/* Phone: every row the same shape, the name, then its control under
+	it on the same left edge; choices span the row. */
+	.settings-inner .setting > .setting-label {
+		flex-basis: 100%;
+	}
+	.settings-inner .setting > .setting-control {
+		flex: 1 1 100%;
+		justify-content: flex-start;
+		margin-left: 0;
+	}
+	.settings-inner .setting-below > .segmented {
+		justify-content: flex-start;
+	}
+	.settings-inner .setting > .setting-control > .segmented:not(.swatches) {
+		flex: 1 1 100%;
+	}
+	.settings-inner .stepper-setting .setting-reset {
+		order: 2;
+	}
+}

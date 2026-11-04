@@ -58,7 +58,7 @@ is a stepper. -->
 		onChange={(v: number) => (settings.lineHeight = v)}
 	/>
 	<Stepper
-		label="Gap between messages"
+		label="Gap between msgs"
 		ariaLabel="Gap size in rem"
 		value={settings.messageGap ?? MESSAGE_GAP_DEFAULT}
 		ladder={MESSAGE_GAP_LADDER}
@@ -91,6 +91,6 @@ is a stepper. -->
 	/>
 	<label class="check">
 		<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
-		<span>Scale message icons with text size</span>
+		<span>Scale msg icons with text size</span>
 	</label>
 </section>

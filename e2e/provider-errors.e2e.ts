@@ -273,7 +273,7 @@ test("row error text scales only with the button opt-in", async ({ page }) => {
 	expect(await px()).toBeLessThan(14);
 	await page.keyboard.press("Meta+,");
 	const check = page.locator(
-		'.settings-panel label:has-text("Scale message icons with text size") input'
+		'.settings-panel label:has-text("Scale msg icons with text size") input'
 	);
 	await expect(check).toBeVisible({ timeout: 5_000 });
 	await check.check();
