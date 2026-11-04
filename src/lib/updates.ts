@@ -100,7 +100,7 @@ export interface LatestApk {
 
 /**
  * Newest release APK newer than `currentVersion`, or null when up to
- * date. Throws when the check fails or the release has no APK. Fetch
+ * date. Throws when the check fails or a newer release has no APK. Fetch
  * is injected so tests run without a network. Pure-logic wrapper.
  */
 export async function fetchLatestApk(
@@ -119,9 +119,11 @@ export async function fetchLatestApk(
 	const assets = Array.isArray(body.assets)
 		? (body.assets as ReleaseAsset[])
 		: [];
-	const url = pickApkAsset(assets);
-	if (!tag || !url) throw new Error("this release has no APK yet");
+	if (!tag) throw new Error("no release found");
+	// Up to date says so even while the newest release's APK uploads.
 	if (compareVersions(tag, currentVersion) <= 0) return null;
+	const url = pickApkAsset(assets);
+	if (!url) throw new Error("this release has no APK yet");
 	return { version: tag, url };
 }
 
@@ -368,6 +370,8 @@ export async function runAndroidOneTap(
 		);
 	} catch (error) {
 		deps.say(`Installer did not start: ${errorText(error)}`);
+		// The file may be gone or broken: the next tap checks again.
+		return null;
 	}
 	return path;
 }

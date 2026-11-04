@@ -46,9 +46,9 @@
 		if (onToast) onToast(message);
 		else updateStatus = message;
 	}
-	/** A downloaded APK ready to install (the background check's, or the
-	last tap's when its installer was dismissed). */
-	let apkPath = $state<string | null>(readyApk.path || null);
+	/* A downloaded APK ready to install is readyApk.path, shared with the
+	background check: the panel is mounted before that check is done,
+	and a copy taken then never saw its download. */
 	async function checkUpdates() {
 		if (updatePhase.stage !== "idle") return;
 		const route = updateRoute;
@@ -108,20 +108,21 @@
 	 */
 	async function androidUpdate(): Promise<void> {
 		updatePhase = { stage: "checking" };
-		const { invoke } = await import("@tauri-apps/api/core");
-		const { listen } = await import("@tauri-apps/api/event");
-		const unlisten = await listen<{ received: number; total: number | null }>(
-			"update-download-progress",
-			(event) => {
-				updatePhase = {
-					stage: "downloading",
-					received: event.payload.received,
-					total: event.payload.total
-				};
-			}
-		);
+		let unlisten: (() => void) | undefined;
 		try {
-			apkPath = await runAndroidOneTap({
+			const { invoke } = await import("@tauri-apps/api/core");
+			const { listen } = await import("@tauri-apps/api/event");
+			unlisten = await listen<{ received: number; total: number | null }>(
+				"update-download-progress",
+				(event) => {
+					updatePhase = {
+						stage: "downloading",
+						received: event.payload.received,
+						total: event.payload.total
+					};
+				}
+			);
+			const path = await runAndroidOneTap({
 				currentVersion: async () => {
 					const { getVersion } = await import("@tauri-apps/api/app");
 					return getVersion();
@@ -136,17 +137,22 @@
 					return invoke<string>("update_install_apk", { path });
 				},
 				say: sayUpdate,
-				ready: apkPath
+				ready: readyApk.path || null
 			});
+			readyApk.path = path ?? "";
+		} catch (error) {
+			sayUpdate(
+				`Couldn't check for updates: ${error instanceof Error ? error.message : String(error)}`
+			);
 		} finally {
-			unlisten();
+			unlisten?.();
 			updatePhase = { stage: "idle" };
 		}
 	}
 	/** Android button: check, download the found version, or install. */
 	function androidButtonLabel(): string {
 		if (updatePhase.stage !== "idle") return updateButtonLabel(updatePhase);
-		if (apkPath) return "Install update";
+		if (readyApk.path) return "Install update";
 		return "Check for updates";
 	}
 </script>
