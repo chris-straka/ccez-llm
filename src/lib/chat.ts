@@ -1431,6 +1431,26 @@ export async function streamAssistantReply(
 			m.id === replyId ? { ...m, ...patch } : m
 		);
 	};
+	// Tokens shown once a frame: each show renders the whole reply
+	// (markdown, sanitizer, bidi), so one per token grew with the
+	// square of a long answer. No frames (tests, a hidden page): at once.
+	let frame = 0;
+	const showStreamed = () => {
+		if (frame) return;
+		if (
+			typeof requestAnimationFrame !== "function" ||
+			(typeof document !== "undefined" && document.visibilityState === "hidden")
+		)
+			return replaceReply({ content: streamed });
+		frame = requestAnimationFrame(() => {
+			frame = 0;
+			replaceReply({ content: streamed });
+		});
+	};
+	const dropFrame = () => {
+		if (frame) cancelAnimationFrame(frame);
+		frame = 0;
+	};
 	try {
 		// Roll the summary forward before the send (no-op unless
 		// overflow awaits a fold). Inside the try so a stop during
@@ -1463,9 +1483,12 @@ export async function streamAssistantReply(
 					if (streamed === "" && token !== "") {
 						markReplyStarted(state, chatId);
 						opts.onFirstToken?.();
+						streamed += token;
+						replaceReply({ content: streamed });
+					} else {
+						streamed += token;
+						showStreamed();
 					}
-					streamed += token;
-					replaceReply({ content: streamed });
 					if (token !== "") opts.onToken?.();
 				},
 				// Tool round: the streamed prefix was provisional —
@@ -1473,14 +1496,17 @@ export async function streamAssistantReply(
 				// lands, then the final round streams fresh.
 				onRoundRetract: () => {
 					streamed = "";
+					dropFrame();
 					replaceReply({ content: "" });
 					unmarkReplyStarted(state, chatId);
 				}
 			},
 			{ signal: controller.signal, thinking: opts.thinking }
 		);
+		dropFrame();
 		replaceReply({ content: result.content, usage: result.usage });
 	} catch (error) {
+		dropFrame();
 		if (cancelledSends.has(controller)) {
 			// Stopped by the user: keep what streamed as a plain reply,
 			// or drop the placeholder when nothing did.
