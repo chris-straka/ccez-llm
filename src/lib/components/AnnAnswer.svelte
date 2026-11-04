@@ -63,6 +63,10 @@ where it was left. -->
 		/** Save or unsave the quote as a card; absent hides the icon
 		 * (flashcards off). */
 		onToggleSave?: (() => void) | undefined;
+		/** The word is learning in the shared word list (the star fills). */
+		starred?: boolean;
+		/** Star or unstar the word in the shared word list; absent hides it. */
+		onToggleStar?: (() => void) | undefined;
 		/** Replies argued under the answer, oldest first. */
 		thread?: AnnotationFollowUp[];
 		/** The one-word answer as a word card; renders in place of the
@@ -91,6 +95,8 @@ where it was left. -->
 		badgeId,
 		saved = false,
 		onToggleSave,
+		starred,
+		onToggleStar,
 		thread = [],
 		wordCard,
 		onReply,
@@ -632,7 +638,7 @@ where it was left. -->
 			{/if}
 		</form>
 	{/if}
-	{#if onToggleSave || (onReply && replyButton)}
+	{#if onToggleSave || onToggleStar || (onReply && replyButton)}
 		<!-- Save and Reply hang outside the card, on the side away from
 		the word, so they add no layout to the note. -->
 		<div
@@ -641,6 +647,30 @@ where it was left. -->
 			bind:offsetHeight={actionsH}
 			bind:offsetWidth={actionsW}
 		>
+			{#if onToggleStar}
+				<!-- The shared word list (ccez-tube, ccez-lang): learning. -->
+				<button
+					type="button"
+					class="ann-answer-star"
+					class:on={starred}
+					aria-pressed={starred ?? false}
+					aria-label={starred
+						? "Learning · remove from my words"
+						: "Add to my words"}
+					title={starred ? "Learning · click to remove" : "Add to my words"}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={(e) => {
+						e.stopPropagation();
+						onToggleStar();
+					}}
+				>
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><path
+							d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"
+						/></svg
+					>
+				</button>
+			{/if}
 			{#if onToggleSave}
 				<button
 					type="button"
@@ -725,7 +755,8 @@ where it was left. -->
 		transition: color 120ms ease;
 	}
 	/* Reply is an icon alone (phones). */
-	.ann-answer-actions .ann-answer-reply {
+	.ann-answer-actions .ann-answer-reply,
+	.ann-answer-actions .ann-answer-star {
 		padding: 0.3em 0.75em;
 	}
 	.ann-answer-actions button:hover,
@@ -742,7 +773,8 @@ where it was left. -->
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	.ann-answer-save.on svg {
+	.ann-answer-save.on svg,
+	.ann-answer-star.on svg {
 		fill: currentColor;
 	}
 	@media (prefers-reduced-motion: reduce) {

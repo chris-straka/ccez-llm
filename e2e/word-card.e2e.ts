@@ -85,6 +85,7 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 			JSON.stringify({
 				meaning: "students at a lycée",
 				pos: "noun",
+				lang: "fr",
 				parts: [
 					{ text: "lycéen", label: "lycéen", kind: "core" },
 					{ text: "s", label: "plural", kind: "agree" }
@@ -108,6 +109,22 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 	await expect(card.locator(".k-core .wc-gender")).toHaveText("m.");
 	// Its kind, a small tag top right (as ccez-tube's card).
 	await expect(card.locator(".wc-pos")).toHaveText("n");
+	// The star: learning in the shared word list, by its base form.
+	const star = page.locator(".ann-answer-star");
+	await expect(star).toHaveAttribute("aria-pressed", "false");
+	await star.click();
+	await expect(star).toHaveAttribute("aria-pressed", "true");
+	await page.screenshot({ path: ".screenshots/word-card-star.png" });
+	await expect
+		.poll(
+			() =>
+				(
+					page as unknown as {
+						wordsPosted: Array<{ word: string; status: string }>;
+					}
+				).wordsPosted
+		)
+		.toMatchObject([{ lang: "fr", word: "lycéen", status: "learning" }]);
 	await card.screenshot({ path: "test-results/word-card-pos.png" });
 	await expect(card.locator(".wc-fact")).toHaveCount(0);
 	await expect(card.locator(".wc-ghost")).toHaveCount(0);

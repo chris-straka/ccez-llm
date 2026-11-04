@@ -591,6 +591,8 @@
 		type ReaderState
 	} from "$lib/reader";
 	import { FlashcardsMode } from "$lib/flashcards-mode.svelte";
+	import { WordList } from "$lib/wordList.svelte";
+	import { listWord } from "$lib/word-card";
 	import {
 		isKeyboardOpen,
 		kbFreshOpen,
@@ -2847,6 +2849,8 @@
 	}
 	let shortcutsOpen = $state(false);
 	/** Flashcards: sitting, schedule, and export (see flashcards-mode). */
+	/** The shared word list (ccez-words): a word card's star. */
+	const wordList = new WordList();
 	const flashcards = new FlashcardsMode({
 		getChats: () => chatState.chats,
 		draftsFor: (id) => drafts.draftsFor(id),
@@ -10036,6 +10040,8 @@
 	}
 
 	onMount(() => {
+		// What other apps starred or knew since last time.
+		void wordList.sync();
 		// A failed save keeps working in memory: say so once per
 		// kind, before a relaunch loses what didn't save.
 		const saveWarned: string[] = [];
@@ -10740,6 +10746,14 @@
 									selectWordAtPoint(ended.clientX, ended.clientY);
 								}
 							} else selectWordAtPoint(ended.clientX, ended.clientY);
+							// The word annotated too (owner, 2026-11-04), once
+							// no third tap turns the run into a sentence pick.
+							const run = msgTapSeq;
+							setTimeout(() => {
+								if (msgTapSeq !== run || window.getSelection()?.isCollapsed)
+									return;
+								annotateMode.annotateTappedWord();
+							}, 420);
 						}
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
@@ -15610,6 +15624,21 @@
 				saved={flashcards.isSaved(answered.quote)}
 				onToggleSave={settings.flashcardsEnabled
 					? () => flashcards.toggleSaved(answered.quote)
+					: undefined}
+				starred={answered.card?.lang
+					? wordList.status(
+							answered.card.lang,
+							listWord(answered.card, answered.quote)
+						) === "learning"
+					: false}
+				onToggleStar={answered.card?.lang
+					? () => {
+							const c = answered.card!;
+							void wordList.toggleLearning(
+								c.lang!,
+								listWord(c, answered.quote)
+							);
+						}
 					: undefined}
 				thread={answered.thread ?? []}
 				wordCard={answered.card}

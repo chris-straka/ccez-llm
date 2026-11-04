@@ -1234,3 +1234,13 @@ export function buildWordCardMessages(
 		}
 	];
 }
+
+/**
+ * The word a card stands for in the shared word list: its base form
+ * where the card names one (fragilisant: fragiliser), else the quote.
+ */
+export function listWord(card: WordCard, quote: string): string {
+	const cores = card.parts.filter((p) => p.kind === "core");
+	const base = cores.length === 1 ? cores[0]!.label.trim() : "";
+	return base && !/\s/.test(base) ? base : quote.trim();
+}

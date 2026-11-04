@@ -44,7 +44,8 @@ A chat app for language learners: bring your own API key, chat with the model, a
 - Delete this chat: Three-finger hold
 
 ### Selected text
-- Select a word: Double-tap · long-press
+- Annotate a word: Double-tap
+- Select a word: Long-press
 - Annotate: Select text, then Annotate
 - Copy: Select text, then Copy
 - Speak: Select text, then Speak

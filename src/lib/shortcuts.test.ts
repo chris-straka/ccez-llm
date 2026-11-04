@@ -284,6 +284,7 @@ describe("shortcuts menu copy", () => {
 			[
 				"Selected text",
 				[
+					"Annotate a word",
 					"Select a word",
 					"Annotate",
 					"Copy",

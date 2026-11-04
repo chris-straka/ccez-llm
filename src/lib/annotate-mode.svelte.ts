@@ -537,6 +537,44 @@ export class AnnotateMode {
 		window.getSelection()?.removeAllRanges();
 	}
 
+	/**
+	 * A word double-tapped on a phone (owner, 2026-11-04): annotated at
+	 * once, its word card asked for, or where the word already has an
+	 * answered note, that note's card opened instead of a second one.
+	 */
+	annotateTappedWord(): void {
+		this.placeSelMenu();
+		const menu = this.selMenu;
+		if (!menu?.quote.trim()) return;
+		const quote = menu.quote.trim();
+		const at = menu.messageId
+			? this.occurrenceFromSelection(menu.messageId, quote, menu.range)
+			: 0;
+		const dupe = duplicateAnnotationId(
+			this.deps.getAnnotations(),
+			{
+				...(menu.messageId ? { messageId: menu.messageId } : {}),
+				...(menu.story ? { story: menu.story } : {})
+			},
+			quote,
+			at,
+			menu.messageId && this.deps.isAidPinned(menu.messageId)
+				? ("tashkeel" as const)
+				: undefined
+		);
+		const existing = dupe
+			? this.deps.getAnnotations().find((a) => a.id === dupe)
+			: undefined;
+		if (existing && existing.answer !== undefined) {
+			this.selMenu = null;
+			this.clearSelection();
+			this.openBadge(existing.id);
+			return;
+		}
+		this.annotate("", true);
+		this.selMenu = null;
+	}
+
 	/** Annotate at the cursor: the comment pill opens where the selection
 	was — never down in the composer. Enter saves, Escape cancels. The
 	annotation stays pending (no badge, no count) until submit. */
