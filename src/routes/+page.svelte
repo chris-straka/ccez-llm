@@ -15269,7 +15269,8 @@
 					listenMode.close();
 					startMusicChat(chatState, chat.id);
 				},
-				source: listenBackend(),
+				// No music on Android (owner, 2026-11-04): no button there.
+				source: androidUI ? null : listenBackend(),
 				pick: (song: Song) => {
 					setMusicSong(chatState, chat.id, song);
 					void music.play(song, chat.id);

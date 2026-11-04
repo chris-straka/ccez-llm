@@ -221,3 +221,22 @@ test("double-clicking right of the music player opens Settings", async ({
 	await page.mouse.dblclick(1150, 420);
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 });
+
+test.describe("on Android", () => {
+	test.use({
+		hasTouch: true,
+		userAgent:
+			"Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+		viewport: { width: 412, height: 915 }
+	});
+
+	test("there is no music button", async ({ page }) => {
+		await seedChat(page, []);
+		await mockMusicShell(page);
+		await page.goto("/");
+		await expect(page.locator(".lang-menus")).toBeVisible({ timeout: 60_000 });
+		// The desktop's button shows by now (the tests above); none here.
+		await page.waitForTimeout(1500);
+		await expect(page.getByRole("tab", { name: "Music" })).toHaveCount(0);
+	});
+});
