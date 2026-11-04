@@ -10669,6 +10669,9 @@
 						if (emptyTapTimer) {
 							clearTimeout(emptyTapTimer);
 							emptyTapTimer = null;
+							// The first tap focused the prompt at once: the
+							// switcher takes over, the keyboard goes.
+							editor?.blur();
 						}
 						// Dead-space double-tap opens the quick switcher
 						// (the list keeps its swipe and button openers).
@@ -10676,9 +10679,9 @@
 						return;
 					}
 					// Single tap on the dead space of an empty new chat
-					// focuses the composer (phones have no i key). Fired
-					// past the double-tap window so the opener above wins
-					// the pair; chats with messages keep tap-to-peace. A
+					// focuses the composer (phones have no i key), at once;
+					// a second tap inside the window opens the switcher
+					// instead; chats with messages keep tap-to-peace. A
 					// tap that dismisses the keyboard never re-arms: the
 					// prompt had focus when the stroke began, so this tap
 					// is the way out, not the way in. Dismissal taps
@@ -10695,11 +10698,15 @@
 						openLangMenu === null &&
 						settings.sidebarCollapsed
 					) {
+						// At once, inside the tap (owner, 2026-11-04: waiting out
+						// the double-tap window, then focusing from a timer, left
+						// the keyboard slow to come up). The timer only marks the
+						// window in which a second tap takes it back.
+						editor?.focus();
 						if (emptyTapTimer) clearTimeout(emptyTapTimer);
 						emptyTapTimer = setTimeout(() => {
 							emptyTapTimer = null;
-							editor?.focus();
-						}, 380);
+						}, 400);
 					}
 				}
 				// Message taps pair into runs (phones): double-tap stays

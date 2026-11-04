@@ -3220,10 +3220,11 @@ test.describe("always-visible prompt", () => {
 		await seedEmpty(page);
 		await page.goto("/");
 		await expect(page.locator(".prompt")).toBeVisible();
-		// Dead space below the hero: past the 380ms double-tap window
-		// the single tap lands the caret (a pair would open the list).
+		// Dead space below the hero: the caret lands at once, inside the
+		// tap (the keyboard came up slowly when it waited out the
+		// double-tap window first).
 		await flick(page, "main", 200, 600, 200, 601);
-		await expect(composer(page)).toBeFocused({ timeout: 5000 });
+		await expect(composer(page)).toBeFocused({ timeout: 150 });
 	});
 
 	/** A stroke starting on a message folds it either way, never summons. */
