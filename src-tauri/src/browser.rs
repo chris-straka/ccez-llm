@@ -14,15 +14,20 @@
 use serde::Serialize;
 
 /// A page started or finished loading: `{ id, url, done }`.
+#[cfg(desktop)]
 pub const LOAD_EVENT: &str = "browser-load";
 /// A page's title changed: `{ id, title }`.
+#[cfg(desktop)]
 pub const TITLE_EVENT: &str = "browser-title";
 /// A page asked for a new window (target=_blank, window.open): `{ id, url }`.
+#[cfg(desktop)]
 pub const NEW_TAB_EVENT: &str = "browser-new-tab";
 /// A download finished: `{ id, name, ok }`.
+#[cfg(desktop)]
 pub const DOWNLOAD_EVENT: &str = "browser-download";
 
 /// A tab's webview label. Ids come from the frontend: short, plain.
+#[cfg_attr(mobile, allow(dead_code))]
 fn label(id: &str) -> Result<String, String> {
     if id.is_empty() || id.len() > 32 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
     {
@@ -32,6 +37,7 @@ fn label(id: &str) -> Result<String, String> {
 }
 
 /// What a page may be: the web, and the blank page a new tab starts on.
+#[cfg_attr(mobile, allow(dead_code))]
 fn page_url(raw: &str) -> Result<tauri::Url, String> {
     let url = tauri::Url::parse(raw).map_err(|_| "not a URL".to_string())?;
     match url.scheme() {

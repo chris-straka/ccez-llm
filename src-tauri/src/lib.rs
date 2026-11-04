@@ -329,7 +329,6 @@ fn install_tls_provider() {
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Debug builds: scripts/drive.ts runs JavaScript in the window by
 /// emitting `drive-js` (through the MCP bridge's Rust-side emit), and
 /// the page answers here; the answer lands in a temp file the script
@@ -362,6 +361,7 @@ fn drive_result(id: String, value: serde_json::Value) -> Result<(), String> {
     std::fs::write(dir.join(format!("{id}.json")), value.to_string()).map_err(|e| e.to_string())
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_tls_provider();
     let builder = tauri::Builder::default()
