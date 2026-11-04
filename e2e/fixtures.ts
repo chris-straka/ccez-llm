@@ -32,24 +32,6 @@ export const test = base.extend<{ pageErrors: string[] }>({
 						configurable: true
 					});
 			});
-			// Never the owner's real word list (ccez-words on the tailnet):
-			// a spec that stars a word gets a stand-in that remembers it.
-			const words: unknown[] = [];
-			await page.route("https://z.tailfe37c2.ts.net:8448/**", async (route) => {
-				const req = route.request();
-				const cors = { "access-control-allow-origin": "*" };
-				if (req.method() === "POST") {
-					words.push(...(JSON.parse(req.postData() ?? "[]") as unknown[]));
-					return route.fulfill({ status: 204, headers: cors });
-				}
-				return route.fulfill({
-					status: 200,
-					headers: cors,
-					contentType: "application/json",
-					body: JSON.stringify({ words: [], seq: 0 })
-				});
-			});
-			(page as unknown as { wordsPosted: unknown[] }).wordsPosted = words;
 			const errors: string[] = [];
 			page.on("pageerror", (error) => {
 				if (!BENIGN.test(error.message)) errors.push(error.message);

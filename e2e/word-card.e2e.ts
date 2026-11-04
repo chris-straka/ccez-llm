@@ -79,6 +79,25 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Ce qui va changer pour les lycéens." }
 	]);
+	// A stand-in word list for the star (never the owner's real one).
+	const posted: Array<{ lang: string; word: string; status: string }> = [];
+	await page.route("https://words.test/**", async (route) => {
+		const req = route.request();
+		const cors = { "access-control-allow-origin": "*" };
+		if (req.method() === "POST") {
+			posted.push(...(JSON.parse(req.postData() ?? "[]") as typeof posted));
+			return route.fulfill({ status: 204, headers: cors });
+		}
+		return route.fulfill({
+			status: 200,
+			headers: cors,
+			contentType: "application/json",
+			body: JSON.stringify({ words: [], seq: 0 })
+		});
+	});
+	await page.addInitScript(() =>
+		localStorage.setItem("ccez-words-server", "https://words.test")
+	);
 	await page.addInitScript(() => {
 		localStorage.setItem(
 			"ccez-mock-reply",
@@ -116,14 +135,7 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 	await expect(star).toHaveAttribute("aria-pressed", "true");
 	await page.screenshot({ path: ".screenshots/word-card-star.png" });
 	await expect
-		.poll(
-			() =>
-				(
-					page as unknown as {
-						wordsPosted: Array<{ word: string; status: string }>;
-					}
-				).wordsPosted
-		)
+		.poll(() => posted)
 		.toMatchObject([{ lang: "fr", word: "lycéen", status: "learning" }]);
 	await card.screenshot({ path: "test-results/word-card-pos.png" });
 	await expect(card.locator(".wc-fact")).toHaveCount(0);

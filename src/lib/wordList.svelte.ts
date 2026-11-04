@@ -57,6 +57,13 @@ export class WordList {
 		private send: typeof fetch = (...a) => fetch(...a)
 	) {
 		if (typeof localStorage === "undefined") return;
+		// The browser tests' mock app never reaches the owner's real list:
+		// only a stand-in they name (ccez-words-server).
+		if (localStorage.getItem("ccez-mock-provider") === "1") {
+			const stand = localStorage.getItem("ccez-words-server");
+			if (stand) this.server = stand;
+			else this.send = () => Promise.reject(new Error("no word list in tests"));
+		}
 		const s = read();
 		this.statuses = s.statuses;
 		this.pending = s.pending;
