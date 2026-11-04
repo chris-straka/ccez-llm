@@ -339,3 +339,71 @@ test("a word's pieces stay on one row at phone width", async ({ page }) => {
 	);
 	expect(new Set(tops).size).toBe(1);
 });
+
+/** A long compound's pieces shrink to stay on one row at phone width
+(owner, 2026-11-04: Vorladungsbefugnisse sent "se" to a second line). */
+test("a long compound shrinks onto one row at phone width", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 360, height: 780 });
+	// At the owner's text size (170%), where it wrapped.
+	await seedChat(
+		page,
+		[
+			{
+				role: "assistant",
+				content: "Sie hätten dann Untersuchungs- und Vorladungsbefugnisse."
+			}
+		],
+		null,
+		{ fontScale: 1.7 }
+	);
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			"ccez-mock-reply",
+			JSON.stringify({
+				meaning: "subpoena powers",
+				parts: [
+					{
+						text: "Vorladungs",
+						label: "Vorladung",
+						kind: "core",
+						meaning: "summons"
+					},
+					{
+						text: "befugnis",
+						label: "Befugnis",
+						kind: "core",
+						meaning: "authority"
+					},
+					{ text: "se", label: "plural", kind: "agree" }
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 0, "Vorladungsbefugnisse");
+	await page.keyboard.press("a");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 10_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const pieces = page.locator(".ann-answer.placed .wc-piece");
+	await expect(pieces).toHaveText(["Vorladungs", "befugnis", "se"]);
+	await expect
+		.poll(
+			async () =>
+				new Set(
+					await pieces.evaluateAll((els) =>
+						els.map((e) => Math.round(e.getBoundingClientRect().top))
+					)
+				).size
+		)
+		.toBe(1);
+	await page.locator(".ann-answer.placed").screenshot({
+		path: ".screenshots/word-card-compound.png"
+	});
+});

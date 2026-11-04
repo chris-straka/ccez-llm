@@ -110,6 +110,46 @@ where it was left. -->
 	/** The word row without repeats (cardWordRow): pieces, the ghost
 	article, and the facts left for pills. */
 	const row = $derived(wordCard ? cardWordRow(wordCard, quote) : null);
+
+	/**
+	 * The word's pieces on one row (owner, 2026-11-04: a long compound
+	 * sent its last piece to a second line): drawn smaller, down to two
+	 * thirds, until they fit the card; only a word longer than that wraps.
+	 */
+	function fitRow(el: HTMLElement, _key: string) {
+		let last = -1;
+		const fit = (): void => {
+			const card = el.closest<HTMLElement>(".wc");
+			if (!card) return;
+			// Measured at full size on one row: the card then stands as wide
+			// as it may, so the room read is its most, never a width this
+			// fit itself made (no shrinking loop).
+			el.style.fontSize = "";
+			el.style.flexWrap = "nowrap";
+			el.style.width = "max-content";
+			const natural = el.scrollWidth;
+			const room = card.clientWidth;
+			el.style.width = "";
+			el.style.flexWrap = "";
+			last = room;
+			if (natural > room && room > 0)
+				el.style.fontSize = `${Math.max(0.66, (room - 1) / natural)}em`;
+		};
+		fit();
+		const watch =
+			typeof ResizeObserver === "undefined"
+				? null
+				: new ResizeObserver(() => {
+						const card = el.closest<HTMLElement>(".wc");
+						if (card && Math.abs(card.clientWidth - last) > 1) fit();
+					});
+		const card = el.closest(".wc");
+		if (card) watch?.observe(card);
+		return {
+			update: () => fit(),
+			destroy: () => watch?.disconnect()
+		};
+	}
 	const cardWord = $derived(row?.parts ?? []);
 	const cardReadings = $derived(cardWord.some((p) => p.reading));
 	/** Each Han character of the word with its parts (radical marked). */
@@ -440,7 +480,11 @@ where it was left. -->
 				{#if cardWord.length > 0 || wordCard.construction}
 					<div class="wc-top">
 						{#if cardWord.length > 0}
-							<div class="wc-word" dir={wordCardDir(wordCard.lang)}>
+							<div
+								class="wc-word"
+								dir={wordCardDir(wordCard.lang)}
+								use:fitRow={cardWord.map((p) => p.text).join("|")}
+							>
 								{#if row?.article}
 									<!-- The article in ghost: it shows the gender without a
 									pill repeating the word. -->
