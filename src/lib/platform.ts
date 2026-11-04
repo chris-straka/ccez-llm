@@ -468,6 +468,38 @@ export interface TapSequence {
 	y: number;
 }
 
+/** How long a double-tap's word waits for a third tap before it's annotated (ms). */
+export const WORD_TAP_SETTLE_MS = 420;
+
+/**
+ * A phone double-tap on message text (owner, 2026-11-04): the word it
+ * picked is annotated once the run has settled, unless a third tap has
+ * since made it a sentence pick or the pick is gone. Pure.
+ */
+export function annotateTappedWordNow(
+	run: TapSequence | null,
+	latest: TapSequence | null,
+	hasSelection: boolean
+): boolean {
+	return run !== null && run.count === 2 && latest === run && hasSelection;
+}
+
+/**
+ * Whether a lift still sits inside a double-tap's settle window: the
+ * selection menu waits (the word is about to be annotated, or the run
+ * becomes a sentence pick). Pure.
+ */
+export function inWordTapWindow(
+	latest: TapSequence | null,
+	now: number
+): boolean {
+	return (
+		latest !== null &&
+		latest.count === 2 &&
+		now - latest.at < WORD_TAP_SETTLE_MS + 80
+	);
+}
+
 /**
  * Fold a tap into its sequence: taps within `windowMs` and `maxDist`
  * of the last increment the count (cycling back to one after four);

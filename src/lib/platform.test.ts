@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+	annotateTappedWordNow,
+	inWordTapWindow,
 	isAndroidUserAgent,
 	androidMajorFromUA,
 	osConfirmsClipboard,
@@ -579,5 +581,21 @@ describe("touchPastSlop", () => {
 		expect(touchPastSlop(0, 0, 9, 9, 12)).toBe(true);
 		expect(touchPastSlop(0, 0, 5, 5, 12)).toBe(false);
 		expect(touchPastSlop(0, 0, 12, 0, 12)).toBe(false);
+	});
+});
+
+describe("double-tap annotate", () => {
+	const seq = (count: number, at: number) => ({ count, at, x: 0, y: 0 });
+	it("annotates a settled double-tap's word, not a run a third tap took", () => {
+		const two = seq(2, 1000);
+		expect(annotateTappedWordNow(two, two, true)).toBe(true);
+		expect(annotateTappedWordNow(two, seq(3, 1200), true)).toBe(false);
+		expect(annotateTappedWordNow(two, two, false)).toBe(false);
+		expect(annotateTappedWordNow(seq(1, 1000), seq(1, 1000), true)).toBe(false);
+	});
+	it("holds the menu back only inside the double-tap's window", () => {
+		expect(inWordTapWindow(seq(2, 1000), 1300)).toBe(true);
+		expect(inWordTapWindow(seq(2, 1000), 1600)).toBe(false);
+		expect(inWordTapWindow(seq(3, 1000), 1100)).toBe(false);
 	});
 });

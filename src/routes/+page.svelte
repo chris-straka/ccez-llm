@@ -404,6 +404,9 @@
 		switcherVeilStep,
 		isThreeFingerTap,
 		nextTapCount,
+		annotateTappedWordNow,
+		inWordTapWindow,
+		WORD_TAP_SETTLE_MS,
 		multiTapOwnsRelease,
 		visibleProviderIds,
 		stepCyclicId,
@@ -10761,10 +10764,10 @@
 							// no third tap turns the run into a sentence pick.
 							const run = msgTapSeq;
 							setTimeout(() => {
-								if (msgTapSeq !== run || window.getSelection()?.isCollapsed)
-									return;
-								annotateMode.annotateTappedWord();
-							}, 420);
+								const picked = !(window.getSelection()?.isCollapsed ?? true);
+								if (annotateTappedWordNow(run, msgTapSeq, picked))
+									annotateMode.annotateTappedWord();
+							}, WORD_TAP_SETTLE_MS);
 						}
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
@@ -10908,7 +10911,7 @@
 				// A double-tap's word is annotated a moment later (or
 				// becomes a sentence on a third tap): no menu to flash up
 				// and close in between (owner, 2026-11-04).
-				if (msgTapSeq?.count === 2 && Date.now() - msgTapSeq.at < 500) return;
+				if (inWordTapWindow(msgTapSeq, Date.now())) return;
 				annotateMode.placeSelMenu(touch.clientX, touch.clientY);
 				touchMenuAt = Date.now();
 				// Headphones in: the fresh selection reads itself aloud
