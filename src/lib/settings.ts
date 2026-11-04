@@ -454,8 +454,9 @@ export const PROMPT_IDLE_MIN = 2;
 export const PROMPT_IDLE_MAX = 10;
 
 /**
- * Dev-time `.env` prefill (Vite bakes these into dev/preview builds only —
- * the installed app cannot read `.env` and uses Settings → Keychain).
+ * Dev-time `.env` prefill, in `vite dev` only: a built app never has it
+ * (spreading `import.meta.env` inlined every VITE_ value, keys included,
+ * into production bundles). The installed app uses Settings → Keychain.
  * Recognized names (VITE_ first, then legacy META_ aliases), never commit:
  *   VITE_MUSE_API_KEY / META_OPENAI_API_KEY_MUSE_SPARK_ONE_POINT_THREE
  *   VITE_MUSE_BASE_URL / META_BASE_URL, VITE_DEEPSEEK_API_KEY, ...
@@ -466,12 +467,18 @@ function devEnv(): Record<string, string | undefined> {
 			process?: { env?: Record<string, string | undefined> };
 		}
 	).process?.env;
-	try {
-		const viteEnv = import.meta.env;
-		return { ...(fromProcess ?? {}), ...(viteEnv ?? {}) };
-	} catch {
-		return { ...(fromProcess ?? {}) };
-	}
+	// Vite replaces DEV with false in a build, and the branch below goes
+	// with it, so no key is ever in a built file.
+	if (!import.meta.env.DEV) return { ...(fromProcess ?? {}) };
+	return {
+		...(fromProcess ?? {}),
+		VITE_MUSE_API_KEY: import.meta.env.VITE_MUSE_API_KEY,
+		VITE_MUSE_BASE_URL: import.meta.env.VITE_MUSE_BASE_URL,
+		VITE_DEEPSEEK_API_KEY: import.meta.env.VITE_DEEPSEEK_API_KEY,
+		VITE_DEEPSEEK_BASE_URL: import.meta.env.VITE_DEEPSEEK_BASE_URL,
+		VITE_OPENCODE_ZEN_API_KEY: import.meta.env.VITE_OPENCODE_ZEN_API_KEY,
+		VITE_OPENCODE_ZEN_BASE_URL: import.meta.env.VITE_OPENCODE_ZEN_BASE_URL
+	};
 }
 
 const ENV_ALIASES: Record<string, string[]> = {
