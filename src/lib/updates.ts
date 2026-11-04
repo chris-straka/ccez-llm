@@ -315,3 +315,63 @@ export async function runAndroidAutoUpdate(
 		return null;
 	}
 }
+
+export interface AndroidOneTapDeps {
+	currentVersion: () => Promise<string>;
+	latest: (current: string) => Promise<LatestApk | null>;
+	/** Downloads the APK; resolves its path. */
+	download: (url: string) => Promise<string>;
+	/** Opens the system installer: "installing" or "needs-approval". */
+	install: (path: string) => Promise<string>;
+	say: (message: string) => void;
+	/** An APK already downloaded (the background check's): installed at once. */
+	ready?: string | null;
+}
+
+/**
+ * Settings' one tap on Android (owner, 2026-11-04): check, download,
+ * then straight to the system installer, which still asks its own
+ * confirm. Resolves the downloaded path (null when there was nothing
+ * to install or a step failed), so a later tap installs without
+ * fetching again.
+ */
+export async function runAndroidOneTap(
+	deps: AndroidOneTapDeps
+): Promise<string | null> {
+	let path = deps.ready ?? null;
+	if (!path) {
+		let found: LatestApk | null;
+		try {
+			found = await deps.latest(await deps.currentVersion());
+		} catch (error) {
+			deps.say(`Couldn't check for updates: ${errorText(error)}`);
+			return null;
+		}
+		if (!found) {
+			deps.say("You're on the latest version.");
+			return null;
+		}
+		deps.say(`Version ${found.version} found, downloading…`);
+		try {
+			path = await deps.download(found.url);
+		} catch (error) {
+			deps.say(`Download failed: ${errorText(error)}`);
+			return null;
+		}
+	}
+	try {
+		const status = await deps.install(path);
+		deps.say(
+			status === "needs-approval"
+				? "Allow installs from this app once, then tap again."
+				: "Opening the installer…"
+		);
+	} catch (error) {
+		deps.say(`Installer did not start: ${errorText(error)}`);
+	}
+	return path;
+}
+
+function errorText(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}

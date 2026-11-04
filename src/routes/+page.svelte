@@ -4724,6 +4724,10 @@
 				announce: (version, path) => {
 					readyApk.version = version;
 					readyApk.path = path;
+					// Straight to the system installer once it's down (owner,
+					// 2026-11-04); Android still asks its one confirm. The
+					// toast stays as the way back if that's dismissed.
+					void install(path);
 					flashToast(
 						`Version ${version.replace(/^v/, "")} is ready · tap to install`,
 						() => void install(path),

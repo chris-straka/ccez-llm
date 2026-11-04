@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+	runAndroidOneTap,
+	type AndroidOneTapDeps,
 	AUTO_CHECK_EVERY_MS,
 	RELEASES_URL,
 	autoCheckDue,
@@ -381,5 +383,53 @@ describe("runAndroidAutoUpdate", () => {
 			})
 		).toBeNull();
 		expect(announce).not.toHaveBeenCalled();
+	});
+});
+
+describe("runAndroidOneTap", () => {
+	const deps = (over: Partial<AndroidOneTapDeps> = {}) => {
+		const said: string[] = [];
+		const calls: string[] = [];
+		return {
+			said,
+			calls,
+			deps: {
+				currentVersion: async () => "0.61.0",
+				latest: async () => ({ version: "v0.62.0", url: "https://x/app.apk" }),
+				download: async (url: string) => {
+					calls.push(`download ${url}`);
+					return "/cache/app.apk";
+				},
+				install: async (path: string) => {
+					calls.push(`install ${path}`);
+					return "installing";
+				},
+				say: (m: string) => said.push(m),
+				...over
+			} satisfies AndroidOneTapDeps
+		};
+	};
+
+	it("checks, downloads, then opens the installer in one tap", async () => {
+		const t = deps();
+		expect(await runAndroidOneTap(t.deps)).toBe("/cache/app.apk");
+		expect(t.calls).toEqual([
+			"download https://x/app.apk",
+			"install /cache/app.apk"
+		]);
+		expect(t.said.at(-1)).toBe("Opening the installer…");
+	});
+
+	it("installs an APK already downloaded without fetching again", async () => {
+		const t = deps({ ready: "/cache/old.apk" });
+		await runAndroidOneTap(t.deps);
+		expect(t.calls).toEqual(["install /cache/old.apk"]);
+	});
+
+	it("says so when up to date, and stops", async () => {
+		const t = deps({ latest: async () => null });
+		expect(await runAndroidOneTap(t.deps)).toBeNull();
+		expect(t.said).toEqual(["You're on the latest version."]);
+		expect(t.calls).toEqual([]);
 	});
 });

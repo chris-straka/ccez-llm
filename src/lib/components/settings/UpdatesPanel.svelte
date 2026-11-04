@@ -3,11 +3,12 @@
 	import {
 		DEV_UPDATE_MESSAGE,
 		fetchLatestApk,
+		runAndroidOneTap,
 		runUpdateFlow,
 		updateButtonLabel,
 		updateRouteFor
 	} from "$lib/updates";
-	import type { LatestApk, UpdatePhase } from "$lib/updates";
+	import type { UpdatePhase } from "$lib/updates";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { isIOSUserAgent } from "$lib/platform";
 	import { check } from "@tauri-apps/plugin-updater";
@@ -45,21 +46,13 @@
 		if (onToast) onToast(message);
 		else updateStatus = message;
 	}
-	/** Newest release waiting, or a downloaded APK ready to install. */
-	let pendingApk = $state<LatestApk | null>(null);
-	// The background check may have downloaded it already.
+	/** A downloaded APK ready to install (the background check's, or the
+	last tap's when its installer was dismissed). */
 	let apkPath = $state<string | null>(readyApk.path || null);
-	function updateError(error: unknown): string {
-		return error instanceof Error ? error.message : String(error);
-	}
 	async function checkUpdates() {
 		if (updatePhase.stage !== "idle") return;
 		const route = updateRoute;
-		if (route.kind === "android") {
-			if (apkPath) return void installAndroidUpdate();
-			if (pendingApk) return void downloadAndroidUpdate();
-			return void checkAndroidUpdate();
-		}
+		if (route.kind === "android") return void androidUpdate();
 		if (route.kind === "releases") {
 			// Browser and dev previews have no installer bridge: open
 			// the Releases page instead.
@@ -110,32 +103,11 @@
 		}
 	}
 	/**
-	 * In-app Android update: check the newest release, download its
-	 * APK into the app cache, then fire the system installer. The OS
-	 * still confirms the install; a first run opens the
-	 * unknown-sources page for a one-time allow instead.
+	 * In-app Android update, one tap: check, download (progress on the
+	 * button), then the system installer (runAndroidOneTap).
 	 */
-	async function checkAndroidUpdate(): Promise<void> {
+	async function androidUpdate(): Promise<void> {
 		updatePhase = { stage: "checking" };
-		try {
-			const { getVersion } = await import("@tauri-apps/api/app");
-			const latest = await fetchLatestApk(fetch, await getVersion());
-			if (!latest) {
-				sayUpdate("You're on the latest version.");
-				return;
-			}
-			pendingApk = latest;
-			sayUpdate(`Version ${latest.version} found — download it below.`);
-		} catch (error) {
-			sayUpdate(`Couldn't check for updates: ${updateError(error)}`);
-		} finally {
-			updatePhase = { stage: "idle" };
-		}
-	}
-	async function downloadAndroidUpdate(): Promise<void> {
-		const pending = pendingApk;
-		if (!pending) return;
-		updatePhase = { stage: "downloading", received: 0, total: null };
 		const { invoke } = await import("@tauri-apps/api/core");
 		const { listen } = await import("@tauri-apps/api/event");
 		const unlisten = await listen<{ received: number; total: number | null }>(
@@ -149,34 +121,25 @@
 			}
 		);
 		try {
-			const path = await invoke<string>("update_download_apk", {
-				url: pending.url
+			apkPath = await runAndroidOneTap({
+				currentVersion: async () => {
+					const { getVersion } = await import("@tauri-apps/api/app");
+					return getVersion();
+				},
+				latest: (current) => fetchLatestApk(fetch, current),
+				download: (url) => {
+					updatePhase = { stage: "downloading", received: 0, total: null };
+					return invoke<string>("update_download_apk", { url });
+				},
+				install: (path) => {
+					updatePhase = { stage: "installing" };
+					return invoke<string>("update_install_apk", { path });
+				},
+				say: sayUpdate,
+				ready: apkPath
 			});
-			apkPath = path;
-			pendingApk = null;
-			sayUpdate("Downloaded — install it below.");
-		} catch (error) {
-			sayUpdate(`Download failed: ${updateError(error)}`);
 		} finally {
 			unlisten();
-			updatePhase = { stage: "idle" };
-		}
-	}
-	async function installAndroidUpdate(): Promise<void> {
-		const path = apkPath;
-		if (!path) return;
-		updatePhase = { stage: "installing" };
-		try {
-			const { invoke } = await import("@tauri-apps/api/core");
-			const status = await invoke<string>("update_install_apk", { path });
-			if (status === "needs-approval") {
-				sayUpdate("Allow installs from this app once, then tap Install again.");
-			} else {
-				sayUpdate("Opening the installer…");
-			}
-		} catch (error) {
-			sayUpdate(`Installer did not start: ${updateError(error)}`);
-		} finally {
 			updatePhase = { stage: "idle" };
 		}
 	}
@@ -184,7 +147,6 @@
 	function androidButtonLabel(): string {
 		if (updatePhase.stage !== "idle") return updateButtonLabel(updatePhase);
 		if (apkPath) return "Install update";
-		if (pendingApk) return `Download ${pendingApk.version}`;
 		return "Check for updates";
 	}
 </script>
