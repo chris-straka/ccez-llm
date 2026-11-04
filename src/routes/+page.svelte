@@ -692,6 +692,8 @@
 		type CaptureOneShot
 	} from "$lib/nativeCapture";
 	import CaptureOverlay from "$lib/components/CaptureOverlay.svelte";
+	import BrowserPaneView from "$lib/components/BrowserPane.svelte";
+	import { BrowserPane } from "$lib/browser-pane.svelte";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
 	import { joinExternalDraft, routeExternalText } from "$lib/externalText";
 	import {
@@ -2854,6 +2856,12 @@
 	/** Flashcards: sitting, schedule, and export (see flashcards-mode). */
 	/** The shared word list (ccez-words): a word card's star. */
 	const wordList = new WordList();
+	/** The browser beside the chat (desktop shell; docs/design/browser-pane.md). */
+	const browser = new BrowserPane({
+		available: () => tauriBackendAvailable() && !androidUI && !iosUI,
+		dark: () => document.documentElement.dataset.theme === "dark",
+		note: (text) => flashToast(text)
+	});
 	const flashcards = new FlashcardsMode({
 		getChats: () => chatState.chats,
 		draftsFor: (id) => drafts.draftsFor(id),
@@ -9840,6 +9848,96 @@
 		});
 	}
 
+	/** The browser pane's menu items (menu.rs; docs/design/browser-pane.md). */
+	function browserMenu(action: string): void {
+		if (!browser.available) return;
+		if (action === "browser-toggle") browser.toggle();
+		else if (action === "browser-new-tab") browser.newTab();
+		else if (!browser.open) return;
+		else if (action === "browser-close-tab") browser.closeTab();
+		else if (action === "browser-location") browser.locate++;
+		else if (action === "browser-expand")
+			browser.setExpanded(!browser.expanded);
+		else if (action === "browser-back") browser.back();
+		else if (action === "browser-forward") browser.forward();
+		else if (action === "browser-reload") browser.reload();
+		else if (action === "browser-next-tab") browser.step(1);
+		else if (action === "browser-prev-tab") browser.step(-1);
+		else if (action === "browser-find") browser.finding++;
+		else if (action === "browser-actual-size") browser.zoom(null);
+	}
+
+	/** One of the app's floating menus or cards reaches over the browser's page. */
+	let browserFloat = $state(false);
+	const BROWSER_FLOATERS =
+		".sel-menu, .ann-pop, .lang-list, [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip']";
+	function checkBrowserFloats(): void {
+		const pane = document.querySelector("aside.browser");
+		if (!pane || !browser.open) {
+			browserFloat = false;
+			return;
+		}
+		const p = pane.getBoundingClientRect();
+		// Expanded, the pane sits over the chat (z-index 45): only what's
+		// stacked above it reaches the page.
+		const expanded = pane.classList.contains("expanded");
+		const above = (el: Element): boolean => {
+			for (let at: Element | null = el; at; at = at.parentElement) {
+				const z = Number.parseInt(getComputedStyle(at).zIndex, 10);
+				if (Number.isFinite(z)) return z > 45;
+			}
+			return false;
+		};
+		browserFloat = [...document.querySelectorAll(BROWSER_FLOATERS)].some(
+			(el) => {
+				if (pane.contains(el)) return false;
+				// Faded out or hidden (a tooltip at rest) covers nothing.
+				if (
+					!el.checkVisibility({
+						opacityProperty: true,
+						visibilityProperty: true
+					})
+				)
+					return false;
+				const r = el.getBoundingClientRect();
+				return (
+					r.width > 0 &&
+					r.height > 0 &&
+					r.right > p.left &&
+					r.left < p.right &&
+					r.bottom > p.top &&
+					r.top < p.bottom &&
+					(!expanded || above(el))
+				);
+			}
+		);
+	}
+	// The page steps aside (its snapshot stands in) while anything of the
+	// app's is over it: native pages draw above the app's HTML.
+	$effect(() => {
+		const cover =
+			settingsOpen ||
+			shortcutsOpen ||
+			palette.open ||
+			readerOpen ||
+			flashcards.session !== null ||
+			inspectChar !== null ||
+			licensesView.open ||
+			dictManager.open ||
+			browserFloat;
+		void browser.setCovered(browser.open && cover);
+	});
+
+	// The menu's browser keys follow what has the keyboard (menu.rs).
+	$effect(() => {
+		const open = browser.available && browser.open;
+		const page = browser.focused;
+		if (!tauriBackendAvailable()) return;
+		void import("@tauri-apps/api/core")
+			.then(({ invoke }) => invoke("browser_menu", { open, page }))
+			.catch(() => {});
+	});
+
 	/**
 	 * Native menu bar clicks (desktop shell only): the Rust side emits
 	 * `menu-action` with the item id. The frontend keeps its own key
@@ -9874,9 +9972,14 @@
 				} else if (action === "print-sheet") {
 					printCurrentChat();
 				} else if (action === "bigger-text") {
-					adjustFontScale(0.1);
+					// The page's zoom while it has the keyboard, the app's text otherwise.
+					if (browser.open && browser.focused) browser.zoom(0.1);
+					else adjustFontScale(0.1);
 				} else if (action === "smaller-text") {
-					adjustFontScale(-0.1);
+					if (browser.open && browser.focused) browser.zoom(-0.1);
+					else adjustFontScale(-0.1);
+				} else if (action.startsWith("browser-")) {
+					browserMenu(action);
 				}
 			});
 		} catch (error) {
@@ -10010,7 +10113,9 @@
 				persistSettings();
 			}
 		} else if (side === "right") {
-			if (!settingsOpen) openSettingsPanel();
+			// The right side is the browser's while it's open: a
+			// double-click near the divider never opens Settings.
+			if (!settingsOpen && !browser.open) openSettingsPanel();
 		} else if (
 			target === scrollBox ||
 			target.closest(".empty-state") === target
@@ -10086,6 +10191,116 @@
 			androidUI = false;
 			iosUI = false;
 		}
+		// The browser pane (desktop shell), once the platform is known.
+		void browser.start();
+		// Debug builds: scripts/drive.ts runs JavaScript here (lib.rs
+		// drive_result). Release builds have no drive_ready: no listener.
+		if (tauriBackendAvailable()) {
+			void import("@tauri-apps/api/core").then(({ invoke }) =>
+				invoke("drive_ready")
+					.then(() => {
+						// The browser pane's state, for drive scripts to read.
+						(
+							window as unknown as { __ccezBrowser: BrowserPane }
+						).__ccezBrowser = browser;
+						return listen<{ id: string; script: string }>(
+							"drive-js",
+							({ payload }) => {
+								void (async () => {
+									let value: unknown;
+									try {
+										// Debug builds only (no drive_ready in release): running the script is the point.
+										// eslint-disable-next-line @typescript-eslint/no-implied-eval
+										const run = new Function(
+											`return (async () => { ${payload.script} })()`
+										) as () => Promise<unknown>;
+										value = { ok: true, data: (await run()) ?? null };
+									} catch (error) {
+										value = { ok: false, error: String(error) };
+									}
+									await invoke("drive_result", { id: payload.id, value }).catch(
+										() => {}
+									);
+								})();
+							}
+						);
+					})
+					.catch(() => {})
+			);
+		}
+		// The page has the keyboard when the app's own page loses it
+		// while the window keeps it (a click in the page); back when
+		// the app's page has it again.
+		window.addEventListener("blur", () => {
+			if (!browser.open || !tauriBackendAvailable()) return;
+			setTimeout(() => {
+				try {
+					void getCurrentWindow()
+						.isFocused()
+						.then((focused) => {
+							if (focused && !document.hasFocus()) browser.focused = true;
+						})
+						.catch(() => {});
+				} catch {
+					// No window to ask (a stand-in shell): the page never had it.
+				}
+			}, 0);
+		});
+		window.addEventListener("focus", () => (browser.focused = false));
+		// A link in a reply: a new tab beside the page while the browser
+		// is open, the system's browser otherwise (the app never leaves
+		// itself for a link). A click with a selection made picks text.
+		document.addEventListener(
+			"click",
+			(event) => {
+				if (event.button !== 0 || !tauriBackendAvailable()) return;
+				const link = (event.target as Element | null)?.closest?.("a[href]");
+				if (!(link instanceof HTMLAnchorElement) || !link.closest("article"))
+					return;
+				if (!/^https?:/i.test(link.href)) return;
+				event.preventDefault();
+				if (browser.available && browser.open) {
+					browser.newTab(link.href, { after: browser.active ?? undefined });
+				} else {
+					void import("@tauri-apps/api/core").then(({ invoke }) =>
+						invoke("plugin:opener|open_url", {
+							url: link.href,
+							with: null
+						}).catch(() => undefined)
+					);
+				}
+			},
+			true
+		);
+		// A menu or card opening over the page: checked once a frame at most.
+		let floatFrame = 0;
+		new MutationObserver(() => {
+			if (!browser.open || floatFrame) return;
+			floatFrame = requestAnimationFrame(() => {
+				floatFrame = 0;
+				checkBrowserFloats();
+			});
+		}).observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["class", "style", "hidden", "open"]
+		});
+		// The pointer comes back from the page: a fresh snapshot, ready
+		// for whatever it opens over the page next.
+		let pointerAway = false;
+		document.addEventListener("mouseout", (event) => {
+			if (!event.relatedTarget) pointerAway = true;
+		});
+		document.addEventListener(
+			"mousemove",
+			() => {
+				if (!pointerAway) return;
+				pointerAway = false;
+				if (browser.open) void browser.snap();
+			},
+			{ passive: true }
+		);
 		// Phones keep the prompt on screen instead of idle-hiding it:
 		// there is no keyboard summon (i/Enter/Space) and the sliders
 		// are hidden, so migrate an uncustomized timeout to "never"
@@ -10347,7 +10562,11 @@
 			edgeMouse = {
 				x: event.clientX,
 				y: event.clientY,
-				clean,
+				// The browser's tabs sit at the window's right edge: dragging
+				// one is never an edge stroke for Settings.
+				clean:
+					clean &&
+					!(target instanceof Element && target.closest("aside.browser")),
 				sel: window.getSelection()?.toString() ?? ""
 			};
 		});
@@ -13174,6 +13393,14 @@
 		 */
 		const onMiddleClick = (event: MouseEvent) => {
 			if (event.button !== 1) return;
+			// The browser pane's own middle-click closes a tab (its target
+			// may be gone by now: the path still has the pane).
+			if (
+				event
+					.composedPath()
+					.some((el) => el instanceof Element && el.matches("aside.browser"))
+			)
+				return;
 			// A middle-drag just acted: the release is the gesture's
 			// end, never a shortcuts toggle.
 			if (midDragged) {
@@ -15126,7 +15353,23 @@
 			tabindex="-1"
 			onmousedown={dragWindow}
 			ondblclick={zoomWindow}
-		></header>
+		>
+			{#if browser.available && !browser.open}
+				<!-- The browser beside the chat (⇧⌘B). -->
+				<button
+					type="button"
+					class="browser-toggle"
+					aria-label="Open the browser"
+					title="Browser (⇧⌘B)"
+					onclick={() => browser.show()}
+					><svg viewBox="0 0 24 24" aria-hidden="true"
+						><circle cx="12" cy="12" r="8.5" /><path
+							d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5M12 3.5C9.6 5.8 8.4 8.6 8.4 12s1.2 6.2 3.6 8.5"
+						/></svg
+					></button
+				>
+			{/if}
+		</header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
 		{#if find.open}
@@ -15542,6 +15785,15 @@
 		<!-- Speech errors render from `Toasts.svelte` (top notice,
 		tap to dismiss); the banner below stays paged. -->
 	</main>
+
+	{#if browser.available && browser.open}
+		<BrowserPaneView
+			pane={browser}
+			{dragWindow}
+			{zoomWindow}
+			lights={isMac && tauriBackendAvailable()}
+		/>
+	{/if}
 
 	{#if annotateMode.selMenu && !previewing && !iosUI}
 		<!-- Floating Annotate/Copy/Inspect menu: annotate-mode owns the
@@ -15968,6 +16220,36 @@
 	browser layout). The header clears them with left padding; the
 	empty sidebar head indents by the same amount so the chat list
 	starts at the same x. */
+	/* The browser's button: the strip's one control, at its right end. */
+	header .browser-toggle {
+		margin-left: auto;
+		display: grid;
+		place-items: center;
+		width: 1.7rem;
+		height: 1.5rem;
+		padding: 0;
+		border: none;
+		border-radius: 0.4rem;
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+		opacity: 0.7;
+		transition:
+			opacity 0.15s ease,
+			background-color 0.15s ease;
+	}
+	header .browser-toggle:hover {
+		opacity: 1;
+		background: var(--hover-wash);
+		color: var(--ink);
+	}
+	header .browser-toggle svg {
+		width: 0.95rem;
+		height: 0.95rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.6;
+	}
 	.app[data-titlebar="overlay"] header {
 		padding-left: 5.75rem;
 		/* Sit the top chrome a touch lower so it centers on the

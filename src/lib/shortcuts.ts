@@ -125,7 +125,15 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Set capture area",
 	// Shell-only chords: the browser claims ⌘E and ⇧⌘R out there.
 	"Edit newest message",
-	"Flashcards"
+	"Flashcards",
+	// The browser pane is the desktop shell's.
+	"Browser beside the chat",
+	"New tab / close tab",
+	"Address bar",
+	"Next / previous tab",
+	"Expand the browser",
+	"In the page: back, forward, reload",
+	"In the page: find, zoom"
 ]);
 
 /** Rows whose feature only exists on macOS (screen capture). */
@@ -151,6 +159,7 @@ export function desktopShortcuts(
 	const mouse = "Mouse & selection";
 	const scroll = "Scrolling";
 	const view = "Window & view";
+	const browser = "Browser";
 	const rows: ShortcutRow[] = [
 		{
 			group: hover,
@@ -198,7 +207,7 @@ export function desktopShortcuts(
 		{
 			group: chats,
 			name: "New chat",
-			keys: `${meta}N · ${shiftMeta}N · ${meta}T`
+			keys: `${meta}N · ${shiftMeta}N`
 		},
 		{
 			group: chats,
@@ -324,7 +333,34 @@ export function desktopShortcuts(
 			keys: isMac ? `⇧${mod}+ / ⇧${mod}−` : "Ctrl+Shift+Plus / Ctrl+Shift+Minus"
 		},
 		{ group: view, name: "Prompt text size", keys: `${meta}[ / ${meta}]` },
-		{ group: view, name: "Prompt width", keys: `${shiftMeta}[ / ${shiftMeta}]` }
+		{
+			group: view,
+			name: "Prompt width",
+			keys: `${shiftMeta}[ / ${shiftMeta}]`
+		},
+		{ group: browser, name: "Browser beside the chat", keys: `${shiftMeta}B` },
+		{
+			group: browser,
+			name: "New tab / close tab",
+			keys: `${meta}T / ${meta}W`
+		},
+		{ group: browser, name: "Address bar", keys: `${meta}L` },
+		{
+			group: browser,
+			name: "Next / previous tab",
+			keys: `${isMac ? "⌥⌘" : "Ctrl+Alt+"}→ / ←`
+		},
+		{ group: browser, name: "Expand the browser", keys: `${shiftMeta}E` },
+		{
+			group: browser,
+			name: "In the page: back, forward, reload",
+			keys: `${meta}[ · ${meta}] · ${meta}R`
+		},
+		{
+			group: browser,
+			name: "In the page: find, zoom",
+			keys: `${meta}F · ${meta}= / ${meta}- / ${meta}0`
+		}
 	];
 	return rows.filter(
 		(row) =>

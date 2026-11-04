@@ -6,6 +6,7 @@ mod dev_icon;
 // lives at a path baked in from the build host, which a phone (or a CI
 // Simulator) cannot rely on.
 mod annotate;
+mod browser;
 mod capture;
 mod coderun;
 #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
@@ -329,6 +330,38 @@ fn install_tls_provider() {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Debug builds: scripts/drive.ts runs JavaScript in the window by
+/// emitting `drive-js` (through the MCP bridge's Rust-side emit), and
+/// the page answers here; the answer lands in a temp file the script
+/// reads. The bridge's own execute_js waits on an event it never gets.
+/// Release builds have neither command, so the page never listens.
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn drive_ready() -> bool {
+    true
+}
+
+/// Debug builds: the app's own page as JPEG, for drive screenshots
+/// (the MCP bridge's capture looks up a webview window, and with the
+/// browser pane's pages in it the main window isn't one).
+#[cfg(all(debug_assertions, target_os = "macos"))]
+#[tauri::command]
+async fn drive_main_snapshot(app: tauri::AppHandle) -> Result<tauri::ipc::Response, String> {
+    browser::snapshot_of(&app, "main").await
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn drive_result(id: String, value: serde_json::Value) -> Result<(), String> {
+    if id.is_empty() || id.len() > 64 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
+        return Err("bad id".into());
+    }
+    let dir = std::env::temp_dir().join("ccez-drive");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(format!("{id}.json")), value.to_string()).map_err(|e| e.to_string())
+}
+
 pub fn run() {
     install_tls_provider();
     let builder = tauri::Builder::default()
@@ -377,6 +410,24 @@ pub fn run() {
     let builder = builder
         .invoke_handler(tauri::generate_handler![
             annotate::drain_pending_external,
+            #[cfg(debug_assertions)]
+            drive_ready,
+            #[cfg(debug_assertions)]
+            drive_result,
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            drive_main_snapshot,
+            browser::browser_open,
+            browser::browser_bounds,
+            browser::browser_visible,
+            browser::browser_focus,
+            browser::browser_close,
+            browser::browser_navigate,
+            browser::browser_go,
+            browser::browser_zoom,
+            browser::browser_find,
+            browser::browser_state,
+            browser::browser_snapshot,
+            browser::browser_menu,
             dict::dict_installed,
             dict::dict_lookup,
             dict::dict_install,

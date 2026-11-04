@@ -18,4 +18,6 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cargo build --manifest-path "$ROOT/src-tauri/Cargo.toml" --no-default-features
 "$ROOT/scripts/sign-dev-binary.sh"
-exec bun run tauri dev --no-watch -- "$@"
+# The MCP bridge (debug only) reports back through window.__TAURI__,
+# which release builds leave out.
+exec bun run tauri dev --no-watch --config '{"app":{"withGlobalTauri":true}}' -- "$@"

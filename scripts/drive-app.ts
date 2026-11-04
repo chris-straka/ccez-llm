@@ -19,6 +19,9 @@ const config = {
 	productName: "Ccez LLM Dev",
 	// No signed update files: this copy never updates.
 	bundle: { createUpdaterArtifacts: false },
+	// The drive bridge reports back through window.__TAURI__, which
+	// release builds leave out (pages could call every command with it).
+	app: { withGlobalTauri: true },
 	plugins: {
 		"deep-link": { desktop: { schemes: [] }, mobile: [] },
 		updater: { active: false }

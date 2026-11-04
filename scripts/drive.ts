@@ -20,7 +20,9 @@
  * sharing its data: `bun scripts/drive-app.ts` builds and opens it.
  */
 import { Buffer } from "node:buffer";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import process from "node:process";
 
 interface Reply {
@@ -83,14 +85,34 @@ async function send(
 	});
 }
 
-/** Run `body` in the page; it may await and return any JSON value. */
-function script(body: string): string {
-	return `(async () => { ${body} })()`;
-}
 
+/**
+ * Run `body` in the page. The bridge's execute_js waits for a reply
+ * event that never reaches it, so the page is asked through an event
+ * the bridge emits from Rust (`drive-js`), and answers through a
+ * debug-only command that writes a temp file (lib.rs drive_result).
+ */
 async function run(ws: WebSocket, body: string): Promise<unknown> {
-	const reply = await send(ws, "execute_js", { script: script(body) });
-	return reply.data ?? reply.result;
+	const id = crypto.randomUUID();
+	const file = join(tmpdir(), "ccez-drive", `${id}.json`);
+	await send(ws, "invoke_tauri", {
+		command: "plugin:mcp-bridge|emit_event",
+		args: { eventName: "drive-js", payload: { id, script: body } }
+	});
+	for (let i = 0; i < 200; i++) {
+		if (existsSync(file)) {
+			const answer = JSON.parse(readFileSync(file, "utf8")) as {
+				ok: boolean;
+				data?: unknown;
+				error?: string;
+			};
+			unlinkSync(file);
+			if (!answer.ok) throw new Error(answer.error);
+			return answer.data;
+		}
+		await pause(50);
+	}
+	throw new Error("the page didn't answer");
 }
 
 async function shot(ws: WebSocket, out: string): Promise<void> {
@@ -197,14 +219,15 @@ async function main(): Promise<void> {
 			await shot(ws, out);
 			console.log(out);
 		} else if (cmd === "js") {
-			const reply = await send(ws, "execute_js", {
-				script: script(`return (${rest.join(" ")});`)
-			});
-			console.log(JSON.stringify(reply.data ?? reply.result ?? reply, null, 2));
+			// An expression, or a body that returns.
+			const body = rest.join(" ");
+			const value = await run(ws, /\breturn\b/.test(body) ? body : `return (${body});`);
+			console.log(JSON.stringify(value, null, 2));
 		} else if (cmd === "click") {
 			const sel = JSON.stringify(rest[0] ?? "");
-			const reply = await send(ws, "execute_js", {
-				script: script(`
+			const value = await run(
+				ws,
+				`
 					const el = document.querySelector(${sel});
 					if (!el) return "no element matches " + ${sel};
 					const r = el.getBoundingClientRect();
@@ -212,21 +235,22 @@ async function main(): Promise<void> {
 					for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"])
 						el.dispatchEvent(new (type.startsWith("pointer") ? PointerEvent : MouseEvent)(type, at));
 					return "clicked";
-				`)
-			});
-			console.log(JSON.stringify(reply.data ?? reply));
+				`
+			);
+			console.log(JSON.stringify(value));
 		} else if (cmd === "key") {
 			const key = JSON.stringify(rest[0] ?? "");
 			const code = JSON.stringify(rest[1] ?? "");
-			const reply = await send(ws, "execute_js", {
-				script: script(`
+			const value = await run(
+				ws,
+				`
 					const target = document.activeElement ?? document.body;
 					for (const type of ["keydown", "keyup"])
 						target.dispatchEvent(new KeyboardEvent(type, { key: ${key}, code: ${code}, bubbles: true, cancelable: true }));
 					return "pressed";
-				`)
-			});
-			console.log(JSON.stringify(reply.data ?? reply));
+				`
+			);
+			console.log(JSON.stringify(value));
 		} else if (cmd === "tour") {
 			const shots = await tour(ws, rest[0] ?? ".screenshots/tour");
 			console.log(shots.join("\n"));

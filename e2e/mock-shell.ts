@@ -107,6 +107,33 @@ export async function seedMockShell(page: Page): Promise<void> {
 							return "data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 						return null;
 					}
+					// The browser pane: every call kept for the specs to read;
+					// a page reports itself as where it was sent.
+					if (cmd.startsWith("browser_")) {
+						const w = window as unknown as Record<string, unknown>;
+						const calls = (w.__browserCalls ??= []) as Array<{
+							cmd: string;
+							args: Record<string, unknown>;
+						}>;
+						calls.push({ cmd, args });
+						const urls = (w.__browserUrls ??= {}) as Record<string, string>;
+						const id = String(args["id"] ?? "");
+						if (cmd === "browser_open" || cmd === "browser_navigate")
+							urls[id] = String(args["url"] ?? "");
+						if (cmd === "browser_state")
+							return {
+								url: urls[id] ?? "about:blank",
+								title: "",
+								back: false,
+								forward: false,
+								icon: "",
+								loading: false
+							};
+						if (cmd === "browser_snapshot") return new ArrayBuffer(0);
+						if (cmd === "browser_find") return true;
+						return null;
+					}
+					if (cmd === "plugin:opener|open_url") return null;
 					// Launch-time calls the app tolerates failing.
 					if (cmd === "keychain_get") return null;
 					if (cmd === "keychain_set" || cmd === "keychain_delete") return null;

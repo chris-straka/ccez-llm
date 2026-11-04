@@ -14,5 +14,14 @@
 	<string>Ccez LLM uses the microphone to dictate messages.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Ccez LLM transcribes your dictation into the prompt and times the words in your listening drills.</string>
+	<!-- The browser pane (browser.rs) opens plain-http pages as Safari
+	does, marked Not secure; without this, App Transport Security
+	stopped them loading and the tab spun for good. Web views only:
+	the app's own requests go through Rust. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

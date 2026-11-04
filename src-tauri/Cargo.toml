@@ -21,7 +21,8 @@ tauri-build = { version = "2", features = [] }
 # tray-icon + image-png feed the desktop summon kit (desktop.rs tray):
 # both crates already sit in Cargo.lock as transitive deps, so no new
 # crate is vendored by enabling them here.
-tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+# unstable: child webviews in the main window (the browser pane, browser.rs).
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png", "unstable"] }
 # Triage 2026-09-12 (Dependabot #2, glib VariantStrIter unsoundness,
 # moderate): the gtk 0.18 stack under tauri/wry pulls glib 0.18 (fixed
 # only in glib >= 0.20). A solo bump is rejected by the solver, verified

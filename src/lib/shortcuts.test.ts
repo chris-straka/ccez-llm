@@ -114,6 +114,18 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Prompt text size",
 			"Prompt width"
 		]
+	],
+	[
+		"Browser",
+		[
+			"Browser beside the chat",
+			"New tab / close tab",
+			"Address bar",
+			"Next / previous tab",
+			"Expand the browser",
+			"In the page: back, forward, reload",
+			"In the page: find, zoom"
+		]
 	]
 ];
 const MAC_NAMES = MAC_SECTIONS.flatMap(([, names]) => names);
@@ -169,7 +181,14 @@ describe("shortcuts menu copy", () => {
 			"Capture window text",
 			"Set capture area",
 			"Edit newest message",
-			"Flashcards"
+			"Flashcards",
+			"Browser beside the chat",
+			"New tab / close tab",
+			"Address bar",
+			"Next / previous tab",
+			"Expand the browser",
+			"In the page: back, forward, reload",
+			"In the page: find, zoom"
 		];
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac, false).map((r) => r.name);

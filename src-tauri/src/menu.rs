@@ -21,6 +21,36 @@ fn custom<R: Runtime>(
     MenuItem::with_id(app, id, text, true, accelerator)
 }
 
+/// A browser-pane item that starts off: its keys are the app's own
+/// until the pane (or its page) needs them (`set_browser`).
+fn page<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    text: &str,
+    accelerator: Option<&str>,
+) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(app, id, text, false, accelerator)
+}
+
+/// The browser pane's items while the chat has the keyboard keep its
+/// keys for the app (⌘[ ⌘] size the prompt's text, ⌘F finds in chats);
+/// while the page has it, they're the page's. ⌘W and ⌘L follow whether
+/// the pane is open at all. A disabled item's key passes to the app.
+pub const PAGE_ITEMS: &[&str] = &[
+    "browser-back",
+    "browser-forward",
+    "browser-reload",
+    "browser-find",
+    "browser-actual-size",
+];
+pub const PANE_ITEMS: &[&str] = &[
+    "browser-close-tab",
+    "browser-location",
+    "browser-expand",
+    "browser-next-tab",
+    "browser-prev-tab",
+];
+
 fn sep<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<PredefinedMenuItem<R>> {
     PredefinedMenuItem::separator(app)
 }
@@ -58,6 +88,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &custom(app, "new-chat", "New Chat", Some("CmdOrCtrl+N"))?,
+            &custom(app, "browser-new-tab", "New Tab", Some("CmdOrCtrl+T"))?,
+            &page(
+                app,
+                "browser-location",
+                "Open Location…",
+                Some("CmdOrCtrl+L"),
+            )?,
+            &page(app, "browser-close-tab", "Close Tab", Some("CmdOrCtrl+W"))?,
             &sep(app)?,
             &custom(app, "share-sheet", "Share Chat as Study Sheet…", None)?,
             &custom(app, "print-sheet", "Print Study Sheet…", None)?,
@@ -77,6 +115,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::copy(app, None)?,
             &PredefinedMenuItem::paste(app, None)?,
             &PredefinedMenuItem::select_all(app, None)?,
+            &sep(app)?,
+            &page(app, "browser-find", "Find in Page…", Some("CmdOrCtrl+F"))?,
         ],
     )?;
     let view = Submenu::with_items(
@@ -100,6 +140,35 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 "Decrease Text Size",
                 Some("CmdOrCtrl+-"),
             )?,
+            &page(
+                app,
+                "browser-actual-size",
+                "Actual Size",
+                Some("CmdOrCtrl+0"),
+            )?,
+            &sep(app)?,
+            &custom(app, "browser-toggle", "Browser", Some("CmdOrCtrl+Shift+B"))?,
+            &page(
+                app,
+                "browser-expand",
+                "Expand Browser",
+                Some("CmdOrCtrl+Shift+E"),
+            )?,
+            &page(app, "browser-back", "Back", Some("CmdOrCtrl+["))?,
+            &page(app, "browser-forward", "Forward", Some("CmdOrCtrl+]"))?,
+            &page(app, "browser-reload", "Reload Page", Some("CmdOrCtrl+R"))?,
+            &page(
+                app,
+                "browser-next-tab",
+                "Next Tab",
+                Some("CmdOrCtrl+Alt+Right"),
+            )?,
+            &page(
+                app,
+                "browser-prev-tab",
+                "Previous Tab",
+                Some("CmdOrCtrl+Alt+Left"),
+            )?,
         ],
     )?;
     let window_menu = Submenu::with_items(
@@ -120,6 +189,21 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[&custom(app, "shortcuts", "Keyboard Shortcuts…", None)?],
     )?;
     Menu::with_items(app, &[&app_menu, &file, &edit, &view, &window_menu, &help])
+}
+
+/// Turns the browser pane's items on and off: `open` the pane shows,
+/// `page` its page has the keyboard.
+pub fn set_browser<R: Runtime>(app: &AppHandle<R>, open: bool, page: bool) {
+    let Some(menu) = app.menu() else { return };
+    let ids = PANE_ITEMS
+        .iter()
+        .map(|id| (id, open))
+        .chain(PAGE_ITEMS.iter().map(|id| (id, open && page)));
+    for (id, on) in ids {
+        if let Some(item) = menu.get(*id).and_then(|kind| kind.as_menuitem().cloned()) {
+            let _ = item.set_enabled(on);
+        }
+    }
 }
 
 /// Forward menu clicks to the frontend (see MENU_EVENT).
