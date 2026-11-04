@@ -95,11 +95,22 @@ export class WordList {
 		await this.sync();
 	}
 
-	/** Sends what's waiting and takes in what other apps changed. Quiet when the server is out of reach. */
-	async sync(): Promise<void> {
+	private syncing: Promise<void> = Promise.resolve();
+
+	/**
+	 * Sends what's waiting and takes in what other apps changed, one round
+	 * at a time (two at once sent changes twice and dropped a quick
+	 * unstar). Quiet when the server is out of reach.
+	 */
+	sync(): Promise<void> {
+		this.syncing = this.syncing.then(() => this.round());
+		return this.syncing;
+	}
+
+	private async round(): Promise<void> {
 		try {
 			if (this.pending.length) {
-				const out = this.pending;
+				const out = [...this.pending];
 				const res = await this.send(`${this.server}/words`, {
 					method: "POST",
 					headers: { "content-type": "application/json" },

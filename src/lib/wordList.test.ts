@@ -36,6 +36,28 @@ describe("the shared word list", () => {
 		expect(list.status("fr", "fragiliser")).toBe("new");
 	});
 
+	it("a quick star and unstar both reach the server, once each, in order", async () => {
+		const posted: Array<{ word: string; status: string }> = [];
+		let held: (() => void) | null = null;
+		const send = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) => {
+			if (init?.method === "POST") {
+				posted.push(...(JSON.parse(init.body as string) as typeof posted));
+				// The first send is slow: the unstar lands while it's out.
+				if (!held) await new Promise<void>((r) => (held = r));
+				return reply(null);
+			}
+			return reply({ words: [], seq: 1 });
+		});
+		const list = new WordList("https://words.test", send);
+		const first = list.toggleLearning("fr", "marre");
+		await Promise.resolve();
+		const second = list.toggleLearning("fr", "marre");
+		held!();
+		await Promise.all([first, second]);
+		expect(posted.map((p) => p.status)).toEqual(["learning", "new"]);
+		expect(list.status("fr", "marre")).toBe("new");
+	});
+
 	it("keeps a star made off the tailnet and sends it next time", async () => {
 		const down = vi.fn(async () => {
 			throw new Error("offline");
