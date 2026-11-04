@@ -22,6 +22,16 @@ async function stubSpeech(page: Page): Promise<void> {
 			for (const id of pending) window.clearTimeout(id);
 			pending = [];
 		};
+		// __hold keeps the phrase on screen until __release, for a test
+		// that looks at it.
+		const h = window as unknown as { __hold: boolean; __release: () => void };
+		let held: SpeechSynthesisUtterance | null = null;
+		h.__hold = false;
+		h.__release = () => {
+			h.__hold = false;
+			held?.onend?.(new Event("end") as SpeechSynthesisEvent);
+			held = null;
+		};
 		synth.speak = ((u: SpeechSynthesisUtterance) => {
 			w.__spoken.push(u.text);
 			w.__rates.push(u.rate);
@@ -32,12 +42,14 @@ async function stubSpeech(page: Page): Promise<void> {
 					0
 				)
 			);
-			pending.push(
-				window.setTimeout(
-					() => u.onend?.(new Event("end") as SpeechSynthesisEvent),
-					100
-				)
-			);
+			if (h.__hold) held = u;
+			else
+				pending.push(
+					window.setTimeout(
+						() => u.onend?.(new Event("end") as SpeechSynthesisEvent),
+						100
+					)
+				);
 		}) as typeof synth.speak;
 		synth.cancel = (() => clear()) as typeof synth.cancel;
 	});
@@ -55,6 +67,9 @@ test("follow mode reads the whole message phrase by phrase", async ({
 		voiceEngine: "web"
 	});
 	await page.goto("/");
+	await page.evaluate(() => {
+		(window as unknown as { __hold: boolean }).__hold = true;
+	});
 	const article = page.locator("article.assistant");
 	await expect(article).toBeVisible({ timeout: 60_000 });
 	await article.hover();
@@ -65,6 +80,9 @@ test("follow mode reads the whole message phrase by phrase", async ({
 	await expect(reader.locator(".reader-phrase")).toHaveText("Der Bahnhof ist");
 	await page.waitForTimeout(250); // overlay fade-in
 	await page.screenshot({ path: ".screenshots/reader-desktop.png" });
+	await page.evaluate(() =>
+		(window as unknown as { __release: () => void }).__release()
+	);
 	await expect(reader.getByText("Done · tap to close")).toBeVisible({
 		timeout: 5000
 	});

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, type Page } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /**
@@ -24,11 +24,26 @@ test.beforeEach(async ({ page }) => {
 				for (const id of pending) window.clearTimeout(id);
 				pending = [];
 			};
+			// A test that checks a speaking mark holds the end
+			// (__hold) and lets it go (__release) once it has looked.
+			const w = window as unknown as {
+				__hold: boolean;
+				__release: () => void;
+			};
+			let held: SpeechSynthesisUtterance[] = [];
+			w.__hold = false;
+			w.__release = () => {
+				w.__hold = false;
+				for (const u of held)
+					u.onend?.(new Event("end") as SpeechSynthesisEvent);
+				held = [];
+			};
 			const fire = (
 				utterance: SpeechSynthesisUtterance,
 				name: "start" | "end",
 				ms: number
 			) => {
+				if (name === "end" && w.__hold) return void held.push(utterance);
 				pending.push(
 					window.setTimeout(() => {
 						if (name === "start")
@@ -45,12 +60,14 @@ test.beforeEach(async ({ page }) => {
 					utterance.lang
 				);
 				clearPending();
+				held = [];
 				fire(utterance, "start", 0);
 				fire(utterance, "end", 100);
 			}) as typeof synth.speak;
 			const origCancel = synth.cancel.bind(synth);
 			synth.cancel = (() => {
 				clearPending();
+				held = [];
 				try {
 					origCancel();
 				} catch {
@@ -150,7 +167,17 @@ test("right-click with a selection reads the selection, app menu owned", async (
 		.toEqual([true]);
 });
 
+const hold = (page: Page) =>
+	page.evaluate(() => {
+		(window as unknown as { __hold: boolean }).__hold = true;
+	});
+const release = (page: Page) =>
+	page.evaluate(() =>
+		(window as unknown as { __release: () => void }).__release()
+	);
+
 test("right-click on a word reads just that word", async ({ page }) => {
+	await hold(page);
 	const para = page.locator("article.assistant .rendered p").first();
 	// Aim at the first word's own pixels ("alpha").
 	const point = await para.evaluate((el) => {
@@ -175,6 +202,9 @@ test("right-click on a word reads just that word", async ({ page }) => {
 		timeout: 10_000
 	});
 	const count = (await spoken(page)).length;
+	await release(page);
+	await expect(page.locator("article.assistant.speaking-sel")).toHaveCount(0);
+	await hold(page);
 	// Same word, still no selection: restarts instead of stopping.
 	await page.mouse.click(point.x, point.y, { button: "right" });
 	await expect
