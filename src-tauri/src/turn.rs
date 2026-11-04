@@ -1351,7 +1351,7 @@ async fn finish_turn(
         live.seen.load(Ordering::Relaxed),
         status == "done",
         app_foreground(),
-        app.get_webview_window("main")
+        app.get_window("main")
             .and_then(|window| window.is_focused().ok())
             .unwrap_or(false),
     ) {

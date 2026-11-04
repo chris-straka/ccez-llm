@@ -624,9 +624,12 @@ fn disengage_sleep_guard() {
 // ---------------------------------------------------------------------------
 
 /// Show + focus the main window (tray clicks, second launch, summon).
+/// The window, not the webview window: with the browser pane's pages
+/// in it, it holds more than one webview, and get_webview_window finds
+/// nothing then.
 #[cfg(desktop)]
 pub(crate) fn focus_main<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
@@ -671,7 +674,7 @@ pub fn wire(app: &AppHandle) -> tauri::Result<()> {
 /// chose that still fits is left alone.
 #[cfg(desktop)]
 fn fit_main_window(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = app.get_window("main") else {
         return;
     };
     if window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false) {
@@ -810,7 +813,7 @@ fn install_summon_hotkey(app: &AppHandle) {
             if event.state != ShortcutState::Pressed || is_key_repeat() {
                 return;
             }
-            let Some(window) = handle.get_webview_window("main") else {
+            let Some(window) = handle.get_window("main") else {
                 return;
             };
             // Focused gets the toggle half: hide back to the

@@ -264,7 +264,7 @@ fn open_area_picker_desktop(app: &tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn show_main(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager as _;
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -522,7 +522,7 @@ mod imp {
         kind: super::InteractiveKind,
     ) -> Result<Option<String>, String> {
         use tauri::Manager as _;
-        let main = app.get_webview_window("main");
+        let main = app.get_window("main");
         let hide = main
             .as_ref()
             .map(|window| window.is_focused().unwrap_or(false))
