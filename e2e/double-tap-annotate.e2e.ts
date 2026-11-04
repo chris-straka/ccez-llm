@@ -51,6 +51,10 @@ test("double-tapping a word annotates it; again opens its card", async ({
 		await page.touchscreen.tap(box.x, box.y);
 	};
 	await doubleTap();
+	// No menu flashing up before the note files.
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
+	await page.waitForTimeout(200);
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
 	const badge = page.locator("button.ccez-ann-badge");
 	await expect(badge).toHaveCount(1, { timeout: 10_000 });
 	await expect(page.locator("button.ccez-ann-badge.ans-ready")).toBeVisible({
@@ -69,4 +73,35 @@ test("double-tapping a word annotates it; again opens its card", async ({
 		"students at a lycée"
 	);
 	await page.screenshot({ path: ".screenshots/double-tap-card.png" });
+});
+
+/** Three taps still take the sentence (no note), with the menu. */
+test("a triple-tap still selects the sentence with its menu", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Ce qui va changer pour les lycéens." }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article.assistant .rendered").first()).toBeVisible(
+		{
+			timeout: 60_000
+		}
+	);
+	const box = await page
+		.locator("article.assistant .rendered")
+		.first()
+		.boundingBox();
+	if (!box) throw new Error("no message");
+	const [x, y] = [box.x + 30, box.y + box.height / 2];
+	for (let i = 0; i < 3; i++) {
+		await page.touchscreen.tap(x, y);
+		await page.waitForTimeout(110);
+	}
+	await page.waitForTimeout(700);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+		"Ce qui va changer pour les lycéens."
+	);
+	await expect(page.locator(".sel-menu")).toBeVisible();
 });

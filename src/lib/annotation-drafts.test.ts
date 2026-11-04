@@ -577,6 +577,32 @@ describe("word cards", () => {
 		expect(loadDraftAnnotations("c1")[0]?.card).toEqual(card);
 	});
 
+	it("a word explained before shows its card while this sentence's is asked", async () => {
+		let finish: (reply: AnnotationReply) => void = () => undefined;
+		const { drafts } = harness({
+			answer: () =>
+				new Promise<AnnotationReply>((resolve) => {
+					finish = resolve;
+				})
+		});
+		const before = note({
+			id: "old" as AnnotationId,
+			quote: "Franchi",
+			answer: "crossed",
+			card
+		});
+		const fresh = note({ id: "new" as AnnotationId, quote: "franchi" });
+		drafts.setList([before, fresh]);
+		const asked = drafts.ask(fresh);
+		await vi.waitFor(() =>
+			expect(drafts.list[1]?.card).toEqual({ ...card, partial: true })
+		);
+		finish({ answer: "got over", card: { ...card, meaning: "got over" } });
+		await asked;
+		expect(drafts.list[1]?.card?.meaning).toBe("got over");
+		expect(drafts.list[1]?.card?.partial).toBeUndefined();
+	});
+
 	it("the dictionary's card lands first and the model's replaces it", async () => {
 		const instant: WordCard = {
 			...card,

@@ -10894,6 +10894,10 @@
 				if (!el?.closest(".messages .rendered, .news-card-title")) return;
 				const live = window.getSelection()?.toString() ?? "";
 				if (live === "" || live === start.sel) return;
+				// A double-tap's word is annotated a moment later (or
+				// becomes a sentence on a third tap): no menu to flash up
+				// and close in between (owner, 2026-11-04).
+				if (msgTapSeq?.count === 2 && Date.now() - msgTapSeq.at < 500) return;
 				annotateMode.placeSelMenu(touch.clientX, touch.clientY);
 				touchMenuAt = Date.now();
 				// Headphones in: the fresh selection reads itself aloud

@@ -347,6 +347,27 @@ export class AnnotationDrafts {
 		this.list = deleteAnnotation(this.list, id);
 	}
 
+	/** An answered word note with the same quote and no question: this
+	chat's first, then the other chats', the newest first. */
+	earlierAnswer(ann: Annotation): Annotation | undefined {
+		const fold = (q: string) => q.trim().toLocaleLowerCase();
+		const want = fold(ann.quote);
+		const fits = (a: Annotation) =>
+			a.id !== ann.id &&
+			!a.comment.trim() &&
+			!!a.answer?.trim() &&
+			!a.card?.partial &&
+			fold(a.quote) === want;
+		const here = this.list.filter(fits);
+		if (here.length) return here[here.length - 1];
+		for (const id of this.deps.getChatIds()) {
+			if (id === this.deps.getActiveChatId()) continue;
+			const found = loadDraftAnnotations(id).filter(fits);
+			if (found.length) return found[found.length - 1];
+		}
+		return undefined;
+	}
+
 	/** Fire one annotation's own model request: never linked to the
 	main prompt or history — later questions file while earlier ones
 	are still waiting. Failures banner (toast on phones) and leave
@@ -380,6 +401,17 @@ export class AnnotationDrafts {
 				return;
 			}
 			this.deps.clearBanner();
+			// The same word explained before (here or in another chat):
+			// that card shows at once, marked as still writing, until this
+			// sentence's own answer lands (owner, 2026-11-04).
+			const earlier = ann.comment.trim() ? undefined : this.earlierAnswer(ann);
+			if (earlier)
+				this.attachAnswer(
+					chatId,
+					ann.id,
+					earlier.answer!,
+					earlier.card ? { ...earlier.card, partial: true } : undefined
+				);
 			const reply = await this.deps.answerQuestion(
 				provider,
 				{
