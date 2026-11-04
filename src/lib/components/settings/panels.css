@@ -1043,64 +1043,6 @@ SettingRow (its name, then its control on the same line, or under
 it when stacked or when the sheet is too narrow), a lone checkbox,
 a field, or a note. Controls ride the raised ground, so they read
 as set into the card in either theme. */
-.settings-inner {
-	--set-card: color-mix(in srgb, var(--ink) 5%, transparent);
-	--set-radius: 12px;
-}
-.settings-inner section {
-	padding: 1.4rem 0 0.4rem;
-}
-.settings-inner section > h2 {
-	margin: 0 0 0.55rem 0.15rem;
-	font-size: 1.02rem;
-	font-weight: 650;
-}
-.settings-inner section[id^="settings-"] > :not(h2),
-.settings-inner .keys-updates > section {
-	box-sizing: border-box;
-	min-height: 2.65rem;
-	margin: 0;
-	padding: 0.5rem 1rem;
-	border-top: 1px solid var(--line-soft);
-	background: var(--set-card);
-}
-.settings-inner section[id^="settings-"] > h2 + * {
-	border-top: 0;
-	border-radius: var(--set-radius) var(--set-radius) 0 0;
-}
-.settings-inner section[id^="settings-"] > :last-child {
-	border-radius: 0 0 var(--set-radius) var(--set-radius);
-}
-.settings-inner section[id^="settings-"] > h2 + :last-child {
-	border-radius: var(--set-radius);
-}
-/* Shortcuts, Updates and Licenses: one card, a row each (the web
-build has no Updates row, so the card rounds itself). */
-.settings-inner .keys-updates {
-	margin-top: 1.4rem;
-	border-radius: var(--set-radius);
-	overflow: hidden;
-}
-.settings-inner .keys-updates > section {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.8rem;
-	padding-block: 0.5rem;
-	border-top: 0;
-}
-.settings-inner .keys-updates > section + section {
-	border-top: 1px solid var(--line-soft);
-}
-.settings-inner .keys-updates > section > h2 {
-	margin: 0;
-	font-size: 0.95rem;
-	font-weight: 500;
-}
-.settings-inner .keys-updates > section > .note {
-	flex-basis: 100%;
-}
 /* A row: the name takes what's left, the control sits at the end and
 wraps under the name when the two don't fit side by side. */
 .settings-inner .setting {
@@ -1259,10 +1201,6 @@ line under the name, and a thumb-sized hit row. */
 	padding: 0 0.85rem;
 	font-size: 0.86rem;
 }
-.settings-inner .keys-updates > section > button {
-	padding: 0.3rem 0.85rem;
-	font-size: 0.86rem;
-}
 /* The seven message colors keep to one line in the window column. */
 .settings-inner .segmented.swatches {
 	gap: 0.25rem;
@@ -1275,6 +1213,10 @@ line under the name, and a thumb-sized hit row. */
 A section is its heading and its rows on the page itself: no card, no
 lines between rows; room between rows and more between sections does
 the grouping. */
+.settings-inner {
+	--set-card: color-mix(in srgb, var(--ink) 5%, transparent);
+	--set-radius: 12px;
+}
 .settings-inner section {
 	padding: 2.2rem 0 0;
 }
@@ -1286,18 +1228,10 @@ the grouping. */
 	text-transform: uppercase;
 	color: var(--muted);
 }
-.settings-inner section[id^="settings-"] > :not(h2),
-.settings-inner .keys-updates > section {
-	min-height: 0;
+.settings-inner section[id^="settings-"] > :not(h2) {
+	box-sizing: border-box;
+	margin: 0;
 	padding: 0.85rem 0;
-	border: 0;
-	border-radius: 0;
-	background: none;
-}
-.settings-inner section[id^="settings-"] > h2 + *,
-.settings-inner section[id^="settings-"] > :last-child,
-.settings-inner section[id^="settings-"] > h2 + :last-child {
-	border-radius: 0;
 }
 /* The sample keeps its own panel: it's a picture of the chat. */
 .settings-inner section[id^="settings-"] > .reading-preview {
@@ -1314,6 +1248,7 @@ dropped to a second row): a row that scrolls sideways, its ends
 fading where more waits. */
 .settings-inner .segmented:not(.swatches) {
 	flex-wrap: nowrap;
+	gap: 0.2rem;
 	overflow-x: auto;
 	scrollbar-width: none;
 	max-width: 100%;
@@ -1324,9 +1259,6 @@ fading where more waits. */
 }
 /* Compact and sharing the row, so every choice shows at once; only
 when they can't all fit does the row scroll. */
-.settings-inner .segmented:not(.swatches) {
-	gap: 0.2rem;
-}
 .settings-inner .segmented:not(.swatches) button,
 .app[data-android] .settings-inner .segmented:not(.swatches) button {
 	flex: 1 1 0;
@@ -1347,16 +1279,18 @@ when they can't all fit does the row scroll. */
 button, a chevron at its end; no boxed buttons (owner, 2026-11-04). */
 .settings-inner .keys-updates {
 	margin-top: 2.2rem;
-	border-radius: 0;
-	overflow: visible;
 }
 .settings-inner .keys-updates > section {
 	position: relative;
-	flex-wrap: nowrap;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.8rem;
 	padding: 0.95rem 0;
 }
-.settings-inner .keys-updates > section + section {
-	border-top: 0;
+.settings-inner .keys-updates > section > .note {
+	flex-basis: 100%;
 }
 .settings-inner .keys-updates > section > h2 {
 	margin: 0;

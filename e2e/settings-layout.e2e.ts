@@ -123,12 +123,15 @@ test.describe("desktop window", () => {
 			.first()
 			.getByRole("button", { name: "Reset" });
 		await expect(reset).toBeVisible();
-		const after = await rowParts(page, "Text size");
 		// Within a pixel of rounding (Reset under the name added ~16px).
+		// Polled: under load the row is read before the stepper settles.
 		const height = (b: Box): number => b.bottom - b.top;
-		expect(
-			Math.abs(height(after!.row) - height(before!.row))
-		).toBeLessThanOrEqual(1);
+		await expect
+			.poll(async () => {
+				const after = await rowParts(page, "Text size");
+				return Math.abs(height(after!.row) - height(before!.row));
+			})
+			.toBeLessThanOrEqual(1);
 	});
 
 	test("a stepper at its default shows no Reset", async ({ page }) => {
