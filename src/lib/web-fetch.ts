@@ -202,6 +202,44 @@ export function parseBatchexecute(text: string): string | null {
 	return null;
 }
 
+/**
+ * A Google News story id into its publisher URL: the params page's
+ * signature, then one batchexecute POST. `get` does the fetching (the
+ * relay on z; Google refuses Cloudflare's servers). Throws the shell's
+ * machine codes.
+ */
+export async function decodeGoogleStory(
+	id: string,
+	get: (url: string, init?: RequestInit) => Promise<Response>
+): Promise<string> {
+	const page = await get(paramsPageUrl(id));
+	if (!page.ok) throw new Error("bad-status");
+	const signed = parseSignature(await page.text());
+	if (!signed) throw new Error("no-signature");
+	const res = await get(BATCHEXECUTE_URL, {
+		method: "POST",
+		headers: {
+			"content-type": "application/x-www-form-urlencoded;charset=UTF-8"
+		},
+		body: batchexecuteBody(id, signed.ts, signed.sig)
+	});
+	if (!res.ok) throw new Error("bad-status");
+	const url = parseBatchexecute(await res.text());
+	if (!url) throw new Error("no-decoded-url");
+	return url;
+}
+
+/** A Google News feed URL the relay may fetch: news.google.com's /rss feeds only. Pure. */
+export function googleFeedUrl(raw: string): URL | null {
+	const url = publicUrl(raw);
+	return url &&
+		url.protocol === "https:" &&
+		url.hostname === "news.google.com" &&
+		/^\/rss(\/|$)/.test(url.pathname)
+		? url
+		: null;
+}
+
 // ---- the page's side -----------------------------------------------------
 
 /**

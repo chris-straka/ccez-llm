@@ -1,0 +1,6 @@
+{
+	// The Google News relay on z (Bun, through Node's APIs).
+	"extends": "../tsconfig.json",
+	"compilerOptions": { "types": ["node"] },
+	"include": ["./**/*.ts", "../src/lib/web-fetch.ts"]
+}

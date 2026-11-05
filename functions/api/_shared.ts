@@ -15,7 +15,34 @@ const UA =
 
 export interface Context {
 	request: Request;
+	env: { RELAY_TOKEN?: string; RELAY_URL?: string };
 	waitUntil(p: Promise<unknown>): void;
+}
+
+/** Google refuses Cloudflare's servers: its two calls go through the relay on z (relay/README.md). */
+const RELAY_URL = "https://z.tailfe37c2.ts.net:10000";
+
+/** One relay call: its answer as ours (the relay speaks the same codes). */
+export async function relay(
+	ctx: Context,
+	path: string,
+	params: Record<string, string>
+): Promise<Response> {
+	const token = ctx.env.RELAY_TOKEN;
+	if (!token) return answer("failed", 424);
+	try {
+		const res = await fetch(
+			`${ctx.env.RELAY_URL ?? RELAY_URL}${path}?${new URLSearchParams(params)}`,
+			{
+				headers: { "x-relay-token": token },
+				signal: AbortSignal.timeout(TIMEOUT_MS + 5000)
+			}
+		);
+		const body = await res.text();
+		return res.ok ? answer(body, 200, true) : answer(body || "failed", 424);
+	} catch (error) {
+		return answer(transportCode(error), 424);
+	}
 }
 
 export function answer(body: string, status = 200, cache = false): Response {
