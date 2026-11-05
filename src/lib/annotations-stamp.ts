@@ -140,7 +140,7 @@ export function quoteRange(
 	occurrence = 0
 ): Range | null {
 	try {
-		const nodes = quoteTextNodes(root);
+		const nodes = quoteNodesFor(root, quote);
 		const loc = locateQuote(
 			nodes.map((n) => n.textContent ?? ""),
 			quote,
@@ -441,30 +441,68 @@ export function equationBodyRange(body: Element): Range | null {
 	}
 }
 
-export function quoteTextNodes(root: Node): Text[] {
+export function quoteTextNodes(
+	root: Node,
+	part: "message" | "correction" = "message"
+): Text[] {
 	const nodes: Text[] = [];
 	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	while (walker.nextNode()) {
 		const node = walker.currentNode;
 		if (!(node instanceof Text)) continue;
 		const parent = node.parentNode;
+		if (!(parent instanceof Element)) {
+			if (part === "message") nodes.push(node);
+			continue;
+		}
 		// Badge buttons are UI chrome, and ruby readings are overlay:
 		// neither is message text. A reading left in the haystack
 		// mis-anchors badges (or wraps the reading itself and corrupts
 		// the ruby), so both stay out. Math `$`/copy buttons are the
-		// same kind of chrome (their `$` text is never quotable), and
-		// so is the correction diff under a user's message (its words
-		// doubled the haystack: notes and repeats landed in the diff).
+		// same kind of chrome (their `$` text is never quotable).
 		if (
-			parent instanceof Element &&
 			parent.closest(
-				"[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy, .correction"
+				"[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy"
 			)
 		)
+			continue;
+		// The correction diff under a user's message is its own
+		// haystack (its words doubled the message's: notes and repeats
+		// landed in the diff); its struck-out words quote nothing.
+		const inFix = !!parent.closest(".correction");
+		if (part === "message" ? inFix : !inFix || parent.closest(".corr-del, del"))
 			continue;
 		nodes.push(node);
 	}
 	return nodes;
+}
+
+/**
+ * The text nodes a quote is found in: the message's own words, else the
+ * correction line under it, for a note on the corrected sentence (owner,
+ * 2026-11-05: "J'apprends toujours." filed, its badge nowhere). Only a
+ * quote the message never says falls through, so repeats and old notes
+ * keep their places.
+ */
+export function quoteNodesFor(root: Node, quote: string): Text[] {
+	const own = quoteTextNodes(root);
+	if (
+		locateQuote(
+			own.map((n) => n.textContent ?? ""),
+			quote,
+			0
+		)
+	)
+		return own;
+	const fix = quoteTextNodes(root, "correction");
+	return fix.length > 0 &&
+		locateQuote(
+			fix.map((n) => n.textContent ?? ""),
+			quote,
+			0
+		)
+		? fix
+		: own;
 }
 /**
  * Numbered badge on the first occurrence of each quoted span, plus the
@@ -622,7 +660,7 @@ function wrapLeaving(
 ): void {
 	const gone = items.find((item) => item.id === fading);
 	if (!gone) return;
-	const fnodes = quoteTextNodes(root);
+	const fnodes = quoteNodesFor(root, gone.quote);
 	const floc = locateQuote(
 		fnodes.map((node) => node.textContent ?? ""),
 		gone.quote,
@@ -750,7 +788,7 @@ function washRanges(
 	const item = items.find((i) => i.id === wash);
 	if (!item) return [];
 	return washRangesForText(
-		quoteTextNodes(root),
+		quoteNodesFor(root, item.quote),
 		item.quote,
 		item.at ?? 0,
 		root.ownerDocument
@@ -842,7 +880,7 @@ export function repaintLiveWash(): void {
 		if (!highlightsSupported()) return;
 		if (!document.contains(cur.root)) return;
 		const ranges = washRangesForText(
-			quoteTextNodes(cur.root),
+			quoteNodesFor(cur.root, cur.quote),
 			cur.quote,
 			cur.at,
 			cur.root.ownerDocument
@@ -1260,7 +1298,7 @@ function stampBadges(
 		// Fresh snapshot per item: the previous anchor splits text
 		// nodes, so earlier indices go stale — nested quotes (a
 		// sentence and its parts) only locate on the current DOM.
-		const nodes = quoteTextNodes(root);
+		const nodes = quoteNodesFor(root, item.quote);
 		const loc = locateQuote(
 			nodes.map((node) => node.textContent ?? ""),
 			item.quote,
@@ -1333,10 +1371,10 @@ function stampLegacy(
 		root.normalize();
 		root.dataset.washStamped = wash ?? "";
 		if (wash) {
-			const nodes = quoteTextNodes(root);
-			const texts = nodes.map((n) => n.textContent ?? "");
 			for (const item of items) {
 				if (item.id !== wash) continue;
+				const nodes = quoteNodesFor(root, item.quote);
+				const texts = nodes.map((n) => n.textContent ?? "");
 				const loc = locateQuote(texts, item.quote, item.at ?? 0);
 				if (!loc) continue;
 				wrapRange(nodes, loc, "fresh");
@@ -1387,7 +1425,7 @@ function stampLegacy(
 		// Fresh snapshot per item: the previous wrap splits text nodes,
 		// so earlier indices go stale — nested quotes (a sentence and
 		// its parts) only locate on the current DOM.
-		const nodes = quoteTextNodes(root);
+		const nodes = quoteNodesFor(root, item.quote);
 		const texts = nodes.map((n) => n.textContent ?? "");
 		const loc = locateQuote(texts, item.quote, item.at ?? 0);
 		if (!loc) continue;
@@ -1399,7 +1437,7 @@ function stampLegacy(
 		// Fresh snapshot: the wash wrap above split text nodes, so the
 		// badge anchors on the current DOM (same quote, same corner —
 		// hovering the wash on and off can never move it).
-		const freshNodes = quoteTextNodes(root);
+		const freshNodes = quoteNodesFor(root, item.quote);
 		const freshLoc = locateQuote(
 			freshNodes.map((node) => node.textContent ?? ""),
 			item.quote,

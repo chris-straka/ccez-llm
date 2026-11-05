@@ -20,6 +20,7 @@ import {
 	equationBodyRange,
 	quoteFragmentText,
 	quoteRange,
+	quoteNodesFor,
 	quoteTextNodes,
 	wordEdgeRange
 } from "./annotations-stamp";
@@ -850,7 +851,7 @@ export class AnnotateMode {
 			.findIndex((m) => m.id === ann.messageId);
 		const root = document.querySelector(`article#msg-${index} .rendered`);
 		if (index === -1 || !(root instanceof HTMLElement)) return [];
-		const nodes = quoteTextNodes(root);
+		const nodes = quoteNodesFor(root, ann.quote);
 		const loc = locateQuote(
 			nodes.map((n) => n.textContent ?? ""),
 			ann.quote,
@@ -902,7 +903,7 @@ export class AnnotateMode {
 		if (index === -1) return null;
 		const root = document.querySelector(`article#msg-${index} .rendered`);
 		if (!(root instanceof HTMLElement)) return null;
-		const nodes = quoteTextNodes(root);
+		const nodes = quoteNodesFor(root, ann.quote);
 		const loc = locateQuote(
 			nodes.map((n) => n.textContent ?? ""),
 			ann.quote,

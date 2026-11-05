@@ -46,6 +46,16 @@ test("correction mode diffs under the user message and hides the block", async (
 	await page.keyboard.type("why grand?");
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".ann-pop")).toBeHidden({ timeout: 10_000 });
+	// Its badge shows on the corrected word: the message never says
+	// "grand" (owner, 2026-11-05: the note filed, its marker nowhere).
+	await expect(diff.locator(".corr-ins [data-ann-badge]")).toBeVisible({
+		timeout: 10_000
+	});
+	await expect(diff.locator(".corr-del [data-ann-badge]")).toHaveCount(0);
+	await page.screenshot({
+		path: "test-results/correction-badge.png",
+		clip: (await page.locator("article.user").boundingBox()) ?? undefined
+	});
 });
 
 test("correction toggle hides without a reply language", async ({ page }) => {

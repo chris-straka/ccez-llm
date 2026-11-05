@@ -620,6 +620,28 @@ describe("applyMarks wash over paragraphs", () => {
 		expect(root.querySelector(".correction [data-ann-badge]")).toBeNull();
 	});
 
+	it("a quote only the correction says badges in the correction; struck words never", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<p>Je toujours apprendre</p><div class="correction"><span class="corr-del">Je toujours apprendre</span><span class="corr-ins">J\'apprends toujours.</span></div>';
+		applyMarks(
+			root,
+			[
+				{ id: "a1" as AnnotationId, number: 1, quote: "J'apprends toujours." },
+				{ id: "a2" as AnnotationId, number: 2, quote: "toujours" }
+			],
+			false,
+			null
+		);
+		// Owner, 2026-11-05: a note on the corrected sentence had no badge.
+		expect(
+			root.querySelector('.corr-ins [data-ann-badge="a1"]')
+		).not.toBeNull();
+		// A word the message says stays on the message's own.
+		expect(root.querySelector('p [data-ann-badge="a2"]')).not.toBeNull();
+		expect(root.querySelector(".corr-del [data-ann-badge]")).toBeNull();
+	});
+
 	it("reuses badge buttons across re-stamps", () => {
 		const marks: AnnotationMark[] = [
 			{ id: "a1" as AnnotationId, number: 1, quote: "alpha" }
