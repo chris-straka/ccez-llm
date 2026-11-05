@@ -307,8 +307,59 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		the welcome text on every platform); the page keeps emptiness
 		and the pill state. In news mode the welcome text goes away
 		and the pills rail the story cards below them. -->
+		{#snippet ways()}
+			<!-- Ways in, as emoji, at the chips' row end: the language's news,
+			listening to videos in it (both need a language), and music (any
+			video, played as a song; the app only). -->
+			<div class="study-modes" role="tablist" aria-label="Study with">
+				{#if listen.modes}
+					<button
+						type="button"
+						role="tab"
+						aria-label="News"
+						title="News"
+						aria-selected={newsPanel !== null && !listen.mode.open}
+						onclick={(e) => {
+							// Focus never parks on the switch: bare keys
+							// (i summons the prompt) keep working.
+							e.currentTarget.blur();
+							listen.showNews();
+						}}><span aria-hidden="true">📰</span></button
+					>
+					{#if listen.available}
+						<button
+							type="button"
+							role="tab"
+							aria-label="Listen"
+							title="Listen"
+							aria-selected={listen.mode.open}
+							onclick={(e) => {
+								e.currentTarget.blur();
+								listen.showListen();
+							}}><span aria-hidden="true">🎧</span></button
+						>
+					{/if}
+				{/if}
+				{#if music.source}
+					<button
+						type="button"
+						role="tab"
+						aria-label="Music"
+						title="Music"
+						aria-selected={false}
+						onclick={(e) => {
+							e.currentTarget.blur();
+							music.start();
+						}}><span aria-hidden="true">🎵</span></button
+					>
+				{/if}
+			</div>
+		{/snippet}
 		<EmptyHero mock={useMock} newsMode={newsPanel !== null || listen.mode.open}>
 			<LangMenus
+				trailing={(listen.modes || music.source) && !previewing
+					? ways
+					: undefined}
 				openId={openLangMenu}
 				anchor={langMenuAnchor}
 				activeCode={activeReplyCode}
@@ -327,54 +378,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 							? "1 flashcard due"
 							: `${flashcardsDue} flashcards due`}
 					</button>
-				{/if}
-				{#if (listen.modes || music.source) && !previewing}
-					<!-- Ways in, as emoji: the language's news, listening to
-				videos in it (both need a language), and music (any
-				video, played as a song; the app only). -->
-					<div class="study-modes" role="tablist" aria-label="Study with">
-						{#if listen.modes}
-							<button
-								type="button"
-								role="tab"
-								aria-label="News"
-								title="News"
-								aria-selected={newsPanel !== null && !listen.mode.open}
-								onclick={(e) => {
-									// Focus never parks on the switch: bare keys
-									// (i summons the prompt) keep working.
-									e.currentTarget.blur();
-									listen.showNews();
-								}}><span aria-hidden="true">📰</span></button
-							>
-							{#if listen.available}
-								<button
-									type="button"
-									role="tab"
-									aria-label="Listen"
-									title="Listen"
-									aria-selected={listen.mode.open}
-									onclick={(e) => {
-										e.currentTarget.blur();
-										listen.showListen();
-									}}><span aria-hidden="true">🎧</span></button
-								>
-							{/if}
-						{/if}
-						{#if music.source}
-							<button
-								type="button"
-								role="tab"
-								aria-label="Music"
-								title="Music"
-								aria-selected={false}
-								onclick={(e) => {
-									e.currentTarget.blur();
-									music.start();
-								}}><span aria-hidden="true">🎵</span></button
-							>
-						{/if}
-					</div>
 				{/if}
 			</div>
 			{#if listen.mode.open && listen.mode.lang}
@@ -849,26 +852,28 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 
 	/* Chat switching snaps instantly on every platform: no slide,
 	no fade — the next chat replaces the current one in place. */
+	/* The row's height, the chips': an emoji's line box is taller than text's. */
 	.study-modes {
 		display: flex;
-		gap: 0.5rem;
-		margin-top: 0.35rem;
+		gap: 0.6rem;
+		align-self: stretch;
 	}
-	/* Shaped like the language chips above them (owner, 2026-11-05: the
-	circles looked off): the same rounded square and height, the picked
-	one filled softly rather than ringed. */
+	/* Shaped like the language chips beside them (owner, 2026-11-05: the
+	circles, then a lone square under the row, looked off): the same
+	rounded square, padding and type size, so the row reads as one; the
+	picked one filled softly rather than ringed. */
 	.study-modes button {
 		display: grid;
 		place-items: center;
-		width: 2.6rem;
-		height: 2.1rem;
+		height: 100%;
+		padding: 0 0.6rem;
+		line-height: 1;
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
 		border-radius: 10px;
 		background: transparent;
 		font: inherit;
-		font-size: 1.1rem;
-		line-height: 1;
+		font-size: 0.82rem;
 		cursor: pointer;
 		transition:
 			border-color 0.15s ease,

@@ -6,6 +6,7 @@ sheet dropping under its pill. The page owns the open menu, the
 sheet anchor, the active code, and every behavior; this component
 owns the row markup and its surfaces. -->
 <script lang="ts">
+	import type { Snippet } from "svelte";
 	import {
 		LANGUAGE_MENUS,
 		menuSections,
@@ -36,6 +37,8 @@ owns the row markup and its surfaces. -->
 		highlightCode?: string | null;
 		previewing: boolean;
 		actions: LangMenusActions;
+		/** Ways in (news, listening, music) at the row's end, after a rule (owner, 2026-11-05: not a lone button under it). */
+		trailing?: Snippet | undefined;
 	}
 
 	let {
@@ -44,7 +47,8 @@ owns the row markup and its surfaces. -->
 		activeCode,
 		highlightCode = null,
 		previewing,
-		actions
+		actions,
+		trailing
 	}: Props = $props();
 	let root: HTMLElement | undefined = $state();
 	// Typed matches scroll into view inside the sheet (never the page).
@@ -125,6 +129,10 @@ owns the row markup and its surfaces. -->
 			{/if}
 		</div>
 	{/each}
+	{#if trailing}
+		<span class="row-rule" aria-hidden="true"></span>
+		{@render trailing()}
+	{/if}
 </div>
 
 <style>
@@ -199,6 +207,12 @@ owns the row markup and its surfaces. -->
 	}
 	:global(main.empty) .lang-menus {
 		justify-content: center;
+	}
+	.row-rule {
+		width: 1px;
+		height: 1.3rem;
+		background: #c7c7cc;
+		background: var(--line);
 	}
 	/* No row-level fade here: hovering open space inside the row lit
 	every button at once and the opacity shimmer read as movement.
