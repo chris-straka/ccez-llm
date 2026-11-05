@@ -244,7 +244,9 @@ test("a nudge up mid-stream stays put, with no jump button", async ({
 	await expect(box).toHaveAttribute("data-stick", "false");
 	const held = await box.evaluate((el) => el.scrollTop);
 	// Through the rest of the stream and the completion: no movement.
-	await expect(page.locator(".send-btn .send-arrow")).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".send-btn .send-arrow")).toBeVisible({
+		timeout: 60_000
+	});
 	await page.waitForTimeout(800);
 	expect(
 		Math.abs((await box.evaluate((el) => el.scrollTop)) - held)

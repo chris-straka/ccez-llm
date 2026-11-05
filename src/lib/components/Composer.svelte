@@ -490,8 +490,7 @@ stop, so both rules below stay suppressed. -->
 				character its own way (owner, 2026-11-05: thin in Brave). --><svg
 					class="send-arrow"
 					viewBox="0 0 16 16"
-					aria-hidden="true"
-					><path d="M8 13V3.5M3.5 7.5 8 3l4.5 4.5" /></svg
+					aria-hidden="true"><path d="M8 13V3.5M3.5 7.5 8 3l4.5 4.5" /></svg
 				>{/if}
 		</button></span
 	>
