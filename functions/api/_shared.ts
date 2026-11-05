@@ -1,7 +1,8 @@
 /**
  * What both news functions share: only the site's own pages may call
  * them, every answer says it came from here (WEB_FETCH_HEADER), errors
- * are the shell's machine codes as plain text, and answers are cached
+ * are the shell's machine codes as plain text (424 for the far side's
+ * failures: Cloudflare replaces a 502's body with its own page), and answers are cached
  * for ten minutes so the same feed isn't fetched again by every visit.
  */
 

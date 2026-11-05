@@ -25,10 +25,10 @@ export async function onRequestGet(ctx: Context): Promise<Response> {
 		try {
 			res = await get(url.href);
 		} catch (error) {
-			return answer(transportCode(error), 502);
+			return answer(transportCode(error), 424);
 		}
-		if (!res.ok) return answer(`bad-status:${res.status}`, 502);
+		if (!res.ok) return answer(`bad-status:${res.status}`, 424);
 		const text = await head(res);
-		return text ? answer(text, 200, true) : answer("news-empty", 502);
+		return text ? answer(text, 200, true) : answer("news-empty", 424);
 	});
 }

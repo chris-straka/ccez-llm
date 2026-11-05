@@ -32,9 +32,9 @@ export async function onRequestGet(ctx: Context): Promise<Response> {
 	return cached(ctx, async () => {
 		try {
 			const page = await get(paramsPageUrl(id));
-			if (!page.ok) return answer("bad-status", 502);
+			if (!page.ok) return answer("bad-status", 424);
 			const signed = parseSignature(await head(page, PARAMS_BYTES));
-			if (!signed) return answer("no-signature", 502);
+			if (!signed) return answer("no-signature", 424);
 			const res = await get(BATCHEXECUTE_URL, {
 				method: "POST",
 				headers: {
@@ -42,11 +42,11 @@ export async function onRequestGet(ctx: Context): Promise<Response> {
 				},
 				body: batchexecuteBody(id, signed.ts, signed.sig)
 			});
-			if (!res.ok) return answer("bad-status", 502);
+			if (!res.ok) return answer("bad-status", 424);
 			const url = parseBatchexecute(await res.text());
-			return url ? answer(url, 200, true) : answer("no-decoded-url", 502);
+			return url ? answer(url, 200, true) : answer("no-decoded-url", 424);
 		} catch (error) {
-			return answer(transportCode(error), 502);
+			return answer(transportCode(error), 424);
 		}
 	});
 }
