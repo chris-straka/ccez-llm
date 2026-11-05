@@ -228,3 +228,11 @@ prompt from a Playwright browser means something launched without it.
   BlueStacks, read through the capture-OCR chord). CJK voices are
   installed locally (`say -v '?'`), so multilingual read-aloud is
   verifiable on the Mac.
+
+## Silent tests (owner, 2026-11-05)
+
+Tests and checks never make sound on the owner's machines: it distracts them
+while they work, and they've asked many times. Playwright runs with `--mute-audio` and
+`e2e/fixtures.ts` stubs `speechSynthesis` and mutes media (macOS speaks past the
+flag); keep both, and use the same for one-off scripts. The desktop and Android
+apps: never let a check speak or play out loud; mute the device first.
