@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 
 test("arrow by default, flag while a language is set", async ({ page }) => {
 	const send = page.locator(".send-btn");
-	await expect(send).toHaveText("↑", { ignoreCase: false });
+	await expect(send.locator(".send-arrow")).toBeVisible();
 	await expect(page.locator(".lang-chip").first()).toHaveCount(0);
 	const menu = page.locator(".lang-menu > button").first();
 	await menu.click();
@@ -25,10 +25,10 @@ test("arrow by default, flag while a language is set", async ({ page }) => {
 	const badge = (await list.locator(".badge").last().innerText()).trim();
 	await list.locator("button").last().click();
 	await expect(send).toContainText(badge);
-	await expect(send).not.toContainText("↑");
+	await expect(send.locator(".send-arrow")).toHaveCount(0);
 	// Picking the active option again clears back to the arrow.
 	await menu.click();
 	await expect(list).toBeVisible();
 	await list.locator("button.selected").click();
-	await expect(send).toHaveText("↑");
+	await expect(send.locator(".send-arrow")).toBeVisible();
 });

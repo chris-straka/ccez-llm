@@ -1468,7 +1468,7 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await page.waitForTimeout(400);
 	await pill.click();
 	await page.locator(".lang-list button.selected").click();
-	await expect(send).toHaveText("↑");
+	await expect(send.locator(".send-arrow")).toBeVisible();
 	await expect(panel).toHaveCount(0);
 	expect(await focusedComposer()).toBe(true);
 });

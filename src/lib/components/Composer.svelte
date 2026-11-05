@@ -486,7 +486,13 @@ stop, so both rules below stay suppressed. -->
 					: "Send"}
 			onclick={(event) => actions.submit(altHeld || event.altKey)}
 		>
-			{altHeld ? "Add +" : replyLang ? replyLang.badge : "↑"}
+			{#if altHeld}Add +{:else if replyLang}{replyLang.badge}{:else}<!-- Drawn, not "↑": each browser's font drew the
+				character its own way (owner, 2026-11-05: thin in Brave). --><svg
+					class="send-arrow"
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+					><path d="M8 13V3.5M3.5 7.5 8 3l4.5 4.5" /></svg
+				>{/if}
 		</button></span
 	>
 	{#if tray}
@@ -853,6 +859,15 @@ stop, so both rules below stay suppressed. -->
 	}
 	.send-btn:hover:not(:disabled) {
 		opacity: 0.8;
+	}
+	.send-arrow {
+		width: 0.95rem;
+		height: 0.95rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2.2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 	/* Light theme submit: the accent fill instead of the pitch-black
 	inversion (dark keeps the inverted fill). */
