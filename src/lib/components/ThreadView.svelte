@@ -854,22 +854,25 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		gap: 0.5rem;
 		margin-top: 0.35rem;
 	}
+	/* Shaped like the language chips above them (owner, 2026-11-05: the
+	circles looked off): the same rounded square and height, the picked
+	one filled softly rather than ringed. */
 	.study-modes button {
 		display: grid;
 		place-items: center;
-		width: 3rem;
-		height: 3rem;
-		border: 1px solid var(--line-soft);
-		border-radius: 50%;
+		width: 2.6rem;
+		height: 2.1rem;
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+		border-radius: 10px;
 		background: transparent;
 		font: inherit;
-		font-size: 1.35rem;
+		font-size: 1.1rem;
 		line-height: 1;
 		cursor: pointer;
 		transition:
-			background-color 0.15s ease,
 			border-color 0.15s ease,
-			transform 0.15s ease;
+			background-color 0.15s ease;
 	}
 	.study-modes button span {
 		/* Emoji sit a hair low in most fonts. */
@@ -877,16 +880,11 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	}
 	.study-modes button[aria-selected="true"] {
 		background: var(--hover-wash);
-		border-color: var(--ink);
+		border-color: transparent;
 	}
 	.study-modes button:hover {
-		background: var(--hover-wash);
-		transform: translateY(-1px);
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.study-modes button:hover {
-			transform: none;
-		}
+		border-color: #1c1c1e;
+		border-color: var(--strong);
 	}
 	.flashcards-open {
 		margin-top: 0.4rem;

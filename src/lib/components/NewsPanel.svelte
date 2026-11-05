@@ -588,28 +588,27 @@ everything else is theme tokens, never raw hex. -->
 		border-color: #fff;
 		border-color: var(--accent-ink);
 	}
+	/* A bare ✕, no ring (owner, 2026-11-05): a soft square under the pointer. */
 	.news-x {
 		flex: 0 0 auto;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
+		border: none;
 		background: transparent;
 		color: #6e6e73;
 		color: var(--muted);
-		border-radius: 999px;
-		width: calc(2.5 * var(--u, 1rem));
-		height: calc(2.5 * var(--u, 1rem));
+		border-radius: 8px;
+		width: calc(2.1 * var(--u, 1rem));
+		height: calc(2.1 * var(--u, 1rem));
 		font-size: calc(0.95 * var(--u, 1rem));
 		line-height: 1;
 		cursor: pointer;
 		transition:
 			color 0.15s ease,
-			border-color 0.15s ease;
+			background-color 0.15s ease;
 	}
 	.news-x:hover {
 		color: #1c1c1e;
 		color: var(--ink);
-		border-color: #8e8e93;
-		border-color: var(--line-hover);
+		background: var(--hover-wash);
 	}
 	.news-meta {
 		margin: 0;
