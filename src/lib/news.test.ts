@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
 	regionFlag,
 	cachedFeed,
@@ -693,10 +693,15 @@ describe("news feeds", () => {
 		await expect(decodeNewsLink("https://www.rfi.fr/fr/a")).resolves.toBe(
 			"https://www.rfi.fr/fr/a"
 		);
-		// Google links still need the shell decoder.
+		// Google links need a decoder: the shell's, or the website's own
+		// functions. A dev server answers with its page, not theirs.
+		const page = vi
+			.spyOn(globalThis, "fetch")
+			.mockResolvedValue(new Response("<!doctype html>", { status: 200 }));
 		await expect(
 			decodeNewsLink("https://news.google.com/rss/articles/AAA")
 		).rejects.toThrow("news-needs-shell");
+		page.mockRestore();
 	});
 
 	it("fans Europe loads out across the continent, minus home", async () => {

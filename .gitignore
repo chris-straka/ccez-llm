@@ -25,3 +25,4 @@ pnpm-workspace.yaml
 
 # Dictionary sources and built packs (scripts/dictionaries)
 .dict-cache/
+.wrangler/

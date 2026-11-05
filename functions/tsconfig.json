@@ -1,0 +1,6 @@
+{
+	// The site's Pages Functions (Cloudflare Workers runtime, the same
+	// web APIs as the page): checked on their own, with the shared module.
+	"extends": "../tsconfig.json",
+	"include": ["./**/*.ts", "../src/lib/web-fetch.ts"]
+}

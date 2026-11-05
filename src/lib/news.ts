@@ -1,3 +1,4 @@
+import { webFetch } from "./web-fetch";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
 import { MAX_FEED_ITEMS, parseFeedItems, type FeedItem } from "./tools";
@@ -1784,13 +1785,14 @@ export async function fetchArticleText(
 }
 
 /**
- * Raw page markup through the shell (RSS XML, outlet HTML). The
- * browser preview has no shell transport — CORS would block Google
- * and most outlets anyway — so it fails honest up front. Errors
- * carry machine-readable messages for newsErrorCopy.
+ * Raw page markup through the shell (RSS XML, outlet HTML). Without a
+ * shell, the website's own functions fetch it (CORS keeps the page from
+ * Google and the outlets); a dev server has neither and fails honest
+ * (`news-needs-shell`). Errors carry machine-readable messages for
+ * newsErrorCopy.
  */
 export async function fetchRawPage(url: string): Promise<string> {
-	if (!tauriBackendAvailable()) throw new Error("news-needs-shell");
+	if (!tauriBackendAvailable()) return webFetch("/api/fetch", { url });
 	const out = await tauriInvoke<unknown>("fetch_page", { url });
 	if (typeof out !== "string" || !out) throw new Error("news-empty");
 	return out;
@@ -1799,7 +1801,8 @@ export async function fetchRawPage(url: string): Promise<string> {
 /** Share image through the hidden desktop browser (shell only,
  * null when the page holds none). Mobile answers `unsupported`. */
 export async function fetchWebviewImage(url: string): Promise<string | null> {
-	if (!tauriBackendAvailable()) throw new Error("news-needs-shell");
+	// The website has no hidden browser: the page's own image tags stand.
+	if (!tauriBackendAvailable()) return null;
 	const out = await tauriInvoke<unknown>("fetch_og_image", { url });
 	if (out === null || out === undefined) return null;
 	if (typeof out !== "string" || !out) throw new Error("news-empty");
@@ -1830,7 +1833,7 @@ export function isDirectStoryLink(link: string): boolean {
  */
 export async function decodeNewsLink(link: string): Promise<string> {
 	if (isDirectStoryLink(link)) return link;
-	if (!tauriBackendAvailable()) throw new Error("news-needs-shell");
+	if (!tauriBackendAvailable()) return webFetch("/api/news-decode", { link });
 	const out = await tauriInvoke<unknown>("news_decode_url", { link });
 	if (typeof out !== "string" || !out.startsWith("http")) {
 		throw new Error("news-decode-failed");
