@@ -12572,20 +12572,27 @@
 				}
 			}
 			if (chrome === "delete-badge" && annotateMode.hoverBadgeId !== null) {
-				// Shell Cmd+D over a hovered badge drops its
-				// annotation, never the message underneath (same
-				// path as bare Delete on the badge).
+				// Cmd+D over a hovered badge drops its annotation,
+				// never the message underneath (same path as bare
+				// Delete on the badge).
 				event.preventDefault();
 				annotateMode.removeAnnotation(annotateMode.hoverBadgeId);
 				return;
 			}
-			if (chrome === "delete-message") {
+			if (chrome === "delete-annotations") {
+				// Cmd+D over a message clears its annotations
+				// (Shift+Delete's path); one with none keeps the key
+				// dead, never a bookmark.
 				const target = chat.messages[hoveredIdx];
-				if (target) {
-					consumeEvent(event);
-					removeMessage(hoveredIdx);
-					return;
-				}
+				if (target) clearMessageAnnotations(target.id);
+				consumeEvent(event);
+				return;
+			}
+			if (chrome === "swallow") {
+				// Cmd+D with no note in reach: nothing, not the
+				// browser's bookmark.
+				event.preventDefault();
+				return;
 			}
 			if (chrome === "undo-delete") {
 				// ⌘Z outside fields: deleted messages come back. With

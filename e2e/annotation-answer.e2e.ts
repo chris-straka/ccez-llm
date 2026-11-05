@@ -1078,6 +1078,71 @@ test("Shift+Delete clears a message's annotations", async ({ page }) => {
 	await expect(page.locator(".toast")).toContainText("2 annotations deleted");
 });
 
+/** ⌘D is the notes' (owner, 2026-11-05: never a bookmark): over a
+badge that note goes, over a message every note on it while the
+message stays, and with nothing under the pointer it still never
+reaches the browser (no bookmark). This preview has no shell, so it is
+the website's path. */
+test("⌘D deletes notes, never the message, never a bookmark", async ({
+	page
+}) => {
+	// A message of the owner's first: the reply's badges sit below the
+	// sticky header, where the pointer can reach them.
+	await seedChat(page, [
+		{ role: "user", content: "Describe a quiet morning by the river." },
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	for (const word of ["riverbank", "dawn", "fog"]) {
+		await dragQuote(page, 1, word);
+		await page.keyboard.press("a");
+	}
+	const badges = page.locator("button.ccez-ann-badge");
+	await expect(badges).toHaveCount(3, { timeout: 10_000 });
+	await page.evaluate(() => {
+		const w = window as unknown as { cmdD: boolean[] };
+		w.cmdD = [];
+		window.addEventListener("keydown", (e) => {
+			if (e.metaKey && e.key.toLowerCase() === "d")
+				w.cmdD.push(e.defaultPrevented);
+		});
+	});
+	const blur = () =>
+		page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
+	// Over one badge: that note alone.
+	const box = await badges.first().boundingBox();
+	if (!box) throw new Error("badge has no box");
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.waitForTimeout(300);
+	await blur();
+	await page.keyboard.press("Meta+d");
+	await expect(badges).toHaveCount(2);
+	// Over the message: the rest of its notes; the message stays.
+	const row = await article.boundingBox();
+	if (!row) throw new Error("article has no box");
+	await page.mouse.move(row.x + row.width - 12, row.y + row.height / 2);
+	await page.waitForTimeout(300);
+	await blur();
+	await page.keyboard.press("Meta+d");
+	await expect(badges).toHaveCount(0);
+	await expect(article).toContainText("the riverbank at dawn holds the fog");
+	// Nothing under the pointer: nothing happens, and no bookmark.
+	await page.mouse.move(2, 2);
+	await page.keyboard.press("Meta+d");
+	await expect(article).toHaveCount(1);
+	const prevented = await page.evaluate(
+		() => (window as unknown as { cmdD: boolean[] }).cmdD
+	);
+	// Every ⌘D that reached the page's bubble phase was already claimed
+	// (the message's is stopped outright): none was left to the browser.
+	expect(prevented.length).toBeGreaterThan(0);
+	expect(prevented.every(Boolean)).toBe(true);
+});
+
 /** Arguing with an answer: Reply opens the field, a reply joins a
 thread under the answer (never a second card), its answer lands there,
 and the thread survives a reload. Typing in the field never fires

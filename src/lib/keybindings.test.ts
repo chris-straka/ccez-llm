@@ -1233,6 +1233,7 @@ describe("chromeChord", () => {
 		expect(
 			chromeChord({ ...chromeBase, inShell: false, key: "b", code: "KeyB" })
 		).toBeNull();
+		// ⌘D is the notes' on the website too, never a bookmark.
 		expect(
 			chromeChord({
 				...chromeBase,
@@ -1241,7 +1242,7 @@ describe("chromeChord", () => {
 				code: "KeyD",
 				hovered: true
 			})
-		).toBeNull();
+		).toBe("delete-annotations");
 		// Shell keeps them all.
 		expect(chromeChord({ ...chromeBase, key: "=", code: "Equal" })).toBe(
 			"zoom"
@@ -1249,9 +1250,34 @@ describe("chromeChord", () => {
 		expect(chromeChord({ ...chromeBase, key: "b", code: "KeyB" })).toBe(
 			"toggle-sidebar"
 		);
+		// ⌘D clears a hovered message's notes, never the message
+		// (owner, 2026-11-05); with nothing in reach, or in a field, it
+		// does nothing rather than bookmark.
 		expect(
 			chromeChord({ ...chromeBase, key: "d", code: "KeyD", hovered: true })
-		).toBe("delete-message");
+		).toBe("delete-annotations");
+		expect(chromeChord({ ...chromeBase, key: "d", code: "KeyD" })).toBe(
+			"swallow"
+		);
+		expect(
+			chromeChord({
+				...chromeBase,
+				key: "d",
+				code: "KeyD",
+				hovered: true,
+				inField: true
+			})
+		).toBe("swallow");
+		expect(
+			chromeChord({
+				...chromeBase,
+				metaKey: false,
+				ctrlKey: true,
+				key: "d",
+				code: "KeyD",
+				hovered: true
+			})
+		).toBeNull();
 		// A hovered badge owns Cmd+D: the annotation goes, never
 		// the message underneath.
 		expect(
@@ -1336,7 +1362,7 @@ describe("chromeChord", () => {
 		).toBeNull();
 	});
 
-	it("keeps the guard spellings (Cmd+D stays meta-only and hover-gated)", () => {
+	it("keeps the guard spellings (Cmd+D stays meta-only; off a note it only swallows)", () => {
 		// Ctrl+D belongs to the prompt and scroll-mode fast-scroll.
 		expect(
 			chromeChord({
@@ -1347,13 +1373,16 @@ describe("chromeChord", () => {
 				hovered: true
 			})
 		).toBe(null);
+		// Typing targets and empty space: nothing, never the bookmark.
 		expect(
 			chromeChord({ ...chromeBase, key: "d", hovered: true, inEditor: true })
-		).toBe(null);
+		).toBe("swallow");
 		expect(
 			chromeChord({ ...chromeBase, key: "d", hovered: true, inField: true })
-		).toBe(null);
-		expect(chromeChord({ ...chromeBase, key: "d", code: "KeyD" })).toBe(null);
+		).toBe("swallow");
+		expect(chromeChord({ ...chromeBase, key: "d", code: "KeyD" })).toBe(
+			"swallow"
+		);
 		// Alt breaks every chord in the cluster.
 		expect(chromeChord({ ...chromeBase, altKey: true, key: "b" })).toBe(null);
 		expect(

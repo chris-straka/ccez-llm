@@ -784,7 +784,8 @@ export type ChromeChord =
 	| "prompt-width"
 	| "quick-lang"
 	| "delete-badge"
-	| "delete-message"
+	| "delete-annotations"
+	| "swallow"
 	| "undo-delete";
 
 /** Digit order for the Cmd+1..0 quick-language chords (see `quickLangIndexForKey`). */
@@ -909,24 +910,20 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 			if (facts.key === "ArrowDown") return "step-chat-newer";
 			if (facts.key === "ArrowUp") return "step-chat-older";
 		}
-		// Shell only: a browser claims ⌘/Ctrl+D (bookmark tab).
+		// ⌘D is for notes, never a bookmark (owner, 2026-11-05), on the
+		// website too: over a badge its note goes, over a message every
+		// note on it (Shift+Delete's path); messages themselves keep
+		// ⌘Delete and Shift+D. Anywhere else it does nothing, rather
+		// than let the browser bookmark the tab. Ctrl+D stays out: the
+		// prompt keeps it for editing and scroll mode fast-scrolls on it.
 		if (
-			facts.inShell &&
 			facts.metaKey &&
 			!facts.ctrlKey &&
-			(facts.key === "d" || facts.key === "D") &&
-			!facts.inEditor &&
-			facts.hovered &&
-			!facts.inField
+			(facts.key === "d" || facts.key === "D")
 		) {
-			// A hovered annotation badge owns Cmd+D: the annotation
-			// goes, never the message underneath (bare Delete drops
-			// badges the same way — same small-target authorization).
-			// Otherwise Cmd+D deletes the hovered message. Ctrl+D is
-			// deliberately excluded: the prompt keeps it for editing
-			// and scroll mode fast-scrolls on it instead.
+			if (facts.inEditor || facts.inField || !facts.hovered) return "swallow";
 			if (facts.hoverBadgeId) return "delete-badge";
-			return "delete-message";
+			return "delete-annotations";
 		}
 	}
 	return null;

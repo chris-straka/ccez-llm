@@ -154,7 +154,9 @@ describe("shortcuts menu copy", () => {
 		expect(keys.get("Set capture area")).toBe("⇧⌘U");
 		expect(keys.get("Fullscreen")).toBe("Ctrl+⌘F");
 		expect(keys.get("Edit newest message")).toBe("⌘E");
-		expect(keys.get("Delete")).toBe("⌘Delete · ⌘D · Shift+D");
+		expect(keys.get("Delete")).toBe("⌘Delete · Shift+D");
+		// ⌘D is the notes' (owner, 2026-11-05: never a bookmark).
+		expect(keys.get("Clear its annotations")).toBe("⌘D · Shift+Delete");
 		expect(keys.get("Delete this chat")).toBe("⇧⌘Delete");
 		expect(keys.get("Undo delete")).toBe("⌘Z");
 		// Hover is the section's premise: its keys never repeat it.

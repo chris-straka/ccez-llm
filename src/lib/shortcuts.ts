@@ -174,18 +174,22 @@ export function desktopShortcuts(
 			keys: "Shift+W / Shift+S / Shift+P"
 		},
 		{ group: hover, name: "Annotate word", keys: "A" },
-		{ group: hover, name: "Clear its annotations", keys: "Shift+Delete" },
+		{
+			group: hover,
+			name: "Clear its annotations",
+			keys: isMac ? "⌘D · Shift+Delete" : "Shift+Delete"
+		},
 		{ group: hover, name: "Edit your message", keys: "E" },
 		{ group: hover, name: "Rerun / regenerate", keys: "R" },
 		{ group: hover, name: "Cut", keys: "X" },
 		{ group: hover, name: "Branch from here", keys: "Shift+C" },
 		{ group: hover, name: "Trim above here", keys: "T" },
 		{ group: hover, name: "Jump to its start / end", keys: "z / Z" },
-		// ⌘D is meta-only (Ctrl+D fast-scrolls in scroll mode); Shift+D works everywhere.
+		// ⌘D clears notes instead (owner, 2026-11-05); Shift+D works everywhere.
 		{
 			group: hover,
 			name: "Delete",
-			keys: isMac ? "⌘Delete · ⌘D · Shift+D" : "Ctrl+Delete · Shift+D"
+			keys: isMac ? "⌘Delete · Shift+D" : "Ctrl+Delete · Shift+D"
 		},
 		{ group: hover, name: "Undo delete", keys: `${meta}Z` },
 		{
