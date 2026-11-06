@@ -22,6 +22,15 @@ pub const TITLE_EVENT: &str = "browser-title";
 /// A page asked for a new window (target=_blank, window.open): `{ id, url }`.
 #[cfg(desktop)]
 pub const NEW_TAB_EVENT: &str = "browser-new-tab";
+/// A page's mail, phone or text-message link: `{ id, url }`. The app
+/// opens it only while the page has the keyboard (a click in it), once in
+/// a while: the engine says nothing of who started it, and a hidden frame
+/// could open Mail over and over.
+#[cfg(desktop)]
+pub const EXTERNAL_EVENT: &str = "browser-external";
+/// A download began (the page stays where it was): `{ id }`.
+#[cfg(desktop)]
+pub const DOWNLOAD_START_EVENT: &str = "browser-download-start";
 /// A download finished: `{ id, name, ok }`.
 #[cfg(desktop)]
 pub const DOWNLOAD_EVENT: &str = "browser-download";
@@ -73,7 +82,9 @@ fn navigation(to: &tauri::Url) -> Go {
 #[cfg_attr(mobile, allow(dead_code))]
 const NO_DEVICES_JS: &str = r#"(() => {
   const no = () => Promise.reject(new DOMException("Not allowed", "NotAllowedError"));
-  const lock = (o, k, v) => { try { Object.defineProperty(o, k, { value: v, writable: false, configurable: false }); } catch (_) {} };
+  // Replaceable: sites (adapter.js) wrap getUserMedia by assigning it,
+  // and a read-only one threw. A wrapper still calls this one.
+  const lock = (o, k, v) => { try { Object.defineProperty(o, k, { value: v, writable: true, configurable: true }); } catch (_) {} };
   if (window.MediaDevices) { lock(MediaDevices.prototype, "getUserMedia", no); lock(MediaDevices.prototype, "getDisplayMedia", no); }
   if (window.Geolocation) {
     const denied = (_, err) => { if (typeof err === "function") setTimeout(() => err({ code: 1, message: "User denied Geolocation", PERMISSION_DENIED: 1 }), 0); };
@@ -123,6 +134,32 @@ fn webview(app: &tauri::AppHandle, id: &str) -> Result<tauri::Webview, String> {
         .ok_or_else(|| "no such tab".to_string())
 }
 
+/// Runs `f` on tab view `view`'s WKWebView (on the main thread), then
+/// lets go of what Tauri handed over: each `with_webview` passes the
+/// view, its manager and its window retained (tauri-runtime-wry's
+/// `into_raw`) and nothing releases them, so a closed tab's page lived on,
+/// sound and all (owner's review, 2026-11-06).
+#[cfg(target_os = "macos")]
+fn with_view<F>(view: &tauri::Webview, f: F) -> Result<(), String>
+where
+    F: FnOnce(*mut objc2::runtime::AnyObject) + Send + 'static,
+{
+    view.with_webview(move |platform| unsafe {
+        use objc2::rc::Retained;
+        use objc2::runtime::AnyObject;
+        let webview = platform.inner().cast::<AnyObject>();
+        f(webview);
+        for held in [
+            webview,
+            platform.controller().cast(),
+            platform.ns_window().cast(),
+        ] {
+            drop(Retained::<AnyObject>::from_raw(held));
+        }
+    })
+    .map_err(|e| e.to_string())
+}
+
 #[cfg(desktop)]
 fn rect(x: f64, y: f64, w: f64, h: f64) -> tauri::Rect {
     tauri::Rect {
@@ -162,7 +199,7 @@ pub fn browser_open(
         }
         let window = app.get_window("main").ok_or("no main window")?;
         let (a, b, c) = (app.clone(), app.clone(), app.clone());
-        let (i1, i2, i3, i4) = (id.clone(), id.clone(), id.clone(), id.clone());
+        let (i1, i2, i3, i4, i5) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
         let downloads = app.path().download_dir().ok();
         let d = app.clone();
         // Dark pages open dark: no white flash before the first paint.
@@ -203,8 +240,13 @@ pub fn browser_open(
                 .on_navigation(move |to| match navigation(to) {
                     Go::Load => true,
                     Go::System => {
-                        use tauri_plugin_opener::OpenerExt;
-                        let _ = c.opener().open_url(to.as_str(), None::<&str>);
+                        let _ = c.emit(
+                            EXTERNAL_EVENT,
+                            NewTab {
+                                id: i5.clone(),
+                                url: to.to_string(),
+                            },
+                        );
                         false
                     }
                     Go::Refuse => false,
@@ -226,8 +268,13 @@ pub fn browser_open(
                             );
                         }
                         Go::System => {
-                            use tauri_plugin_opener::OpenerExt;
-                            let _ = d.opener().open_url(to.as_str(), None::<&str>);
+                            let _ = d.emit(
+                                EXTERNAL_EVENT,
+                                NewTab {
+                                    id: i3.clone(),
+                                    url: to.to_string(),
+                                },
+                            );
                         }
                         _ => {}
                     }
@@ -236,6 +283,13 @@ pub fn browser_open(
                 .on_download(move |webview, event| {
                     match event {
                         tauri::webview::DownloadEvent::Requested { url, destination } => {
+                            let _ = webview.app_handle().emit(
+                                DOWNLOAD_START_EVENT,
+                                NewTab {
+                                    id: i4.clone(),
+                                    url: url.to_string(),
+                                },
+                            );
                             if let Some(dir) = &downloads {
                                 let name = url
                                     .path_segments()
@@ -278,8 +332,7 @@ pub fn browser_open(
             )
             .map_err(|e| e.to_string())?;
         #[cfg(target_os = "macos")]
-        let _ =
-            view.with_webview(|platform| unsafe { mac::refuse_devices(platform.inner().cast()) });
+        let _ = with_view(&view, |webview| unsafe { mac::refuse_devices(webview) });
         #[cfg(not(target_os = "macos"))]
         let _ = view;
         Ok(())
@@ -348,8 +401,7 @@ pub fn browser_close(app: tauri::AppHandle, id: String) -> Result<(), String> {
         match webview(&app, &id) {
             Ok(view) => {
                 #[cfg(target_os = "macos")]
-                let _ =
-                    view.with_webview(|platform| unsafe { mac::forget(platform.inner().cast()) });
+                let _ = with_view(&view, |webview| unsafe { mac::forget(webview) });
                 view.close().map_err(|e| e.to_string())
             }
             Err(_) => Ok(()),
@@ -486,7 +538,42 @@ pub async fn browser_selection(
         Err("the browser is desktop only".into())
     }
     #[cfg(desktop)]
-    eval_json(&app, &id, SELECTION_JS).await
+    {
+        // What the page answers is the page's: a page can say anything
+        // (its own JSON.stringify), so lengths are capped here and the
+        // address is the engine's own.
+        let mut value = eval_json(&app, &id, SELECTION_JS).await?;
+        let cap = |v: &serde_json::Value, n: usize| -> String {
+            v.as_str().unwrap_or_default().chars().take(n).collect()
+        };
+        let url = webview(&app, &id)?.url().map_err(|e| e.to_string())?;
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err("not a web page".into());
+        }
+        let text = cap(&value["text"], 600);
+        let block = cap(&value["block"], 4000);
+        let title = cap(&value["title"], 200);
+        value = serde_json::json!({ "text": text, "block": block, "title": title, "url": url.to_string() });
+        Ok(value)
+    }
+}
+
+/// Debug builds only: `body` (a function body that returns a value) run
+/// in tab `id`'s page, its result as JSON, for scripts/drive.ts `page`.
+/// Release builds have no such command.
+#[cfg(all(debug_assertions, desktop))]
+#[tauri::command]
+pub async fn browser_debug_eval(
+    app: tauri::AppHandle,
+    id: String,
+    body: String,
+) -> Result<serde_json::Value, String> {
+    eval_json(
+        &app,
+        &id,
+        &format!("JSON.stringify((() => {{ try {{ return (() => {{ {body} }})(); }} catch (e) {{ return {{ thrown: String(e) }}; }} }})())"),
+    )
+    .await
 }
 
 /// `js` (which returns a JSON string) run in tab `id`, parsed.
@@ -513,8 +600,8 @@ async fn eval_json(
 async fn mac_history(app: &tauri::AppHandle, id: &str) -> Option<(bool, bool)> {
     let view = webview(app, id).ok()?;
     let (tx, rx) = tokio::sync::oneshot::channel::<(bool, bool)>();
-    view.with_webview(move |platform| {
-        let _ = tx.send(unsafe { mac::history(platform.inner().cast()) });
+    with_view(&view, move |webview| {
+        let _ = tx.send(unsafe { mac::history(webview) });
     })
     .ok()?;
     tokio::time::timeout(std::time::Duration::from_secs(1), rx)
@@ -606,8 +693,7 @@ pub async fn snapshot_of(
     use tauri::Manager;
     let view = app.get_webview(label).ok_or("no such tab")?;
     let (tx, rx) = tokio::sync::oneshot::channel::<Option<Vec<u8>>>();
-    view.with_webview(move |platform| unsafe { mac::snapshot(platform.inner().cast(), tx) })
-        .map_err(|e| e.to_string())?;
+    with_view(&view, move |webview| unsafe { mac::snapshot(webview, tx) })?;
     let bytes = tokio::time::timeout(std::time::Duration::from_secs(2), rx)
         .await
         .map_err(|_| "no snapshot".to_string())?

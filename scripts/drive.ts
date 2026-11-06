@@ -11,6 +11,9 @@
  *   bun scripts/drive.ts js "<expression>"   run JS, print the result
  *   bun scripts/drive.ts click "<selector>"  click an element
  *   bun scripts/drive.ts key "<key>" [code]  press a key in the page
+ *   bun scripts/drive.ts page "<body>"       run a function body in the browser
+ *                                            pane's active page (synchronous;
+ *                                            debug builds only), print its result
  *   bun scripts/drive.ts windows             list the app's windows
  *   bun scripts/drive.ts tour [dir]          shoot a fixed set of screens
  *                                            (chat, chat list, every page
@@ -262,12 +265,23 @@ async function main(): Promise<void> {
 		} else if (cmd === "tour") {
 			const shots = await tour(ws, rest[0] ?? ".screenshots/tour");
 			console.log(shots.join("\n"));
+		} else if (cmd === "page") {
+			const body = JSON.stringify(rest.join(" "));
+			const value = await run(
+				ws,
+				`
+					const p = window.__ccezBrowser;
+					if (!p?.active) return "no page";
+					return await window.__TAURI__.core.invoke("browser_debug_eval", { id: p.active, body: ${body} });
+				`
+			);
+			console.log(JSON.stringify(value, null, 2));
 		} else if (cmd === "windows") {
 			const reply = await send(ws, "list_windows");
 			console.log(JSON.stringify(reply.data ?? reply, null, 2));
 		} else {
 			console.log(
-				"usage: bun scripts/drive.ts shot [out.png] | js <expr> | click <selector> | key <key> [code] | tour [dir] | windows"
+				"usage: bun scripts/drive.ts shot [out.png] | js <expr> | page <body> | click <selector> | key <key> [code] | tour [dir] | windows"
 			);
 		}
 	} finally {

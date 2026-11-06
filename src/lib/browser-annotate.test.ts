@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { pageExcerpt, plainMarkdown, selectQuote } from "./browser";
+import { renderMessage } from "./render";
 
 describe("annotating a page's selection", () => {
 	it("takes the sentence the selection is in", () => {
@@ -38,8 +39,25 @@ describe("annotating a page's selection", () => {
 		expect(out.endsWith("…")).toBe(true);
 	});
 
-	it("keeps a page's own * # _ as characters in the chat", () => {
-		expect(plainMarkdown("# 5 * 3 = 15_ok")).toBe("\\# 5 \\* 3 = 15\\_ok");
+	it("shows a page's text in the chat exactly as written", () => {
+		const texts = [
+			"# 5 * 3 = 15_ok",
+			"1. Premier point, puis 2) le second",
+			"- un tiret + un plus",
+			"Le menu coûte 5 $ et le vin 10 $ seulement.",
+			"R&amp;D &lt;b&gt; et a < b > c",
+			"`code` ~~barré~~ *étoile* [lien](https://x.fr) a | b",
+			"> citation === ---",
+			"Voir https://www.lemonde.fr/ ou écrire à a@b.fr !",
+			"\\ une barre \\n inverse"
+		];
+		for (const text of texts) {
+			const out = renderMessage(plainMarkdown(text), false);
+			const el = document.createElement("div");
+			el.innerHTML = out.html;
+			expect(el.textContent?.trim()).toBe(text);
+			expect(out.maths).toHaveLength(0);
+		}
 	});
 
 	it("selects the quote again inside the chat's message, across its elements", () => {

@@ -9913,14 +9913,33 @@
 	 * with the page's link, and the selection in it is annotated as A
 	 * does in the chat (filed and asked at once, the answer in its badge).
 	 */
+	let annotatingPage = false;
 	async function annotateFromPage(): Promise<void> {
-		if (isSending(chatState) || nativeTurns.live.has(chatState.activeChatId)) {
+		// One at a time: ⇧⌘A twice would file the sentence twice.
+		if (annotatingPage) return;
+		annotatingPage = true;
+		try {
+			await annotatePageSelection();
+		} finally {
+			annotatingPage = false;
+		}
+	}
+
+	async function annotatePageSelection(): Promise<void> {
+		const busy = (): boolean =>
+			isSending(chatState) || nativeTurns.live.has(chatState.activeChatId);
+		if (busy()) {
 			flashToast("Wait for the reply");
 			return;
 		}
 		const sel = await browser.selection();
 		if (!sel) {
 			flashToast("Nothing selected in the page");
+			return;
+		}
+		// Asked while the selection was read: still the same chat, shown.
+		if (busy() || previewing) {
+			flashToast(previewing ? "Open the chat first" : "Wait for the reply");
 			return;
 		}
 		const quote = sel.text.replace(/\s+/g, " ").trim();
@@ -9933,9 +9952,14 @@
 		await tick();
 		await new Promise((done) => requestAnimationFrame(() => done(null)));
 		const index = chat.messages.findIndex((m) => m.id === id);
-		const article = document.getElementById(`msg-${index}`);
+		const article = index >= 0 ? document.getElementById(`msg-${index}`) : null;
 		const body = article?.querySelector(".rendered") ?? article;
-		if (!body || !selectQuote(body, quote)) return;
+		if (chat.id !== chatId || !body || !selectQuote(body, quote)) {
+			// Never a message left behind with nothing on it.
+			if (chat.id === chatId && index >= 0) deleteMessage(chatState, index);
+			flashToast("Couldn't annotate that");
+			return;
+		}
 		article?.scrollIntoView({ block: "nearest" });
 		annotateMode.placeSelMenu();
 		annotateMode.annotate("", true);

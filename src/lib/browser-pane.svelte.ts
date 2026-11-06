@@ -50,6 +50,8 @@ export interface PageSelection {
 
 /** How often the active page is asked where it is (its URL follows single-page sites). */
 const POLL_MS = 600;
+/** A page opens at most one mail or phone link this often (ms). */
+const EXTERNAL_GAP_MS = 4000;
 /** A load still going after this long, with the engine idle, has failed. */
 const LOAD_GIVE_UP_MS = 15_000;
 
@@ -91,6 +93,8 @@ export class BrowserPane {
 	private since = new Map<string, number>();
 	private wantCovered = false;
 	private wantResizing = false;
+	/** When a page last opened a mail or phone link in the system. */
+	private lastExternal = 0;
 	/** The box each tab was last nudged to fill (once a box, never a loop). */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	private nudged = new Map<string, string>();
@@ -159,6 +163,27 @@ export class BrowserPane {
 			}),
 			listen<{ id: string; url: string }>("browser-new-tab", ({ payload }) => {
 				this.newTab(payload.url, { after: payload.id });
+			}),
+			listen<{ id: string; url: string }>("browser-external", ({ payload }) => {
+				// A mail, phone or text link: only from the page you're in
+				// (it has the keyboard: you clicked in it), and once in a
+				// while, since the engine can't say who started it.
+				const now = Date.now();
+				if (payload.id !== this.active || !this.focused) return;
+				if (now - this.lastExternal < EXTERNAL_GAP_MS) return;
+				if (!/^(mailto|tel|sms):/i.test(payload.url)) return;
+				this.lastExternal = now;
+				void this.call("plugin:opener|open_url", {
+					url: payload.url,
+					with: null
+				});
+			}),
+			listen<{ id: string }>("browser-download-start", ({ payload }) => {
+				// A download never becomes the page: the tab stays where it
+				// was, not loading (and never failed) for good.
+				this.since.delete(payload.id);
+				this.patch(payload.id, { loading: false, failed: false });
+				void this.refresh(payload.id);
 			}),
 			listen<{ id: string; name: string; ok: boolean }>(
 				"browser-download",

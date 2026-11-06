@@ -92,7 +92,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [x] Dark pages and light pages both look right next to the app in both themes (the pane's chrome follows the app).
 - [ ] Video full screen from a page fills the pane (or the window), and Esc brings it back.
 - [ ] The page's own right-click menu.
-- [ ] A page that asks for the camera, microphone or location: refused quietly (in code: WebKit's grant turned down for tabs, and a script in every frame; not run live, to keep the Mac from a microphone prompt).
+- [x] A page that asks for the camera, microphone or location: refused quietly (WebKit's grant turned down for tabs, and a script in every frame; checked from the page and from a frame it made after loading).
 
 ### Annotating and language (owner, 2026-11-06)
 
@@ -157,3 +157,27 @@ keys while the page has the keyboard, video full screen, downloads).
   own there (Ctrl for ⌘), while the app has the keyboard.
 - A new tab's address bar, a frame after opening, wiped what was already
   typed in it.
+
+## Second review (2026-11-06, fixed)
+
+- Every `with_webview` call leaked the view, its manager and its window
+  (tauri-runtime-wry hands them over retained), so a closed tab's page
+  kept running: a page pinging a local server went on after the pane
+  closed. `with_view` releases them; the pings stop now.
+- Mail, phone and text links opened with no click (a hidden frame could
+  open Mail over and over): the app opens one only from the active page
+  while it has the keyboard, at most every 4 s.
+- The camera and microphone stub was read-only, which broke sites that
+  wrap getUserMedia by assigning it (adapter.js); it's replaceable now
+  (a wrapper still calls it, and WebKit's refusal stands behind it).
+- A typed download address left the tab loading, then failed: a
+  download's start ends the load.
+- Annotating from a page left the message behind when its quote couldn't
+  be found again (it's taken back now), filed twice on a double press,
+  and didn't check the chat again after reading the selection. Page
+  text shows exactly as written (every punctuation mark escaped but
+  parentheses, which open maths here). The page's title and text are
+  capped and its address is the engine's own, never what the page says.
+
+`scripts/drive.ts page "<body>"` runs a function body in the active page
+(debug builds only, `browser_debug_eval`), for checks like these.

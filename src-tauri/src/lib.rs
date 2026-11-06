@@ -416,6 +416,8 @@ pub fn run() {
             drive_result,
             #[cfg(all(debug_assertions, target_os = "macos"))]
             drive_main_snapshot,
+            #[cfg(all(debug_assertions, desktop))]
+            browser::browser_debug_eval,
             browser::browser_open,
             browser::browser_bounds,
             browser::browser_visible,

@@ -330,9 +330,16 @@ export function pageExcerpt(text: string, block: string): string {
 	return `${from > 0 && !isEnd(from - 1) ? "…" : ""}${cut}${to < all.length && !isEnd(to - 1) ? "…" : ""}`;
 }
 
-/** `text` safe in Markdown: shown as written (a page's * and # stay characters). */
+/**
+ * `text` as Markdown that shows exactly as written: every ASCII
+ * punctuation mark escaped (CommonMark allows it for all of them), so a
+ * page's "1.", "- ", "$5", "&amp;", "<b>" or "*" stay characters, never
+ * a list, maths, an entity or a tag.
+ */
 export function plainMarkdown(text: string): string {
-	return text.replace(/([\\`*_[\]<>#|~])/g, "\\$1");
+	// Not ( and ): "\\(" opens maths here, and with [ ] escaped they
+	// make no link.
+	return text.replace(/[!-'*-/:-@[-`{-~]/g, "\\$&");
 }
 
 /**
