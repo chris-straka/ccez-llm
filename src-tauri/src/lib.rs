@@ -426,6 +426,7 @@ pub fn run() {
             browser::browser_zoom,
             browser::browser_find,
             browser::browser_state,
+            browser::browser_selection,
             browser::browser_snapshot,
             browser::browser_menu,
             dict::dict_installed,

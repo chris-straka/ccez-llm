@@ -133,7 +133,8 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Next / previous tab",
 	"Expand the browser",
 	"In the page: back, forward, reload",
-	"In the page: find, zoom"
+	"In the page: find, zoom",
+	"In the page: annotate the selection"
 ]);
 
 /** Rows whose feature only exists on macOS (screen capture). */
@@ -364,6 +365,11 @@ export function desktopShortcuts(
 			group: browser,
 			name: "In the page: find, zoom",
 			keys: `${meta}F · ${meta}= / ${meta}- / ${meta}0`
+		},
+		{
+			group: browser,
+			name: "In the page: annotate the selection",
+			keys: `${shiftMeta}A`
 		}
 	];
 	return rows.filter(

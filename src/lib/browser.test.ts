@@ -22,7 +22,18 @@ describe("the address bar", () => {
 		expect(resolveBrowserUrl("lemonde.fr/international")).toBe(
 			"https://lemonde.fr/international"
 		);
-		expect(resolveBrowserUrl("localhost:3000")).toBe("https://localhost:3000/");
+		// This computer and the home network: plain http.
+		expect(resolveBrowserUrl("localhost:3000")).toBe("http://localhost:3000/");
+		expect(resolveBrowserUrl("192.168.1.1")).toBe("http://192.168.1.1/");
+		expect(resolveBrowserUrl("[::1]:8080")).toBe("http://[::1]:8080/");
+		expect(resolveBrowserUrl("nas.local/admin")).toBe("http://nas.local/admin");
+		expect(resolveBrowserUrl("8.8.8.8")).toBe("https://8.8.8.8/");
+		// Names in other scripts, and their punycode.
+		expect(resolveBrowserUrl("münchen.de")).toBe("https://xn--mnchen-3ya.de/");
+		expect(resolveBrowserUrl("пример.рф")).toMatch(/^https:\/\/xn--/);
+		expect(resolveBrowserUrl("xn--e1afmkfd.xn--p1ai")).toBe(
+			"https://xn--e1afmkfd.xn--p1ai/"
+		);
 		expect(resolveBrowserUrl("http://example.com")).toBe("http://example.com/");
 		expect(resolveBrowserUrl("le monde")).toBe(
 			"https://duckduckgo.com/?q=le%20monde"
@@ -37,6 +48,22 @@ describe("the address bar", () => {
 		expect(resolveBrowserUrl("file:///etc/passwd")).toMatch(
 			/^https:\/\/duckduckgo\.com\/\?q=/
 		);
+	});
+
+	it("searches in the chat's reply language where DuckDuckGo has its region", () => {
+		expect(resolveBrowserUrl("pain au chocolat", "fr")).toBe(
+			"https://duckduckgo.com/?q=pain%20au%20chocolat&kl=fr-fr"
+		);
+		expect(resolveBrowserUrl("ラーメン", "ja")).toMatch(/&kl=jp-jp$/);
+		// No region for it, or no reply language: searched as usual.
+		expect(resolveBrowserUrl("habari", "sw")).toBe(
+			"https://duckduckgo.com/?q=habari"
+		);
+		expect(resolveBrowserUrl("hello", null)).toBe(
+			"https://duckduckgo.com/?q=hello"
+		);
+		// An address is an address in any language.
+		expect(resolveBrowserUrl("lemonde.fr", "fr")).toBe("https://lemonde.fr/");
 	});
 
 	it("shows the host, the rest after it, and Not secure for plain http", () => {

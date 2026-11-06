@@ -22,9 +22,14 @@ something of the app's over it), its snapshot fills `.page`. -->
 		zoomWindow: (event: MouseEvent) => void;
 		/** The traffic lights sit over the pane's top left (expanded on macOS). */
 		lights: boolean;
+		/** Annotate what's selected in the page, in the chat. */
+		annotate: () => void;
+		/** The key for it, for its hold label ("⇧⌘A"). */
+		annotateKey: string;
 	}
 
-	let { pane, dragWindow, zoomWindow, lights }: Props = $props();
+	let { pane, dragWindow, zoomWindow, lights, annotate, annotateKey }: Props =
+		$props();
 
 	let el: HTMLElement | undefined = $state();
 	let pageEl: HTMLElement | undefined = $state();
@@ -85,7 +90,9 @@ something of the app's over it), its snapshot fills `.page`. -->
 			if (over !== more) more = over;
 		}
 		const box = pageEl.getBoundingClientRect();
-		const key = `${box.left},${box.top},${box.width},${box.height}`;
+		// The screen's density too: moved to another display, the same
+		// box is a different size in the engine's own pixels.
+		const key = `${box.left},${box.top},${box.width},${box.height},${devicePixelRatio}`;
 		if (key !== last) {
 			last = key;
 			pane.setBox(box);
@@ -155,20 +162,25 @@ something of the app's over it), its snapshot fills `.page`. -->
 	});
 
 	function edit(): void {
-		draft = tab && tab.url !== "about:blank" ? tab.url : "";
+		// Already being typed in (the field took the keyboard first, and
+		// a new tab's own call came a frame later): what's typed stays.
+		const typed = editing && draft !== "";
+		if (!typed) {
+			draft = tab && tab.url !== "about:blank" ? tab.url : "";
+			// Set here, not only through the binding: a value typed before
+			// stayed in the field after it was sent.
+			if (input) input.value = draft;
+		}
 		editing = true;
-		// Set here, not only through the binding: a value typed before
-		// stayed in the field after it was sent.
-		if (input) input.value = draft;
 		requestAnimationFrame(() => {
 			input?.focus();
-			input?.select();
+			if (!typed) input?.select();
 		});
 	}
 
 	function submit(event: SubmitEvent): void {
 		event.preventDefault();
-		pane.go(resolveBrowserUrl(draft));
+		pane.go(resolveBrowserUrl(draft, pane.lang));
 		editing = false;
 		input?.blur();
 		pane.focusPage();
@@ -263,7 +275,9 @@ something of the app's over it), its snapshot fills `.page`. -->
 		globe:
 			"M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5M12 3.5C9.6 5.8 8.4 8.6 8.4 12s1.2 6.2 3.6 8.5",
 		up: "M6 15l6-6 6 6",
-		down: "M6 9l6 6 6-6"
+		down: "M6 9l6 6 6-6",
+		// A pen over a line: annotate what's selected.
+		annotate: "M4 20h16M14.5 4.5l3 3L9 16H6v-3z"
 	};
 </script>
 
@@ -462,6 +476,14 @@ something of the app's over it), its snapshot fills `.page`. -->
 					onkeydown={addressKey}
 				/>
 			</label>
+			<button
+				type="button"
+				class="tool"
+				aria-label="Annotate the selection"
+				title="Annotate the selection ({annotateKey})"
+				disabled={blank}
+				onclick={annotate}>{@render icon("annotate")}</button
+			>
 		{/if}
 		<span
 			class="progress"

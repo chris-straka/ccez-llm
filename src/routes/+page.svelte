@@ -694,6 +694,7 @@
 	import CaptureOverlay from "$lib/components/CaptureOverlay.svelte";
 	import BrowserPaneView from "$lib/components/BrowserPane.svelte";
 	import { BrowserPane } from "$lib/browser-pane.svelte";
+	import { pageExcerpt, plainMarkdown, selectQuote } from "$lib/browser";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
 	import { joinExternalDraft, routeExternalText } from "$lib/externalText";
 	import {
@@ -2860,7 +2861,8 @@
 	const browser = new BrowserPane({
 		available: () => tauriBackendAvailable() && !androidUI && !iosUI,
 		dark: () => document.documentElement.dataset.theme === "dark",
-		note: (text) => flashToast(text)
+		note: (text) => flashToast(text),
+		lang: () => activeReplyCode
 	});
 	const flashcards = new FlashcardsMode({
 		getChats: () => chatState.chats,
@@ -9865,6 +9867,79 @@
 		else if (action === "browser-prev-tab") browser.step(-1);
 		else if (action === "browser-find") browser.finding++;
 		else if (action === "browser-actual-size") browser.zoom(null);
+		else if (action === "browser-annotate") void annotateFromPage();
+	}
+
+	/**
+	 * Windows has no menu bar (lib.rs), so the browser's menu keys are the
+	 * app's own there, Ctrl for ⌘ (owner's review, 2026-11-06). While a
+	 * page has the keyboard they're the page's, as there's no menu to
+	 * catch them first.
+	 */
+	function windowsBrowserKey(event: KeyboardEvent): boolean {
+		if (!browser.available || !currentPlatform().isWindows) return false;
+		if (!event.ctrlKey || event.metaKey) return false;
+		const { code, shiftKey: shift, altKey: alt } = event;
+		const action =
+			!alt && shift && code === "KeyB"
+				? "browser-toggle"
+				: !alt && !shift && code === "KeyT"
+					? "browser-new-tab"
+					: !browser.open
+						? null
+						: !alt && !shift && code === "KeyW" && browserPaneFocus
+							? "browser-close-tab"
+							: !alt && !shift && code === "KeyL"
+								? "browser-location"
+								: !alt && shift && code === "KeyE"
+									? "browser-expand"
+									: !alt && shift && code === "KeyA"
+										? "browser-annotate"
+										: alt && !shift && code === "ArrowRight"
+											? "browser-next-tab"
+											: alt && !shift && code === "ArrowLeft"
+												? "browser-prev-tab"
+												: null;
+		if (!action) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		browserMenu(action);
+		return true;
+	}
+
+	/**
+	 * Annotates what's selected in the browser's page, in the chat beside
+	 * it (owner, 2026-11-06): the sentence it's in lands as a message,
+	 * with the page's link, and the selection in it is annotated as A
+	 * does in the chat (filed and asked at once, the answer in its badge).
+	 */
+	async function annotateFromPage(): Promise<void> {
+		if (isSending(chatState) || nativeTurns.live.has(chatState.activeChatId)) {
+			flashToast("Wait for the reply");
+			return;
+		}
+		const sel = await browser.selection();
+		if (!sel) {
+			flashToast("Nothing selected in the page");
+			return;
+		}
+		const quote = sel.text.replace(/\s+/g, " ").trim();
+		const excerpt = pageExcerpt(quote, sel.block);
+		const source = sel.title.trim() || sel.url;
+		const content = `${plainMarkdown(excerpt)}\n\n— [${plainMarkdown(source)}](${sel.url.replace(/[()\s]/g, encodeURIComponent)})`;
+		const chatId = chatState.activeChatId;
+		const id = appendAssistantMessage(chatState, chatId, content);
+		if (!id) return;
+		await tick();
+		await new Promise((done) => requestAnimationFrame(() => done(null)));
+		const index = chat.messages.findIndex((m) => m.id === id);
+		const article = document.getElementById(`msg-${index}`);
+		const body = article?.querySelector(".rendered") ?? article;
+		if (!body || !selectQuote(body, quote)) return;
+		article?.scrollIntoView({ block: "nearest" });
+		annotateMode.placeSelMenu();
+		annotateMode.annotate("", true);
+		annotateMode.selMenu = null;
 	}
 
 	/** One of the app's floating menus or cards reaches over the browser's page. */
@@ -9928,13 +10003,29 @@
 		void browser.setCovered(browser.open && cover);
 	});
 
+	// The browser's own tab strip or address bar has the keyboard (⌘W is its then).
+	let browserPaneFocus = $state(false);
+	$effect(() => {
+		const update = (): void => {
+			browserPaneFocus = !!document.activeElement?.closest("aside.browser");
+		};
+		const later = (): void => void setTimeout(update, 0);
+		document.addEventListener("focusin", update);
+		document.addEventListener("focusout", later);
+		return () => {
+			document.removeEventListener("focusin", update);
+			document.removeEventListener("focusout", later);
+		};
+	});
+
 	// The menu's browser keys follow what has the keyboard (menu.rs).
 	$effect(() => {
 		const open = browser.available && browser.open;
 		const page = browser.focused;
+		const pane = browserPaneFocus;
 		if (!tauriBackendAvailable()) return;
 		void import("@tauri-apps/api/core")
-			.then(({ invoke }) => invoke("browser_menu", { open, page }))
+			.then(({ invoke }) => invoke("browser_menu", { open, page, pane }))
 			.catch(() => {});
 	});
 
@@ -14910,6 +15001,7 @@
 		// field composing its accent (see chord-composition.ts).
 		const chordComposition = createChordCompositionGuard(document);
 		const onKeyDown = (event: KeyboardEvent): void => {
+			if (windowsBrowserKey(event)) return;
 			onKey(event);
 			if (event.defaultPrevented && (isImeKey(event) || event.key === "Dead"))
 				chordComposition.undo(event.target);
@@ -15799,6 +15891,8 @@
 			{dragWindow}
 			{zoomWindow}
 			lights={isMac && tauriBackendAvailable()}
+			annotate={() => void annotateFromPage()}
+			annotateKey={isMac ? "⇧⌘A" : "Ctrl+Shift+A"}
 		/>
 	{/if}
 

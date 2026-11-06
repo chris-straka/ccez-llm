@@ -47,7 +47,7 @@ keys while the page has the keyboard, video full screen, downloads).
 - [x] The width is remembered as a share of the window, so a bigger window gives both more.
 - [x] Expand: the pane takes the whole window (chat hidden), the same button or ⌘⇧E takes it back.
 - [ ] The chat column re-centres in its narrower room; the prompt and the chat list keep working.
-- [ ] Resizing the window: the page keeps up (no gap at its edge, no stale size after).
+- [x] Resizing the window: the page keeps up (no gap at its edge, no stale size after).
 
 ### Tabs
 
@@ -61,7 +61,7 @@ keys while the page has the keyboard, video full screen, downloads).
 
 ### Address bar
 
-- [ ] Back, forward, reload (stop while loading); back and forward greyed when there's nowhere to go.
+- [x] Back, forward, reload (stop while loading); back and forward greyed when there's nowhere to go, from WebKit's own list (the Navigation API only counts the page's own site).
 - [x] The URL shown plainly (the host darker), the whole URL while editing; a click selects it all.
 - [x] Enter goes: a URL as typed (https added), anything else searched (DuckDuckGo).
 - [ ] Esc while editing puts the URL back and gives the page focus.
@@ -92,12 +92,18 @@ keys while the page has the keyboard, video full screen, downloads).
 - [x] Dark pages and light pages both look right next to the app in both themes (the pane's chrome follows the app).
 - [ ] Video full screen from a page fills the pane (or the window), and Esc brings it back.
 - [ ] The page's own right-click menu.
-- [ ] A page that asks for the camera, microphone or location: refused quietly.
+- [ ] A page that asks for the camera, microphone or location: refused quietly (in code: WebKit's grant turned down for tabs, and a script in every frame; not run live, to keep the Mac from a microphone prompt).
+
+### Annotating and language (owner, 2026-11-06)
+
+- [x] Select text in a page, then ⇧⌘A (Edit → Annotate Selection in Page) or the pen at the end of the address bar: the sentence it's in lands in the chat beside it with the page's link, and the selection is annotated there as A does (filed and asked at once). The app reads the selection out of the page; the page is given nothing.
+- [x] A search from the address bar comes back in the chat's reply language (DuckDuckGo's region for it).
+- [ ] Sites that pick their language on their server (lemonde.fr's English edition) still see the Mac's own languages: WebKit has no per-page setting for the languages a page is told.
 
 ### Never
 
-- [ ] Never a flash of white when opening a tab in dark mode.
-- [ ] Never two panes, never a page at a stale size or place, never a page left behind after its tab closed.
+- [x] Never a flash of white when opening a tab in dark mode.
+- [x] Never two panes, never a page at a stale size or place, never a page left behind after its tab closed. Closing the pane ends its pages (their sound with them); they load again when it opens.
 - [x] Never the app's keys or commands reachable from a page.
 - [x] Never on phones or the web build.
 
@@ -126,3 +132,28 @@ keys while the page has the keyboard, video full screen, downloads).
 - The MCP bridge's execute_js never answers (it waits on an event that
   doesn't reach it); scripts/drive.ts asks the page through an event
   the bridge emits from Rust and reads a debug-only command's answer.
+
+## Found in the owner's review (2026-11-06, fixed)
+
+- Any page, or a hidden frame in one with no click, could open local
+  files and any app's links (`file:`, `vscode:`, `smb:`): only mail and
+  phone links leave a page now, and a new window only opens a web page.
+- wry grants every camera and microphone ask, and the app holds the
+  microphone for dictation, so any site could listen. Tabs are refused.
+- After the window shrank, the page kept its old size (a stale snapshot
+  showed past its edge): a page whose own size doesn't match its box is
+  placed again, once a box.
+- A quick click on the divider could leave the page hidden behind its
+  snapshot; Try again (or a new address) never showed a failed tab's
+  page again; a link opening a non-web window left a dead tab.
+- The address bar showed the old page's address while a new one loaded,
+  and Stop left the spinner going.
+- ⌘W closed a browser tab while typing in the chat (now only while the
+  browser has the keyboard); ⌘B in a page toggled the chat list (it's
+  the page's while the page has the keyboard).
+- `localhost:3000` and `192.168.1.1` got https; names in other scripts
+  (münchen.de, пример.рф) were searched instead of opened.
+- Windows has no menu bar, so it had no browser keys: they're the app's
+  own there (Ctrl for ⌘), while the app has the keyboard.
+- A new tab's address bar, a frame after opening, wiped what was already
+  typed in it.

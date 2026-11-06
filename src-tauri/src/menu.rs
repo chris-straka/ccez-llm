@@ -37,6 +37,7 @@ fn page<R: Runtime>(
 /// while the page has it, they're the page's. ⌘W and ⌘L follow whether
 /// the pane is open at all. A disabled item's key passes to the app.
 pub const PAGE_ITEMS: &[&str] = &[
+    "browser-annotate",
     "browser-back",
     "browser-forward",
     "browser-reload",
@@ -44,12 +45,19 @@ pub const PAGE_ITEMS: &[&str] = &[
     "browser-actual-size",
 ];
 pub const PANE_ITEMS: &[&str] = &[
-    "browser-close-tab",
     "browser-location",
     "browser-expand",
     "browser-next-tab",
     "browser-prev-tab",
 ];
+
+/// ⌘W closes a tab only while the browser has the keyboard (its page,
+/// or its own tab strip and address bar): typing in the chat, it's the
+/// chat's (owner's review, 2026-11-06).
+pub const FOCUS_ITEMS: &[&str] = &["browser-close-tab"];
+/// The app's own items that step aside while a page has the keyboard,
+/// so the page gets the key (⌘B is bold in a mail or a document).
+pub const YIELD_ITEMS: &[&str] = &["toggle-sidebar"];
 
 fn sep<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<PredefinedMenuItem<R>> {
     PredefinedMenuItem::separator(app)
@@ -117,6 +125,12 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::select_all(app, None)?,
             &sep(app)?,
             &page(app, "browser-find", "Find in Page…", Some("CmdOrCtrl+F"))?,
+            &page(
+                app,
+                "browser-annotate",
+                "Annotate Selection in Page",
+                Some("CmdOrCtrl+Shift+A"),
+            )?,
         ],
     )?;
     let view = Submenu::with_items(
@@ -192,13 +206,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 /// Turns the browser pane's items on and off: `open` the pane shows,
-/// `page` its page has the keyboard.
-pub fn set_browser<R: Runtime>(app: &AppHandle<R>, open: bool, page: bool) {
+/// `page` its page has the keyboard, `pane` the pane's own controls do.
+pub fn set_browser<R: Runtime>(app: &AppHandle<R>, open: bool, page: bool, pane: bool) {
     let Some(menu) = app.menu() else { return };
     let ids = PANE_ITEMS
         .iter()
         .map(|id| (id, open))
-        .chain(PAGE_ITEMS.iter().map(|id| (id, open && page)));
+        .chain(PAGE_ITEMS.iter().map(|id| (id, open && page)))
+        .chain(FOCUS_ITEMS.iter().map(|id| (id, open && (page || pane))))
+        .chain(YIELD_ITEMS.iter().map(|id| (id, !(open && page))));
     for (id, on) in ids {
         if let Some(item) = menu.get(*id).and_then(|kind| kind.as_menuitem().cloned()) {
             let _ = item.set_enabled(on);

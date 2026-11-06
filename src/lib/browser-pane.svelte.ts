@@ -35,6 +35,17 @@ export interface BrowserPaneDeps {
 	dark: () => boolean;
 	/** A short note for the user (a finished download). */
 	note: (text: string) => void;
+	/** The chat's reply language: searches from the address bar come back in it. */
+	lang?: () => string | null;
+}
+
+/** What's selected in a page, for annotating in the chat. */
+export interface PageSelection {
+	text: string;
+	/** The paragraph (or cell, item, heading) it sits in. */
+	block: string;
+	title: string;
+	url: string;
 }
 
 /** How often the active page is asked where it is (its URL follows single-page sites). */
@@ -79,6 +90,10 @@ export class BrowserPane {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	private since = new Map<string, number>();
 	private wantCovered = false;
+	private wantResizing = false;
+	/** The box each tab was last nudged to fill (once a box, never a loop). */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	private nudged = new Map<string, string>();
 	/** Open when the app was last closed: reopened by start(), once the shell is known. */
 	private wasOpen = false;
 
@@ -103,6 +118,11 @@ export class BrowserPane {
 
 	get available(): boolean {
 		return this.deps.available();
+	}
+
+	/** The chat's reply language, for searches. */
+	get lang(): string | null {
+		return this.deps.lang?.() ?? null;
 	}
 
 	get tab(): BrowserTab | null {
@@ -180,10 +200,22 @@ export class BrowserPane {
 		this.place();
 	}
 
-	/** Closes the pane; its tabs stay for next time. */
+	/**
+	 * Closes the pane; its tabs stay for next time. Their pages go: a
+	 * hidden page kept playing its video's sound, and could open new
+	 * tabs, with nothing on screen (owner's review, 2026-11-06). They
+	 * load again from their addresses when the pane opens.
+	 */
 	close(): void {
 		this.open = false;
 		this.focused = false;
+		for (const id of this.made.keys()) void this.call("browser_close", { id });
+		this.made.clear();
+		this.zooms.clear();
+		this.since.clear();
+		this.tabs = this.tabs.map((t) =>
+			t.loading || t.failed ? { ...t, loading: false, failed: false } : t
+		);
 		this.persist();
 		this.place();
 	}
@@ -263,9 +295,11 @@ export class BrowserPane {
 			return;
 		}
 		this.patch(tab.id, { url, loading: url !== "about:blank", failed: false });
+		this.since.delete(tab.id);
 		if (this.made.has(tab.id))
 			void this.call("browser_navigate", { id: tab.id, url });
-		else this.place();
+		// A page that failed was hidden: it shows again as it loads.
+		this.place();
 		this.persist();
 	}
 
@@ -282,10 +316,20 @@ export class BrowserPane {
 	reload(): void {
 		const tab = this.tab;
 		if (!tab) return;
+		if (tab.failed) {
+			// Try again: the address it failed on, shown again as it loads.
+			this.go(tab.url);
+			return;
+		}
 		void this.call("browser_go", {
 			id: tab.id,
 			to: tab.loading ? "stop" : "reload"
 		});
+		if (tab.loading) {
+			// The engine says nothing when a load stops.
+			this.since.delete(tab.id);
+			this.patch(tab.id, { loading: false });
+		}
 	}
 
 	/** ⌘= / ⌘- / ⌘0 while the page has the keyboard: the page's zoom, not the app's text. */
@@ -349,10 +393,32 @@ export class BrowserPane {
 
 	/** The divider starts (true) or stops (false) moving. */
 	async setResizing(on: boolean): Promise<void> {
-		if (on) await this.snap();
+		this.wantResizing = on;
+		if (on) {
+			await this.snap();
+			// Let go (a click, a double-click) while the snapshot was
+			// taken: the page stays, never hidden behind a still for good.
+			if (!this.wantResizing) return;
+		}
 		this.resizing = on;
 		this.place();
 		if (!on) setTimeout(() => this.release(), 120);
+	}
+
+	/** What's selected in the active page (null: nothing, or no page). */
+	async selection(): Promise<PageSelection | null> {
+		const id = this.active;
+		if (!id || !this.made.get(id)) return null;
+		const s = await this.call<Partial<PageSelection>>("browser_selection", {
+			id
+		});
+		if (!s || typeof s.text !== "string" || !s.text.trim()) return null;
+		return {
+			text: s.text,
+			block: typeof s.block === "string" ? s.block : "",
+			title: typeof s.title === "string" ? s.title : "",
+			url: typeof s.url === "string" ? s.url : ""
+		};
 	}
 
 	/** A fresh snapshot of the active page, kept to stand in when it hides. */
@@ -404,12 +470,24 @@ export class BrowserPane {
 		if (!this.made.has(tab.id)) {
 			this.made.set(tab.id, true);
 			if (tab.url !== "about:blank") this.patch(tab.id, { loading: true });
-			await this.call("browser_open", {
+			const made = await this.invoke<null>("browser_open", {
 				id: tab.id,
 				url: tab.url,
 				...box,
 				dark: this.deps.dark()
-			});
+			}).then(
+				() => true,
+				(error: unknown) => {
+					console.warn("browser: browser_open", error);
+					return false;
+				}
+			);
+			// No page was made (an address no page can have): the tab
+			// says it failed, and Try again or a new address makes one.
+			if (!made) {
+				this.made.delete(tab.id);
+				this.patch(tab.id, { loading: false, failed: true });
+			}
 		} else {
 			void this.call("browser_bounds", { id: tab.id, ...box });
 		}
@@ -426,6 +504,8 @@ export class BrowserPane {
 			icon: string;
 			loading: boolean;
 			bg?: string;
+			vw?: number;
+			vh?: number;
 		}>("browser_state", { id });
 		const was = this.tabs.find((t) => t.id === id);
 		// A failed load's page answers nothing at all (the engine drops
@@ -457,8 +537,31 @@ export class BrowserPane {
 				return;
 			}
 		} else this.since.delete(id);
+		// The page fills its box: the engine can leave it at its old
+		// size when the window changes under it (the box itself didn't).
+		const box = this.box;
+		const zoom = this.zooms.get(id) ?? 1;
+		if (
+			id === this.active &&
+			box &&
+			typeof s.vw === "number" &&
+			typeof s.vh === "number" &&
+			(Math.abs(s.vw * zoom - box.w) > 2 ||
+				Math.abs(s.vh * zoom - box.h) > 2) &&
+			this.nudged.get(id) !== `${box.x},${box.y},${box.w},${box.h}`
+		) {
+			this.nudged.set(id, `${box.x},${box.y},${box.w},${box.h}`);
+			console.info(
+				`browser: page ${s.vw}×${s.vh} in a ${box.w}×${box.h} box, placed again`
+			);
+			void this.call("browser_bounds", { id, ...box, w: box.w + 1 }).then(() =>
+				this.call("browser_bounds", { id, ...box })
+			);
+		}
 		this.patch(id, {
-			url: s.url,
+			// While a new address loads, the page still answers from the
+			// old one: the bar keeps what's loading.
+			url: was?.loading ? was.url : s.url,
 			title: s.title || was?.title || "",
 			icon: s.icon,
 			// Engines without the Navigation API: both always on.

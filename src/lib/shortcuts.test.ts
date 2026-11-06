@@ -124,7 +124,8 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Next / previous tab",
 			"Expand the browser",
 			"In the page: back, forward, reload",
-			"In the page: find, zoom"
+			"In the page: find, zoom",
+			"In the page: annotate the selection"
 		]
 	]
 ];
@@ -190,7 +191,8 @@ describe("shortcuts menu copy", () => {
 			"Next / previous tab",
 			"Expand the browser",
 			"In the page: back, forward, reload",
-			"In the page: find, zoom"
+			"In the page: find, zoom",
+			"In the page: annotate the selection"
 		];
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac, false).map((r) => r.name);

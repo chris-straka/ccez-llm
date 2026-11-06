@@ -9,21 +9,66 @@
 export const BROWSER_HOME_URL = "https://duckduckgo.com/";
 export const BROWSER_SEARCH_PREFIX = "https://duckduckgo.com/?q=";
 
-/** A bare host: "example.com", "localhost:3000", "192.168.1.4". */
+/**
+ * A bare host: "example.com", "münchen.de", "localhost:3000",
+ * "192.168.1.4", "[::1]:8080", a punycode TLD ("xn--p1ai").
+ */
 const BARE_HOST_RE =
-	/^(localhost|(\d{1,3}\.){3}\d{1,3}|([a-z0-9-]+\.)+[a-z]{2,})(:\d{1,5})?([/?#].*)?$/i;
+	/^(localhost|(\d{1,3}\.){3}\d{1,3}|\[[0-9a-f:]+\]|([\p{L}\p{N}-]+\.)+(\p{L}{2,}|xn--[a-z0-9-]+))(:\d{1,5})?([/?#].*)?$/iu;
+
+/** This computer and the home network: no certificate there, so plain http. */
+const LOCAL_HOST_RE =
+	/^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|\[[0-9a-f:]+\]|[^/:]+\.local)(:\d{1,5})?([/?#].*)?$/i;
+
+/**
+ * DuckDuckGo's region for a reply language (its `kl`): a search from the
+ * address bar comes back in the language the chat is in (owner,
+ * 2026-11-06). Languages DuckDuckGo has no region for search as usual.
+ */
+const SEARCH_REGIONS: Record<string, string> = {
+	fr: "fr-fr",
+	de: "de-de",
+	es: "es-es",
+	pt: "pt-pt",
+	ru: "ru-ru",
+	pl: "pl-pl",
+	it: "it-it",
+	no: "no-no",
+	cs: "cz-cs",
+	el: "gr-el",
+	ro: "ro-ro",
+	bg: "bg-bg",
+	hu: "hu-hu",
+	uk: "ua-uk",
+	nl: "nl-nl",
+	sv: "se-sv",
+	da: "dk-da",
+	fi: "fi-fi",
+	sk: "sk-sk",
+	zh: "cn-zh",
+	ja: "jp-jp",
+	ko: "kr-kr",
+	th: "th-th",
+	vi: "vn-vi",
+	tr: "tr-tr"
+};
+
+export function searchRegion(lang: string | null | undefined): string | null {
+	return lang ? (SEARCH_REGIONS[lang] ?? null) : null;
+}
 
 /**
  * What an address-bar entry opens: a URL as typed (https added to a bare
- * host), anything else a search. Never anything but http(s).
+ * host, http to a local one), anything else a search, in the reply
+ * language's region when it has one. Never anything but http(s).
  */
-export function resolveBrowserUrl(raw: string): string {
+export function resolveBrowserUrl(raw: string, lang?: string | null): string {
 	const input = raw.trim();
 	if (!input) return BROWSER_HOME_URL;
 	if (!/\s/.test(input)) {
 		// A bare host first: "localhost:3000" isn't a scheme called localhost.
 		const typed = BARE_HOST_RE.test(input)
-			? `https://${input}`
+			? `${LOCAL_HOST_RE.test(input) ? "http" : "https"}://${input}`
 			: /^https?:\/\//i.test(input)
 				? input
 				: null;
@@ -35,7 +80,12 @@ export function resolveBrowserUrl(raw: string): string {
 			}
 		}
 	}
-	return BROWSER_SEARCH_PREFIX + encodeURIComponent(input);
+	const region = searchRegion(lang);
+	return (
+		BROWSER_SEARCH_PREFIX +
+		encodeURIComponent(input) +
+		(region ? `&kl=${region}` : "")
+	);
 }
 
 /** How the address bar shows a URL at rest: the host, then the rest dimmer. */
@@ -248,4 +298,77 @@ export function readKept(raw: string | null): KeptBrowser {
 	} catch {
 		return fresh;
 	}
+}
+
+/** An excerpt never runs much past this (chars), whatever the paragraph. */
+const EXCERPT_MAX = 420;
+
+/**
+ * The sentence (or sentences) of a page's `block` that hold the selected
+ * `text`, for the chat to annotate in context; the selection itself when
+ * it isn't in the block (it ran across paragraphs).
+ */
+export function pageExcerpt(text: string, block: string): string {
+	const quote = text.replace(/\s+/g, " ").trim();
+	// The line it's on first (a card's heading and links are lines of
+	// their own), else the whole block (the selection ran across lines).
+	const line = block
+		.split("\n")
+		.find((l) => l.replace(/\s+/g, " ").includes(quote));
+	const all = (line ?? block).replace(/\s+/g, " ").trim();
+	const at = all.indexOf(quote);
+	if (!quote || at < 0) return quote;
+	// A sentence ends at . ! ? … (then a space) or a CJK full stop.
+	const isEnd = (i: number): boolean =>
+		/[。！？]/.test(all[i] ?? "") ||
+		(/[.!?…]/.test(all[i] ?? "") && /\s/.test(all[i + 1] ?? " "));
+	let from = at;
+	while (from > 0 && !isEnd(from - 1) && at - from < EXCERPT_MAX / 2) from--;
+	let to = at + quote.length;
+	while (to < all.length && !isEnd(to - 1) && to - at < EXCERPT_MAX) to++;
+	const cut = all.slice(from, to).trim();
+	return `${from > 0 && !isEnd(from - 1) ? "…" : ""}${cut}${to < all.length && !isEnd(to - 1) ? "…" : ""}`;
+}
+
+/** `text` safe in Markdown: shown as written (a page's * and # stay characters). */
+export function plainMarkdown(text: string): string {
+	return text.replace(/([\\`*_[\]<>#|~])/g, "\\$1");
+}
+
+/**
+ * Selects the first `quote` in `root`'s text (across inline elements);
+ * whether it was found.
+ */
+export function selectQuote(root: Element, quote: string): boolean {
+	const doc = root.ownerDocument;
+	const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+	const nodes: Text[] = [];
+	let joined = "";
+	for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+		nodes.push(n as Text);
+		joined += n.textContent ?? "";
+	}
+	const at = joined.indexOf(quote);
+	if (!quote || at < 0) return false;
+	const end = at + quote.length;
+	const range = doc.createRange();
+	let seen = 0;
+	let started = false;
+	for (const node of nodes) {
+		const len = node.textContent?.length ?? 0;
+		if (!started && at < seen + len) {
+			range.setStart(node, at - seen);
+			started = true;
+		}
+		if (started && end <= seen + len) {
+			range.setEnd(node, end - seen);
+			break;
+		}
+		seen += len;
+	}
+	const selection = doc.getSelection();
+	if (!selection) return false;
+	selection.removeAllRanges();
+	selection.addRange(range);
+	return true;
 }

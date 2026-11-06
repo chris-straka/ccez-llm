@@ -47,6 +47,41 @@ fn page_url(raw: &str) -> Result<tauri::Url, String> {
     }
 }
 
+/// What a page's navigation to a URL does.
+#[cfg_attr(mobile, allow(dead_code))]
+#[derive(Debug, PartialEq)]
+enum Go {
+    Load,
+    System,
+    Refuse,
+}
+
+#[cfg_attr(mobile, allow(dead_code))]
+fn navigation(to: &tauri::Url) -> Go {
+    match to.scheme() {
+        "http" | "https" | "about" | "data" | "blob" => Go::Load,
+        "mailto" | "tel" | "sms" => Go::System,
+        _ => Go::Refuse,
+    }
+}
+
+/// Pages never get the camera, the microphone, the screen or the
+/// location: the app's own permission for dictation would otherwise
+/// reach any site (the engine grants every request). On macOS the
+/// engine's own answer is turned down too (`mac::refuse_devices`); this
+/// covers the other engines and asks that never reach it.
+#[cfg_attr(mobile, allow(dead_code))]
+const NO_DEVICES_JS: &str = r#"(() => {
+  const no = () => Promise.reject(new DOMException("Not allowed", "NotAllowedError"));
+  const lock = (o, k, v) => { try { Object.defineProperty(o, k, { value: v, writable: false, configurable: false }); } catch (_) {} };
+  if (window.MediaDevices) { lock(MediaDevices.prototype, "getUserMedia", no); lock(MediaDevices.prototype, "getDisplayMedia", no); }
+  if (window.Geolocation) {
+    const denied = (_, err) => { if (typeof err === "function") setTimeout(() => err({ code: 1, message: "User denied Geolocation", PERMISSION_DENIED: 1 }), 0); };
+    lock(Geolocation.prototype, "getCurrentPosition", denied);
+    lock(Geolocation.prototype, "watchPosition", (a, b) => { denied(a, b); return 0; });
+  }
+})();"#;
+
 #[cfg(desktop)]
 #[derive(Serialize, Clone)]
 struct Load {
@@ -161,25 +196,41 @@ pub fn browser_open(
                         },
                     );
                 })
-                // mailto:, tel:, an app's own scheme: the system's, never a
-                // dead page in the tab.
-                .on_navigation(move |to| match to.scheme() {
-                    "http" | "https" | "about" | "data" | "blob" => true,
-                    _ => {
+                // Web pages load; mail and phone links go to the system's
+                // apps. Nothing else leaves the page: a page (or a hidden
+                // frame in it, with no click) could otherwise open local
+                // files and any app's links (owner's review, 2026-11-06).
+                .on_navigation(move |to| match navigation(to) {
+                    Go::Load => true,
+                    Go::System => {
                         use tauri_plugin_opener::OpenerExt;
                         let _ = c.opener().open_url(to.as_str(), None::<&str>);
                         false
                     }
+                    Go::Refuse => false,
                 })
+                .initialization_script_for_all_frames(NO_DEVICES_JS)
                 // A new window is a new tab beside this one.
                 .on_new_window(move |to, _| {
-                    let _ = d.emit(
-                        NEW_TAB_EVENT,
-                        NewTab {
-                            id: i3.clone(),
-                            url: to.to_string(),
-                        },
-                    );
+                    match navigation(&to) {
+                        // Only a web page can be a tab of its own (a
+                        // blob: or data: one belongs to the page that
+                        // made it): anything else left a dead tab.
+                        Go::Load if page_url(to.as_str()).is_ok() => {
+                            let _ = d.emit(
+                                NEW_TAB_EVENT,
+                                NewTab {
+                                    id: i3.clone(),
+                                    url: to.to_string(),
+                                },
+                            );
+                        }
+                        Go::System => {
+                            use tauri_plugin_opener::OpenerExt;
+                            let _ = d.opener().open_url(to.as_str(), None::<&str>);
+                        }
+                        _ => {}
+                    }
                     tauri::webview::NewWindowResponse::Deny
                 })
                 .on_download(move |webview, event| {
@@ -219,13 +270,18 @@ pub fn browser_open(
             Ok(dir) => builder.data_directory(dir.join("browser")),
             Err(_) => builder,
         };
-        window
+        let view = window
             .add_child(
                 builder,
                 tauri::LogicalPosition::new(x, y),
                 tauri::LogicalSize::new(w.max(1.0), h.max(1.0)),
             )
             .map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")]
+        let _ =
+            view.with_webview(|platform| unsafe { mac::refuse_devices(platform.inner().cast()) });
+        #[cfg(not(target_os = "macos"))]
+        let _ = view;
         Ok(())
     }
 }
@@ -290,7 +346,12 @@ pub fn browser_close(app: tauri::AppHandle, id: String) -> Result<(), String> {
     #[cfg(desktop)]
     {
         match webview(&app, &id) {
-            Ok(view) => view.close().map_err(|e| e.to_string()),
+            Ok(view) => {
+                #[cfg(target_os = "macos")]
+                let _ =
+                    view.with_webview(|platform| unsafe { mac::forget(platform.inner().cast()) });
+                view.close().map_err(|e| e.to_string())
+            }
             Err(_) => Ok(()),
         }
     }
@@ -347,13 +408,15 @@ pub fn browser_zoom(app: tauri::AppHandle, id: String, factor: f64) -> Result<()
 }
 
 /// The browser's menu items for what has the keyboard (menu.rs): `open`
-/// the pane shows, `page` its page has the keyboard.
+/// the pane shows, `page` its page has the keyboard, `pane` the pane's
+/// own tab strip or address bar does.
 #[tauri::command]
-pub fn browser_menu(app: tauri::AppHandle, open: bool, page: bool) {
+pub fn browser_menu(app: tauri::AppHandle, open: bool, page: bool, pane: Option<bool>) {
+    let pane = pane.unwrap_or(false);
     #[cfg(all(desktop, not(target_os = "windows")))]
-    crate::menu::set_browser(&app, open, page);
+    crate::menu::set_browser(&app, open, page, pane);
     #[cfg(not(all(desktop, not(target_os = "windows"))))]
-    let _ = (&app, open, page);
+    let _ = (&app, open, page, pane);
 }
 
 /// Find `text` in tab `id`'s page, the next match (or the one before):
@@ -384,8 +447,7 @@ pub async fn browser_find(
 }
 
 /// What the frontend shows of tab `id`: where it is, its title, whether
-/// it can go back or forward (the Navigation API, where the engine has
-/// it), its icon, whether it's still loading.
+/// it can go back or forward, its icon, whether it's still loading.
 #[tauri::command]
 pub async fn browser_state(app: tauri::AppHandle, id: String) -> Result<serde_json::Value, String> {
     #[cfg(mobile)]
@@ -395,17 +457,70 @@ pub async fn browser_state(app: tauri::AppHandle, id: String) -> Result<serde_js
     }
     #[cfg(desktop)]
     {
-        let raw = eval(&app, &id, STATE_JS).await?;
-        // The engine hands back the value as JSON; WebKit wraps a string
-        // result in quotes once more.
-        let value: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-        Ok(match value {
-            serde_json::Value::String(inner) => {
-                serde_json::from_str(&inner).unwrap_or(serde_json::Value::Null)
+        #[allow(unused_mut)]
+        let mut value = eval_json(&app, &id, STATE_JS).await?;
+        // The Navigation API only counts the page's own site: after a
+        // link to another, Back went grey. WebKit's own list counts all.
+        #[cfg(target_os = "macos")]
+        if let Some((back, forward)) = mac_history(&app, &id).await {
+            if let Some(map) = value.as_object_mut() {
+                map.insert("back".into(), back.into());
+                map.insert("forward".into(), forward.into());
             }
-            other => other,
-        })
+        }
+        Ok(value)
     }
+}
+
+/// What's selected in tab `id`'s page, with the block of text it sits
+/// in, the page's title and address: for annotating it in the chat. The
+/// app asks; the page is never given a way to send anything itself.
+#[tauri::command]
+pub async fn browser_selection(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<serde_json::Value, String> {
+    #[cfg(mobile)]
+    {
+        let _ = (&app, &id);
+        Err("the browser is desktop only".into())
+    }
+    #[cfg(desktop)]
+    eval_json(&app, &id, SELECTION_JS).await
+}
+
+/// `js` (which returns a JSON string) run in tab `id`, parsed.
+#[cfg(desktop)]
+async fn eval_json(
+    app: &tauri::AppHandle,
+    id: &str,
+    js: &str,
+) -> Result<serde_json::Value, String> {
+    let raw = eval(app, id, js).await?;
+    // The engine hands back the value as JSON; WebKit wraps a string
+    // result in quotes once more.
+    let value: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    Ok(match value {
+        serde_json::Value::String(inner) => {
+            serde_json::from_str(&inner).unwrap_or(serde_json::Value::Null)
+        }
+        other => other,
+    })
+}
+
+/// WebKit's own back and forward for tab `id`.
+#[cfg(target_os = "macos")]
+async fn mac_history(app: &tauri::AppHandle, id: &str) -> Option<(bool, bool)> {
+    let view = webview(app, id).ok()?;
+    let (tx, rx) = tokio::sync::oneshot::channel::<(bool, bool)>();
+    view.with_webview(move |platform| {
+        let _ = tx.send(unsafe { mac::history(platform.inner().cast()) });
+    })
+    .ok()?;
+    tokio::time::timeout(std::time::Duration::from_secs(1), rx)
+        .await
+        .ok()?
+        .ok()
 }
 
 #[cfg(desktop)]
@@ -415,15 +530,33 @@ const STATE_JS: &str = r#"JSON.stringify((() => {
   return {
     url: location.href,
     title: document.title,
-    back: n && typeof n.canGoBack === "boolean" ? n.canGoBack : null,
+    back: n && typeof n.canGoBack === "boolean" ? n.canGoBack || history.length > 1 : null,
     forward: n && typeof n.canGoForward === "boolean" ? n.canGoForward : null,
     icon: icon ? icon.href : (location.protocol.startsWith("http") ? location.origin + "/favicon.ico" : ""),
     loading: document.readyState !== "complete",
+    // The page's own size, to check it fills its box.
+    vw: innerWidth,
+    vh: innerHeight,
     // Its ground, for the room past its snapshot while the pane widens.
     bg: [document.body, document.documentElement]
       .map((el) => el && getComputedStyle(el).backgroundColor)
       .find((c) => c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent") || ""
   };
+})())"#;
+
+#[cfg(desktop)]
+const SELECTION_JS: &str = r#"JSON.stringify((() => {
+  const s = getSelection();
+  const text = s ? s.toString().replace(/\s+/g, " ").trim() : "";
+  let block = "";
+  if (text && s.rangeCount) {
+    const n = s.getRangeAt(0).commonAncestorContainer;
+    const el = n.nodeType === 1 ? n : n.parentElement;
+    const at = el && (el.closest("p,li,dd,dt,td,th,blockquote,figcaption,h1,h2,h3,h4,h5,h6,pre,caption") || el);
+    // Lines kept: a card's heading or links sit on lines of their own.
+    block = at ? (at.innerText || at.textContent || "").replace(/[^\S\n]+/g, " ").trim() : "";
+  }
+  return { text: text.slice(0, 600), block: block.slice(0, 4000), title: document.title, url: location.href };
 })())"#;
 
 /// Run `js` in tab `id` and wait for its result (as JSON), a second at most.
@@ -485,8 +618,100 @@ pub async fn snapshot_of(
 
 #[cfg(target_os = "macos")]
 mod mac {
-    use objc2::runtime::AnyObject;
-    use objc2::{class, msg_send};
+    use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
+    use objc2::{class, msg_send, sel};
+    use std::collections::HashSet;
+    use std::sync::{Mutex, Once};
+
+    /// The browser tabs' WKWebViews (as addresses): their camera and
+    /// microphone asks are refused; every other view's (the app's own,
+    /// for dictation) go on as the engine answers them.
+    static TABS: Mutex<Option<HashSet<usize>>> = Mutex::new(None);
+    static INSTALL: Once = Once::new();
+    static mut ORIGINAL: Option<Imp> = None;
+
+    type Decide = unsafe extern "C-unwind" fn(
+        *mut AnyObject,
+        Sel,
+        *mut AnyObject,
+        *mut AnyObject,
+        *mut AnyObject,
+        isize,
+        *mut block2::Block<dyn Fn(isize)>,
+    );
+
+    /// wry answers every camera and microphone ask with Grant
+    /// (WryWebViewUIDelegate). Its answer is replaced once with ours:
+    /// Deny for a browser tab, wry's own for anything else.
+    unsafe extern "C-unwind" fn decide(
+        this: *mut AnyObject,
+        cmd: Sel,
+        view: *mut AnyObject,
+        origin: *mut AnyObject,
+        frame: *mut AnyObject,
+        kind: isize,
+        handler: *mut block2::Block<dyn Fn(isize)>,
+    ) {
+        let tab = TABS
+            .lock()
+            .ok()
+            .and_then(|t| t.as_ref().map(|t| t.contains(&(view as usize))))
+            .unwrap_or(false);
+        if tab {
+            // WKPermissionDecisionDeny
+            if let Some(handler) = handler.as_ref() {
+                handler.call((2,));
+            }
+            return;
+        }
+        #[allow(static_mut_refs)]
+        if let Some(original) = ORIGINAL {
+            let original: Decide = std::mem::transmute(original);
+            original(this, cmd, view, origin, frame, kind, handler);
+        } else if let Some(handler) = handler.as_ref() {
+            // WKPermissionDecisionPrompt
+            handler.call((0,));
+        }
+    }
+
+    /// WKWebView's canGoBack and canGoForward.
+    pub unsafe fn history(view: *mut AnyObject) -> (bool, bool) {
+        let Some(view) = view.as_ref() else {
+            return (false, false);
+        };
+        let back: bool = msg_send![view, canGoBack];
+        let forward: bool = msg_send![view, canGoForward];
+        (back, forward)
+    }
+
+    /// Marks `view` as a browser tab's: its camera and microphone asks are refused.
+    pub unsafe fn refuse_devices(view: *mut AnyObject) {
+        INSTALL.call_once(|| {
+            let Some(class) = AnyClass::get(c"WryWebViewUIDelegate") else {
+                return;
+            };
+            let name = sel!(webView:requestMediaCapturePermissionForOrigin:initiatedByFrame:type:decisionHandler:);
+            let method = objc2::ffi::class_getInstanceMethod(class, name);
+            if method.is_null() {
+                return;
+            }
+            let ours: Decide = decide;
+            let previous = objc2::ffi::method_setImplementation(method as *mut _, std::mem::transmute::<Decide, Imp>(ours));
+            ORIGINAL = previous;
+        });
+        if let Ok(mut tabs) = TABS.lock() {
+            tabs.get_or_insert_with(HashSet::new).insert(view as usize);
+        }
+    }
+
+    /// A closed tab's view is no longer a tab's.
+    pub unsafe fn forget(view: *mut AnyObject) {
+        if let Ok(mut tabs) = TABS.lock() {
+            if let Some(tabs) = tabs.as_mut() {
+                tabs.remove(&(view as usize));
+            }
+        }
+    }
 
     /// WKWebView's own snapshot of what it shows, as JPEG, sent on `tx`
     /// (None when it has none). Runs on the main thread (with_webview).
@@ -541,6 +766,22 @@ mod tests {
         assert!(label("").is_err());
         assert!(label("../main").is_err());
         assert!(label(&"x".repeat(33)).is_err());
+    }
+
+    #[test]
+    fn pages_open_the_web_mail_and_phone_only() {
+        let go = |u: &str| navigation(&tauri::Url::parse(u).unwrap());
+        assert_eq!(go("https://example.com/"), Go::Load);
+        assert_eq!(go("about:blank"), Go::Load);
+        assert_eq!(go("mailto:a@example.com"), Go::System);
+        assert_eq!(go("tel:+15551234"), Go::System);
+        assert_eq!(go("file:///Users/c/Downloads/x.app"), Go::Refuse);
+        assert_eq!(go("vscode://file/etc/passwd"), Go::Refuse);
+        assert_eq!(go("smb://host/share"), Go::Refuse);
+        assert_eq!(
+            go("x-apple.systempreferences:com.apple.preference"),
+            Go::Refuse
+        );
     }
 
     #[test]
