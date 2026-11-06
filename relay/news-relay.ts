@@ -24,7 +24,7 @@ import {
 	googleFeedUrl
 } from "../src/lib/web-fetch";
 
-const PORT = Number(process.env.NEWS_RELAY_PORT ?? 8799);
+const PORT = Number(process.env.NEWS_RELAY_PORT ?? 8789);
 const TOKEN = readFileSync(
 	join(homedir(), ".config/ccez-news-relay/token"),
 	"utf8"

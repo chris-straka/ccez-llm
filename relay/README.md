@@ -12,7 +12,7 @@ Cloudflare.
   decoding with the functions (`src/lib/web-fetch.ts`).
 - `install.sh`: bundles it to `~/.local/share/ccez-news-relay/`, runs it
   at login (`uk.ccez.news-relay`, launchd keeps it up), publishes
-  127.0.0.1:8799 through Tailscale Funnel at
+  127.0.0.1:8789 through Tailscale Funnel at
   `https://z.tailfe37c2.ts.net:10000`. Run it again after changing the
   relay.
 - Token: `~/.config/ccez-news-relay/token` (made once by the installer),

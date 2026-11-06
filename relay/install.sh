@@ -30,7 +30,7 @@ launchctl bootout "gui/$(id -u)/uk.ccez.news-relay" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 # Funnel waits for the tailnet to allow it (once, in Tailscale's admin page): say so instead of hanging.
 OUT="$DIR/funnel.out"
-tailscale funnel --bg --https=10000 http://127.0.0.1:8799 >"$OUT" 2>&1 &
+tailscale funnel --bg --https=10000 http://127.0.0.1:8789 >"$OUT" 2>&1 &
 pid=$!
 sleep 6
 if kill -0 "$pid" 2>/dev/null; then
@@ -39,4 +39,4 @@ if kill -0 "$pid" 2>/dev/null; then
 	grep -o 'https://login.tailscale.com/[^ ]*' "$OUT"
 	exit 1
 fi
-echo "relay: $(curl -s http://127.0.0.1:8799/health) · https://$(tailscale status --self --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))'):10000"
+echo "relay: $(curl -s http://127.0.0.1:8789/health) · https://$(tailscale status --self --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))'):10000"
