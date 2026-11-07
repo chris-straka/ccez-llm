@@ -81,6 +81,8 @@ test("error toast tap copies its text and dismisses", async ({ page }) => {
 /** Failures hold the long delay (8s): still up past the plain toast's
 expiry, gone on their own later. */
 test("error toast outlives the plain delay", async ({ page }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	await seedChat(page, [{ role: "assistant", content: "copy me" }]);
 	await page.addInitScript(() => {
 		Object.defineProperty(window.navigator, "clipboard", {
@@ -98,7 +100,7 @@ test("error toast outlives the plain delay", async ({ page }) => {
 	const toast = page.locator(".toast.error");
 	await expect(toast).toBeVisible({ timeout: 10_000 });
 	// Past the plain 3s delay the failure is still up...
-	await page.waitForTimeout(4500);
+	await page.clock.fastForward(4500);
 	await expect(toast).toBeVisible();
 	// ...and clears on the long delay.
 	await expect(toast).toBeHidden({ timeout: 10_000 });

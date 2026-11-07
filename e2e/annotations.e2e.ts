@@ -101,10 +101,12 @@ test("drag, slide to Annotate, and file the pill", async ({ page }) => {
 test("clicking blank space deselects instead of reopening the menu", async ({
 	page
 }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	await clickText(page, 2);
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	// Past the 6s idle window with no pointer activity: expired.
-	await page.waitForTimeout(7000);
+	await page.clock.fastForward(7000);
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 	await page.mouse.click(10, 300);
 	const selected = await page.evaluate(
@@ -161,6 +163,8 @@ re-summoning the menu. */
 test("clicking a stale highlight never brings the menu back", async ({
 	page
 }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	const body = page.locator("article .rendered").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
@@ -170,7 +174,7 @@ test("clicking a stale highlight never brings the menu back", async ({
 	await page.mouse.move(box.x + 300, y, { steps: 5 });
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.waitForTimeout(2700);
+	await page.clock.fastForward(2700);
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 	await page.mouse.click(box.x + 200, y);
 	const selected = await page.evaluate(

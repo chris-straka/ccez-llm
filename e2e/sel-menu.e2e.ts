@@ -334,12 +334,14 @@ test.describe("desktop", () => {
 	Chromium keeps it — the menu standing on its stored quote is the
 	contract both engines keep.) */
 	test("hovering the menu holds it past the timer", async ({ page }) => {
+		// The timers below run on the test's clock, not the wall's.
+		await page.clock.install();
 		await selectWord(page);
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
 		await menu.hover();
 		// Past the 6s desktop idle window the hovered menu still stands.
-		await page.waitForTimeout(7000);
+		await page.clock.fastForward(7000);
 		await expect(menu).toBeVisible();
 	});
 
@@ -361,6 +363,8 @@ test.describe("desktop", () => {
 	steering toward Annotate never races the dismiss, and going still
 	lets it expire. */
 	test("pointer activity holds the menu without hovering", async ({ page }) => {
+		// The timers below run on the test's clock, not the wall's.
+		await page.clock.install();
 		await selectWord(page);
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
@@ -371,7 +375,7 @@ test.describe("desktop", () => {
 		if (!box) throw new Error("message has no box");
 		for (let i = 0; i < 7; i++) {
 			await page.mouse.move(box.x + 30 + (i % 2) * 60, box.y + box.height / 2);
-			await page.waitForTimeout(1000);
+			await page.clock.fastForward(1000);
 		}
 		await expect(menu).toBeVisible();
 		const selected = await page.evaluate(
@@ -379,7 +383,7 @@ test.describe("desktop", () => {
 		);
 		expect(selected).not.toBe("");
 		// Hands off: the idle window expires and the menu stands down.
-		await page.waitForTimeout(7000);
+		await page.clock.fastForward(7000);
 		await expect(menu).toHaveCount(0);
 	});
 
@@ -814,6 +818,8 @@ test.describe("ios", () => {
 	tracks the native bubble, not the clock (collapsing the selection
 	still clears it at once). */
 	test("ios dock holds while the highlight lives", async ({ page }) => {
+		// The timers below run on the test's clock, not the wall's.
+		await page.clock.install();
 		await seedChat(page, [
 			{ role: "assistant", content: "漢字を読むテストです" }
 		]);
@@ -826,7 +832,7 @@ test.describe("ios", () => {
 		const dock = page.locator(".prompt-tools .ann-dock");
 		await expect(dock).toBeVisible();
 		// Past the 4.5s touch timer with the highlight still live.
-		await page.waitForTimeout(6000);
+		await page.clock.fastForward(6000);
 		await expect(dock).toBeVisible();
 	});
 

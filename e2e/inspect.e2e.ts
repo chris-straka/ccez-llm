@@ -225,6 +225,8 @@ test("decomposition replaces the stroke bar", async ({ page }) => {
 test("stepper arrows and h/l step manually, never autoplay", async ({
 	page
 }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	await seedWithInspect(page, true, "語");
 	await selectWord(page);
 	await page.locator('.sel-menu button:has-text("Inspect")').click();
@@ -235,7 +237,7 @@ test("stepper arrows and h/l step manually, never autoplay", async ({
 	await expect(modal.locator(".inspect-svg")).toBeVisible({ timeout: 60_000 });
 	await expect(count).toHaveText("1 / 14");
 	// No autoplay: still on step 1 after the old interval elapsed twice.
-	await page.waitForTimeout(1500);
+	await page.clock.fastForward(1500);
 	await expect(count).toHaveText("1 / 14");
 	await modal.locator('button[aria-label="Next stroke (l)"]').click();
 	await expect(count).toHaveText("2 / 14");

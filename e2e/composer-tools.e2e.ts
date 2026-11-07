@@ -156,6 +156,8 @@ test("idle-hide takes the attachment strip with the prompt", async ({
 });
 
 test("empty chat never idle-hides the composer", async ({ page }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	// No messages, 2s timeout: there is no text to uncover, so the
 	// prompt and its strip stay put past the timeout.
 	await page.addInitScript(() => {
@@ -176,7 +178,7 @@ test("empty chat never idle-hides the composer", async ({ page }) => {
 	});
 	await page.reload();
 	await expect(page.locator(".prompt")).toBeVisible({ timeout: 60_000 });
-	await page.waitForTimeout(4000);
+	await page.clock.fastForward(4000);
 	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/);
 });
 
@@ -192,6 +194,8 @@ test.describe("phone idle default", () => {
 	test("prompt stays visible on phones unless a timeout was chosen", async ({
 		page
 	}) => {
+		// The timers below run on the test's clock, not the wall's.
+		await page.clock.install();
 		// Long thread (would hide on desktop) but NO stored timeout.
 		await page.addInitScript((msgs) => {
 			window.localStorage.setItem(
@@ -212,7 +216,7 @@ test.describe("phone idle default", () => {
 			timeout: 60_000
 		});
 		// Past the 6s desktop default: the phone composer stays put.
-		await page.waitForTimeout(8000);
+		await page.clock.fastForward(8000);
 		await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/);
 	});
 });

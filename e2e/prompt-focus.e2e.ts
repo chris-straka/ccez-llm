@@ -142,6 +142,8 @@ press anywhere else hides it, focusout or not. */
 test("a press on the composer keeps it up; a press elsewhere hides it", async ({
 	page
 }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	await seedTwoChats(page);
 	await focusPrompt(page);
 	const press = (selector: string) =>
@@ -156,7 +158,7 @@ test("a press on the composer keeps it up; a press elsewhere hides it", async ({
 	await page.evaluate(() =>
 		(document.activeElement as HTMLElement | null)?.blur()
 	);
-	await page.waitForTimeout(2_000);
+	await page.clock.fastForward(2_000);
 	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/);
 	await press("article .rendered");
 	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/);

@@ -127,6 +127,8 @@ test.describe("voice-error", () => {
 	});
 
 	test("background readback failure stays silent", async ({ page }) => {
+		// The timers below run on the test's clock, not the wall's.
+		await page.clock.install();
 		await throwingSpeak(page);
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
@@ -185,7 +187,7 @@ test.describe("voice-error", () => {
 			timeout: 60_000
 		});
 		// Past the reply and any failure banner's full auto-expiry.
-		await page.waitForTimeout(12_000);
+		await page.clock.fastForward(12_000);
 		const seen = await page.evaluate(() => window.voiceToastSeen ?? -1);
 		expect(seen).toBe(0);
 	});

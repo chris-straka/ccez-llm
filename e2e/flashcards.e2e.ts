@@ -83,6 +83,8 @@ async function seedDeck(page: Page): Promise<void> {
 test("flashcards flip, grade, delete, and skip English quotes", async ({
 	page
 }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	await seedDeck(page);
 	await page.goto("/");
 	// The entry lives on empty chats only.
@@ -137,7 +139,7 @@ test("flashcards flip, grade, delete, and skip English quotes", async ({
 	);
 	const toast = page.locator(".toast", { hasText: "Flashcards downloaded" });
 	await toast.hover();
-	await page.waitForTimeout(4500);
+	await page.clock.fastForward(4500);
 	await expect(toast).toBeVisible();
 	await page.mouse.move(5, 5);
 	await expect(toast).toBeHidden({ timeout: 3000 });

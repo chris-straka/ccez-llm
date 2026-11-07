@@ -216,6 +216,8 @@ test("right-click on a word reads just that word", async ({ page }) => {
 });
 
 test("right-click on message open space does nothing", async ({ page }) => {
+	// The timers below run on the test's clock, not the wall's.
+	await page.clock.install();
 	const para = page.locator("article.assistant .rendered p").first();
 	// The paragraph box is wider than its text: its far-right padding
 	// is message space with no word under the cursor — not a listen
@@ -225,7 +227,7 @@ test("right-click on message open space does nothing", async ({ page }) => {
 	await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2, {
 		button: "right"
 	});
-	await page.waitForTimeout(2000);
+	await page.clock.fastForward(2000);
 	expect(await spoken(page)).toEqual([]);
 });
 
