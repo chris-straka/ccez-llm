@@ -134,6 +134,7 @@ export class WordList {
 		// Another tab's stars still waiting (each tab saves the whole list,
 		// so one tab's save dropped the other's): taken along. One sent
 		// twice changes nothing on the server.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
 		const seen = new Set(this.pending.map(changeId));
 		for (const c of read().pending)
 			if (!seen.has(changeId(c))) this.pending.push(c);
