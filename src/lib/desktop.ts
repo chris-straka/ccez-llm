@@ -31,50 +31,6 @@ export type DeepLink =
 
 export type ShareOutcome = "shared" | "copied" | "downloaded" | "unavailable";
 
-/**
- * Parse a `ccez://` URL (mirrors `parse_deep_link` in `desktop.rs`):
- * `ccez://chat/<id>`, `ccez://chat?id=<id>`, `ccez://new`. Foreign
- * input is null, never a throw. Pure and unit-tested.
- */
-export function parseCcezDeepLink(url: string): DeepLink | null {
-	const rest = url.trim().match(/^ccez:\/\/([\s\S]*)$/);
-	if (!rest) return null;
-	const after = rest[1] ?? "";
-	const queryIndex = after.indexOf("?");
-	const path = queryIndex < 0 ? after : after.slice(0, queryIndex);
-	const query = queryIndex < 0 ? "" : after.slice(queryIndex + 1);
-	if (path === "new") return { kind: "new-chat" };
-	if (path === "chat") {
-		const id = queryValue(query, "id");
-		if (id === null) return null;
-		const clean = cleanLinkId(id);
-		return clean === null ? null : { kind: "open-chat", chatId: clean };
-	}
-	if (path.startsWith("chat/")) {
-		const clean = cleanLinkId(safeDecode(path.slice("chat/".length)));
-		return clean === null ? null : { kind: "open-chat", chatId: clean };
-	}
-	return null;
-}
-
-function queryValue(query: string, key: string): string | null {
-	for (const pair of query.split("&")) {
-		const equals = pair.indexOf("=");
-		if (equals < 0) continue;
-		if (pair.slice(0, equals) === key)
-			return safeDecode(pair.slice(equals + 1));
-	}
-	return null;
-}
-
-function safeDecode(value: string): string {
-	try {
-		return decodeURIComponent(value.replace(/\+/g, " "));
-	} catch {
-		return value;
-	}
-}
-
 function cleanLinkId(id: string): string | null {
 	const trimmed = id.trim();
 	if (!trimmed || trimmed.includes("/") || trimmed.includes("\\")) return null;

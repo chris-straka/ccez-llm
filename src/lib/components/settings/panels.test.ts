@@ -71,34 +71,6 @@ describe("updates section", () => {
 });
 
 describe("desktop voice copy and controls", () => {
-	// Windows and Linux shells report every voice at quality 1, so the
-	// macOS premium/enhanced gate would list nothing — those shells
-	// list every installed voice instead, and the note names no OS.
-	it("names no OS in the system-voice note and lists all voices off-macOS", () => {
-		const source = panelSource("VoicePanel.svelte");
-		expect(source).not.toMatch(/macOS system voices/);
-		expect(source).toMatch(/Messages always read with system voices/);
-		expect(source).toMatch(/isWindowsShell \|\| isLinuxShell/);
-		expect(source).toMatch(/allVoicesForLang\(installedVoices, voiceLangTag\)/);
-	});
-	it("links each platform to its own voice-download settings", () => {
-		const source = panelSource("VoicePanel.svelte");
-		expect(source).toMatch(/Open Speech settings/);
-		expect(source).toMatch(/Open text-to-speech settings/);
-	});
-	it("seats the mic toggle with the other checkboxes, not in the voice panel", () => {
-		// The toggle moved out of VoicePanel (buried under the pickers)
-		// into DefaultsPanel's Messages group, both branches.
-		const voice = panelSource("VoicePanel.svelte");
-		expect(voice).not.toMatch(/Microphone dictation/);
-		const defaults = panelSource("DefaultsPanel.svelte");
-		const android = defaults.indexOf("{#if androidUI}");
-		if (android === -1) throw new Error("no android branch");
-		const desktop = defaults.indexOf("{:else}", android);
-		if (desktop === -1) throw new Error("no desktop branch");
-		expect(defaults.slice(android, desktop)).toMatch(/Microphone dictation/);
-		expect(defaults.slice(desktop)).toMatch(/Microphone dictation/);
-	});
 	it("offers the message-buttons master switch on both platforms", () => {
 		// Phones used to render the row unconditionally (no shortcuts
 		// to cover an off state); the toggle now lives in both branches.

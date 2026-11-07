@@ -67,23 +67,6 @@ describe("updateRouteFor", () => {
 	});
 });
 
-describe("updateButtonLabel", () => {
-	it("narrates every stage at the button", () => {
-		expect(updateButtonLabel({ stage: "idle" })).toBe("Check for updates");
-		expect(updateButtonLabel({ stage: "checking" })).toBe("Checking…");
-		expect(updateButtonLabel({ stage: "installing" })).toBe("Installing…");
-		expect(updateButtonLabel({ stage: "restarting" })).toBe("Restarting…");
-	});
-	it("shows download percent when the total is known", () => {
-		expect(
-			updateButtonLabel({ stage: "downloading", received: 50, total: 100 })
-		).toBe("Downloading… 50%");
-		expect(
-			updateButtonLabel({ stage: "downloading", received: 0, total: null })
-		).toBe("Downloading…");
-	});
-});
-
 /** A found update needs only its version for the flow; the rest of
 the plugin class never runs under fakes. */
 function fakeUpdate(version: string): UpdaterUpdate {

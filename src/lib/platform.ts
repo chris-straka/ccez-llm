@@ -121,11 +121,6 @@ export function altKeyLabel(isMac: boolean): string {
 	return isMac ? "⌥" : "Alt";
 }
 
-/** Shift label: ⇧ on Mac, Shift elsewhere. */
-export function shiftKeyLabel(isMac: boolean): string {
-	return isMac ? "⇧" : "Shift";
-}
-
 /**
  * Runtime desktop-OS probe for the shortcuts modal and voice guidance:
  * reads `navigator.platform` with User-Agent Client Hints winning when

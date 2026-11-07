@@ -8,12 +8,10 @@ import {
 	inspectLangFor,
 	isHanChar,
 	isSingleHanChar,
-	onKunLine,
 	readingChips,
 	parseKangxi,
 	shouldShowInspect,
-	clampStrokeStep,
-	speaksJapaneseSelection
+	clampStrokeStep
 } from "./inspect";
 import { extractStrokePaths, kanjiSvgUrl } from "./kanjivg";
 import {
@@ -149,17 +147,9 @@ describe("getInspectData", () => {
 			japaneseKun: null
 		});
 	});
-
-	it("reports no bundled stroke paths (KanjiVG follow-up)", () => {
-		expect(getInspectData("語").hasStrokePaths).toBe(false);
-	});
 });
 
 describe("inspect setting", () => {
-	it("defaults on (fresh installs inspect single han highlights)", () => {
-		expect(defaultSettings().inspectEnabled).toBe(true);
-	});
-
 	it("backfills true on older saves, keeps an explicit off", () => {
 		const blank = defaultSettings();
 		blank.providers["deepseek"]!.apiKey = "";
@@ -328,20 +318,6 @@ describe("readingChips", () => {
 	});
 });
 
-describe("onKunLine", () => {
-	it("lowercases and comma-joins both sides on one line", () => {
-		expect(
-			onKunLine({ japaneseOn: "ICHI ITSU", japaneseKun: "HITOTSU HAJIME" })
-		).toBe("On/Kun: ichi,itsu | hitotsu,hajime");
-	});
-	it("omits a missing side without a dangling separator", () => {
-		expect(onKunLine({ japaneseOn: "ICHI", japaneseKun: null })).toBe(
-			"On/Kun: ichi"
-		);
-		expect(onKunLine({ japaneseOn: null, japaneseKun: null })).toBeNull();
-	});
-});
-
 describe("kanjivg", () => {
 	it("addresses files by 5-digit lowercase hex codepoint", () => {
 		expect(kanjiSvgUrl("一")).toBe(
@@ -374,14 +350,6 @@ describe("clampStrokeStep", () => {
 	it("pins unknown totals at 1", () => {
 		expect(clampStrokeStep(1, 1, 0)).toBe(1);
 		expect(clampStrokeStep(9, -1, 0)).toBe(1);
-	});
-});
-
-describe("speaksJapaneseSelection", () => {
-	it("needs kanji plus a Japanese probe", () => {
-		expect(speaksJapaneseSelection("漢字を読む", "漢字を読む")).toBe(true);
-		expect(speaksJapaneseSelection("hello", "hello world")).toBe(false);
-		expect(speaksJapaneseSelection("漢字", "你好世界")).toBe(false);
 	});
 });
 

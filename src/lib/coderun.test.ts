@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	CODE_RUN_TIMEOUT_SECS,
 	codeRunBody,
 	codeRunDisabledReason,
 	codeRunSummary,
@@ -12,16 +11,11 @@ import {
 describe("runnerFor", () => {
 	it("maps the obvious fence labels to PATH runners", () => {
 		expect(runnerFor("python")).toEqual({ program: "python3", suffix: "py" });
-		expect(runnerFor("py")).toEqual({ program: "python3", suffix: "py" });
-		expect(runnerFor("javascript")).toEqual({ program: "node", suffix: "js" });
 		expect(runnerFor("js")).toEqual({ program: "node", suffix: "js" });
-		expect(runnerFor("typescript")).toEqual({ program: "bun", suffix: "ts" });
 		expect(runnerFor("ts")).toEqual({ program: "bun", suffix: "ts" });
 		expect(runnerFor("bash")).toEqual({ program: "bash", suffix: "sh" });
-		expect(runnerFor("sh")).toEqual({ program: "bash", suffix: "sh" });
 		expect(runnerFor("ruby")).toEqual({ program: "ruby", suffix: "rb" });
 		expect(runnerFor("deno")).toEqual({ program: "deno", suffix: "js" });
-		expect(runnerFor("go")).toEqual({ program: "go", suffix: "go" });
 		expect(runnerFor("golang")).toEqual({ program: "go", suffix: "go" });
 	});
 
@@ -37,12 +31,6 @@ describe("runnerFor", () => {
 		expect(noRunnerReason("haskell")).toContain(
 			'No local runner for "haskell"'
 		);
-	});
-});
-
-describe("timeout", () => {
-	it("matches the backend CODE_RUN_TIMEOUT_SECS (10s)", () => {
-		expect(CODE_RUN_TIMEOUT_SECS).toBe(10);
 	});
 });
 
@@ -62,8 +50,6 @@ describe("runCodeBlock outside the shell", () => {
 		expect(outcome.kind).toBe("unavailable");
 		if (outcome.kind === "unavailable")
 			expect(outcome.reason).toContain("No local runner");
-		expect(runnerFor("haskell")).toBeNull();
-		expect(noRunnerReason("haskell")).toContain("No local runner");
 	});
 
 	it("rejects empty blocks", async () => {

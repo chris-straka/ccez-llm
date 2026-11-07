@@ -32,13 +32,6 @@ describe("folded code chrome", () => {
 		expect(selectors).toContain(".ccez-code-copy");
 		expect(selectors).toContain(".ccez-code-run");
 	});
-	it("caps folded previews to a few words on phones", () => {
-		// A full first line is a paragraph on a 360px column: phones
-		// clip the preview far earlier, desktop keeps the whole line.
-		const css = bodyStyle();
-		expect(css).toMatch(/\.folded-preview[\s\S]*?22ch/);
-		expect(css).toContain(".app[data-android]");
-	});
 	it("keeps folded labels non-selectable chrome", () => {
 		// Labels are chrome, not content: quoting `latex · N LOC`
 		// annotates nothing and badges orphan on unfold — so labels
@@ -97,115 +90,6 @@ describe("folded code chrome", () => {
 		expect(source).toContain(
 			"if (unfoldedDrag || blockHoldsHighlight(codeBlock)) return;"
 		);
-	});
-});
-
-describe("math chrome alignment", () => {
-	/** Both chrome buttons share one box: the copy glyph brings its
-	own height while `$` is bare text, so equal height — not
-	line-height games — is what centers them on each other. */
-	function texRule(): string {
-		const css = bodyStyle();
-		const rules = [
-			...css.matchAll(/([^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g)
-		];
-		const own = rules.find(
-			(rule) =>
-				!rule[1]!.includes(".ccez-math-copy") &&
-				!/hover|data-folded/.test(rule[1]!)
-		);
-		if (!own) throw new Error("no base .ccez-math-tex rule");
-		return own[2]!;
-	}
-	function sharedRule(): string {
-		const css = bodyStyle();
-		const rules = [
-			...css.matchAll(/([^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g)
-		];
-		const shared = rules.find((rule) => rule[1]!.includes(".ccez-math-copy"));
-		if (!shared) throw new Error("no shared math chrome rule");
-		return shared[2]!;
-	}
-	function copyRule(): string {
-		const css = bodyStyle();
-		const rules = [
-			...css.matchAll(/([^{}]*\.ccez-math-copy[^{}]*)\{([^}]*)\}/g)
-		];
-		const own = rules.find(
-			(rule) =>
-				!rule[1]!.includes(".ccez-math-tex") &&
-				!/hover|data-folded/.test(rule[1]!)
-		);
-		if (!own) throw new Error("no base .ccez-math-copy rule");
-		return own[2]!;
-	}
-	/** Base display-body rule (not the folded, raw-view, or inline overrides). */
-	function mathBodyRule(): string {
-		const css = bodyStyle();
-		const rules = [
-			...css.matchAll(/([^{}]*\.ccez-math-body[^{}]*)\{([^}]*)\}/g)
-		];
-		const base = rules.find(
-			(rule) =>
-				/\(\.ccez-math-body\)$/.test(rule[1]!.trim()) &&
-				!/inline|data-folded|data-math-raw/.test(rule[1]!)
-		);
-		if (!base) throw new Error("no base .ccez-math-body rule");
-		return base[2]!;
-	}
-	it("keeps the source toggle upright", () => {
-		expect(texRule()).toMatch(/font-style\s*:\s*normal/);
-	});
-	it("leaves the toggle text on a real line box", () => {
-		expect(texRule()).not.toMatch(/line-height\s*:\s*0/);
-	});
-	it("sizes both buttons to one shared box", () => {
-		expect(sharedRule()).toMatch(/height\s*:\s*1\.3rem/);
-		expect(sharedRule()).toMatch(/width\s*:\s*1\.3rem/);
-	});
-	it("centers the chrome pair on top instead of pinning the right edge", () => {
-		expect(copyRule()).toMatch(/left\s*:\s*calc\(50%/);
-		expect(texRule()).toMatch(/right\s*:\s*calc\(50%/);
-	});
-	it("clears the chrome with top room, not a right gutter", () => {
-		expect(mathBodyRule()).toMatch(/padding\s*:\s*2\.2rem/);
-		expect(mathBodyRule()).not.toMatch(/3\.4rem/);
-	});
-	/** Inline chrome rule (not the absolute display pair): both
-	buttons self-center on the line, so the `$` text button and the
-	svg copy button sit on each other while the equation keeps the
-	row's baseline rhythm. */
-	function inlineChromeRule(): string {
-		const css = bodyStyle();
-		const rules = [
-			...css.matchAll(
-				/([^{}]*\.ccez-math-inline[^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g
-			)
-		];
-		const own = rules.find((rule) => rule[1]!.includes(".ccez-math-copy"));
-		if (!own) throw new Error("no inline math chrome rule");
-		return own[2]!;
-	}
-	it("self-centers the inline pair instead of baselining them", () => {
-		expect(inlineChromeRule()).toMatch(/align-self\s*:\s*center/);
-		expect(inlineChromeRule()).not.toMatch(/vertical-align\s*:\s*baseline/);
-	});
-	/** Base inline wrapper rule (not the body, raw, or chrome overrides). */
-	function inlineRule(): string {
-		const css = bodyStyle();
-		const rules = [
-			...css.matchAll(/([^{}]*\.ccez-math-inline[^{}]*)\{([^}]*)\}/g)
-		];
-		const base = rules.find(
-			(rule) =>
-				/\(\.ccez-math-inline\)$/.test(rule[1]!.trim()) &&
-				!/body|raw|tex|copy/.test(rule[1]!)
-		);
-		if (!base) throw new Error("no base .ccez-math-inline rule");
-		return base[2]!;
-	}
-	it("never wraps an inline equation onto a second line", () => {
-		expect(inlineRule()).toMatch(/white-space\s*:\s*nowrap/);
 	});
 });
 

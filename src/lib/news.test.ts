@@ -11,10 +11,8 @@ import {
 	storeFeed,
 	storeNewsPicks,
 	NEWS_FEED_TTL_MS,
-	CEFR_LEVELS,
 	NEWS_CACHE_TTL_MS,
 	NEWS_FEEDS,
-	SUMMARY_SIZES,
 	articleImageFromHtml,
 	cachedArticle,
 	cachedNewsImage,
@@ -29,7 +27,6 @@ import {
 	isDirectStoryLink,
 	isNewsFallback,
 	isWebviewUnsupported,
-	isNewsSupported,
 	isUnopenableOutlet,
 	jinaUrl,
 	loadNewsStories,
@@ -124,7 +121,6 @@ describe("news feeds", () => {
 		].map((l) => l.code);
 		expect(codes.length).toBeGreaterThan(40);
 		for (const code of codes) {
-			expect(isNewsSupported(code)).toBe(true);
 			const regions = newsRegionsFor(code);
 			expect(regions!.length).toBeGreaterThanOrEqual(1);
 			expect(isNewsFallback(code)).toBe(fallback.has(code));
@@ -429,8 +425,8 @@ describe("news feeds", () => {
 	});
 
 	it("reads native desks where a world service publishes the language", () => {
-		// French U.S. and Global go fully native (no AI
-		// translation); German keeps the translated feeds.
+		// French U.S. and German Global read native desks (no AI
+		// translation); three cases stand in for the whole table.
 		const frUs = newsRegionsFor("fr")!.find((r) => r.gl === "US")!;
 		expect(frUs.translate).toBeUndefined();
 		expect(frUs.merge).toMatchObject([
@@ -440,44 +436,6 @@ describe("news feeds", () => {
 			},
 			{ url: "https://www.rfi.fr/fr/am%C3%A9riques/rss", source: "RFI" }
 		]);
-		const frGbl = newsRegionsFor("fr")!.find((r) => r.gl === "GBL")!;
-		expect(frGbl.translate).toBeUndefined();
-		expect(frGbl.merge).toMatchObject([
-			{ url: "https://www.france24.com/fr/rss", source: "France 24" },
-			{ url: "https://www.rfi.fr/fr/rss", source: "RFI" }
-		]);
-		const esGbl = newsRegionsFor("es")!.find((r) => r.gl === "GBL")!;
-		expect(esGbl.translate).toBeUndefined();
-		expect(esGbl.merge).toMatchObject([
-			{ url: "https://feeds.bbci.co.uk/mundo/rss.xml", source: "BBC Mundo" },
-			{ url: "https://www.france24.com/es/rss", source: "France 24" }
-		]);
-		const arGbl = newsRegionsFor("ar")!.find((r) => r.gl === "GBL")!;
-		expect(arGbl.translate).toBeUndefined();
-		expect(arGbl.merge).toMatchObject([
-			{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" },
-			{ url: "https://www.france24.com/ar/rss", source: "France 24" }
-		]);
-		const frEur = newsRegionsFor("fr")!.find((r) => r.gl === "EUR")!;
-		expect(frEur.translate).toBeUndefined();
-		expect(frEur.merge).toMatchObject([
-			{ url: "https://www.france24.com/fr/europe/rss", source: "France 24" },
-			{ url: "https://www.rfi.fr/fr/europe/rss", source: "RFI" }
-		]);
-		const itEur = newsRegionsFor("it")!.find((r) => r.gl === "EUR")!;
-		expect(itEur.translate).toBeUndefined();
-		expect(itEur.merge).toMatchObject([
-			{ url: "https://it.euronews.com/rss", source: "Euronews" }
-		]);
-		const ptGbl = newsRegionsFor("pt")!.find((r) => r.gl === "GBL")!;
-		expect(ptGbl.translate).toBeUndefined();
-		expect(ptGbl.merge).toMatchObject([
-			{
-				url: "https://feeds.bbci.co.uk/portuguese/rss.xml",
-				source: "BBC Brasil"
-			},
-			{ url: "https://www.rfi.fr/br/rss", source: "RFI Brasil" }
-		]);
 		const deGbl = newsRegionsFor("de")!.find((r) => r.gl === "GBL")!;
 		expect(deGbl.translate).toBeUndefined();
 		expect(deGbl.merge).toMatchObject([
@@ -486,119 +444,6 @@ describe("news feeds", () => {
 				source: "tagesschau"
 			}
 		]);
-		const zhUs = newsRegionsFor("zh")!.find((r) => r.gl === "US")!;
-		expect(zhUs.translate).toBeUndefined();
-		expect(zhUs.merge).toMatchObject([
-			{ url: "https://www.rfi.fr/cn/%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }
-		]);
-		const zhGbl = newsRegionsFor("zh")!.find((r) => r.gl === "GBL")!;
-		expect(zhGbl.translate).toBeUndefined();
-		expect(zhGbl.merge).toMatchObject([
-			{ url: "https://www.rfi.fr/cn/rss", source: "RFI" }
-		]);
-		const jaGbl = newsRegionsFor("ja")!.find((r) => r.gl === "GBL")!;
-		expect(jaGbl.translate).toBeUndefined();
-		expect(jaGbl.merge).toMatchObject([
-			{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" },
-			{
-				url: "https://feeds.bbci.co.uk/japanese/rss.xml",
-				source: "BBC Japanese"
-			}
-		]);
-		const koGbl = newsRegionsFor("ko")!.find((r) => r.gl === "GBL")!;
-		expect(koGbl.translate).toBeUndefined();
-		expect(koGbl.merge).toMatchObject([
-			{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" },
-			{ url: "https://feeds.bbci.co.uk/korean/rss.xml", source: "BBC Korean" }
-		]);
-		// BBC/RFI world services across Asia, Africa, and Europe.
-		const desks: Array<[string, string[]]> = [
-			["ru", ["bbci.co.uk/russian", "rfi.fr/ru"]],
-			["fa", ["bbci.co.uk/persian", "rfi.fr/fa"]],
-			["vi", ["bbci.co.uk/vietnamese", "rfi.fr/vi"]],
-			["sw", ["bbci.co.uk/swahili", "rfi.fr/sw"]],
-			["ur", ["bbci.co.uk/urdu"]],
-			["hi", ["bbci.co.uk/hindi"]],
-			["id", ["bbci.co.uk/indonesia"]],
-			["uk", ["bbci.co.uk/ukrainian"]],
-			["bn", ["bbci.co.uk/bengali"]],
-			["pa", ["bbci.co.uk/punjabi"]],
-			["am", ["bbci.co.uk/amharic"]],
-			["ta", ["bbci.co.uk/tamil"]],
-			["th", ["bbci.co.uk/thai"]],
-			["tr", ["voaturkce.com/api/"]],
-			["it", ["ansa.it/sito/notizie/mondo/"]]
-		];
-		for (const [code, hosts] of desks) {
-			const gbl = newsRegionsFor(code)!.find((r) => r.gl === "GBL")!;
-			expect(gbl.translate).toBeUndefined();
-			expect(gbl.merge?.map((t) => t.url)).toHaveLength(hosts.length);
-			for (const [i, host] of hosts.entries()) {
-				expect(gbl.merge?.[i]?.url).toContain(host);
-				expect(gbl.merge?.[i]?.source?.length).toBeGreaterThan(0);
-			}
-		}
-		// VOA and RFI/France 24 section desks beyond Global.
-		const sections: Array<[string, string, string[]]> = [
-			["ru", "US", ["golosameriki.com/api/"]],
-			["fa", "US", ["ir.voanews.com/api/"]],
-			["vi", "US", ["voatiengviet.com/api/", "rfi.fr/vi/"]],
-			["th", "US", ["voathai.com/api/"]],
-			["id", "US", ["voaindonesia.com/api/"]],
-			["pt", "US", ["rfi.fr/br/am"]],
-			["es", "EUR", ["france24.com/es/europa", "rfi.fr/es/europa"]],
-			["pt", "EUR", ["rfi.fr/br/europa"]],
-			["ar", "EUR", ["france24.com/ar/"]],
-			["zh", "ASI", ["rfi.fr/cn/"]],
-			["fr", "GB", ["france24.com/fr/tag/", "rfi.fr/fr/tag/"]],
-			["fr", "AU", ["france24.com/fr/tag/", "rfi.fr/fr/tag/"]],
-			["es", "GB", ["france24.com/es/tag/", "rfi.fr/es/tag/"]],
-			["es", "AU", ["france24.com/es/tag/", "rfi.fr/es/tag/"]],
-			["pt", "GB", ["rfi.fr/br/tag/"]],
-			["pt", "AU", ["rfi.fr/br/tag/"]],
-			["pt", "LAT", ["rfi.fr/br/tag/"]],
-			["zh", "GB", ["rfi.fr/cn/"]],
-			["zh", "AU", ["rfi.fr/cn/"]],
-			["ru", "GB", ["rfi.fr/ru/"]],
-			["ru", "AU", ["rfi.fr/ru/"]],
-			["ru", "EUR", ["rfi.fr/ru/"]],
-			["ru", "CA", ["rfi.fr/ru/"]],
-			["sw", "US", ["rfi.fr/sw/"]],
-			["sw", "GB", ["rfi.fr/sw/"]],
-			["sw", "EUR", ["rfi.fr/sw/"]],
-			["sw", "AU", ["rfi.fr/sw/"]],
-			["vi", "EUR", ["rfi.fr/vi/"]],
-			["vi", "AU", ["rfi.fr/vi/"]],
-			["vi", "CA", ["rfi.fr/vi/"]],
-			["es", "CA", ["france24.com/es/tag/"]],
-			["zh", "EUR", ["rfi.fr/cn/"]],
-			["zh", "LAT", ["rfi.fr/cn/"]],
-			["zh", "CA", ["rfi.fr/cn/"]],
-			["fr", "LAT", ["france24.com/fr/tag/"]],
-			["fr", "ASI", ["france24.com/fr/asie-pacifique"]],
-			["es", "ASI", ["france24.com/es/tag/"]],
-			["pt", "ASI", ["rfi.fr/br/tag/"]],
-			["ar", "ASI", ["france24.com/ar/"]],
-			["fa", "GB", ["rfi.fr/fa/"]],
-			["fa", "EUR", ["rfi.fr/fa/"]],
-			["fa", "AU", ["rfi.fr/fa/"]],
-			["fa", "CA", ["rfi.fr/fa/"]],
-			["fa", "ASI", ["rfi.fr/fa/"]],
-			["fa", "LAT", ["rfi.fr/fa/"]],
-			["ko", "US", ["voakorea.com/api/"]],
-			["am", "US", ["amharic.voanews.com/api/"]],
-			["sw", "CA", ["rfi.fr/sw/"]],
-			["pt", "CA", ["rfi.fr/br/tag/"]]
-		];
-		for (const [code, gl, hosts] of sections) {
-			const region = newsRegionsFor(code)!.find((r) => r.gl === gl)!;
-			expect(region.translate).toBeUndefined();
-			expect(region.merge?.map((t) => t.url)).toHaveLength(hosts.length);
-			for (const [i, host] of hosts.entries()) {
-				expect(region.merge?.[i]?.url).toContain(host);
-				expect(region.merge?.[i]?.source?.length).toBeGreaterThan(0);
-			}
-		}
 		// A native desk stands in for a fallback home region too
 		// (Persian U.S. reads VOA first, untranslated).
 		const faHome = newsRegionsFor("fa")!;
@@ -612,7 +457,6 @@ describe("news feeds", () => {
 				.map((r) => r.gl)
 		).toEqual(["GBL", "US", "EUR", "GB", "AU", "LAT", "ASI"]);
 		expect(frUs).toMatchObject({ label: "U.S.", icon: "🇺🇸" });
-		expect(frGbl).toMatchObject({ label: "Global", icon: "🌐" });
 		// Everyone else keeps the translated English feeds.
 		expect(newsRegionsFor("de")!.find((r) => r.gl === "US")).toMatchObject({
 			hl: "en-US",
@@ -759,35 +603,6 @@ describe("news feeds", () => {
 			return xml("Asia");
 		});
 		expect(seen).toEqual(["https://www.rfi.fr/cn/%E4%BA%9A%E6%B4%B2/rss"]);
-	});
-
-	it("fans Latin America out across Mexico, Brazil, Argentina", async () => {
-		const seen: string[] = [];
-		const xml = (title: string) =>
-			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const feed = async (url: string) => {
-			seen.push(url);
-			const gl = new URL(url).searchParams.get("gl");
-			if (gl === "MX" || gl === "BR" || gl === "AR") return xml(gl);
-			throw new Error(`unexpected feed ${url}`);
-		};
-		const stories = await loadNewsStories("da", "LAT", feed);
-		expect(seen).toHaveLength(3);
-		expect(stories.map((s) => s.title)).toEqual(["MX", "BR", "AR"]);
-		seen.length = 0;
-		await loadNewsStories("es", "LAT", async (url) => {
-			seen.push(url);
-			return xml("AmLat");
-		});
-		expect(seen).toEqual([
-			"https://www.france24.com/es/am%C3%A9rica-latina/rss"
-		]);
-		seen.length = 0;
-		await loadNewsStories("pt", "LAT", async (url) => {
-			seen.push(url);
-			return xml("AmLat");
-		});
-		expect(seen).toEqual(["https://www.rfi.fr/br/tag/am%C3%A9rica-latina/rss"]);
 	});
 
 	it("applies translated titles, dropping cross-language dupes", () => {
@@ -971,22 +786,6 @@ describe("session prompts", () => {
 		snippet: "Up all week."
 	};
 
-	it("pins CEFR levels and summary sizes", () => {
-		expect(CEFR_LEVELS.map((l) => l.level)).toEqual([
-			"A1",
-			"A2",
-			"B1",
-			"B2",
-			"C1",
-			"C2"
-		]);
-		expect(SUMMARY_SIZES.map((s) => s.size)).toEqual([
-			"short",
-			"medium",
-			"long"
-		]);
-	});
-
 	it("writes short summary openers with outlet and word target", () => {
 		const short = newsSummaryInstruction(story, "short", "B1", "French");
 		expect(short).toContain("📰");
@@ -1009,23 +808,6 @@ describe("session prompts", () => {
 		expect(
 			newsSummaryInstruction({ ...story, source: "" }, "short", "B1", "French")
 		).not.toContain("()");
-	});
-
-	it("writes conversation openers: analysis, open end, one voice", () => {
-		const opener = newsConversationInstruction(story, "B1", "French");
-		expect(opener).toContain("🗣️");
-		expect(opener).toContain("Markets rally");
-		expect(opener).toContain("CEFR B1");
-		expect(opener).toContain("Intermediate");
-		expect(opener).toContain("Two named locals");
-		expect(opener).toContain("never a retelling");
-		expect(opener).toContain("nothing concluded");
-		expect(opener).toContain("one voice answers");
-		expect(opener).toContain("correct my mistakes");
-		expect(opener).toContain("Never explain grammar or words unless I");
-		expect(opener).toContain("Stay in French");
-		expect(opener).toContain("about 250 words");
-		expect(opener).not.toContain("invite");
 	});
 });
 

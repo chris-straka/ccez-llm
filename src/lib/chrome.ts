@@ -1,9 +1,4 @@
-import {
-	PROMPT_IDLE_ALWAYS,
-	PROMPT_IDLE_MAX,
-	PROMPT_IDLE_MIN,
-	PROMPT_IDLE_NEVER
-} from "./settings";
+import { PROMPT_IDLE_ALWAYS } from "./settings";
 
 /**
  * App-chrome helpers (pure, DOM-free): prompt idle-hide and friends. The Svelte shells own listeners and classes; the
@@ -29,17 +24,6 @@ export function isPromptIdle(
 ): boolean {
 	if (!(idleSec > 0)) return false;
 	return now - lastInputAt >= idleSec * 1000;
-}
-
-/**
- * Clamp a raw idle-timeout value into the settings range (whole
- * seconds). 0 ("never hide") passes through; everything else outside
- * the range falls back to the range floor.
- */
-export function clampPromptIdleSec(raw: number): number {
-	if (typeof raw !== "number" || Number.isNaN(raw)) return PROMPT_IDLE_MIN;
-	if (raw === PROMPT_IDLE_NEVER || raw === PROMPT_IDLE_ALWAYS) return raw;
-	return Math.min(PROMPT_IDLE_MAX, Math.max(PROMPT_IDLE_MIN, Math.round(raw)));
 }
 
 /** Readout for the stored idle value: "always", seconds, or "never". */

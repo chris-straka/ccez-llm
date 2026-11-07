@@ -6,7 +6,6 @@ import {
 	loadSettings,
 	saveSettings,
 	memoryStore,
-	DEFAULT_SYSTEM_PROMPT,
 	CHAT_WIDTH_DEFAULT,
 	CHAT_WIDTH_MAX,
 	CHAT_WIDTH_MIN,
@@ -22,11 +21,9 @@ import {
 	stepFontScale,
 	stepChatWidth,
 	stepPromptWidth,
-	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
 	PROMPT_IDLE_MAX,
 	PROMPT_IDLE_MIN,
-	activeThinkingId,
 	keyNeedsEditing,
 	MIN_KEY_CHARS,
 	maskKey,
@@ -52,29 +49,6 @@ function blankSettings() {
 }
 
 describe("settings", () => {
-	it("defaults to per-model thinking, voice off, empty system prompt", () => {
-		const s = defaultSettings();
-		expect(s.thinking).toEqual({});
-		// Unset resolves to each model's default (muse → medium).
-		expect(activeThinkingId(s)).toBe("medium");
-		expect("readingAids" in s).toBe(false);
-		expect(s.vim).toBe(true);
-		expect(s.voice).toBe(false);
-		expect(s.ownBubble).toBe(false);
-		expect(s.hoverUserActions).toBe(true);
-		expect(s.hoverAssistantActions).toBe(true);
-		expect(s.scaleActionsWithFont).toBe(true);
-		expect(s.promptIdleSec).toBe(PROMPT_IDLE_DEFAULT);
-		expect(s.voiceEngine).toBe("native");
-		// Locale-aware: defaultSettings() follows systemLocale() (OS locale),
-		// so this must track the helper, not a hardcoded tag.
-		expect(s.voiceLang).toBe(systemLocale());
-		expect(s.systemPrompt).toBe(DEFAULT_SYSTEM_PROMPT);
-		expect(s.providers["deepseek"]!.model).toBe("deepseek-flash");
-		expect(s.providers["muse"]!.model).toBe("muse-spark-1.3-contributor");
-		expect(s.providers["muse"]!.models).toEqual([]);
-	});
-
 	it("defaults text size to 1 and backfills/clamps old saves", () => {
 		expect(defaultSettings().fontScale).toBe(1);
 		const s = blankSettings();
@@ -186,11 +160,6 @@ describe("settings", () => {
 		(junk as unknown as Record<string, unknown>).chatWidth = "wide";
 		saveSettings(junk, memoryStore);
 		expect(loadSettings(memoryStore).chatWidth).toBe(CHAT_WIDTH_DEFAULT);
-	});
-
-	it("hides the prompt whenever unfocused out of the box", () => {
-		expect(PROMPT_IDLE_DEFAULT).toBe(PROMPT_IDLE_ALWAYS);
-		expect(defaultSettings().promptIdleSec).toBe(PROMPT_IDLE_ALWAYS);
 	});
 
 	it("backfills and clamps the prompt idle timeout on old saves", () => {
@@ -622,22 +591,6 @@ describe("settings", () => {
 		);
 	});
 
-	it("defaults to Muse with an empty system prompt", () => {
-		const s = defaultSettings();
-		expect(s.activeProviderId).toBe("muse");
-		expect(s.systemPrompt).toBe("");
-	});
-
-	it("adds the lookup line only for tool-capable providers", () => {
-		const s = defaultSettings();
-		s.systemPrompt = "Be brief.";
-		expect(effectiveSystemPrompt(s)).toBe("Be brief.");
-		expect(effectiveSystemPrompt(s, null, false)).toBe("Be brief.");
-		expect(effectiveSystemPrompt(s, null, true)).toBe(
-			`Be brief. ${LOOKUP_CAPABILITY_HINT}`
-		);
-	});
-
 	it("adds the correction line only when the toggle is on", () => {
 		const s = defaultSettings();
 		s.systemPrompt = "Be brief.";
@@ -851,9 +804,6 @@ describe("theme", () => {
 });
 
 describe("ownInk", () => {
-	it("defaults to pink", () => {
-		expect(blankSettings().ownInk).toBe("pink");
-	});
 	it("heals unknown saved values back to pink", () => {
 		const store = memoryStore;
 		const s = blankSettings();

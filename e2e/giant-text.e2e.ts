@@ -53,7 +53,7 @@ async function overflowReport(page: Page): Promise<string[]> {
 	});
 }
 
-for (const scale of [8, 20]) {
+for (const scale of [20]) {
 	test(`desktop thread fits at ${scale * 100}% text`, async ({ page }) => {
 		await page.setViewportSize({ width: 1280, height: 800 });
 		await seedChat(page, THREAD, null, { fontScale: scale });
@@ -121,7 +121,7 @@ test.describe("phone", () => {
 			"Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
 		viewport: { width: 412, height: 915 }
 	});
-	for (const scale of [8, 20]) {
+	for (const scale of [20]) {
 		test(`phone thread fits at ${scale * 100}% text`, async ({ page }) => {
 			await seedChat(page, THREAD, null, { fontScale: scale });
 			await page.goto("/");

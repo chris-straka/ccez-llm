@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { aidTextNodes, AID_SKIP_SELECTOR } from "./aidNodes";
+import { aidTextNodes } from "./aidNodes";
 
 function rootOf(html: string): Element {
 	const host = document.createElement("div");
@@ -38,21 +38,5 @@ describe("aidTextNodes", () => {
 	it("stays empty with no prose", () => {
 		expect(aidTextNodes(rootOf("<pre>x</pre>"))).toEqual([]);
 		expect(aidTextNodes(rootOf(""))).toEqual([]);
-	});
-
-	it("documents the skip contract", () => {
-		for (const sel of [
-			"pre",
-			"code",
-			"[data-math-index]",
-			".katex",
-			"ruby",
-			"rt",
-			"rp",
-			"button",
-			"a"
-		]) {
-			expect(AID_SKIP_SELECTOR).toContain(sel);
-		}
 	});
 });

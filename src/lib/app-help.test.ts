@@ -10,16 +10,6 @@ describe("app help", () => {
 		expect(new URL(APP_HELP_URL).hostname.endsWith(".invalid")).toBe(true);
 	});
 
-	it("lists the platform's own keys or gestures", () => {
-		const mac = buildAppHelp("mac");
-		expect(mac).toContain("Keyboard and mouse shortcuts");
-		expect(mac).toContain("- Reply to an open note: R");
-		const touch = buildAppHelp("touch");
-		expect(touch).toContain("Gestures (phone)");
-		expect(touch).toContain("- Annotate: Select text, then Annotate");
-		expect(touch).not.toContain("Keyboard and mouse shortcuts");
-	});
-
 	it("the Android runner's copy is current (bun scripts/app-help.ts)", () => {
 		const rust = readFileSync(
 			new URL("../../src-tauri/src/app_help_touch.md", import.meta.url),

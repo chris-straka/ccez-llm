@@ -166,27 +166,6 @@ test("double-click closes the settings panel", async ({ page }) => {
 	await expect(panel).not.toHaveClass(/closed/);
 });
 
-/** Waypoint menu fades on a slow ramp, not a blink. */
-test("waypoint menu reveals on a 0.3s fade", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
-		20
-	);
-	await openWithMessages(
-		page,
-		[0, 1, 2, 3].flatMap((n) => [
-			{ role: "user" as const, content: `q${n} ${long}` },
-			{ role: "assistant" as const, content: `a${n} ${long}` }
-		])
-	);
-	await page.locator(".wp-wrap").hover();
-	const menu = page.locator(".wp-menu");
-	await expect(menu).toBeVisible();
-	const duration = await menu.evaluate(
-		(el) => window.getComputedStyle(el).transitionDuration
-	);
-	expect(duration).toContain("0.3s");
-});
-
 /** Idle hide and restore never move the messages (reserved slot). */
 test("idle hide keeps every offset stable", async ({ page }) => {
 	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
@@ -810,26 +789,6 @@ test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
 	expect(fade).toBeLessThanOrEqual(0.35);
 });
 
-/** Surfaces stay solid: both transparency sliders were removed by
-decision (the settings carry no transparency control anymore), so
-the page background stays opaque. */
-test("page background stays opaque", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello" }]);
-	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({
-		timeout: 60_000
-	});
-	// The background lives on .app (html itself stays unpainted).
-	const bg = await page.evaluate(
-		() =>
-			getComputedStyle(document.querySelector(".app") as Element)
-				.backgroundColor
-	);
-	const nums = bg.match(/[\d.]+/g)?.map(Number) ?? [];
-	// rgb() carries no alpha (opaque); rgba()/color(srgb / a) do.
-	expect(nums.length === 4 ? (nums[3] ?? 1) : 1).toBe(1);
-});
-
 /** Message buttons track text size outright (85% of message size);
 "Scale msg icons with text size" grows only the icon glyphs,
 live: toggling the checkbox applies on the spot — no reload, no save. */
@@ -876,28 +835,6 @@ test("scale icons with text size applies immediately", async ({ page }) => {
 	await check.uncheck();
 	await expect(page.locator("main")).not.toHaveClass(/scale-actions/);
 	expect(await glyphPx()).toBeLessThan(18);
-});
-
-/** The top bar is an invisible gesture strip: fully transparent so
-messages bleed underneath it, still overlaid for window drag and
-double-click zoom. */
-test("top bar is transparent", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello" }]);
-	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({
-		timeout: 60_000
-	});
-	const bar = await page.evaluate(() => {
-		const style = getComputedStyle(document.querySelector("header") as Element);
-		return {
-			bg: style.backgroundColor,
-			blur: style.backdropFilter,
-			border: style.borderBottomWidth
-		};
-	});
-	expect(bar.bg).toBe("rgba(0, 0, 0, 0)");
-	expect(bar.blur).toBe("none");
-	expect(bar.border).toBe("0px");
 });
 
 /** Only the first message stands off the top: one strip-height of
@@ -1304,21 +1241,6 @@ test("huge type widens neither the column nor the composer", async ({
 	expect(promptBox!.width).toBeGreaterThan(500);
 	// …and the composer never exceeds the column.
 	expect(promptBox!.width).toBeLessThanOrEqual(heroBox!.width + 1);
-});
-
-/** Desktop pills slot under the welcome text (hero), not over the
-composer: one row inside .empty-state, below the h1. */
-test("desktop language pills live under the hero", async ({ page }) => {
-	await openWithMessages(page, []);
-	const hero = page.locator(".hero");
-	const menus = page.locator(".empty-state .lang-menus");
-	await expect(hero).toBeVisible();
-	await expect(menus).toBeVisible();
-	const heroBox = await hero.boundingBox();
-	const menusBox = await menus.boundingBox();
-	expect(heroBox).toBeTruthy();
-	expect(menusBox).toBeTruthy();
-	expect(menusBox!.y).toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height);
 });
 
 /** WebKit sees no interactive-widget key: it ships only to Android at runtime. */

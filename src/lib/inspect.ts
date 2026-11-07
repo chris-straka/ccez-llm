@@ -137,16 +137,6 @@ export function decomposeTree(
 	};
 }
 
-/** Lowercased comma-joined readings ("ICHI ITSU" → "ichi,itsu"). */
-function joinReadings(raw: string | null): string {
-	if (!raw) return "";
-	return raw
-		.split(/\s+/)
-		.filter((r) => r.length > 0)
-		.map((r) => r.toLowerCase())
-		.join(",");
-}
-
 /** One Japanese reading as the overlay lists it: the kana the voice
 speaks (on in katakana, kun in hiragana) with its Unihan romaji. */
 export interface ReadingChip {
@@ -177,21 +167,6 @@ export function readingChips(
 			kana: toHiragana(romaji)
 		}))
 	};
-}
-
-/**
- * One-line on/kun row ("On/Kun: ichi,itsu | hitor..."), or null when the
- * subset holds neither. Pure and unit-tested.
- */
-export function onKunLine(
-	data: Pick<InspectData, "japaneseOn" | "japaneseKun">
-): string | null {
-	const parts = [
-		joinReadings(data.japaneseOn),
-		joinReadings(data.japaneseKun)
-	].filter((part) => part.length > 0);
-	if (parts.length === 0) return null;
-	return `On/Kun: ${parts.join(" | ")}`;
 }
 
 /**
@@ -271,19 +246,6 @@ export function clampStrokeStep(
 ): number {
 	const top = Math.max(total, 1);
 	return Math.min(Math.max(current + delta, 1), top);
-}
-
-/**
- * Whether a selection speaks Japanese: kanji present
- * and the sentence probe reads Japanese. Such fragments speak
- * their sentence reading, never the raw quote.
- * Page call-site deferred while the selection-pinyin E2E flake is
- * diagnosed (probe slice reverted to the original page wiring).
- */
-export function speaksJapaneseSelection(quote: string, probe: string): boolean {
-	return (
-		[...quote].some((ch) => isHanChar(ch)) && hanOverlayLangFor(probe) === "ja"
-	);
 }
 
 /** One part of a character in a word card's breakdown. */

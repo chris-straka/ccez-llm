@@ -55,19 +55,6 @@ test("code highlighting leaves the math nodes in place", async ({ page }) => {
 	expect(removed).toEqual([]);
 });
 
-/** Display math renders KaTeX with copy + `$` chrome and a hidden folded label. */
-test("display block carries copy, $ toggle, and folded label", async ({
-	page
-}) => {
-	const block = page.locator(".ccez-math").first();
-	await expect(block.locator(".ccez-math-body")).toBeVisible();
-	expect(await block.locator(".katex").count()).toBeGreaterThan(0);
-	await expect(block.locator(".ccez-math-copy")).toBeVisible();
-	await expect(block.locator(".ccez-math-tex")).toBeVisible();
-	await expect(block.locator(".ccez-math-foldedlabel")).toBeHidden();
-	await expect(block.locator(".ccez-math-raw")).toBeHidden();
-});
-
 /** Body click never copies: only the copy icon writes the clipboard. */
 test("body click selects without copying", async ({ page }) => {
 	await page.evaluate(() => navigator.clipboard.writeText("SENTINEL"));
@@ -128,36 +115,6 @@ test("inline math carries $ toggle and copy", async ({ page }) => {
 		.toContain("$n = 1");
 });
 
-/** Single-dollar inline math renders with KaTeX; prices stay plain text. */
-test("single-dollar inline math renders, prices stay plain", async ({
-	page
-}) => {
-	await seedChat(page, [
-		{ role: "user", content: "quadratic?" },
-		{
-			role: "assistant",
-			content:
-				"Roots are $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$ but it costs $5 and $10."
-		}
-	]);
-	await page.goto("/");
-	const inline = page.locator(".ccez-math-inline").first();
-	await expect(inline).toBeVisible({ timeout: 60_000 });
-	expect(await inline.locator(".katex").count()).toBeGreaterThan(0);
-	await expect(page.locator(".ccez-math-inline")).toHaveCount(1);
-	await expect(page.locator(".rendered").last()).toContainText("$5 and $10");
-});
-
-/** Invalid math and fenced $$ stay plain text, never fatal. */
-test("invalid math and code fences stay plain", async ({ page }) => {
-	const body = page.locator(".rendered").last();
-	await expect(body).toContainText("totally broken");
-	await expect(body).toContainText("E = mc^2");
-	// One display block + one inline span; the broken $$ and the fence add none.
-	await expect(page.locator(".ccez-math")).toHaveCount(1);
-	await expect(page.locator(".ccez-math-inline")).toHaveCount(1);
-});
-
 /** The composer prompt never renders math: typed $$ stays plain text. */
 test("composer does not render latex", async ({ page }) => {
 	const composer = page.locator(".ta-input").first();
@@ -208,35 +165,6 @@ test("right-click toggles the math fold, left-click unfolds, and both stay silen
 	await block.locator(".ccez-math-foldedlabel").click();
 	await expect(block).not.toHaveAttribute("data-folded", "1");
 	await expect(body).toBeVisible();
-});
-
-/** A latex fence duplicating its neighboring display block renders exactly once. */
-test("fence-plus-display pair shows once", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "user", content: "quad" },
-		{
-			role: "assistant",
-			content: "Quad:\n\n```latex\n$$x = 1$$\n```\n\n$$x = 1$$"
-		}
-	]);
-	await page.goto("/");
-	const blocks = page.locator("article.assistant .ccez-math");
-	await expect(blocks).toHaveCount(1, { timeout: 60_000 });
-	await expect(page.locator("article.assistant .ccez-code")).toHaveCount(0);
-	await expect(blocks.first().locator(".ccez-math-body")).toBeVisible();
-});
-
-/** A lone latex fence renders as display math (not a code block). */
-test("lone latex fence renders as math", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "user", content: "quad" },
-		{ role: "assistant", content: "Quad:\n\n```latex\nx = 1\n```" }
-	]);
-	await page.goto("/");
-	const blocks = page.locator("article.assistant .ccez-math");
-	await expect(blocks).toHaveCount(1, { timeout: 60_000 });
-	await expect(page.locator("article.assistant .ccez-code")).toHaveCount(0);
-	expect(await blocks.first().locator(".katex").count()).toBeGreaterThan(0);
 });
 
 /** The `$` toggle flips the rendered equation and its raw source. */

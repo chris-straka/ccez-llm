@@ -14,7 +14,6 @@ import {
 	isWindowsPlatform,
 	modKeyLabel,
 	altKeyLabel,
-	shiftKeyLabel,
 	edgeSwipeTarget,
 	contentSwipeTarget,
 	holdSwipeOpensChats,
@@ -240,10 +239,8 @@ describe("modifier labels", () => {
 	it("shows glyphs on Mac, names elsewhere", () => {
 		expect(modKeyLabel(true)).toBe("⌘");
 		expect(altKeyLabel(true)).toBe("⌥");
-		expect(shiftKeyLabel(true)).toBe("⇧");
 		expect(modKeyLabel(false)).toBe("Ctrl");
 		expect(altKeyLabel(false)).toBe("Alt");
-		expect(shiftKeyLabel(false)).toBe("Shift");
 	});
 });
 

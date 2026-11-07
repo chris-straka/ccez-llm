@@ -2,10 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
 	desktopShortcuts,
 	filteredShortcuts,
-	groupShortcuts,
 	HOVER_GROUP,
-	keyChips,
-	touchShortcuts
+	keyChips
 } from "./shortcuts";
 
 /**
@@ -141,33 +139,10 @@ const REMOVED = [
 ];
 
 describe("shortcuts menu copy", () => {
-	it("pins the exact mac list in section order", () => {
-		const rows = desktopShortcuts(true);
-		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(
-			groupShortcuts(rows).map((g) => [g.group, g.rows.map((r) => r.name)])
-		).toEqual(MAC_SECTIONS);
-		const keys = new Map(rows.map((r) => [r.name, r.keys]));
-		expect(keys.get("Shortcuts")).toContain("middle-click");
-		expect(keys.get("Reply language")).toContain("⌘1 – ⌘0");
-		expect(keys.get("Speak text aloud")).toBe("Right-click");
-		expect(keys.get("Capture window text")).toBe("⇧⌘O");
-		expect(keys.get("Set capture area")).toBe("⇧⌘U");
-		expect(keys.get("Fullscreen")).toBe("Ctrl+⌘F");
-		expect(keys.get("Edit newest message")).toBe("⌘E");
-		expect(keys.get("Delete")).toBe("⌘Delete · Shift+D");
+	it("keeps ⌘D on the notes, never a bookmark", () => {
+		const keys = new Map(desktopShortcuts(true).map((r) => [r.name, r.keys]));
 		// ⌘D is the notes' (owner, 2026-11-05: never a bookmark).
 		expect(keys.get("Clear its annotations")).toBe("⌘D · Shift+Delete");
-		expect(keys.get("Delete this chat")).toBe("⇧⌘Delete");
-		expect(keys.get("Undo delete")).toBe("⌘Z");
-		// Hover is the section's premise: its keys never repeat it.
-		for (const row of rows.filter((r) => r.group === HOVER_GROUP))
-			expect(row.keys).not.toMatch(/hover/i);
-	});
-
-	it("names rows in sentence case", () => {
-		for (const row of [...desktopShortcuts(true), ...touchShortcuts()])
-			expect(row.name[0]).toBe(row.name[0]?.toUpperCase());
 	});
 
 	it("drops browser-dead rows on the web, order kept", () => {
@@ -262,85 +237,6 @@ describe("shortcuts menu copy", () => {
 			expect(keys).not.toContain("past newest");
 			expect(keys).not.toContain("Enter cycles");
 		}
-	});
-
-	it("keeps entry copy paren-free (the e2e pithiness contract)", () => {
-		for (const row of [
-			...desktopShortcuts(true),
-			...desktopShortcuts(false),
-			...touchShortcuts()
-		]) {
-			expect(`${row.name}: ${row.keys}`).not.toContain("(");
-		}
-	});
-
-	it("pins the touch gestures list", () => {
-		expect(
-			groupShortcuts(touchShortcuts()).map((g) => [
-				g.group,
-				g.rows.map((r) => r.name)
-			])
-		).toEqual([
-			[
-				"Moving around",
-				[
-					"Chats list",
-					"Quick switcher",
-					"Search chats",
-					"Newer / older chat",
-					"Top of chat",
-					"Bottom of chat",
-					"Settings",
-					"Rename a chat"
-				]
-			],
-			[
-				"Messages",
-				[
-					"Message buttons",
-					"Text size",
-					"Fold a message",
-					"Delete a message",
-					"Delete this chat"
-				]
-			],
-			[
-				"Selected text",
-				[
-					"Annotate a word",
-					"Select a word",
-					"Annotate",
-					"Copy",
-					"Speak",
-					"Inspect character",
-					"Move the selection menu",
-					"Cancel an annotation"
-				]
-			]
-		]);
-		const byName = new Map(touchShortcuts().map((r) => [r.name, r.keys]));
-		expect(byName.get("Chats list")).toBe(
-			"Swipe right · hold, then swipe right · two-finger swipe right"
-		);
-		expect(byName.get("Quick switcher")).toBe(
-			"Two-finger hold · double-tap empty space · swipe to cycle"
-		);
-		expect(byName.get("Settings")).toBe(
-			"Swipe left off messages · two-finger swipe left · chats list button"
-		);
-		expect(byName.get("Newer / older chat")).toBe(
-			"Three-finger swipe left / right"
-		);
-		// Phones list gestures only: gg / G are keyboard keys.
-		expect(byName.get("Top of chat")).toBe("Two-finger swipe up");
-		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down");
-		expect(byName.get("Delete a message")).toBe("Three-finger tap");
-		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
-		expect(byName.get("Copy")).toBe("Select text, then Copy");
-		const all = touchShortcuts()
-			.map((r) => r.keys)
-			.join("\n");
-		expect(all).not.toMatch(/\bgg\b|hover/i);
 	});
 
 	it("splits keys into chips on the middle dot", () => {

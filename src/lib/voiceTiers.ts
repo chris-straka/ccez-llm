@@ -1,15 +1,5 @@
 import type { NativeVoice } from "./nativeTts";
 
-/**
- * Whether any installed voice is worth picking the System-voices engine
- * for: premium (quality 3) or enhanced (quality 2). Default-tier voices
- * (quality 0/1, including Siri personas) are always reachable through
- * Auto, so they don't count.
- */
-export function hasQualityVoices(voices: NativeVoice[]): boolean {
-	return voices.some((voice) => voice.quality >= 2);
-}
-
 /** Display tier for one installed voice (drives the picker's option labels). */
 export function tierLabel(voice: NativeVoice): string {
 	if (voice.quality >= 3) return "premium";

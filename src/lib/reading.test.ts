@@ -16,10 +16,7 @@ import {
 	hasPinyinTones,
 	ttsLangFor,
 	scriptRunKey,
-	speakWord,
 	transliterateGurmukhi,
-	vocalizeArabic,
-	buildVocalizeMessages,
 	buildAidMessages,
 	runModelAid,
 	annotationAnswer,
@@ -32,11 +29,7 @@ import {
 	ANNOTATION_QUESTION_WORDS,
 	MODEL_AIDS,
 	MODEL_AID_FOR_SCRIPT,
-	localAidFor,
 	localAidsFor,
-	LOCAL_AID_BUTTON,
-	LOCAL_AID_SHOW_ORIGINAL,
-	LOCAL_AID_ADD_TITLE,
 	aidTargetLines,
 	aidFailureToast,
 	selectAidInput,
@@ -54,10 +47,8 @@ import {
 	wordBoundsAt,
 	isCjkChar,
 	groupRuns,
-	wordAtNodeOffset,
 	paragraphBounds
 } from "./reading";
-import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
 import type { ChatProvider } from "./providers/types";
 
@@ -260,14 +251,6 @@ describe("speech locales", () => {
 		expect(transliterateGurmukhi("hello")).toBe("hello");
 	});
 
-	it("reports unavailable synthesis without throwing", () => {
-		expect(speakWord("hello")).toEqual({ spoken: false, lang: "en-US" });
-		expect(speakWord("bonjour", "fr-FR")).toEqual({
-			spoken: false,
-			lang: "fr-FR"
-		});
-	});
-
 	it("spots pinyin tone marks and nothing else", () => {
 		// The exact misfire: Apple's recognizer reads this as Vietnamese.
 		expect(hasPinyinTones("nǐ hǎo, wǒ shì xuéshēng")).toBe(true);
@@ -297,47 +280,6 @@ describe("model-assisted reading aids", () => {
 		expect(() => buildAidMessages("nope", "x")).toThrow("Unknown reading aid");
 	});
 
-	it("keeps the vocalize wrappers working", () => {
-		expect(buildVocalizeMessages("مرحبا")[0]?.content).toContain("tashkeel");
-	});
-
-	it("maps scripts to their local rendering, if any", () => {
-		expect(localAidFor("zh")).toBe("pinyin");
-		expect(localAidFor("ja")).toBe("furigana");
-		// Arabic renders identically with the toggle on or off: its aid
-		// is model-applied, never locally computed.
-		expect(localAidFor("ar")).toBeNull();
-		expect(localAidFor(null)).toBeNull();
-		expect(localAidFor(detectScript("hello world"))).toBeNull();
-		expect(localAidFor(detectScript("مرحبا بالعالم"))).toBeNull();
-		expect(localAidFor(detectScript("你好世界"))).toBe("pinyin");
-	});
-
-	it("gives every aid script a visible path: local rendering or a model aid", () => {
-		for (const script of ["zh", "ja", "ar"] as const) {
-			expect(localAidFor(script) ?? MODEL_AID_FOR_SCRIPT[script]).toBeTruthy();
-		}
-	});
-
-	it("labels local-aid buttons in their own script", () => {
-		expect(LOCAL_AID_BUTTON.pinyin).toBe("拼音");
-		expect(LOCAL_AID_BUTTON.furigana).toBe("読み仮名");
-	});
-
-	it("labels the pinned state in the aid's own script", () => {
-		expect(LOCAL_AID_SHOW_ORIGINAL.pinyin).toBe("显示原件");
-		expect(LOCAL_AID_SHOW_ORIGINAL.furigana).toBe("オリジナルを表示");
-	});
-
-	it("titles the unpinned buttons in English", () => {
-		expect(LOCAL_AID_ADD_TITLE.pinyin).toBe("Add pinyin");
-		expect(LOCAL_AID_ADD_TITLE.furigana).toBe("Add furigana");
-	});
-
-	it("titles the tashkeel button with no model parenthetical", () => {
-		expect(MODEL_AIDS.tashkeel!.title).toBe("Add tashkeel");
-	});
-
 	it("caches by aid + exact input", async () => {
 		const chat = vi.fn(async () => ({ content: "مَرْحَبًا", usage: null }));
 		const provider = {
@@ -355,44 +297,6 @@ describe("model-assisted reading aids", () => {
 		await expect(runModelAid(provider, "tashkeel", "  ")).rejects.toThrow(
 			"Nothing to vocalize"
 		);
-		await expect(vocalizeArabic(provider, "مرحبا")).resolves.toBe("مَرْحَبًا");
-		expect(chat).toHaveBeenCalledTimes(1);
-	});
-});
-
-describe("pinyin readings", () => {
-	it("annotates Han characters with tone-marked readings", () => {
-		const html = pinyinRuby("汉语拼音");
-		expect(html).toContain("<ruby>汉<rt>hàn</rt></ruby>");
-		expect(html).toContain("<ruby>语<rt>yǔ</rt></ruby>");
-	});
-
-	it("emits native ruby with no estimated spacing", () => {
-		// Spacing is the engine's job (each base fits its own
-		// annotation): the markup carries no padding or hook classes.
-		const html = pinyinRuby("中文");
-		expect(html).toBe(
-			"<ruby>中<rt>zhōng</rt></ruby><ruby>文<rt>wén</rt></ruby>"
-		);
-	});
-
-	it("converts only Han-only lines, passing Japanese through", () => {
-		// Pinyin readings on Japanese kanji are wrong readings: kana
-		// lines survive escaped and unannotated, line count preserved.
-		const html = pinyinBlock("你好\n漢字を読む");
-		expect(html).toBe(
-			"<ruby>你<rt>nǐ</rt></ruby><ruby>好<rt>hǎo</rt></ruby>\n漢字を読む"
-		);
-		expect(html.split("\n")).toHaveLength(2);
-	});
-
-	it("resolves polyphones from context and passes other text through", () => {
-		const html = pinyinRuby("银行， OK!");
-		expect(html).toContain("<ruby>银<rt>yín</rt></ruby>");
-		expect(html).toContain("<ruby>行<rt>háng</rt></ruby>");
-		expect(html).toContain("，");
-		expect(html).toContain("OK!");
-		expect(html).not.toContain("<rt>OK");
 	});
 });
 
@@ -998,21 +902,6 @@ describe("paragraphBounds", () => {
 	});
 	it("trims space-padded edges", () => {
 		expect(paragraphBounds("  padded  \n\nnext", 3)).toEqual([2, 8]);
-	});
-});
-
-describe("wordAtNodeOffset", () => {
-	it("reads the word run at the offset", () => {
-		expect(wordAtNodeOffset("日本語を", 2)).toBe("日本語を");
-		expect(wordAtNodeOffset("日本語を", 0)).toBe("日本語を");
-	});
-	it("retries inside the char on a past-the-end landing", () => {
-		expect(wordAtNodeOffset("日本語を", 4)).toBe("日本語を");
-	});
-	it("stays empty on genuinely empty spots", () => {
-		expect(wordAtNodeOffset("", 0)).toBe("");
-		expect(wordAtNodeOffset("a b", 1)).toBe("");
-		expect(wordAtNodeOffset("hi", 0)).toBe("hi");
 	});
 });
 

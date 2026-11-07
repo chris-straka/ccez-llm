@@ -7,8 +7,6 @@ const FIELD_SELECTOR = "input, textarea, select";
 const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable]";
 /** The prompt's editor subtree (the plain-textarea composer). */
 const PROMPT_EDITOR_SELECTOR = ".prompt .ta-input";
-/** Any composer editor, prompt or message-edit. */
-const COMPOSER_SELECTOR = ".ta-input";
 const FILTER_SELECTOR = ".shortcuts-filter";
 const FIND_BAR_SELECTOR = ".find-bar";
 const SIDEBAR_SELECTOR = "aside";
@@ -97,11 +95,6 @@ export function isPromptEditorTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, PROMPT_EDITOR_SELECTOR) !== null;
 }
 
-/** True inside any composer editor (prompt or message-edit). */
-export function isComposerTarget(target: EventTarget | null): boolean {
-	return closestFromTarget(target, COMPOSER_SELECTOR) !== null;
-}
-
 /** True inside the shortcuts-modal filter input. */
 export function isFilterTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, FILTER_SELECTOR) !== null;
@@ -124,11 +117,6 @@ export function isSidebarTarget(target: EventTarget | null): boolean {
  */
 export function isChatRowTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, "aside ul li button.side-chat") !== null;
-}
-
-/** True anywhere inside the learner-news story panel. */
-export function isNewsPanelTarget(target: EventTarget | null): boolean {
-	return closestFromTarget(target, NEWS_PANEL_SELECTOR) !== null;
 }
 
 /**

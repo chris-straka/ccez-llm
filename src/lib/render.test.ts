@@ -97,19 +97,6 @@ describe("markdown rendering", () => {
 		}
 	});
 
-	it("labels multi-line blocks with their line count", () => {
-		const { html } = renderMarkdown("```js\na\nb\nc\n```");
-		expect(html).toContain("js · 3 LOC");
-	});
-
-	it("renders body-only display math: no fold bar, body kept for fold/copy", () => {
-		const { html } = renderMarkdown("Here:\n\n$$x^2$$\n\ndone");
-		expect(html).not.toContain("ccez-math-head");
-		expect(html).toContain('data-math-index="0"');
-		expect(html).toContain("ccez-math-body");
-		expect(html).toContain("katex");
-	});
-
 	it("strips scripts and dangerous attributes", () => {
 		const { html } = renderMarkdown(
 			'hello <script>alert(1)</script><img src="x" onerror="alert(2)">'

@@ -1,11 +1,6 @@
 import { pinyin } from "pinyin-pro";
 import { escapeHtml } from "./render";
-import {
-	classifyAidLine,
-	codeAwareLines,
-	RUBY_SCRIPT_RE,
-	type LocalAid
-} from "./reading";
+import { RUBY_SCRIPT_RE } from "./reading";
 
 /**
  * Pinyin readings for Chinese text: per-character readings (pinyin-pro
@@ -44,31 +39,6 @@ export function pinyinRuby(text: string): string {
 			return escapeHtml(char);
 		})
 		.join("");
-}
-
-/**
- * One message's pinyin conversion, gated per line exactly like the
- * dual-aid path: lines the classifier owns convert, kana (Japanese)
- * lines pass through escaped — pinyin readings on Japanese kanji are
- * wrong readings. A reply-language preference moves kanji-only lines
- * to furigana ownership, so pinning pinyin there renders them bare,
- * exactly like pinning pinyin on a kana line already does. Line count
- * is preserved 1:1, so `plainParagraphs` source-text alignment is
- * unaffected.
- */
-export function pinyinBlock(
-	text: string,
-	preferred: LocalAid | null = null
-): string {
-	// Fenced code never converts: readings inside code are noise, and
-	// the buttons already ignore those lines at detection time.
-	return codeAwareLines(text)
-		.map(({ line, code }) =>
-			!code && classifyAidLine(line, preferred) === "pinyin"
-				? pinyinRuby(line)
-				: escapeHtml(line)
-		)
-		.join("\n");
 }
 
 /**

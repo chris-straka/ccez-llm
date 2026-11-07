@@ -150,48 +150,6 @@ test("double-tap on sidebar chrome closes it, on buttons does not", async ({
 	await expect(chatsAside(page)).toHaveClass(/collapsed/);
 });
 
-/** The find bar floats near the top (25%, never dead center)
-instead of pushing content down, while the first message still
-bleeds to the window's top edge. Pressing elsewhere dismisses it
-without summoning the prompt. */
-test("open find floats centered, outside press dismisses", async ({ page }) => {
-	// The find chord is shell-only (the browser owns ⌘/Ctrl+F, and no
-	// button opens find): unreachable in this harness.
-	test.skip(true, "find-toggle chord is shell-only");
-	await page.keyboard.press("Control+f");
-	const bar = page.locator(".find-bar");
-	await expect(bar).toBeVisible();
-	const geom = await page.evaluate(() => {
-		const barEl = document.querySelector(".find-bar") as HTMLElement | null;
-		const art = document.querySelector(
-			".messages article"
-		) as HTMLElement | null;
-		if (!barEl || !art) return null;
-		const barBox = barEl.getBoundingClientRect();
-		const artBox = art.getBoundingClientRect();
-		const barPos = getComputedStyle(barEl).getPropertyValue("position");
-		return {
-			barPos,
-			barCX: barBox.left + barBox.width / 2,
-			barCY: barBox.top + barBox.height / 2,
-			winW: window.innerWidth,
-			winH: window.innerHeight,
-			artTop: artBox.top
-		};
-	});
-	expect(geom).not.toBeNull();
-	expect(geom!.barPos).toBe("fixed");
-	expect(Math.abs(geom!.barCX - geom!.winW / 2)).toBeLessThan(4);
-	expect(Math.abs(geom!.barCY - geom!.winH / 4)).toBeLessThan(4);
-	expect(geom!.artTop).toBeLessThan(geom!.winH / 2);
-	const prompt = page.locator(".prompt");
-	const promptBefore = await prompt.getAttribute("class");
-	await page.locator("article .rendered").first().click();
-	await expect(bar).toBeHidden({ timeout: 5_000 });
-	// Dismissing summons nothing: the prompt is exactly as found.
-	expect(await prompt.getAttribute("class")).toBe(promptBefore);
-});
-
 /** Chat rows read their date under the day header (the time for
 today and yesterday), never a message count. */
 test("chat rows show their date with no message count", async ({ page }) => {

@@ -17,8 +17,7 @@ import {
 	attachAnnotationAnswer,
 	unansweredAnnotations,
 	badgeAnswerClass,
-	quoteDirection,
-	annEditCommitToast
+	quoteDirection
 } from "./annotations";
 // The block fns are bake setup for the pinning/seeding tests below.
 import { splitAnnotationBlock, withAnnotations } from "./annotation-block";
@@ -435,12 +434,5 @@ describe("pending filing", () => {
 		);
 		expect(promptAnnWashIdFor({ pending: true }, null)).toBeNull();
 		expect(promptAnnWashIdFor({ id: "s" }, "p" as AnnotationId)).toBe("s");
-	});
-});
-
-describe("annEditCommitToast", () => {
-	it("names filings vs rewrites", () => {
-		expect(annEditCommitToast(true)).toBe("Annotation sent");
-		expect(annEditCommitToast(false)).toBe("Annotation edited");
 	});
 });

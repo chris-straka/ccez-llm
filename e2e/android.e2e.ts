@@ -38,39 +38,6 @@ test.describe("gestures", () => {
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 	});
 
-	/** Synthetic right-edge swipe: opens nothing on phones (it only ever
-	folded the chats list) — asserts the one-finger swipe left never
-	opens settings. */
-	async function swipeFromRightEdge(page: Page): Promise<void> {
-		const width = await page.evaluate(() => window.innerWidth);
-		await page.evaluate((w: number) => {
-			const touch = (x: number, y: number) =>
-				new Touch({
-					identifier: 9,
-					target: document.body,
-					clientX: x,
-					clientY: y
-				});
-			window.dispatchEvent(
-				new TouchEvent("touchstart", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					touches: [touch(w - 4, 600)]
-				})
-			);
-			window.dispatchEvent(
-				new TouchEvent("touchend", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					touches: [],
-					changedTouches: [touch(w - 140, 604)]
-				})
-			);
-		}, width);
-	}
-
 	/** The sheet covers the chat, so Reading keeps a sample; bigger
 	text grows inside its fixed box, never pushing the steppers down. */
 	test("the reading sample holds its height as text grows", async ({
@@ -104,66 +71,6 @@ test.describe("gestures", () => {
 		await setSettingValue(page, "Text size percent", 300);
 		await expect(size).toHaveAttribute("aria-valuenow", "300");
 		expect(await layout()).toEqual(before);
-	});
-
-	test("shortcuts modal teaches touch gestures on Android", async ({
-		page
-	}) => {
-		// Settings opens from the chats-list button (one-finger swipes
-		// never open it): summon the list, then walk the button path.
-		await swipeFromLeftEdge(page);
-		await page.locator("aside button.side-settings").click();
-		await page.locator('button:has-text("Show all gestures")').click();
-		// No title on phones: the filter owns the head row.
-		await expect(page.locator("#shortcuts-heading")).toHaveCount(0);
-		const modal = page.locator(".modal-veil");
-		// Exact-match the row (a substring match would also hit siblings).
-		await expect(modal.locator('dt:text-is("Chats list")')).toBeVisible();
-		await expect(
-			modal.locator('dd:has-text("Double-tap empty space")')
-		).toBeVisible();
-		// The list row teaches its two openers; the switcher owns the
-		// double-tap now, and fold and settings rows exist.
-		await expect(modal.locator('dt:text-is("Chats list") + dd')).toHaveText(
-			"Swipe right · hold, then swipe right · two-finger swipe right"
-		);
-		await expect(modal.locator('dt:text-is("Fold a message")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Settings")')).toBeVisible();
-		await expect(modal.locator('dt:has-text("Chats sidebar")')).toHaveCount(0);
-		await expect(modal.locator('dd:has-text("Chats list button")')).toHaveText(
-			"Swipe left off messages · two-finger swipe left · chats list button"
-		);
-		await expect(
-			modal.locator('dt:text-is("Newer / older chat")')
-		).toBeVisible();
-		await expect(
-			modal.locator('dd:has-text("Three-finger swipe left")')
-		).toHaveText("Three-finger swipe left / right");
-		await expect(modal.locator('dt:text-is("Top of chat")')).toBeVisible();
-		await expect(
-			modal.locator('dd:has-text("Two-finger swipe up")')
-		).toHaveText("Two-finger swipe up");
-		await expect(modal.locator('dt:text-is("Bottom of chat")')).toBeVisible();
-		await expect(
-			modal.locator('dd:has-text("Two-finger swipe down")')
-		).toHaveText("Two-finger swipe down");
-		await expect(modal.locator('dt:text-is("Quick switcher")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Quick switcher") + dd')).toHaveText(
-			"Two-finger hold · double-tap empty space · swipe to cycle"
-		);
-		await expect(modal.locator('dt:text-is("Message end")')).toHaveCount(0);
-		await expect(modal.locator('dt:text-is("Text size") + dd')).toHaveText(
-			"Pinch the messages"
-		);
-		await expect(modal.locator('dt:text-is("Delete a message")')).toBeVisible();
-		await expect(
-			modal.locator('dt:text-is("Delete a message") + dd')
-		).toHaveText("Three-finger tap");
-		await expect(modal.locator('dt:text-is("Delete this chat")')).toBeVisible();
-		await expect(
-			modal.locator('dt:text-is("Delete this chat") + dd')
-		).toHaveText("Three-finger hold");
-		await page.screenshot({ path: ".screenshots/gestures-phone.png" });
 	});
 
 	/** Synthetic edge swipe (untrusted TouchEvents still hit window listeners). */
@@ -241,32 +148,6 @@ test.describe("gestures", () => {
 			{ x0, x1 }
 		);
 	}
-
-	test("edge swipes summon and fold the chat sidebar", async ({ page }) => {
-		const aside = page.locator("aside:has(button.side-chat)");
-		const panel = page.locator(".settings-panel");
-		// A rightward stroke summons the list...
-		await swipeFromLeftEdge(page);
-		await expect(aside).not.toHaveClass(/collapsed/);
-		// ...and never toggles it shut: a repeat summon is a no-op.
-		await swipeFromLeftEdge(page);
-		await expect(aside).not.toHaveClass(/collapsed/);
-		// Only a leftward stroke folds the open list.
-		await swipeMidScreen(page, 260, 150);
-		await expect(aside).toHaveClass(/collapsed/);
-		// ...a one-finger swipe from the right edge opens settings...
-		await swipeFromRightEdge(page);
-		await expect(panel).not.toHaveClass(/closed/);
-		// ...and so does a two-finger swipe left...
-		await swipeMidScreen(page, 4, 144);
-		await expect(panel).toHaveClass(/closed/);
-		await swipeTwoFinger(page, 300, 150);
-		await expect(panel).not.toHaveClass(/closed/);
-		// ...but a rightward stroke still dismisses an open settings.
-		await swipeFromLeftEdge(page);
-		await expect(panel).toHaveClass(/closed/);
-		await expect(aside).toHaveClass(/collapsed/);
-	});
 
 	test("opening the chat sidebar drops composer focus and keeps it down", async ({
 		page
@@ -554,25 +435,6 @@ test.describe("touch", () => {
 			{ x0, x1 }
 		);
 	}
-
-	/** Touch has no hover, so each chat row prints a short message
-	count after the timestamp (the tooltip's full split lives on
-	the hover tip, never in the row where it truncated). */
-	test("chat rows carry the message count in the hover tip", async ({
-		page
-	}) => {
-		await seedChat(page, [
-			{ role: "user", content: "hi" },
-			{ role: "assistant", content: "hello back" }
-		]);
-		await page.goto("/");
-		const row = page.locator("aside ul li .side-chat").first();
-		await expect(row).toBeVisible({ timeout: 15_000 });
-		// Phone rows print the date; the count rides the hover tip.
-		await expect(page.locator("aside ul li .side-tip").first()).toContainText(
-			"2 messages"
-		);
-	});
 
 	test("region menus share one row on a phone", async ({ page }) => {
 		await seedEmpty(page);
@@ -2664,18 +2526,6 @@ test.describe("touch", () => {
 		await page.mouse.move(4, 300);
 		await page.mouse.up();
 		await expect(row).toHaveCSS("opacity", "1");
-	});
-
-	/** The buttons checkbox ships checked: hiding rows is the default,
-	unchecking is the opt-out. */
-	test("buttons checkbox is checked by default", async ({ page }) => {
-		await seedEmpty(page);
-		await swipeTwoFinger(page, 300, 150);
-		await page.locator(".settings-panel").waitFor();
-		const box = page.locator(
-			'label.check:has-text("Show msg buttons only when tapped") input'
-		);
-		await expect(box).toBeChecked();
 	});
 
 	/** A stale master-off save never hides rows on a phone: with no

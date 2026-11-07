@@ -8,7 +8,6 @@ import {
 	MAX_FILE_CHARS,
 	PASTED_TAG_RE,
 	countMarkers,
-	countPastedTags,
 	countPasteSlots,
 	findPasteSlots,
 	PASTE_CLOSE,
@@ -36,7 +35,6 @@ import {
 	removePastedAt,
 	dropAttachmentsAtIndexes,
 	attachmentImageBlobsAt,
-	attachmentDataUrlsAt,
 	pastedTextsAt,
 	writePastedTextAt,
 	removeTags,
@@ -48,7 +46,6 @@ import {
 	stripPastedMarkers,
 	tagPlaceholder,
 	toggleTagKey,
-	attachmentImageBlobs,
 	blobToDataUrl,
 	clipboardPngBlob,
 	reconcileDropCount,
@@ -247,12 +244,6 @@ describe("attachment markers", () => {
 	});
 });
 
-describe("attachment budgets", () => {
-	it("text attachments cost ~4 chars per token, capped by MAX_FILE_CHARS", () => {
-		expect(MAX_FILE_CHARS).toBe(100_000);
-		expect(estimateTextTokens("a".repeat(400))).toBe(100);
-	});
-});
 function testAttachment(
 	partial: Partial<Attachment> & { kind: Attachment["kind"] }
 ): Attachment {
@@ -343,47 +334,6 @@ describe("leftoverAttachments", () => {
 	});
 });
 
-describe("attachmentImageBlobs", () => {
-	const PNG =
-		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-	const png = (id: string, dataUrl: string | null = PNG) =>
-		testAttachment({ id, kind: "image", mime: "image/png", dataUrl });
-
-	it("hands the newest image attachments as blobs", async () => {
-		// The 5-byte entry is oldest: newest-two slicing skips it (an
-		// oldest-first take would lead with it).
-		const tiny = testAttachment({
-			id: "a",
-			kind: "image",
-			mime: "image/png",
-			dataUrl: "data:,hello"
-		});
-		const blobs = await attachmentImageBlobs([tiny, png("b"), png("c")], 2);
-		const pngSize = (await (await fetch(PNG)).blob()).size;
-		expect(blobs.map((b) => b.size)).toEqual([pngSize, pngSize]);
-		expect(blobs.map((b) => b.type)).toEqual(["image/png", "image/png"]);
-	});
-
-	it("skips text attachments, dataless images, and dead counts", async () => {
-		const atts = [
-			testAttachment({ id: "t", kind: "text", text: "hi" }),
-			png("nodata", null),
-			png("a")
-		];
-		expect(await attachmentImageBlobs(atts, 5)).toHaveLength(1);
-		expect(await attachmentImageBlobs(atts, 0)).toEqual([]);
-		expect(await attachmentImageBlobs([], 2)).toEqual([]);
-	});
-
-	it("skips unreadable entries instead of failing", async () => {
-		const atts = [
-			png("bad", "http://127.0.0.1:1/unreachable.png"),
-			png("good")
-		];
-		expect(await attachmentImageBlobs(atts, 2)).toHaveLength(1);
-	});
-});
-
 describe("indexed attachment access", () => {
 	const PNG =
 		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -406,17 +356,6 @@ describe("indexed attachment access", () => {
 			await pngSize()
 		]);
 		expect(await attachmentImageBlobsAt(atts, [5, -1])).toEqual([]);
-	});
-
-	it("reads data URLs synchronously for same-event clipboard writes", () => {
-		const atts = [
-			png("a"),
-			testAttachment({ id: "t", kind: "text", text: "hi" }),
-			png("nodata", null)
-		];
-		expect(attachmentDataUrlsAt(atts, [0])).toEqual([PNG]);
-		expect(attachmentDataUrlsAt(atts, [1])).toEqual([null]);
-		expect(attachmentDataUrlsAt(atts, [9])).toEqual([null]);
 	});
 
 	it("drops one kind's attachments at document-order indexes", () => {
@@ -471,12 +410,6 @@ describe("clipboardPngBlob", () => {
 describe("pasted-text tags", () => {
 	it("labels the stored char count and counts tags", () => {
 		expect(pastedTextMarker(512)).toBe("[Pasted 512 chars]");
-		expect(countPastedTags("plain text")).toBe(0);
-		expect(
-			countPastedTags(`a ${pastedTextMarker(10)} b ${pastedTextMarker(20)}`)
-		).toBe(2);
-		// Fixed markers never read as pasted tags.
-		expect(countPastedTags(`${IMAGE_MARKER} ${FILE_MARKER}`)).toBe(0);
 		expect(countMarkers(pastedTextMarker(10))).toBe(0);
 	});
 
@@ -655,7 +588,6 @@ describe("paste slots", () => {
 		expect(doc.slice(slots[0]!.start, slots[0]!.end)).toBe(tag);
 		expect(doc.slice(slots[1]!.start, slots[1]!.end)).toBe(region("xy"));
 		expect(countPasteSlots(doc)).toBe(2);
-		expect(countPastedTags(doc)).toBe(1);
 	});
 
 	it("ignores tags inside regions and unbalanced markers", () => {

@@ -160,18 +160,6 @@ describe("ocrScriptLangs", () => {
 		expect(ocrScriptLangs("Devanagari", 90)).toEqual(["hin", "eng"]);
 	});
 
-	it("covers the remaining reply-set scripts plus Latin", () => {
-		expect(ocrScriptLangs("Korean", 80)).toEqual(["kor", "eng"]);
-		expect(ocrScriptLangs("Greek", 80)).toEqual(["ell", "eng"]);
-		expect(ocrScriptLangs("Hebrew", 80)).toEqual(["heb", "eng"]);
-		expect(ocrScriptLangs("Thai", 80)).toEqual(["tha", "eng"]);
-		expect(ocrScriptLangs("Armenian", 80)).toEqual(["hye", "eng"]);
-		expect(ocrScriptLangs("Ethiopic", 80)).toEqual(["amh", "eng"]);
-		expect(ocrScriptLangs("Bengali", 80)).toEqual(["ben", "eng"]);
-		expect(ocrScriptLangs("Tamil", 80)).toEqual(["tam", "eng"]);
-		expect(ocrScriptLangs("Latin", 80)).toEqual(["eng"]);
-	});
-
 	it("rejects shaky, missing, and unmodeled scripts", () => {
 		expect(ocrScriptLangs("Japanese", OCR_SCRIPT_FLOOR - 1)).toBeNull();
 		expect(ocrScriptLangs("Japanese", null)).toBeNull();

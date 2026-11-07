@@ -4,7 +4,6 @@ import {
 	closestFromTarget,
 	consumeEvent,
 	isClickControlTarget,
-	isComposerTarget,
 	isEditableTarget,
 	isFieldTarget,
 	isFilterTarget,
@@ -24,8 +23,7 @@ import {
 	isAnnotationUiTarget,
 	middleDragGesture,
 	flickZoneOfTarget,
-	isNewsChipsTarget,
-	isNewsPanelTarget
+	isNewsChipsTarget
 } from "./events";
 
 describe("page event idioms", () => {
@@ -81,9 +79,6 @@ describe("page event idioms", () => {
 		expect(isPromptEditorTarget(byId("ta"))).toBe(true);
 		expect(isPromptEditorTarget(byId("loose"))).toBe(false);
 		expect(isPromptEditorTarget(byId("pb"))).toBe(false);
-		expect(isComposerTarget(byId("ta"))).toBe(true);
-		expect(isComposerTarget(byId("loose"))).toBe(true);
-		expect(isComposerTarget(byId("p"))).toBe(false);
 		expect(isPromptTarget(byId("pb"))).toBe(true);
 		expect(isPromptTarget(byId("p"))).toBe(false);
 		expect(isPromptTarget(null)).toBe(false);
@@ -236,11 +231,6 @@ describe("page event idioms", () => {
 			'<span class="news-card-title" id="title">y</span></div>' +
 			'<p id="dead">z</p></main>';
 		const byId = (id: string): Element | null => document.getElementById(id);
-		expect(isNewsPanelTarget(byId("panel"))).toBe(true);
-		expect(isNewsPanelTarget(byId("chip"))).toBe(true);
-		expect(isNewsPanelTarget(byId("title"))).toBe(true);
-		expect(isNewsPanelTarget(byId("dead"))).toBe(false);
-		expect(isNewsPanelTarget(null)).toBe(false);
 		expect(isNewsChipsTarget(byId("rail"))).toBe(true);
 		expect(isNewsChipsTarget(byId("chip"))).toBe(true);
 		expect(isNewsChipsTarget(byId("title"))).toBe(false);

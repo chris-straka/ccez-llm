@@ -216,18 +216,6 @@ export function extractWordAt(text: string, offset: number): string {
 	return text.slice(start, end);
 }
 
-/**
- * Word at a caret offset, tolerating node-edge landings: a click on a
- * glyph's far edge can resolve past the node (offset === length, an
- * empty pick), so only that case retries inside the char. Mid-text
- * whitespace stays empty. Pure.
- */
-export function wordAtNodeOffset(text: string, offset: number): string {
-	const word = extractWordAt(text, offset);
-	if (word || offset < text.length) return word;
-	return offset > 0 ? extractWordAt(text, offset - 1) : "";
-}
-
 /** Minimal word-segment view (Intl.Segmenter when present). */
 interface WordSegment {
 	index: number;
@@ -526,27 +514,6 @@ export interface SpeakResult {
 	lang: string;
 }
 
-/** Read one word aloud. False when speech synthesis is unavailable. */
-export function speakWord(word: string, fallback = "en-US"): SpeakResult {
-	const lang = ttsLangFor(word, fallback);
-	if (typeof speechSynthesis === "undefined") return { spoken: false, lang };
-	try {
-		speechSynthesis.cancel();
-		const utterance = new SpeechSynthesisUtterance(word);
-		utterance.lang = lang;
-		const voice = speechSynthesis
-			.getVoices()
-			.find((v) =>
-				v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase())
-			);
-		if (voice) utterance.voice = voice;
-		speechSynthesis.speak(utterance);
-		return { spoken: true, lang };
-	} catch {
-		return { spoken: false, lang };
-	}
-}
-
 // --- Gurmukhi → Devanagari (Punjabi speech fallback) ---
 
 /**
@@ -786,11 +753,6 @@ export const LOCAL_AID_ADD_TITLE: Record<LocalAid, string> = {
 	pinyin: "Add pinyin",
 	furigana: "Add furigana"
 };
-export function localAidFor(script: DetectedScript | null): LocalAid | null {
-	if (script === "zh") return "pinyin";
-	if (script === "ja") return "furigana";
-	return null;
-}
 
 /** Local aids for every script present: furigana before pinyin, matching
  * detectScripts priority. Arabic (model aid) contributes none. */
@@ -890,22 +852,6 @@ export async function runModelAid(
 	if (!aided) throw new Error("Empty aid result.");
 	aidCache.set(key, aided);
 	return aided;
-}
-
-/** Back-compat wrapper: tashkeel is `MODEL_AIDS.tashkeel`. */
-export function buildVocalizeMessages(
-	text: string
-): Array<{ role: string; content: string }> {
-	return buildAidMessages("tashkeel", text);
-}
-
-/** Back-compat wrapper: tashkeel is `MODEL_AIDS.tashkeel`. */
-export function vocalizeArabic(
-	provider: ChatProvider,
-	text: string,
-	signal?: AbortSignal
-): Promise<string> {
-	return runModelAid(provider, "tashkeel", text, signal);
 }
 
 /** Floor for the equivalent: a word or short phrase gets this much. */

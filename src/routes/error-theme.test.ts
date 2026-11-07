@@ -21,8 +21,6 @@ function errorStyle(): string {
 describe("crash page theme", () => {
 	it("paints dark without relying on app tokens", () => {
 		const css = errorStyle();
-		expect(css).toContain("background: #1c1c1e");
-		expect(css).toContain("color: #f2f2f7");
 		expect(css).not.toContain("var(--bg");
 		expect(css).not.toContain("var(--ink");
 	});

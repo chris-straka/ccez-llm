@@ -5,8 +5,6 @@ import {
 	dictMatches,
 	dictOutdated,
 	dictPack,
-	dictSize,
-	dictSummary,
 	dictTile
 } from "./dict-manager";
 
@@ -91,21 +89,5 @@ describe("dictMatches", () => {
 		expect(dictMatches(de, "de")).toBe(true);
 		expect(dictMatches(de, "  ")).toBe(true);
 		expect(dictMatches(de, "fren")).toBe(false);
-	});
-});
-
-describe("dictSummary", () => {
-	it("counts what's downloaded and its size", () => {
-		expect(dictSummary([], 49)).toBe("None downloaded yet");
-		expect(
-			dictSummary(
-				[
-					{ lang: "fr", version: "1", bytes: 20_000_000 },
-					{ lang: "de", version: "1", bytes: 31_500_000 }
-				],
-				49
-			)
-		).toBe("2 of 49 downloaded · 52 MB");
-		expect(dictSize(840_000)).toBe("840 KB");
 	});
 });

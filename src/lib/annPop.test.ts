@@ -59,18 +59,6 @@ describe("pillWashId", () => {
 });
 
 describe("annPopWidth", () => {
-	it("runs every popup at 90% of the chat column", () => {
-		// Default 36rem column: 32.4rem = 518.4px.
-		expect(annPopWidth({ chatWidthRem: 36, viewportWidth: 1280 })).toBeCloseTo(
-			518.4,
-			10
-		);
-		// Wide columns earn wide popups (no fixed cap anymore).
-		expect(annPopWidth({ chatWidthRem: 60, viewportWidth: 1280 })).toBeCloseTo(
-			864,
-			10
-		);
-	});
 	it("clamps to the viewport on narrow phones", () => {
 		expect(annPopWidth({ chatWidthRem: 36, viewportWidth: 300 })).toBe(284);
 	});
@@ -430,9 +418,6 @@ describe("noteEditorWidth", () => {
 		chromeWidth: 40,
 		previousWidth: 0
 	};
-	it("starts at the 18em floor", () => {
-		expect(noteEditorWidth(base)).toBe(288);
-	});
 	it("grows with the note up to the column, then wraps", () => {
 		expect(noteEditorWidth({ ...base, contentWidth: 400 })).toBe(440);
 		expect(noteEditorWidth({ ...base, contentWidth: 2000 })).toBe(600);

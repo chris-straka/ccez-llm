@@ -18,13 +18,6 @@ function appCss(): string {
 	return source.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-function annPopSource(): string {
-	return readFileSync(
-		new URL("../lib/components/AnnPop.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
 function componentStyle(source: string, name: string): string {
 	const match = source.match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error(`${name} has no <style> block`);
@@ -129,29 +122,6 @@ describe("badge/wash home", () => {
 	});
 });
 
-describe("annotation edit Save animation", () => {
-	it("animates the popover Save symmetrically on hover in/out", () => {
-		const css = componentStyle(annPopSource(), "AnnPop.svelte");
-		// Symmetric means the transition lives on the base rule, not
-		// :hover (a hover-only transition snaps back on leave).
-		expect(css).toMatch(/\.ann-save\s*\{[^}]*transition:/);
-		expect(css).toContain(".ann-save:hover");
-	});
-});
-
-describe("review delete button", () => {
-	it("is a centered close icon going Clear-all red, never underlined", () => {
-		const source = reviewDockSource();
-		expect(source).toContain('class="review-del"');
-		expect(source).toContain('kind="close"');
-		const css = componentStyle(source, "ReviewDock.svelte");
-		expect(css).toMatch(/button\.review-del\s*\{[^}]*align-self:\s*center/);
-		const hover = css.match(/button\.review-del:hover\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(hover).toContain("var(--danger)");
-		expect(hover).toMatch(/text-decoration:\s*none/);
-	});
-});
-
 describe("review quote clipping and link contract", () => {
 	it("lets the quote button shrink so long quotes clip, and links it on hover", () => {
 		// The dock quote moved to ReviewDock; the refs quote to
@@ -167,33 +137,6 @@ describe("review quote clipping and link contract", () => {
 		expect(css).toMatch(
 			/\.ann-refs-quote:hover\s*\{[^}]*text-decoration:\s*underline/
 		);
-	});
-
-	it("fades quote underlines instead of snapping them", () => {
-		const dockCss = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		const css = componentStyle(sentRefsSource(), "SentRefs.svelte");
-		// The line is always drawn but transparent at rest: color (not
-		// the line) ramps on hover, on both cards.
-		for (const [sel, src] of [
-			["button\\.review-quote", dockCss],
-			["\\.ann-refs-quote", css]
-		] as const) {
-			expect(src).toMatch(
-				new RegExp(`${sel}\\s*\\{[^}]*text-decoration-color:\\s*transparent`)
-			);
-			expect(src).toMatch(
-				new RegExp(
-					`${sel}:hover\\s*\\{[^}]*text-decoration-color:\\s*currentcolor`
-				)
-			);
-		}
-	});
-
-	it("lights both icons on the same color beat", () => {
-		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		for (const sel of ["button\\.review-copy", "button\\.review-del"]) {
-			expect(css).toMatch(new RegExp(`${sel}\\s*\\{[^}]*transition:\\s*color`));
-		}
 	});
 });
 

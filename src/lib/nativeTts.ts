@@ -369,24 +369,6 @@ export async function quoteLangForContext(
 	return identifyLangOffline(probe) ?? identifyLangShort(probe) ?? "zh-CN";
 }
 
-/**
- * Render `text` to an audio file with the same voice pick as live
- * speech (macOS writes through `AVSpeechSynthesizer`; Android through
- * `synthesizeToFile`). Resolves with the saved file path. Rejects
- * outside the Tauri shell and on platforms without a file renderer.
- *
- * Device note: the Android path is code-only — no Android hardware
- * was available to run it, so it is reported as unverified on device.
- * Never throws synchronously; failures reject the promise.
- */
-export async function saveNativeSpeech(
-	text: string,
-	lang: string,
-	voiceId: string | null = null
-): Promise<string> {
-	return invoke<string>("tts_save_speech", { text, lang, voice: voiceId });
-}
-
 /** Open System Settings at the Accessibility pane (voice downloads). */
 export async function openVoiceSettings(): Promise<void> {
 	await invoke("open_voice_settings");

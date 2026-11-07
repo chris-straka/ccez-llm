@@ -178,29 +178,3 @@ export function sameWashRanges(
 		);
 	});
 }
-
-/**
- * Collect DOM ranges for the current live selection clipped to a root,
- * for painting as a highlight instead of mark-wrapping. Empty array
- * when there is no non-collapsed selection fully inside the root.
- * Never throws.
- */
-export function selectionRanges(root: Node): Range[] {
-	try {
-		const sel = document.getSelection();
-		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return [];
-		const anchor = sel.anchorNode;
-		const focus = sel.focusNode;
-		if (!anchor || !focus || !root.contains(anchor) || !root.contains(focus))
-			return [];
-		const out: Range[] = [];
-		for (let i = 0; i < sel.rangeCount; i++) {
-			const range = sel.getRangeAt(i);
-			if (!root.contains(range.commonAncestorContainer)) continue;
-			out.push(range);
-		}
-		return out;
-	} catch {
-		return [];
-	}
-}

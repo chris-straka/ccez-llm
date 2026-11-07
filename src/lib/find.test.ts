@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emptyFind, stepFindCursor } from "./find";
-
-describe("emptyFind", () => {
-	it("closes the bar with a cleared query and cursor", () => {
-		expect(emptyFind()).toEqual({ open: false, query: "", cursor: 0 });
-	});
-});
+import { stepFindCursor } from "./find";
 
 describe("stepFindCursor", () => {
 	it("steps and wraps past either end", () => {

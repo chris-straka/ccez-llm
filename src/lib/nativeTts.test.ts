@@ -14,8 +14,7 @@ import {
 	speakNative,
 	speakNativeMulti,
 	stopNative,
-	prewarmNative,
-	saveNativeSpeech
+	prewarmNative
 } from "./nativeTts";
 import { ttsLangFor } from "./reading";
 
@@ -535,26 +534,6 @@ describe("prewarmNative", () => {
 	it("never throws when the bridge is missing", () => {
 		mockInvoke.mockRejectedValue(new Error("no bridge"));
 		expect(() => prewarmNative("de-DE")).not.toThrow();
-	});
-});
-
-describe("saveNativeSpeech", () => {
-	it("invokes tts_save_speech with the voice pick", async () => {
-		mockInvoke.mockResolvedValue("/tmp/ccez-speech-7.m4a");
-		await expect(saveNativeSpeech("hello", "en-US", "voice-1")).resolves.toBe(
-			"/tmp/ccez-speech-7.m4a"
-		);
-		expect(mockInvoke).toHaveBeenCalledWith("tts_save_speech", {
-			text: "hello",
-			lang: "en-US",
-			voice: "voice-1"
-		});
-	});
-
-	it("rejects when the bridge is unavailable", async () => {
-		await expect(saveNativeSpeech("hello", "en-US")).rejects.toThrow(
-			"no bridge"
-		);
 	});
 });
 

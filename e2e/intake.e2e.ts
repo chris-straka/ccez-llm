@@ -232,20 +232,6 @@ test("image pill and tag remove each other", async ({ page }) => {
 	await expect(page.locator(".ta-input")).not.toHaveValue(/\[Pasted image\]/);
 });
 
-test("deleting the tag drops the pill", async ({ page }) => {
-	await dropImage(page);
-	const card = page.locator(".attachments li.card");
-	await expect(card).toBeVisible({ timeout: 15_000 });
-	// Tag → pill: replacing the whole draft (markers included) drops
-	// the image attachment, like hand-deleting the tag. Meta+A: the
-	// macOS select-all — Control+A only jumps to the line start in
-	// the editor, so typing would prepend instead of replacing.
-	await page.locator(".ta-input").click();
-	await page.keyboard.press("ControlOrMeta+a");
-	await page.keyboard.type("hello");
-	await expect(card).toHaveCount(0);
-	await expect(page.locator(".ta-input")).toHaveValue("hello");
-});
 test("long paste becomes a pill with a positional tag", async ({ page }) => {
 	// A >100-char paste becomes a text pill above the composer plus a
 	// positional [Pasted N chars] tag where the caret was — never raw
@@ -362,23 +348,6 @@ test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({
 	await page.keyboard.press("Control+o");
 	await expect(page.locator("article.assistant .ccez-thoughts")).toHaveCount(0);
 	await expect(body).toContainText("Final answer");
-});
-
-test("screenshot-to-chat is gone, paste still takes images", async ({
-	page
-}) => {
-	// Shot was removed (paste + OCR remain the image paths): no Shot
-	// control even where screen capture is supported.
-	await expect(
-		page.locator(
-			'.prompt-tools button[aria-label="Capture a screenshot into the chat"]'
-		)
-	).toHaveCount(0);
-	await expect(
-		page.locator(
-			'.prompt-tools button[aria-label="Attach images or text files"]'
-		)
-	).toBeVisible();
 });
 
 test("expanded pasted content contracts from either blue bracket", async ({

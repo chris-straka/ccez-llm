@@ -45,11 +45,6 @@ function wakeLockOf(nav: unknown): WakeLockRequester | null {
 	return lock as WakeLockRequester;
 }
 
-/** True when a Screen Wake Lock can be requested in this runtime. */
-export function wakeLockSupported(nav: unknown = globalNavigator()): boolean {
-	return wakeLockOf(nav) !== null;
-}
-
 /**
  * Hold the screen on for a study read-aloud. Resolves a releasable
  * handle, or null where Wake Lock is unsupported or denied. The
@@ -91,17 +86,6 @@ export function releaseStudyWakeLock(handle: WakeLockRelease | null): void {
 	}
 }
 
-/** RMS energy of PCM samples in [-1, 1]; 0 for empty input. */
-export function rmsOf(samples: ArrayLike<number>): number {
-	if (samples.length === 0) return 0;
-	let sum = 0;
-	for (let i = 0; i < samples.length; i++) {
-		const s = samples[i] ?? 0;
-		sum += s * s;
-	}
-	return Math.sqrt(sum / samples.length);
-}
-
 function mediaDevicesGetUserMedia(): unknown {
 	try {
 		if (typeof navigator === "undefined") return null;
@@ -112,13 +96,6 @@ function mediaDevicesGetUserMedia(): unknown {
 	} catch {
 		return null;
 	}
-}
-
-/** True when MediaRecorder capture can run here (voice-bar fallback path). */
-export function mediaRecorderSupported(
-	ctor: unknown = globalOf("MediaRecorder")
-): boolean {
-	return typeof ctor === "function";
 }
 
 /**
@@ -147,15 +124,6 @@ export function vadSupported(input?: {
  */
 export type DictationCaptureMode = "vad" | "fixed" | "none";
 
-export function dictationCaptureMode(
-	vad: boolean,
-	recorder: boolean
-): DictationCaptureMode {
-	if (vad) return "vad";
-	if (recorder) return "fixed";
-	return "none";
-}
-
 /** Tunables for the dictation voice-activity state machine. */
 export interface VadOptions {
 	/** RMS at/above which speech is considered started. */
@@ -181,65 +149,6 @@ export interface VadState {
 }
 
 export type VadEvent = "speech-start" | "speech-end";
-
-/** Fresh VAD state (idle, no hangover clock). */
-export function createVadState(): VadState {
-	return { phase: "idle", belowSince: null };
-}
-
-/**
- * Feed one RMS level (with its timestamp) through the VAD machine.
- * Emits speech-start once per utterance and speech-end after the
- * hangover of sub-threshold silence. Pure and unit-tested; the page
- * stops dictation on speech-end and falls back to fixed recording
- * where vadSupported() is false.
- */
-export function vadUpdate(
-	state: VadState,
-	rms: number,
-	nowMs: number,
-	opts: VadOptions
-): VadEvent | null {
-	if (state.phase === "idle") {
-		if (rms >= opts.startThreshold) {
-			state.phase = "speech";
-			state.belowSince = null;
-			return "speech-start";
-		}
-		return null;
-	}
-	if (rms >= opts.endThreshold) {
-		state.belowSince = null;
-		return null;
-	}
-	if (state.belowSince === null) {
-		state.belowSince = nowMs;
-		return null;
-	}
-	if (nowMs - state.belowSince >= opts.endHangoverMs) {
-		state.phase = "idle";
-		state.belowSince = null;
-		return "speech-end";
-	}
-	return null;
-}
-
-/**
- * Voice-bar levels for one RMS reading: `bars` heights in 0..1 with
- * a rounded taper so the ends rest even at full level. Pure; the
- * page paints these and clamps the input itself.
- */
-export function waveformBars(level: number, bars: number): number[] {
-	const clamped = Math.min(1, Math.max(0, level));
-	if (!(bars > 0)) return [];
-	const n = Math.floor(bars);
-	const out: number[] = [];
-	for (let i = 0; i < n; i++) {
-		const taper = n === 1 ? 1 : Math.sin((Math.PI * (i + 1)) / (n + 1));
-		out.push(clamped * taper);
-	}
-	return out;
-}
 
 /**
  * Fixed notification id for the reply ping: every finished reply
@@ -406,16 +315,6 @@ export function clearStudyBadge(nav: unknown = globalNavigator()): boolean {
 		if (typeof n?.clearAppBadge !== "function") return false;
 		void (n.clearAppBadge as () => unknown)();
 		return true;
-	} catch {
-		return false;
-	}
-}
-
-/** True when navigator.vibrate can tick in this runtime. */
-export function vibrateSupported(nav: unknown = globalNavigator()): boolean {
-	try {
-		const n = nav as { vibrate?: unknown } | null;
-		return typeof n?.vibrate === "function";
 	} catch {
 		return false;
 	}

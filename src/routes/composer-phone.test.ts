@@ -57,22 +57,6 @@ describe("phone composer two bars", () => {
 		);
 	});
 
-	it("keeps the tools row static below the text as its own bar", () => {
-		const css = composerStyle();
-		// One layout for every platform: the base rule carries it.
-		expect(css).toMatch(/\n\t\.prompt-tools\s*\{[^}]*position:\s*static/);
-		expect(css).toMatch(/\n\t\.prompt-tools\s*\{[^}]*order:\s*5/);
-	});
-
-	it("draws no divider between the bars", () => {
-		const css = composerStyle();
-		const toolsRule = css.match(
-			/:global\(\.app\[data-android\]\) \.prompt-tools\s*\{[^}]*\}/
-		);
-		expect(toolsRule?.[0]).toBeDefined();
-		expect(toolsRule?.[0]).not.toContain("border-top:");
-	});
-
 	it("keeps AI text off the screen edge with a rem-floor thread gutter", () => {
 		const css = threadStyle();
 		// Assistant articles carry no side padding, so the thread

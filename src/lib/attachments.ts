@@ -359,11 +359,6 @@ export function pastedTextMarker(chars: number): string {
  * `matchAll`/fresh literals only. */
 export const PASTED_TAG_RE = /\[Pasted (\d+) chars\]/g;
 
-/** How many pasted-text tags a draft holds. Pure. */
-export function countPastedTags(text: string): number {
-	return text.match(PASTED_TAG_RE)?.length ?? 0;
-}
-
 /**
  * Brackets framing an expanded paste region in the draft: clicking
  * a `[Pasted N chars]` tag swaps it for `⟦prose⟧` inline, and
@@ -633,27 +628,6 @@ function trimCompact(value: number): string {
 	return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-/**
- * How many tags of one kind a draft holds (tag → attachment
- * reconciliation counts images and files separately). Pure.
- */
-/**
- * Blobs for the `count` newest image attachments (composer tag
- * copy/cut supplier): the same end the tag→pill reconciliation drops,
- * so what leaves the tray is what lands on the clipboard. Unreadable
- * entries are skipped, never fatal.
- */
-export async function attachmentImageBlobs(
-	list: Attachment[],
-	count: number
-): Promise<Blob[]> {
-	if (count <= 0) return [];
-	const imgs = list
-		.filter((att) => att.kind === "image" && att.dataUrl)
-		.slice(-count);
-	return fetchAttachmentBlobs(imgs);
-}
-
 /** Shared fetch: unreadable entries skipped, never fatal. */
 async function fetchAttachmentBlobs(picks: Attachment[]): Promise<Blob[]> {
 	const settled = await Promise.allSettled(
@@ -680,19 +654,6 @@ export async function attachmentImageBlobsAt(
 		if (att !== undefined && att.dataUrl !== null) picks.push(att);
 	}
 	return fetchAttachmentBlobs(picks);
-}
-
-/**
- * Data URLs for the image attachments at these document-order
- * indexes, read synchronously for same-event clipboard setData.
- * Null entries (no bytes) are skipped downstream. Pure.
- */
-export function attachmentDataUrlsAt(
-	list: Attachment[],
-	indexes: number[]
-): (string | null)[] {
-	const imgs = list.filter((att) => att.kind === "image");
-	return indexes.map((i) => imgs[i]?.dataUrl ?? null);
 }
 
 /**

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
-	parseCcezDeepLink,
 	isSummonHotkey,
 	studySheetMarkdown,
 	sanitizeFileStem,
@@ -13,7 +12,6 @@ import {
 	desktopSleepBlock,
 	desktopSleepUnblock,
 	exportStudySheet,
-	shareOutcomeToast,
 	type StudyLine
 } from "./desktop";
 
@@ -27,42 +25,6 @@ beforeEach(() => {
 	// No shell outside Tauri: every bridge call rejects, like the real
 	// invoke does in browsers and tests.
 	mockInvoke.mockRejectedValue(new Error("no bridge"));
-});
-
-describe("parseCcezDeepLink", () => {
-	it("reads the path form", () => {
-		expect(parseCcezDeepLink("ccez://chat/abc123")).toEqual({
-			kind: "open-chat",
-			chatId: "abc123"
-		});
-	});
-
-	it("reads the query form with decoding", () => {
-		expect(parseCcezDeepLink("ccez://chat?id=hello%20world")).toEqual({
-			kind: "open-chat",
-			chatId: "hello world"
-		});
-	});
-
-	it("reads new-chat", () => {
-		expect(parseCcezDeepLink("ccez://new")).toEqual({ kind: "new-chat" });
-	});
-
-	it("rejects foreign input without throwing", () => {
-		for (const bad of [
-			"https://chat/abc",
-			"ccez://chat/",
-			"ccez://chat",
-			"ccez://chat/a/b",
-			"ccez://chat/../x",
-			"ccez://unknown",
-			"ccez://new/extra",
-			"",
-			"ccez://"
-		]) {
-			expect(parseCcezDeepLink(bad), bad).toBeNull();
-		}
-	});
 });
 
 describe("isSummonHotkey", () => {
@@ -187,25 +149,6 @@ describe("shareStudySheet", () => {
 		vi.stubGlobal("navigator", {});
 		await expect(shareStudySheet("t", "body")).resolves.toBe("unavailable");
 		vi.unstubAllGlobals();
-	});
-});
-
-describe("shareOutcomeToast", () => {
-	it("names where the sheet landed", () => {
-		expect(shareOutcomeToast("shared", "/tmp/a.md")).toEqual({
-			error: false,
-			text: "Study sheet shared (/tmp/a.md)"
-		});
-		expect(shareOutcomeToast("shared", null)).toEqual({
-			error: false,
-			text: "Study sheet shared"
-		});
-		expect(shareOutcomeToast("copied", null).error).toBe(false);
-		expect(shareOutcomeToast("downloaded", null).error).toBe(false);
-		expect(shareOutcomeToast("unavailable", null)).toEqual({
-			error: true,
-			text: "Sharing is unavailable here"
-		});
 	});
 });
 

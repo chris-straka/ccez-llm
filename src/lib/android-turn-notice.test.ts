@@ -64,17 +64,6 @@ describe("android notice tap", () => {
 	});
 });
 
-describe("android service observability", () => {
-	it("logs every claim, post, and failure instead of swallowing", () => {
-		const source = turnSvc();
-		expect(source).toContain("CcezTurns");
-		expect(source).toContain("notice posted");
-		expect(source).toContain("keeperStart failed");
-		expect(source).toContain("keeperStop failed");
-		expect(source).toContain("notice post failed");
-	});
-});
-
 describe("android background silence", () => {
 	it("returns from the hidden branch with no haptic", () => {
 		const body = onVisibleBody();

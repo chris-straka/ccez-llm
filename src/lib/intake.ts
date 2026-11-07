@@ -1,9 +1,8 @@
 /**
  * Intake kernel: the two helpers every content path shares.
  *
- * The three intakes live beside it:
- * screen capture (`screenCapture.ts`), File Handling launches
- * (`launchFiles.ts`), and chat export (`chatExport.ts`). Drag-and-drop
+ * The two intakes live beside it: File Handling launches
+ * (`launchFiles.ts`) and chat export (`chatExport.ts`). Drag-and-drop
  * files land in the same `addFiles` path the attach button and paste
  * already use; permission dismissals stay silent everywhere via
  * `isPermissionDismissal`.

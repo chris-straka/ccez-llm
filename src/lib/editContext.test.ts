@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
-	editContextSupported,
 	isImeKey,
 	shouldDeferForComposition,
 	attachEditContext
@@ -23,9 +22,6 @@ describe("shouldDeferForComposition", () => {
 });
 
 describe("editContextSupported / attachEditContext", () => {
-	it("reports unsupported where the constructor is absent (node/jsdom)", () => {
-		expect(editContextSupported()).toBe(false);
-	});
 	it("falls back to null where unsupported, never throws", () => {
 		const ta = document.createElement("textarea");
 		expect(attachEditContext(ta)).toBeNull();

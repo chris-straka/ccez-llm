@@ -548,56 +548,6 @@ test.describe("touch paths", () => {
 		await expect(sidebar).not.toHaveClass(/collapsed/);
 	});
 
-	test("the sidebar search clear is a 44px thumb target", async ({ page }) => {
-		await seedThreeChats(page);
-		await toggleSidebar(page);
-		const box = page.getByLabel("Search chats");
-		await box.fill("sushi");
-		const clear = page.getByLabel("Clear chat search");
-		// Phones keep the drawer, never the desktop window.
-		await expect(page.locator("aside.windowed")).toHaveCount(0);
-		const btn = (await clear.boundingBox())!;
-		const field = (await box.boundingBox())!;
-		expect(btn.width).toBeGreaterThanOrEqual(44);
-		expect(btn.height).toBeGreaterThanOrEqual(44);
-		// Inside the field, and the typed text stops short of it.
-		expect(btn.x + btn.width).toBeLessThanOrEqual(field.x + field.width);
-		const padRight = await box.evaluate((el) =>
-			parseFloat(getComputedStyle(el).paddingRight)
-		);
-		expect(padRight).toBeGreaterThanOrEqual(btn.width);
-		// No engine cancel glyph (Chromium paints it blue) beside the
-		// app's own X: computed styles can't see the pseudo, pixels can.
-		const shot = (await box.screenshot()).toString("base64");
-		const blue = await page.evaluate(async (b64) => {
-			const img = new Image();
-			img.src = `data:image/png;base64,${b64}`;
-			await img.decode();
-			const c = document.createElement("canvas");
-			c.width = img.width;
-			c.height = img.height;
-			const g = c.getContext("2d")!;
-			g.drawImage(img, 0, 0);
-			// Inside the field only: Chromium may ring the focused box in
-			// blue (a focus ring, not a cancel glyph), so skip the edge
-			// band out to the corner radius.
-			const inset = 8;
-			const d = g.getImageData(
-				inset,
-				inset,
-				c.width - inset * 2,
-				c.height - inset * 2
-			).data;
-			let n = 0;
-			for (let i = 0; i < d.length; i += 4)
-				if (d[i + 2]! - d[i]! > 60 && d[i + 2]! > 120) n++;
-			return n;
-		}, shot);
-		expect(blue).toBe(0);
-		await clear.click();
-		await expect(page.locator("aside ul li")).toHaveCount(3);
-	});
-
 	test("paste-images button appears with clipboard.read and reports an empty clipboard", async ({
 		page
 	}) => {

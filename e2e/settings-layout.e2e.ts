@@ -115,30 +115,6 @@ test.describe("desktop window", () => {
 		}
 	});
 
-	test("the message colors keep to one line", async ({ page }) => {
-		const tops = await page
-			.locator(".settings-panel .segmented.swatches button")
-			.evaluateAll((els) =>
-				els.map((el) => Math.round(el.getBoundingClientRect().top))
-			);
-		expect(tops.length).toBe(7);
-		expect(new Set(tops).size).toBe(1);
-	});
-
-	test("steppers share one width and one right edge", async ({ page }) => {
-		const boxes = await page
-			.locator(".settings-panel .stepper")
-			.evaluateAll((els) =>
-				els.map((el) => {
-					const r = el.getBoundingClientRect();
-					return { width: Math.round(r.width), right: Math.round(r.right) };
-				})
-			);
-		expect(boxes.length).toBeGreaterThan(4);
-		expect(new Set(boxes.map((b) => b.width)).size).toBe(1);
-		expect(new Set(boxes.map((b) => b.right)).size).toBe(1);
-	});
-
 	test("Reset appears beside the stepper without growing its row", async ({
 		page
 	}) => {

@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	clampPromptIdleSec,
 	columnBounds,
-	formatIdleTimeout,
 	isPromptIdle,
 	pointInRect,
 	sendHoldAction,
@@ -13,13 +11,7 @@ import {
 	stageOwnedByOverlay,
 	type StageOwnerFlags
 } from "./chrome";
-import {
-	PROMPT_IDLE_ALWAYS,
-	PROMPT_IDLE_DEFAULT,
-	PROMPT_IDLE_MAX,
-	PROMPT_IDLE_MIN,
-	PROMPT_IDLE_NEVER
-} from "./settings";
+import {} from "./settings";
 
 describe("isPromptIdle", () => {
 	it("hides once the timeout has fully elapsed", () => {
@@ -36,32 +28,6 @@ describe("isPromptIdle", () => {
 	it("restores the instant fresh input lands", () => {
 		const now = 100_000;
 		expect(isPromptIdle(now, now, 6)).toBe(false);
-	});
-});
-
-describe("clampPromptIdleSec", () => {
-	it("rounds to whole seconds inside the range", () => {
-		expect(clampPromptIdleSec(6.4)).toBe(6);
-		expect(clampPromptIdleSec(PROMPT_IDLE_DEFAULT)).toBe(PROMPT_IDLE_DEFAULT);
-	});
-
-	it("clamps strays to the range edges", () => {
-		expect(clampPromptIdleSec(PROMPT_IDLE_MIN - 10)).toBe(PROMPT_IDLE_MIN);
-		expect(clampPromptIdleSec(PROMPT_IDLE_MAX + 10)).toBe(PROMPT_IDLE_MAX);
-		expect(clampPromptIdleSec(Number.NaN)).toBe(PROMPT_IDLE_MIN);
-	});
-
-	it("passes the never-hide sentinel through", () => {
-		expect(clampPromptIdleSec(PROMPT_IDLE_NEVER)).toBe(PROMPT_IDLE_NEVER);
-	});
-});
-
-describe("formatIdleTimeout", () => {
-	it("reads always, seconds, and never", () => {
-		expect(PROMPT_IDLE_MAX).toBe(10);
-		expect(formatIdleTimeout(PROMPT_IDLE_NEVER)).toBe("never");
-		expect(formatIdleTimeout(6)).toBe("6 s");
-		expect(formatIdleTimeout(PROMPT_IDLE_ALWAYS)).toBe("always");
 	});
 });
 

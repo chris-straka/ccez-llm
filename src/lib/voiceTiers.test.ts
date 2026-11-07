@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-	hasQualityVoices,
 	tierLabel,
 	voicesForLang,
 	allVoicesForLang,
@@ -20,32 +19,6 @@ const voice = (
 	name: name ?? id.split(".").pop() ?? id,
 	lang,
 	quality
-});
-
-describe("hasQualityVoices", () => {
-	it("is true when a premium or enhanced voice is installed", () => {
-		const voices = [
-			voice("com.apple.voice.compact.en-US.Samantha", "en-US", 1),
-			voice("com.apple.voice.enhanced.bg-BG.Daria", "bg-BG", 2)
-		];
-		expect(hasQualityVoices(voices)).toBe(true);
-		expect(
-			hasQualityVoices([
-				voice("com.apple.voice.premium.de-DE.Petra", "de-DE", 3)
-			])
-		).toBe(true);
-	});
-
-	it("is false for default-tier voices, Siri personas, and empty lists", () => {
-		expect(
-			hasQualityVoices([
-				voice("com.apple.voice.compact.en-US.Samantha", "en-US", 1),
-				voice("com.apple.eloquence.en-US.Eddy", "en-US", 1),
-				voice("a", "en-US", 0)
-			])
-		).toBe(false);
-		expect(hasQualityVoices([])).toBe(false);
-	});
 });
 
 describe("tierLabel", () => {

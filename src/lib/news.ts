@@ -208,11 +208,6 @@ export const NEWS_FEEDS: Record<string, NewsFeed> = {
 	}
 };
 
-/** True when the language has a Google News edition. */
-export function isNewsSupported(code: string): boolean {
-	return NEWS_FEEDS[code] !== undefined;
-}
-
 /** True when the language reads a fallback English edition. */
 export function isNewsFallback(code: string): boolean {
 	return NEWS_FEEDS[code]?.fallback === true;

@@ -27,9 +27,6 @@ import {
 	planChatStep,
 	clampChatIndex,
 	messageIndexFromId,
-	tokenTotal,
-	tokenSplit,
-	formatTokens,
 	waypoints,
 	waypointIndexAt,
 	waypointOffsets,
@@ -51,7 +48,6 @@ import {
 	buildSummaryRefreshMessages,
 	renderFoldText,
 	summaryBlock,
-	estimateTokens,
 	HISTORY_WINDOW_CHARS,
 	MIN_VERBATIM_MESSAGES,
 	isSending,
@@ -126,7 +122,6 @@ describe("chat", () => {
 		expect(chat.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
 		expect(chat.messages[1]?.content).toBe("hello");
 		expect(chat.messages[1]?.usage?.total).toBe(2);
-		expect(tokenTotal(state)).toBe(2);
 		expect(state.sending).toBe(false);
 	});
 
@@ -290,48 +285,6 @@ describe("chat", () => {
 		await sendMessage(state, bomb, "sys", "hi", {}, store);
 		expect(hasFetchActive(state, state.activeChatId)).toBe(false);
 		expect(isSending(state, state.activeChatId)).toBe(false);
-	});
-
-	it("splits tokens into input and output", async () => {
-		const { state, store } = stateWith(freshStore());
-		await sendMessage(
-			state,
-			scriptedProvider(["hi"], { prompt: 5, completion: 3, total: 8 }),
-			"sys",
-			"hello",
-			{},
-			store
-		);
-		await sendMessage(
-			state,
-			scriptedProvider(["yo"], { prompt: 7, completion: 2, total: 9 }),
-			"sys",
-			"again",
-			{},
-			store
-		);
-		expect(tokenSplit(state)).toEqual({ prompt: 12, completion: 5 });
-		expect(tokenTotal(state)).toBe(17);
-	});
-
-	it("splits zero tokens on an empty chat", () => {
-		const { state } = stateWith(freshStore());
-		expect(tokenSplit(state)).toEqual({ prompt: 0, completion: 0 });
-	});
-
-	it("compacts token counts with K/M/B suffixes", () => {
-		expect(formatTokens(0)).toBe("0");
-		expect(formatTokens(42)).toBe("42");
-		expect(formatTokens(999)).toBe("999");
-		expect(formatTokens(1000)).toBe("1K");
-		expect(formatTokens(1536)).toBe("1.5K");
-		expect(formatTokens(10_400)).toBe("10.4K");
-		expect(formatTokens(99_999)).toBe("100K");
-		expect(formatTokens(999_949)).toBe("1M");
-		expect(formatTokens(999_950)).toBe("1M");
-		expect(formatTokens(2_500_000)).toBe("2.5M");
-		expect(formatTokens(1_000_000_000)).toBe("1B");
-		expect(formatTokens(-5)).toBe("0");
 	});
 
 	it("marks failed replies retryable and keeps the prompt", async () => {
@@ -1567,12 +1520,6 @@ describe("history compaction", () => {
 			streams
 		};
 	}
-
-	it("estimates tokens at chars/4, rounded up", () => {
-		expect(estimateTokens("")).toBe(0);
-		expect(estimateTokens("abcd")).toBe(1);
-		expect(estimateTokens("abcde")).toBe(2);
-	});
 
 	it("keeps small chats whole with no fold", () => {
 		const { state } = stateWith(freshStore());

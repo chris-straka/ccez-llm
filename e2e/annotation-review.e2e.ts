@@ -438,35 +438,6 @@ test("selecting review text summons no menu and stays put", async ({
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 });
 
-/** Review rows stay one line: the quote cuts with an ellipsis,
-the note scrolls sideways, and the copy icon sits at the row's
-end (no dead space for it to float in). */
-test("review rows are one line with copy at the end", async ({ page }) => {
-	await annotateWord(page);
-	await pinFiled(page);
-	const style = await page.evaluate(() => {
-		const q = document.querySelector(".review-quote") as HTMLElement | null;
-		const c = document.querySelector(".review-comment") as HTMLElement | null;
-		const qs = q ? getComputedStyle(q) : null;
-		const cs = c ? getComputedStyle(c) : null;
-		return {
-			quote:
-				qs?.whiteSpace === "nowrap" &&
-				qs?.textOverflow === "ellipsis" &&
-				qs?.overflow === "hidden",
-			note: cs?.whiteSpace === "nowrap" && cs?.overflowX === "auto"
-		};
-	});
-	expect(style).toEqual({ quote: true, note: true });
-	const order = await page.evaluate(() => {
-		const head = document.querySelector(".review-head");
-		const copy = head?.querySelector(".review-copy")?.getBoundingClientRect();
-		const quote = head?.querySelector(".review-quote")?.getBoundingClientRect();
-		return copy && quote ? copy.x > quote.x : false;
-	});
-	expect(order).toBe(true);
-});
-
 /** The note stays readable on both themes: it rides the quiet voice
 (#6e6e73 on the white light card, #98989f on the dark card) instead
 of the pale dark-card grey, which washes out on white. */

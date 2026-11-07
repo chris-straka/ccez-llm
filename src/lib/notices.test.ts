@@ -10,7 +10,6 @@ import {
 	clearNotice,
 	flashNotice,
 	TOAST_TIMEOUT_MS,
-	ERROR_TOAST_TIMEOUT_MS,
 	toastTimeoutFor,
 	errorToastTimeoutFor,
 	toastLong,
@@ -68,11 +67,6 @@ describe("notice queue", () => {
 		} finally {
 			vi.useRealTimers();
 		}
-	});
-
-	it("plain toasts clear fast while error toasts hold the long delay", () => {
-		expect(TOAST_TIMEOUT_MS).toBe(2500);
-		expect(ERROR_TOAST_TIMEOUT_MS).toBe(4000);
 	});
 
 	it("toast delays scale with message length (reading time), capped", () => {

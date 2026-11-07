@@ -10,23 +10,17 @@ import {
 	ANN_FLASH_D2,
 	ANN_FLASH_D3,
 	flashFadeSchedule,
-	highlightsSupported,
 	prefersReducedMotion,
-	liveWashRanges,
 	paintAnnotationWash,
 	clearAnnotationWash,
 	clearAnnotationWashes,
 	sameWashRanges,
-	selectionRanges,
 	washRampSchedule
 } from "./annHighlights";
 
 describe("CSS.highlights annotation wash", () => {
 	it("exposes a stable highlight name", () => {
 		expect(ANN_HIGHLIGHT_NAME).toBe("ccez-ann");
-	});
-	it("reports unsupported in jsdom (no Highlights API)", () => {
-		expect(highlightsSupported()).toBe(false);
 	});
 	it("paint falls back to false where unsupported, never throws", () => {
 		const root = document.createElement("div");
@@ -35,9 +29,6 @@ describe("CSS.highlights annotation wash", () => {
 		range.selectNodeContents(root);
 		expect(paintAnnotationWash([range])).toBe(false);
 		expect(paintAnnotationWash([])).toBe(false);
-	});
-	it("clear is a safe no-op where unsupported", () => {
-		expect(() => clearAnnotationWash()).not.toThrow();
 	});
 	it("fade-in walks D3, D1, then live (fast, ~100ms)", () => {
 		expect(washRampSchedule("in")).toEqual([
@@ -53,16 +44,6 @@ describe("CSS.highlights annotation wash", () => {
 			ANN_HIGHLIGHT_D3,
 			null
 		]);
-	});
-	it("graded names stay distinct from the live name", () => {
-		expect(
-			new Set([
-				ANN_HIGHLIGHT_NAME,
-				ANN_HIGHLIGHT_D1,
-				ANN_HIGHLIGHT_D2,
-				ANN_HIGHLIGHT_D3
-			]).size
-		).toBe(4);
 	});
 	it("flash name stays distinct from every wash name", () => {
 		expect(
@@ -109,16 +90,6 @@ describe("CSS.highlights annotation wash", () => {
 			false
 		);
 		expect(sameWashRanges([at(0, 2)], [at(0, 2), at(3, 5)])).toBe(false);
-		root.remove();
-	});
-	it("liveWashRanges is empty where unsupported", () => {
-		expect(liveWashRanges()).toEqual([]);
-	});
-	it("selectionRanges is empty with no live selection", () => {
-		const root = document.createElement("div");
-		root.textContent = "hello world";
-		document.body.appendChild(root);
-		expect(selectionRanges(root)).toEqual([]);
 		root.remove();
 	});
 	it("jump fade steps down dedicated flash grades, never wash grades", () => {

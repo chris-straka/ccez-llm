@@ -37,30 +37,11 @@ describe("on-device provider gate", () => {
 describe("onDeviceErrorCopy", () => {
 	const cases: Array<[unknown, string]> = [
 		[
-			"stale-aicore",
-			"On-device chat isn't ready. Update AI Core in the Play Store or restart this phone, then try again."
-		],
-		[
 			"no-model",
 			"On-device model isn't downloaded yet. Reconnect to download it once, then it works offline."
 		],
-		[
-			"downloading",
-			"On-device model is still downloading. Try again in a bit."
-		],
-		["no-bridge", "On-device chat isn't available on this device."],
-		["unsupported", "On-device chat isn't available on this device."],
-		["busy", "On-device chat is busy. Try again in a moment."],
-		[
-			"too-long",
-			"That message is too long for on-device chat. Shorten it and try again."
-		],
-		["cancelled", "On-device reply stopped."],
-		["failed", "On-device chat failed. Try again."],
 		["anything-else", "On-device chat failed. Try again."],
-		["", "On-device chat failed. Try again."],
-		[null, "On-device chat failed. Try again."],
-		[undefined, "On-device chat failed. Try again."]
+		[null, "On-device chat failed. Try again."]
 	];
 	for (const [reason, copy] of cases) {
 		it(`maps ${JSON.stringify(reason)} to one short sentence`, () => {

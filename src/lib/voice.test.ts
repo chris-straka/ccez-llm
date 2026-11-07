@@ -33,10 +33,8 @@ import {
 	friendlyMicError,
 	messageSpeakableFor,
 	isMessageSpeaking,
-	speakTitleFor,
 	appendDictation,
-	dictationInsert,
-	micUnavailableMessage
+	dictationInsert
 } from "./voice";
 import { ttsLangFor } from "./reading";
 
@@ -471,11 +469,6 @@ describe("message row voice state", () => {
 		expect(isMessageSpeaking("m1", "m2", null)).toBe(false);
 		expect(isMessageSpeaking("m1", null, null)).toBe(false);
 	});
-
-	it("labels the speak button stop while speaking", () => {
-		expect(speakTitleFor(true)).toBe("Stop reading aloud");
-		expect(speakTitleFor(false)).toBe("Read this message aloud");
-	});
 });
 
 describe("dictation text", () => {
@@ -488,13 +481,6 @@ describe("dictation text", () => {
 	it("trails inserts with one space", () => {
 		expect(dictationInsert("hi")).toBe("hi ");
 		expect(dictationInsert("hi ")).toBe("hi ");
-	});
-
-	it("blames shell vs browser for missing mics", () => {
-		expect(micUnavailableMessage(true)).toBe("Mic input is not available.");
-		expect(micUnavailableMessage(false)).toBe(
-			"Mic input not available in this browser."
-		);
 	});
 });
 

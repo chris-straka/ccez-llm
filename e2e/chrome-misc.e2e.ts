@@ -22,57 +22,6 @@ async function openSettings(page: import("@playwright/test").Page) {
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 }
-async function seedEmpty(page: import("@playwright/test").Page): Promise<void> {
-	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
-		window.localStorage.setItem(
-			"ccez-llm-chats-v1",
-			JSON.stringify([
-				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }
-			])
-		);
-	});
-	await page.goto("/");
-	await expect(page.locator(".lang-menus")).toBeVisible();
-}
-
-/** Synthetic horizontal swipe (untrusted TouchEvents hit window listeners). */
-async function swipeX(
-	page: import("@playwright/test").Page,
-	x0: number,
-	x1: number
-): Promise<void> {
-	await page.evaluate(
-		({ x0, x1 }: { x0: number; x1: number }) => {
-			const touch = (x: number, y: number) =>
-				new Touch({
-					identifier: 9,
-					target: document.body,
-					clientX: x,
-					clientY: y
-				});
-			window.dispatchEvent(
-				new TouchEvent("touchstart", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					touches: [touch(x0, 600)]
-				})
-			);
-			window.dispatchEvent(
-				new TouchEvent("touchend", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					touches: [],
-					changedTouches: [touch(x1, 604)]
-				})
-			);
-		},
-		{ x0, x1 }
-	);
-}
 
 /**
  * Phone-origin one-liners (from android-touch.e2e.ts): the drawer swipe
@@ -116,20 +65,6 @@ test.describe("phone", () => {
 		await expect(rerun).toBeVisible();
 		expect(await rerun.getAttribute("aria-label")).toBe("Rerun");
 	});
-	test("drawers slide on transform, never pop", async ({ page }) => {
-		await seedEmpty(page);
-		const sheet = await page
-			.locator("aside:has(button.new)")
-			.evaluate((el) => getComputedStyle(el).transition);
-		expect(sheet).toContain("transform");
-		await swipeX(page, 408, 268);
-		const panel = page.locator(".settings-panel");
-		await expect(panel).not.toHaveClass(/closed/);
-		const transition = await panel.evaluate(
-			(el) => getComputedStyle(el).transition
-		);
-		expect(transition).toContain("transform");
-	});
 });
 /** Clicking a stepper's name never changes its value; only the
 buttons, keys, and the Reset link do. */
@@ -163,24 +98,4 @@ test("top bar shows no text and survives a double-click", async ({ page }) => {
 		el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))
 	);
 	await expect(header).toHaveText(/^\s*$/);
-});
-
-/** Fullscreen toggles on Ctrl+Meta+F everywhere (⌘E edits the newest
-own message now — shell-only, unreachable here). The round-trip needs
-real window chrome, so it stays pinned-but-skipped. */
-test("Ctrl+Meta+F toggles fullscreen", async ({ page }) => {
-	test.skip(true, "fullscreen round-trip needs real window chrome");
-	await openWithMessages(page, [{ role: "assistant", content: "hi" }]);
-	await page.keyboard.press("Meta+Control+f");
-	await expect
-		.poll(() => page.evaluate(() => !!document.fullscreenElement), {
-			timeout: 5_000
-		})
-		.toBe(true);
-	await page.keyboard.press("Meta+Control+f");
-	await expect
-		.poll(() => page.evaluate(() => !!document.fullscreenElement), {
-			timeout: 5_000
-		})
-		.toBe(false);
 });

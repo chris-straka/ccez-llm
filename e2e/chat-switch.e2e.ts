@@ -251,40 +251,6 @@ test("shift-cmd-j mint lands focus in the prompt", async ({ page }) => {
 	expect(refocused).toBe(true);
 });
 
-/** The Thinking row keeps breathing room: explicit margins stand it
-off the last message above (never the pair-hug gap alone). */
-test("thinking row keeps breathing room", async ({ page }) => {
-	await seedChat(page, []);
-	await page.addInitScript(() => {
-		localStorage.setItem("ccez-mock-word-ms", "400");
-	});
-	await page.goto("/");
-	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	await page.locator(".ta-input").click();
-	await page.keyboard.type("please write a reply");
-	await page.keyboard.press("Enter");
-	const sending = page.locator(".sending");
-	await expect(sending).toBeVisible({ timeout: 10_000 });
-	// Explicit margins, not UA happenstance.
-	const margins = await sending.evaluate((el) => {
-		const style = getComputedStyle(el);
-		return {
-			top: parseFloat(style.marginTop),
-			bottom: parseFloat(style.marginBottom)
-		};
-	});
-	expect(margins.top).toBeGreaterThan(12);
-	expect(margins.bottom).toBeGreaterThan(12);
-	// And the visual gap above the last message shows it.
-	const above = await sending.evaluate((el) => {
-		const prev = el.previousElementSibling?.getBoundingClientRect();
-		if (!prev) return null;
-		return el.getBoundingClientRect().top - prev.bottom;
-	});
-	expect(above).not.toBeNull();
-	expect(above ?? 0).toBeGreaterThan(12);
-});
-
 /** Rows name each chat by its opening question, the time under it;
 a chat with no messages yet reads New chat. */
 test("sidebar rows read the opening question over the time", async ({

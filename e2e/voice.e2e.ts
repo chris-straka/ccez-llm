@@ -18,26 +18,6 @@ test.describe("voice-data", () => {
 			timeout: 60_000
 		});
 	});
-
-	test("settings show no study-fonts or lesson-audio sections", async ({
-		page
-	}) => {
-		await page.keyboard.press("Meta+,");
-		const panel = page.locator(".settings-panel");
-		await expect(panel).not.toHaveClass(/closed/);
-		await expect(panel.getByText("Study fonts", { exact: true })).toHaveCount(
-			0
-		);
-		await expect(
-			panel.getByRole("button", { name: "Check fonts again" })
-		).toHaveCount(0);
-		await expect(panel.getByText("Lesson audio", { exact: true })).toHaveCount(
-			0
-		);
-		await expect(
-			panel.getByRole("button", { name: "Save sample audio" })
-		).toHaveCount(0);
-	});
 });
 
 test("Settings' Test voice reads a sample line, and again stops it", async ({

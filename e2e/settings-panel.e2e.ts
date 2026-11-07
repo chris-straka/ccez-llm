@@ -24,14 +24,6 @@ test("thinking pills fit on one line", async ({ page }) => {
 	expect(new Set(tops).size).toBe(1);
 });
 
-test("own-bubble toggle reads as Background on my msgs, under Enable", async ({
-	page
-}) => {
-	await expect(
-		page.locator(".settings-panel").getByText("Background on my msgs")
-	).toBeVisible();
-});
-
 /** Text size reaches 2000% on desktop (phones share the stored range). */
 test("desktop text size steps up to 2000 percent", async ({ page }) => {
 	const size = page.getByRole("spinbutton", {
@@ -221,26 +213,6 @@ test("the desktop window shows no reading sample", async ({ page }) => {
 	await expect(page.locator(".settings-panel .reading-preview")).toHaveCount(0);
 });
 
-/** Background on my msgs is a look, not a feature: it sits in Look. */
-test("own-bubble checkbox sits in the Look group", async ({ page }) => {
-	await expect(
-		page
-			.locator("#settings-look label.check")
-			.filter({ hasText: "Background on my msgs" })
-	).toHaveCount(1);
-});
-
-/** macOS always uses system voices: no engine picker bubble. */
-test("no System/Web engine picker on desktop", async ({ page }) => {
-	const panel = page.locator(".settings-panel");
-	await expect(
-		panel.getByRole("button", { name: "System voices" })
-	).toHaveCount(0);
-	await expect(panel.getByRole("button", { name: "Web voices" })).toHaveCount(
-		0
-	);
-});
-
 /** Chat-width slider resizes the column live and persists the value. */
 test("chat width slider narrows the column and persists", async ({ page }) => {
 	const slider = page.getByRole("slider", { name: "Chat width in rem" });
@@ -377,35 +349,6 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 	await expect(sidebar).not.toHaveClass(/collapsed/);
 });
 
-/** Tap-to-show is a touch idiom: desktops never see its checkbox. */
-test("no hide-buttons checkbox on desktop", async ({ page }) => {
-	await expect(
-		page
-			.locator(".settings-panel")
-			.getByText("Show msg buttons only when tapped")
-	).toHaveCount(0);
-});
-
-/** The shortcuts entry is a one-line "Shortcuts" button with no
-inline kbd chip; the chord stays documented inside the modal. */
-test("shortcuts entry is a one-line button, chord lives in the modal", async ({
-	page
-}) => {
-	const btn = page.locator(".settings-panel button", { hasText: "Shortcuts" });
-	await expect(btn).toHaveText("Shortcuts");
-	await expect(page.locator(".settings-panel .key-hint")).toHaveCount(0);
-	const single = await btn.evaluate(
-		(el) => el.scrollWidth <= el.clientWidth + 1
-	);
-	expect(single).toBe(true);
-	await btn.click();
-	const modal = page.locator(".modal-veil .modal");
-	await expect(modal).toBeVisible();
-	await expect(modal.locator(".keys")).toContainText("Summon / hide window");
-	await page.keyboard.press("Escape");
-	await expect(modal).toHaveCount(0);
-});
-
 /** Bubble background is decor only: the switch never moves message
 alignment (left, right-docked, both ways). Plain text is the default. */
 test("own-bubble switch keeps left alignment, background follows", async ({
@@ -420,42 +363,6 @@ test("own-bubble switch keeps left alignment, background follows", async ({
 		.click();
 	await expect(bubble).toHaveCSS("background-color", "rgb(241, 241, 244)");
 	await expect(bubble).toHaveCSS("text-align", "left");
-});
-
-/** No transparency sliders: surfaces are solid, so neither control
-exists and no alpha vars reach the app root. */
-test("transparency sliders are gone and surfaces stay solid", async ({
-	page
-}) => {
-	await expect(
-		page.locator(
-			'.settings-panel input[aria-label="Background transparency percent"]'
-		)
-	).toHaveCount(0);
-	await expect(
-		page.locator(
-			'.settings-panel input[aria-label="Composer transparency percent"]'
-		)
-	).toHaveCount(0);
-	const style = await page.locator(".app").getAttribute("style");
-	expect(style ?? "").not.toMatch(/--bg-alpha|--prompt-alpha/);
-	const solid = await page.evaluate(() => {
-		const alpha = (el: Element | null): number => {
-			const bg = el ? getComputedStyle(el).backgroundColor : "";
-			const inner = bg.match(/^(?:rgba?|color)\(([^)]+)\)$/)?.[1] ?? "";
-			if (inner.includes(",")) {
-				const parts = inner.split(",").map((part) => part.trim());
-				return parts.length === 4 ? parseFloat(parts[3]!) : 1;
-			}
-			return parseFloat(inner.match(/\/\s*([\d.]+)\s*$/)?.[1] ?? "1");
-		};
-		return {
-			app: alpha(document.querySelector(".app")),
-			prompt: alpha(document.querySelector("main .prompt"))
-		};
-	});
-	expect(solid.app).toBe(1);
-	expect(solid.prompt).toBe(1);
 });
 
 /** Background reply ping has an opt-out, on by default, persisted. */

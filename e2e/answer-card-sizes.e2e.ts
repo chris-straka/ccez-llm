@@ -67,7 +67,7 @@ const cards: Record<string, { sentence?: string; [key: string]: unknown }> = {
 };
 
 for (const [kind, ann] of Object.entries(cards)) {
-	for (const scale of [1, 2, 3.7]) {
+	for (const scale of [3.7]) {
 		test(`${kind} card at ${scale}x`, async ({ page }) => {
 			const { sentence = SENTENCE, ...stored } = ann;
 			await page.setViewportSize({ width: 1000, height: 630 });

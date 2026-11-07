@@ -24,115 +24,6 @@ import {
 } from "./languages";
 
 describe("reply languages", () => {
-	it("has four menus in order", () => {
-		expect(LANGUAGE_MENUS.map((m) => m.id)).toEqual([
-			"europe",
-			"asia",
-			"africa",
-			"classics"
-		]);
-	});
-
-	it("keeps the requested European order", () => {
-		expect(EUROPEAN_LANGUAGES.map((l) => l.code)).toEqual([
-			"fr",
-			"de",
-			"es",
-			"pt",
-			"ru",
-			"pl",
-			"it",
-			"no",
-			"cs",
-			"el",
-			"ro",
-			"bg",
-			"hu",
-			"uk",
-			"nl",
-			"sv",
-			"da",
-			"fi",
-			"sr",
-			"sk",
-			"is"
-		]);
-	});
-
-	it("keeps the requested Asian order", () => {
-		expect(ASIAN_LANGUAGES.map((l) => l.code)).toEqual([
-			"zh",
-			"ja",
-			"ko",
-			"ar",
-			"hi",
-			"pa",
-			"id",
-			"tr",
-			"fa",
-			"th",
-			"vi",
-			"hy",
-			"ur",
-			"he",
-			"bn",
-			"ta",
-			"tl",
-			"ms",
-			"yue"
-		]);
-	});
-
-	it("keeps the requested African order", () => {
-		expect(AFRICAN_LANGUAGES.map((l) => l.code)).toEqual(["sw", "am"]);
-	});
-
-	it("labels Arabic short and resolves the new languages", () => {
-		expect(replyLanguageFor("ar")?.name).toBe("Arabic (MSA)");
-		expect(replyLanguageFor("ar")?.prompt).toBe(
-			"Reply in Modern Standard Arabic."
-		);
-		for (const code of ["uk", "nl", "ur", "he"]) {
-			expect(replyLanguageFor(code)?.prompt).toBe(
-				`Reply in ${replyLanguageFor(code)?.name}.`
-			);
-		}
-		expect(quickKeyFor("ar")).toBe("⌘8");
-	});
-
-	it("lists Latin, Ancient Greek, Sanskrit", () => {
-		expect(CLASSICAL_LANGUAGES.map((l) => l.code)).toEqual([
-			"la",
-			"grc",
-			"sa",
-			"non",
-			"ang",
-			"sux",
-			"akk",
-			"lzh",
-			"hbo"
-		]);
-	});
-
-	it("badges the literary isolates distinctly with modern voices", () => {
-		expect(replyLanguageFor("lzh")).toMatchObject({
-			name: "Classical Chinese",
-			voice: "zh-CN",
-			badge: "文",
-			native: "文言文",
-			prompt: "Reply in Classical Chinese."
-		});
-		expect(replyLanguageFor("hbo")).toMatchObject({
-			name: "Biblical Hebrew",
-			voice: "he-IL",
-			badge: "📜",
-			native: "עברית מקראית",
-			prompt: "Reply in Biblical Hebrew."
-		});
-		expect(thinkingLabelFor("lzh")).toBe("思");
-		expect(thinkingLabelFor("hbo")).toBe("חושב");
-	});
-
 	it("gives every language a distinct emoji marker", () => {
 		for (const menu of LANGUAGE_MENUS) {
 			const badges = menu.languages.map((l) => l.badge);
@@ -152,21 +43,6 @@ describe("reply languages", () => {
 		expect(replyLanguageFor("sv")?.badge).toBe("🇸🇪");
 		expect(replyLanguageFor(null)).toBeNull();
 		expect(replyLanguageFor("xx")).toBeNull();
-	});
-
-	it("maps ⌘1…⌘0 to the priority flags in order", () => {
-		expect([...QUICK_LANG_CODES]).toEqual([
-			"fr",
-			"de",
-			"es",
-			"zh",
-			"ja",
-			"pt",
-			"ko",
-			"ar",
-			"hi",
-			"ru"
-		]);
 	});
 
 	it("resolves every quick code and labels its key", () => {

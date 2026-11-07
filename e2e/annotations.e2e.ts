@@ -1284,40 +1284,6 @@ test("sent-refs rows point only on the quote", async ({ page }) => {
 	});
 });
 
-/** The sent card follows the theme: overlay surface on both, quiet
-note on light, pale note on dark. */
-for (const theme of ["light", "dark"] as const) {
-	test(`sent-refs card themes on ${theme}`, async ({ page }) => {
-		await seedChat(page, [
-			{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
-			{
-				role: "user",
-				content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
-			}
-		]);
-		await page.addInitScript((name: string) => {
-			const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
-			window.localStorage.setItem(
-				"ccez-llm-settings-v1",
-				JSON.stringify({ ...JSON.parse(raw), theme: name })
-			);
-		}, theme);
-		await page.goto("/");
-		await expect(page.locator("article .rendered").first()).toBeVisible();
-		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-		await page.locator(".ann-refs-pill").first().click();
-		const card = page.locator(".ann-refs-pop").first();
-		await expect(card).toHaveCSS(
-			"background-color",
-			theme === "light" ? "rgb(255, 255, 255)" : "rgb(42, 42, 47)"
-		);
-		await expect(page.locator(".ann-refs-comment").first()).toHaveCSS(
-			"color",
-			theme === "light" ? "rgb(110, 110, 115)" : "rgb(199, 199, 204)"
-		);
-	});
-}
-
 /** A sent quote edited away everywhere falls back to the sending
 message (cleared refs have no badge left to blink). Long messages
 fold, so the landing reads off the scroll call itself, not movement. */
@@ -1411,46 +1377,6 @@ test("selecting sent-refs text summons no menu", async ({ page }) => {
 	expect(
 		await page.evaluate(() => window.getSelection()?.toString() ?? "")
 	).not.toBe("");
-});
-
-/** Sent-refs rows stay one line like the composer card: quote cuts
-with an ellipsis, note scrolls sideways, copy rides the row's end. */
-test("sent-refs rows are one line with copy at the end", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "noted" },
-		{
-			role: "user",
-			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
-		}
-	]);
-	await page.goto("/");
-	await page.locator(".ann-refs-pill").first().click();
-	const style = await page.evaluate(() => {
-		const q = document.querySelector(".ann-refs-quote") as HTMLElement | null;
-		const c = document.querySelector(".ann-refs-comment") as HTMLElement | null;
-		const qs = q ? getComputedStyle(q) : null;
-		const cs = c ? getComputedStyle(c) : null;
-		return {
-			quote:
-				qs?.whiteSpace === "nowrap" &&
-				qs?.textOverflow === "ellipsis" &&
-				qs?.overflow === "hidden",
-			note:
-				cs?.whiteSpace === "nowrap" &&
-				cs?.overflowX === "auto" &&
-				cs?.fontStyle === "italic"
-		};
-	});
-	expect(style).toEqual({ quote: true, note: true });
-	const order = await page.evaluate(() => {
-		const item = document.querySelector(".ann-refs-item");
-		const copy = item?.querySelector(".ann-refs-copy")?.getBoundingClientRect();
-		const quote = item
-			?.querySelector(".ann-refs-quote")
-			?.getBoundingClientRect();
-		return copy && quote ? copy.x > quote.x : false;
-	});
-	expect(order).toBe(true);
 });
 
 /** The sent-refs pencil edits the note in the row (desktop): Enter

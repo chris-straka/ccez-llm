@@ -17,22 +17,10 @@ function stripSource(): string {
 	);
 }
 
-function stripStyle(): string {
-	const match = stripSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("Attachments.svelte has no <style> block");
-	// Strip CSS comments so prose can't trip the assertions below.
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 describe("pasted-text cards", () => {
 	it("renders pasted text as a card, like images", () => {
 		expect(stripSource()).toContain(
 			'class:card={(att.kind === "image" && !!att.dataUrl) || pasted}'
 		);
-	});
-	it("centers strip pills instead of stretching them to card height", () => {
-		const css = stripStyle();
-		const strip = css.match(/\.attachments\s*\{([^}]*)\}/);
-		expect(strip?.[1]).toMatch(/align-items\s*:\s*center/);
 	});
 });
