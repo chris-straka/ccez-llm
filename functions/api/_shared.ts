@@ -45,7 +45,12 @@ export async function relay(
 	}
 }
 
-export function answer(body: string, status = 200, cache = false, seconds = CACHE_SECONDS): Response {
+export function answer(
+	body: string,
+	status = 200,
+	cache = false,
+	seconds = CACHE_SECONDS
+): Response {
 	const keep = cache || seconds !== CACHE_SECONDS;
 	return new Response(body, {
 		status,
@@ -98,7 +103,11 @@ export async function cached(
 	// timeout or a busy relay isn't kept: the next ask may well work.
 	else {
 		const why = await res.clone().text();
-		if (/^(bad-url|bad-status:4\d\d|news-empty|news-decode-failed|no-decoded-url)/.test(why)) {
+		if (
+			/^(bad-url|bad-status:4\d\d|news-empty|news-decode-failed|no-decoded-url)/.test(
+				why
+			)
+		) {
 			ctx.waitUntil(cache.put(key, answer(why, res.status, false, 600)));
 		}
 	}

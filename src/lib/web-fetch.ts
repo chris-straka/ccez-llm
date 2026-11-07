@@ -258,13 +258,24 @@ export function googleFeedUrl(raw: string): URL | null {
 	if (url.pathname !== "/rss" && !search) return null;
 	const allowed = new Set(["hl", "gl", "ceid", ...(search ? ["q"] : [])]);
 	const keys = [...url.searchParams.keys()];
-	if (keys.length !== allowed.size || new Set(keys).size !== keys.length || keys.some((k) => !allowed.has(k)))
+	if (
+		keys.length !== allowed.size ||
+		new Set(keys).size !== keys.length ||
+		keys.some((k) => !allowed.has(k))
+	)
 		return null;
 	const hl = url.searchParams.get("hl")!;
 	const gl = url.searchParams.get("gl")!;
 	const ceid = url.searchParams.get("ceid")!;
 	const [ceidGl, ceidLang, ...more] = ceid.split(":");
-	if (!LANG_RE.test(hl) || !COUNTRY_RE.test(gl) || ceidGl !== gl || !ceidLang || !LANG_RE.test(ceidLang) || more.length)
+	if (
+		!LANG_RE.test(hl) ||
+		!COUNTRY_RE.test(gl) ||
+		ceidGl !== gl ||
+		!ceidLang ||
+		!LANG_RE.test(ceidLang) ||
+		more.length
+	)
 		return null;
 	const q = url.searchParams.get("q");
 	if (search && !SITE_SEARCHES.has(q ?? "")) return null;

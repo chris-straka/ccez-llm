@@ -135,7 +135,8 @@ export class WordList {
 		// so one tab's save dropped the other's): taken along. One sent
 		// twice changes nothing on the server.
 		const seen = new Set(this.pending.map(changeId));
-		for (const c of read().pending) if (!seen.has(changeId(c))) this.pending.push(c);
+		for (const c of read().pending)
+			if (!seen.has(changeId(c))) this.pending.push(c);
 		try {
 			if (this.pending.length) {
 				const out = [...this.pending];
