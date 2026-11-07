@@ -47,6 +47,8 @@ function read(): Stored {
 	}
 }
 
+const changeId = (c: Change) => `${c.lang}:${c.word}:${c.status}:${c.at}`;
+
 /** How often an open app asks for other apps' changes. */
 const WATCH_MS = 5 * 60_000;
 
@@ -129,18 +131,27 @@ export class WordList {
 	}
 
 	private async round(): Promise<void> {
+		// Another tab's stars still waiting (each tab saves the whole list,
+		// so one tab's save dropped the other's): taken along. One sent
+		// twice changes nothing on the server.
+		const seen = new Set(this.pending.map(changeId));
+		for (const c of read().pending) if (!seen.has(changeId(c))) this.pending.push(c);
 		try {
 			if (this.pending.length) {
 				const out = [...this.pending];
 				const res = await this.send(`${this.server}/words`, {
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify(out)
+					body: JSON.stringify(out),
+					// One hung call held every later round behind it.
+					signal: AbortSignal.timeout(15_000)
 				});
 				if (!res.ok) throw new Error(`words server answered ${res.status}`);
 				this.pending = this.pending.slice(out.length);
 			}
-			const res = await this.send(`${this.server}/words?since=${this.seq}`);
+			const res = await this.send(`${this.server}/words?since=${this.seq}`, {
+				signal: AbortSignal.timeout(15_000)
+			});
 			if (!res.ok) throw new Error(`words server answered ${res.status}`);
 			const got = (await res.json()) as {
 				words: Array<{ lang: string; word: string; status: WordStatus }>;

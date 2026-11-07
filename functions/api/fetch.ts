@@ -21,8 +21,10 @@ export async function onRequestGet(ctx: Context): Promise<Response> {
 	if (foreign(ctx.request)) return answer("forbidden", 403);
 	const url = publicUrl(new URL(ctx.request.url).searchParams.get("url") ?? "");
 	if (!url) return answer("bad-url", 400);
-	return cached(ctx, ["url", url.href], async () => {
-		if (googleFeedUrl(url.href)) return relay(ctx, "/rss", { url: url.href });
+	const feed = googleFeedUrl(url.href);
+	if (url.hostname === "news.google.com" && !feed) return answer("bad-url", 400);
+	return cached(ctx, ["url", (feed ?? url).href], async () => {
+		if (feed) return relay(ctx, "/rss", { url: feed.href });
 		let res: Response;
 		try {
 			res = await get(url.href);

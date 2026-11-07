@@ -229,17 +229,25 @@ export async function decodeGoogleStory(
 	return url;
 }
 
-/** An edition parameter (hl, gl, ceid): letters, digits, - and :, short. */
-const EDITION_RE = /^[A-Za-z0-9:-]{1,16}$/;
-/** The one search the news makes: one site's stories of the last days. */
-const SITE_SEARCH_RE =
-	/^site:[a-z0-9.-]{1,64}(\/[a-z0-9_-]{1,32}){0,3} when:\d{1,2}d$/;
+/** An edition's language ("fr", "en-US", "zh-Hans") and country ("FR"). */
+const LANG_RE = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/;
+const COUNTRY_RE = /^[A-Z]{2}$/;
+/**
+ * The searches the news makes (Chinese papers' Singapore desks), exactly:
+ * any other `site:` or `when:` was a fresh relay call to Google each time
+ * (2026-11-07 review: anyone could spend the relay's budget).
+ */
+const SITE_SEARCHES = new Set([
+	"site:zaobao.com.sg/news/singapore when:3d",
+	"site:8world.com/singapore when:3d"
+]);
 
 /**
  * A Google News feed URL the relay may fetch, in the two shapes the
- * news makes: an edition's Top Stories (`/rss?hl&gl&ceid`) and one
- * site's recent stories (`/rss/search?q=site:… when:3d`). Anything else
- * would let a caller have z search Google for them. Pure.
+ * news makes: an edition's Top Stories (`/rss?hl&gl&ceid`) and one of
+ * its site searches (`/rss/search?q=site:… when:3d`), rebuilt in one
+ * spelling (so its cache entry is one). Anything else would let a
+ * caller have z search Google for them. Pure.
  */
 export function googleFeedUrl(raw: string): URL | null {
 	const url = publicUrl(raw);
@@ -249,14 +257,23 @@ export function googleFeedUrl(raw: string): URL | null {
 	const search = url.pathname === "/rss/search";
 	if (url.pathname !== "/rss" && !search) return null;
 	const allowed = new Set(["hl", "gl", "ceid", ...(search ? ["q"] : [])]);
-	const seen = new Set<string>();
-	for (const [key, value] of url.searchParams) {
-		if (!allowed.has(key) || seen.has(key)) return null;
-		seen.add(key);
-		if (key === "q" ? !SITE_SEARCH_RE.test(value) : !EDITION_RE.test(value))
-			return null;
-	}
-	return search && !seen.has("q") ? null : url;
+	const keys = [...url.searchParams.keys()];
+	if (keys.length !== allowed.size || new Set(keys).size !== keys.length || keys.some((k) => !allowed.has(k)))
+		return null;
+	const hl = url.searchParams.get("hl")!;
+	const gl = url.searchParams.get("gl")!;
+	const ceid = url.searchParams.get("ceid")!;
+	const [ceidGl, ceidLang, ...more] = ceid.split(":");
+	if (!LANG_RE.test(hl) || !COUNTRY_RE.test(gl) || ceidGl !== gl || !ceidLang || !LANG_RE.test(ceidLang) || more.length)
+		return null;
+	const q = url.searchParams.get("q");
+	if (search && !SITE_SEARCHES.has(q ?? "")) return null;
+	const out = new URL(`https://news.google.com${url.pathname}`);
+	if (q) out.searchParams.set("q", q);
+	out.searchParams.set("hl", hl);
+	out.searchParams.set("gl", gl);
+	out.searchParams.set("ceid", ceid);
+	return out;
 }
 
 // ---- the page's side -----------------------------------------------------

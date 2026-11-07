@@ -103,6 +103,19 @@ describe("googleFeedUrl", () => {
 		for (const url of urls) expect(googleFeedUrl(url), url).not.toBeNull();
 	});
 
+	it("takes each feed in one spelling, and only the news's own searches", () => {
+		const a = googleFeedUrl("https://news.google.com/rss?ceid=FR:fr&gl=FR&hl=fr");
+		const b = googleFeedUrl("https://news.google.com/rss?hl=fr&gl=FR&ceid=FR%3Afr");
+		expect(a?.href).toBe(b?.href);
+		for (const url of [
+			"https://news.google.com/rss/search?q=site:example.com+when:3d&hl=fr&gl=FR&ceid=FR:fr",
+			"https://news.google.com/rss/search?q=site:zaobao.com.sg/news/singapore+when:9d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+			"https://news.google.com/rss?hl=fr&gl=FR&ceid=DE:fr",
+			"https://news.google.com/rss?hl=fr&gl=fr&ceid=fr:fr"
+		])
+			expect(googleFeedUrl(url), url).toBeNull();
+	});
+
 	it("refuses other Google calls and any search but one site's news", () => {
 		for (const url of [
 			"https://news.google.com/rss/search?q=anything+at+all",

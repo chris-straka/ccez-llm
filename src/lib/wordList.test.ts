@@ -76,6 +76,25 @@ describe("the shared word list", () => {
 		).toMatchObject([{ word: "wetter", status: "learning" }]);
 	});
 
+	it("a tab's save never drops another tab's waiting star", async () => {
+		const down = vi.fn(async () => {
+			throw new Error("offline");
+		});
+		const tabA = new WordList("https://words.test", down);
+		const tabB = new WordList("https://words.test", down);
+		await tabA.toggleLearning("fr", "marée");
+		// B, opened before A's star, saves its own (empty) list.
+		await tabB.sync();
+		const up = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) =>
+			init?.method === "POST" ? reply(null) : reply({ words: [], seq: 1 })
+		);
+		const later = new WordList("https://words.test", up);
+		await later.sync();
+		expect(
+			JSON.parse((up.mock.calls[0]![1] as RequestInit).body as string)
+		).toMatchObject([{ word: "marée", status: "learning" }]);
+	});
+
 	it("brings in other apps' stars while it stays open", async () => {
 		vi.useFakeTimers();
 		try {

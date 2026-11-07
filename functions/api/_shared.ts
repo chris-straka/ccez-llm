@@ -45,7 +45,8 @@ export async function relay(
 	}
 }
 
-export function answer(body: string, status = 200, cache = false): Response {
+export function answer(body: string, status = 200, cache = false, seconds = CACHE_SECONDS): Response {
+	const keep = cache || seconds !== CACHE_SECONDS;
 	return new Response(body, {
 		status,
 		headers: {
@@ -56,7 +57,7 @@ export function answer(body: string, status = 200, cache = false): Response {
 			"x-content-type-options": "nosniff",
 			"content-security-policy": "default-src 'none'; sandbox",
 			[WEB_FETCH_HEADER]: "1",
-			"cache-control": cache ? `public, max-age=${CACHE_SECONDS}` : "no-store"
+			"cache-control": keep ? `public, max-age=${seconds}` : "no-store"
 		}
 	});
 }
@@ -92,6 +93,15 @@ export async function cached(
 	if (hit) return hit;
 	const res = await make();
 	if (res.ok) ctx.waitUntil(cache.put(key, res.clone()));
+	// A link that didn't decode or a page that refused: kept ten minutes,
+	// so asking again can't spend the relay's Google budget each time. A
+	// timeout or a busy relay isn't kept: the next ask may well work.
+	else {
+		const why = await res.clone().text();
+		if (/^(bad-url|bad-status:4\d\d|news-empty|news-decode-failed|no-decoded-url)/.test(why)) {
+			ctx.waitUntil(cache.put(key, answer(why, res.status, false, 600)));
+		}
+	}
 	return res;
 }
 

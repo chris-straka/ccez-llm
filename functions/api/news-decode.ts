@@ -10,6 +10,9 @@ import { answer, cached, foreign, relay, type Context } from "./_shared";
 export async function onRequestGet(ctx: Context): Promise<Response> {
 	if (foreign(ctx.request)) return answer("forbidden", 403);
 	const link = new URL(ctx.request.url).searchParams.get("link") ?? "";
-	if (!articleId(link)) return answer("bad-url", 400);
+	// Google's ids are long base64: anything else is refused before it
+	// costs a call to Google from the relay's budget.
+	const id = articleId(link);
+	if (!id || !/^[A-Za-z0-9_-]{24,600}$/.test(id)) return answer("bad-url", 400);
 	return cached(ctx, ["link", link], () => relay(ctx, "/decode", { link }));
 }
