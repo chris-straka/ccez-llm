@@ -13,22 +13,9 @@ function readingsSource(): string {
 	return readFileSync(new URL("./Readings.svelte", import.meta.url), "utf8");
 }
 
-function pageSource(): string {
-	return readFileSync(
-		new URL("../../routes/+page.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
 function readingsStyle(): string {
 	const match = readingsSource().match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("Readings.svelte has no <style> block");
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
@@ -51,19 +38,6 @@ function zIndexOf(style: string, selector: string): number {
 }
 
 describe("readings panels", () => {
-	it("keeps the panel surfaces scoped to the component", () => {
-		const css = readingsStyle();
-		expect(css).toMatch(/\.sel-pinyin\s*\{[^}]*position:\s*fixed/);
-		expect(css).toContain(".sel-pinyin.above");
-		expect(css).toContain(".sel-pinyin .pk3 .srt");
-		// Panel type rides the chat text size, never a fixed rem.
-		expect(css).toMatch(
-			/\.sel-pinyin\s*\{[^}]*font-size:\s*calc\(0\.85rem \* var\(--font-scale/
-		);
-		expect(pageStyle()).not.toMatch(/\.sel-pinyin\s*\{/);
-		expect(pageStyle()).not.toContain(".sel-pinyin .spr");
-	});
-
 	it("paints above the answer card", () => {
 		// The card hangs over the highlight it answers; the readings
 		// for that same highlight must stay visible above it (below

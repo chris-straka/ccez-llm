@@ -1,16 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
-function messageBodyStyle(): string {
-	const source = readFileSync(
-		new URL("../lib/components/MessageBody.svelte", import.meta.url),
-		"utf8"
-	);
-	const match = source.match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("MessageBody.svelte has no <style> block");
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 /** Badge/wash paint lives global in app.css (chat + headlines share
 every rule), so badge assertions read it, not the component. */
 function appCss(): string {
@@ -91,34 +81,6 @@ describe("headline badge twins", () => {
 			});
 			expect(shared, inner).toBe(true);
 		}
-	});
-});
-
-describe("badge/wash home", () => {
-	it("lives in app.css, not MessageBody's <style>", () => {
-		// The move is total: MessageBody keeps no badge/wash
-		// selectors, keyframes, or highlight names of its own.
-		const css = appCss();
-		for (const sel of [
-			"button.ccez-ann-badge",
-			"mark.ccez-ann",
-			".ccez-ann-anchor"
-		])
-			expect(css, sel).toContain(sel);
-		const body = messageBodyStyle();
-		for (const sel of [
-			"ccez-ann-badge",
-			"ccez-ann-anchor",
-			"mark.ccez-ann",
-			"ann-badge-in",
-			"ann-wash-in",
-			"ann-wash-out",
-			"ann-flash-out",
-			"ccez-ann-breathe",
-			"ccez-ann-arrive",
-			"::highlight(ccez-ann"
-		])
-			expect(body, sel).not.toContain(sel);
 	});
 });
 

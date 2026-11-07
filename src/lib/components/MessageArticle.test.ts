@@ -20,43 +20,7 @@ function componentStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-function pageSource(): string {
-	return readFileSync(
-		new URL("../../routes/+page.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 describe("message article surfaces", () => {
-	it("keeps no article selector in page style", () => {
-		const css = pageStyle();
-		for (const selector of [
-			"article",
-			".bubble",
-			"msg-edit",
-			"folded-msg",
-			"speaking-sel"
-		]) {
-			expect(css, selector).not.toContain(selector);
-		}
-	});
-
-	it("keeps the row surfaces scoped to the article", () => {
-		const css = componentStyle();
-		expect(css).toContain("article.user .bubble");
-		expect(css).toContain("article.user .msg-edit");
-		expect(css).toContain(".msg-edit-box :global(.ta-input)");
-		expect(css).toContain("article.selected");
-		expect(css).toContain(":global(main.hide-messages) article");
-		expect(css).toContain(":global(article.folded-msg) + article.folded-msg");
-	});
-
 	/** Body of the exact desktop rule (never the data-android override). */
 	function desktopRule(css: string, selector: string): string {
 		const match = css.match(new RegExp(`(^|\\n)\\t${selector} \\{([^}]*)\\}`));

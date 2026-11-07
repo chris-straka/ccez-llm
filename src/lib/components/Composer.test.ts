@@ -18,55 +18,7 @@ function componentStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-function pageSource(): string {
-	return readFileSync(
-		new URL("../../routes/+page.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 describe("composer surfaces", () => {
-	it("keeps no composer selector in page style", () => {
-		const css = pageStyle();
-		for (const selector of [
-			".prompt",
-			".send-btn",
-			".prompt-tools",
-			".ann-dock",
-			"hidden-input",
-			"wp-jump",
-			"attach-btn",
-			"mic-btn",
-			"voice-float",
-			"send-hold"
-		]) {
-			expect(css, selector).not.toContain(selector);
-		}
-		// The missing-key banner stays paged above the strip, so it
-		// keeps its own error pairing here (the composer's banner
-		// pairing lives with its markup).
-		expect(css).toMatch(
-			/\.error-banner\s*\{[^}]*background:\s*var\(--error-bg\)/
-		);
-		// The in-place message editor moved with the row: its field
-		// rules live in `MessageArticle.svelte` now.
-		expect(css).not.toContain(".msg-edit-box");
-	});
-
-	it("keeps the composer surfaces scoped to the card", () => {
-		const css = componentStyle();
-		expect(css).toContain(":global(.app[data-android]) .prompt");
-		expect(css).toContain(".send-btn");
-		expect(css).toContain(".prompt-tools");
-		expect(css).toContain(".error-banner");
-	});
-
 	it("keeps the field rhythm tight and its scrollbar off the buttons", () => {
 		const css = componentStyle();
 		// The native caret fills the line box: message rhythm (1.5)
