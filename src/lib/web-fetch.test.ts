@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	articleId,
 	batchexecuteBody,
+	googleFeedUrl,
 	paramsPageUrl,
 	parseBatchexecute,
 	parseSignature,
@@ -78,5 +79,48 @@ describe("Google News links", () => {
 			)
 		).toBe("https://www.lemonde.fr/article.html");
 		expect(parseBatchexecute(")]}'\n\n[]")).toBeNull();
+	});
+});
+
+describe("googleFeedUrl", () => {
+	it("takes every Google feed the news makes", async () => {
+		const { NEWS_FEEDS, newsRegionsFor, newsRssUrl } = await import("./news");
+		const urls = new Set<string>();
+		const collect = (value: unknown): void => {
+			if (typeof value === "string") {
+				if (value.startsWith("https://news.google.com")) urls.add(value);
+			} else if (value && typeof value === "object") {
+				for (const v of Object.values(value)) collect(v);
+			}
+		};
+		for (const code of Object.keys(NEWS_FEEDS)) {
+			const regions = newsRegionsFor(code) ?? [];
+			collect(regions);
+			for (const region of regions) collect(newsRssUrl(code, region.gl));
+		}
+		collect(NEWS_FEEDS);
+		expect(urls.size).toBeGreaterThan(20);
+		for (const url of urls) expect(googleFeedUrl(url), url).not.toBeNull();
+	});
+
+	it("refuses other Google calls and any search but one site's news", () => {
+		for (const url of [
+			"https://news.google.com/rss/search?q=anything+at+all",
+			"https://news.google.com/rss/search?q=site:example.com+when:3d&q=x",
+			"https://news.google.com/rss/search?hl=en-US",
+			"https://news.google.com/rss?hl=en-US&extra=1",
+			"https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdv",
+			"https://news.google.com/rss/articles/CBMiabc",
+			"https://news.google.com/rss?hl=%3Cscript%3E",
+			"https://news.google.com:8443/rss?hl=en-US",
+			"http://news.google.com/rss?hl=en-US",
+			"https://www.google.com/rss?hl=en-US"
+		])
+			expect(googleFeedUrl(url), url).toBeNull();
+		expect(
+			googleFeedUrl(
+				"https://news.google.com/rss/search?q=site:zaobao.com.sg/news/singapore+when:3d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+			)
+		).not.toBeNull();
 	});
 });

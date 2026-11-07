@@ -229,15 +229,34 @@ export async function decodeGoogleStory(
 	return url;
 }
 
-/** A Google News feed URL the relay may fetch: news.google.com's /rss feeds only. Pure. */
+/** An edition parameter (hl, gl, ceid): letters, digits, - and :, short. */
+const EDITION_RE = /^[A-Za-z0-9:-]{1,16}$/;
+/** The one search the news makes: one site's stories of the last days. */
+const SITE_SEARCH_RE =
+	/^site:[a-z0-9.-]{1,64}(\/[a-z0-9_-]{1,32}){0,3} when:\d{1,2}d$/;
+
+/**
+ * A Google News feed URL the relay may fetch, in the two shapes the
+ * news makes: an edition's Top Stories (`/rss?hl&gl&ceid`) and one
+ * site's recent stories (`/rss/search?q=site:… when:3d`). Anything else
+ * would let a caller have z search Google for them. Pure.
+ */
 export function googleFeedUrl(raw: string): URL | null {
 	const url = publicUrl(raw);
-	return url &&
-		url.protocol === "https:" &&
-		url.hostname === "news.google.com" &&
-		/^\/rss(\/|$)/.test(url.pathname)
-		? url
-		: null;
+	if (!url || url.protocol !== "https:" || url.hostname !== "news.google.com")
+		return null;
+	if (url.port || url.hash) return null;
+	const search = url.pathname === "/rss/search";
+	if (url.pathname !== "/rss" && !search) return null;
+	const allowed = new Set(["hl", "gl", "ceid", ...(search ? ["q"] : [])]);
+	const seen = new Set<string>();
+	for (const [key, value] of url.searchParams) {
+		if (!allowed.has(key) || seen.has(key)) return null;
+		seen.add(key);
+		if (key === "q" ? !SITE_SEARCH_RE.test(value) : !EDITION_RE.test(value))
+			return null;
+	}
+	return search && !seen.has("q") ? null : url;
 }
 
 // ---- the page's side -----------------------------------------------------

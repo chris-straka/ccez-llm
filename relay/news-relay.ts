@@ -63,6 +63,23 @@ function code(error: unknown): string {
 		: "failed";
 }
 
+/**
+ * Google calls this relay makes, at most GOOGLE_BUDGET per window: it
+ * speaks from the home address, and Google answering that with a
+ * captcha would reach every browser in the house. One person reading
+ * the news makes a feed call per edition and two per story opened.
+ */
+const GOOGLE_BUDGET = 120;
+const WINDOW_MS = 10 * 60_000;
+const calls: number[] = [];
+
+function spend(cost: number, now = Date.now()): boolean {
+	while (calls.length && calls[0]! <= now - WINDOW_MS) calls.shift();
+	if (calls.length + cost > GOOGLE_BUDGET) return false;
+	for (let i = 0; i < cost; i++) calls.push(now);
+	return true;
+}
+
 /** One request's answer: a status and plain text. */
 async function route(
 	method: string,
@@ -76,6 +93,7 @@ async function route(
 		if (url.pathname === "/rss") {
 			const feed = googleFeedUrl(url.searchParams.get("url") ?? "");
 			if (!feed) return [400, "bad-url"];
+			if (!spend(1)) return [429, "busy"];
 			const res = await get(feed.href, {
 				headers: {
 					accept: "application/rss+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -88,6 +106,7 @@ async function route(
 		if (url.pathname === "/decode") {
 			const id = articleId(url.searchParams.get("link") ?? "");
 			if (!id) return [400, "bad-url"];
+			if (!spend(2)) return [429, "busy"];
 			return [200, await decodeGoogleStory(id, get)];
 		}
 		return [404, "not-found"];

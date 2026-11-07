@@ -50,27 +50,44 @@ export function answer(body: string, status = 200, cache = false): Response {
 		status,
 		headers: {
 			"content-type": "text/plain; charset=utf-8",
+			// Other sites' markup on this origin, which holds the API keys:
+			// never sniffed into a page, and inert if opened directly
+			// (_headers doesn't reach a function's answers).
+			"x-content-type-options": "nosniff",
+			"content-security-policy": "default-src 'none'; sandbox",
 			[WEB_FETCH_HEADER]: "1",
 			"cache-control": cache ? `public, max-age=${CACHE_SECONDS}` : "no-store"
 		}
 	});
 }
 
-/** A call from another site's page (or one naming another origin): refused. */
+/**
+ * Anything but the site's own page calling: refused. Every browser the
+ * site runs in says `sec-fetch-site: same-origin` on its own fetches;
+ * a call without it is a script using the site as a proxy (2026-11-06:
+ * a bare curl fetched any page through here).
+ */
 export function foreign(request: Request): boolean {
-	const site = request.headers.get("sec-fetch-site");
-	if (site && site !== "same-origin") return true;
+	if (request.headers.get("sec-fetch-site") !== "same-origin") return true;
 	const origin = request.headers.get("origin");
 	return !!origin && new URL(origin).host !== new URL(request.url).host;
 }
 
-/** The answer cached for this request, else `make`'s (cached when it worked). */
+/**
+ * The answer cached for this request, else `make`'s (cached when it
+ * worked). Keyed on `param` alone, so extra query junk can't force a
+ * fresh fetch (or a fresh relay call to Google) on every request.
+ */
 export async function cached(
 	ctx: Context,
+	param: [string, string],
 	make: () => Promise<Response>
 ): Promise<Response> {
 	const cache = (caches as unknown as { default: Cache }).default;
-	const key = new Request(ctx.request.url, { method: "GET" });
+	const own = new URL(ctx.request.url);
+	const keyUrl = new URL(own.pathname, own.origin);
+	keyUrl.searchParams.set(...param);
+	const key = new Request(keyUrl.href, { method: "GET" });
 	const hit = await cache.match(key);
 	if (hit) return hit;
 	const res = await make();

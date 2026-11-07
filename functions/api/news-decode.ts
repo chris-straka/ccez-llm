@@ -11,5 +11,5 @@ export async function onRequestGet(ctx: Context): Promise<Response> {
 	if (foreign(ctx.request)) return answer("forbidden", 403);
 	const link = new URL(ctx.request.url).searchParams.get("link") ?? "";
 	if (!articleId(link)) return answer("bad-url", 400);
-	return cached(ctx, () => relay(ctx, "/decode", { link }));
+	return cached(ctx, ["link", link], () => relay(ctx, "/decode", { link }));
 }
