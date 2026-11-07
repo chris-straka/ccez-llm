@@ -75,4 +75,33 @@ describe("the shared word list", () => {
 			JSON.parse((up.mock.calls[0]![1] as RequestInit).body as string)
 		).toMatchObject([{ word: "wetter", status: "learning" }]);
 	});
+
+	it("brings in other apps' stars while it stays open", async () => {
+		vi.useFakeTimers();
+		try {
+			let seq = 0;
+			const send = vi.fn(async () =>
+				reply({
+					words: seq ? [{ lang: "fr", word: "marre", status: "learning" }] : [],
+					seq: ++seq
+				})
+			);
+			const list = new WordList("https://words.test", send);
+			const stop = list.watch(60_000);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(send).toHaveBeenCalledTimes(1);
+			// Starred on the phone meanwhile: here within a round.
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(list.status("fr", "marre")).toBe("learning");
+			// Back in view: a round at once.
+			document.dispatchEvent(new Event("visibilitychange"));
+			await vi.advanceTimersByTimeAsync(0);
+			expect(send).toHaveBeenCalledTimes(3);
+			stop();
+			await vi.advanceTimersByTimeAsync(120_000);
+			expect(send).toHaveBeenCalledTimes(3);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });

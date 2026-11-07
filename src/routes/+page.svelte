@@ -10270,8 +10270,8 @@
 	}
 
 	onMount(() => {
-		// What other apps starred or knew since last time.
-		void wordList.sync();
+		// What other apps starred or knew since last time, and as they do.
+		const stopWords = wordList.watch();
 		// Chats and the key that unlocks the API keys stay: Safari
 		// clears a site's storage after a week away unless it's asked.
 		void navigator.storage?.persist?.().catch(() => {});
@@ -15274,6 +15274,7 @@
 		window.addEventListener("auxclick", onMiddleClick);
 		window.addEventListener("contextmenu", onContextMenu, true);
 		return () => {
+			stopWords();
 			promptGlide?.detach();
 			promptGlide = null;
 			document.removeEventListener("click", onPressHaptic);

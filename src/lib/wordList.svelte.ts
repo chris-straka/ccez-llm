@@ -47,6 +47,9 @@ function read(): Stored {
 	}
 }
 
+/** How often an open app asks for other apps' changes. */
+const WATCH_MS = 5 * 60_000;
+
 export class WordList {
 	statuses = $state<Record<string, WordStatus>>({});
 	private pending: Change[] = [];
@@ -93,6 +96,24 @@ export class WordList {
 		});
 		this.save();
 		await this.sync();
+	}
+
+	/**
+	 * Keeps the list current while the app stays open: a round every few
+	 * minutes and whenever the window comes back into view, so a star
+	 * added on the phone shows here without a restart. Returns the stop.
+	 */
+	watch(everyMs = WATCH_MS): () => void {
+		void this.sync();
+		const timer = setInterval(() => void this.sync(), everyMs);
+		const back = () => {
+			if (document.visibilityState === "visible") void this.sync();
+		};
+		document.addEventListener("visibilitychange", back);
+		return () => {
+			clearInterval(timer);
+			document.removeEventListener("visibilitychange", back);
+		};
 	}
 
 	private syncing: Promise<void> = Promise.resolve();
