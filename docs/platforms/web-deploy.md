@@ -46,6 +46,17 @@ production branch `main`). The old `llm.cstraka.dev` hostname was retired
 4. Re-verify after cutover: `https://llm.ccez.uk/` loads the app and the PWA
    manifest at `https://llm.ccez.uk/manifest.webmanifest` resolves.
 
+## Rate limit on /api
+
+The ccez.uk zone's one free rate-limit rule (`http_ratelimit` phase,
+added 2026-11-07) blocks a visitor for 10 s after 100 requests in 10 s to
+`llm.ccez.uk/api/*`. It backs up `foreign()` in `functions/api/_shared.ts`,
+which a faked `sec-fetch-site` header gets past. Don't tighten it much:
+opening a news region on the web resolves story pictures six at a time,
+up to two calls each, so one first open can burst 50-60 calls. Cached
+answers still count, since rate limiting runs before the cache. Change it
+through the Cloudflare API (wrangler's token can't).
+
 ## PWA status
 
 `static/manifest.webmanifest` + meta in `src/app.html` reference the existing
