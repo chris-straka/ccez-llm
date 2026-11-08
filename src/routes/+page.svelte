@@ -317,7 +317,8 @@
 		lockSelectionToMessage,
 		quoteTextNodes,
 		repaintLiveWash,
-		snapSelectionToWordEdges
+		snapSelectionToWordEdges,
+		wordEdgeExtensions
 	} from "$lib/annotations-stamp";
 	import {
 		ANN_FLASH_NAME,
@@ -325,7 +326,8 @@
 		flashFadeSchedule,
 		highlightsSupported,
 		paintAnnotationWash,
-		prefersReducedMotion
+		prefersReducedMotion,
+		SEL_SNAP_NAME
 	} from "$lib/annHighlights";
 	import { badgeHover } from "$lib/hoverWash";
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
@@ -968,6 +970,17 @@
 	/** In-flight attachment reads (counter: multi-file drops overlap).
 	While nonzero the paperclip dims and reports progress. */
 	let attachBusy = $state(0);
+	// The selection menu's quote takes whole words: tint the rest of
+	// any word its highlight cut through, leaving the selection (and
+	// its touch handles) as drawn.
+	$effect(() => {
+		const range = annotateMode.selMenu?.range ?? null;
+		untrack(() => {
+			const parts = range ? wordEdgeExtensions(range) : [];
+			if (parts.length === 0 || !paintAnnotationWash(parts, SEL_SNAP_NAME))
+				clearAnnotationWash(SEL_SNAP_NAME);
+		});
+	});
 	let foldedIds = new SvelteSet<string>();
 	/** Auto-fold bookkeeping (plain, never rendered): ids the rule has
 	handled, and the folds it made itself (given back when its role

@@ -7,6 +7,7 @@ import {
 	readingPanelPlacement,
 	menuYAbovePanel,
 	clampPanelCenterX,
+	hanWordEdge,
 	spreadPanelCenters,
 	highlightSteady,
 	panelCenterMoved,
@@ -579,5 +580,29 @@ describe("offChatDragLineY", () => {
 	});
 	it("a press below the cursor's line starts at the cursor's line", () => {
 		expect(offChatDragLineY(240, 100, 160, 180)).toBe(170);
+	});
+});
+
+describe("hanWordEdge", () => {
+	const text = "做白宫新闻发言人。他在网上写道";
+	it("moves a cut inside a Chinese word to the word's edge", () => {
+		// ICU reads 白宫 (White House) and 新闻 (news) as words: a drag
+		// from 宫 to 新 takes both whole.
+		expect(hanWordEdge(text, text.indexOf("宫"), "start")).toBe(
+			text.indexOf("白")
+		);
+		expect(hanWordEdge(text, text.indexOf("闻"), "end")).toBe(
+			text.indexOf("发")
+		);
+	});
+	it("leaves ends already on a word edge, or off Han text", () => {
+		expect(hanWordEdge(text, text.indexOf("新"), "start")).toBe(
+			text.indexOf("新")
+		);
+		expect(hanWordEdge(text, text.indexOf("。"), "end")).toBe(
+			text.indexOf("。")
+		);
+		expect(hanWordEdge("bonjour", 3, "start")).toBe(3);
+		expect(hanWordEdge(text, 4, "start", null)).toBe(4);
 	});
 });

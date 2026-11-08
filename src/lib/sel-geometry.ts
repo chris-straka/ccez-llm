@@ -27,6 +27,68 @@ export function isWordChar(ch: string): boolean {
 
 const HYPHEN_RE = /[-\u2010\u2011]/;
 
+const HAN_RE = /\p{Script=Han}/u;
+/** The slice of Intl.Segmenter the Han edge snap reads. */
+export interface HanSegmenter {
+	segment(text: string): Iterable<{
+		segment: string;
+		index: number;
+		isWordLike?: boolean;
+	}>;
+}
+let hanSegmenter: HanSegmenter | null | undefined;
+function defaultHanSegmenter(): HanSegmenter | null {
+	if (hanSegmenter !== undefined) return hanSegmenter;
+	try {
+		const Ctor = (
+			Intl as unknown as {
+				Segmenter?: new (
+					locale: string,
+					options: { granularity: string }
+				) => HanSegmenter;
+			}
+		).Segmenter;
+		hanSegmenter = Ctor ? new Ctor("zh", { granularity: "word" }) : null;
+	} catch {
+		hanSegmenter = null;
+	}
+	return hanSegmenter;
+}
+
+/**
+ * A selection end cut between two Han characters of one word moves to
+ * that word's edge: `side` "start" moves back to where the word
+ * begins, "end" forward to where it ends (owner, 2026-11-08: "snap a
+ * bit to the actual words so I don't select half words"). Words come
+ * from the ICU word segmenter, the one a double-tap pick uses. An end
+ * already on a word edge, or not between two Han characters, stays.
+ * Pure given the segmenter.
+ */
+export function hanWordEdge(
+	text: string,
+	offset: number,
+	side: "start" | "end",
+	segmenter: HanSegmenter | null = defaultHanSegmenter()
+): number {
+	if (!segmenter || offset <= 0 || offset >= text.length) return offset;
+	if (!HAN_RE.test(text[offset - 1] ?? "") || !HAN_RE.test(text[offset] ?? ""))
+		return offset;
+	try {
+		for (const part of segmenter.segment(text)) {
+			const start = part.index;
+			const end = start + part.segment.length;
+			if (start >= offset) break;
+			if (offset < end) {
+				if (part.isWordLike === false) return offset;
+				return side === "start" ? start : end;
+			}
+		}
+	} catch {
+		// No segmentation: the end stays as drawn.
+	}
+	return offset;
+}
+
 /**
  * Whether the gap before `text[i]` sits inside one word: word
  * characters on both sides, or a hyphen joining two (rendez-vous,

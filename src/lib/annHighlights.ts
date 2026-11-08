@@ -27,6 +27,14 @@ export const ANN_HIGHLIGHT_NAME = "ccez-ann";
  */
 export const ANN_FLASH_NAME = "ccez-ann-flash";
 /**
+ * Highlight name for the rest of a word a selection cut through: the
+ * part the quote takes beyond the drawn highlight, tinted like the
+ * selection so the reader sees the whole word it will annotate,
+ * without moving the selection (a script-moved selection loses its
+ * touch handles).
+ */
+export const SEL_SNAP_NAME = "ccez-sel-snap";
+/**
  * Graded dimmers for the jump-landing fade: the flash holds full,
  * then steps down these (never the shared wash grades — a hover
  * ramp mid-fade would steal a shared name and twin the two).

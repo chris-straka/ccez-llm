@@ -421,6 +421,12 @@ input[type="search"]::-webkit-search-decoration {
  * app-unique, so document-wide match paints exactly the washed
  * ranges. Jumps flash DOM marks only, never this name. Keep both
  * forms declaring the same colors. */
+/* The rest of a word a selection cut through (SEL_SNAP_NAME): the
+quote takes the whole word, so it tints like the selection. */
+::highlight(ccez-sel-snap) {
+	background-color: rgba(56, 132, 255, 0.28);
+	color: inherit;
+}
 ::highlight(ccez-ann) {
 	background-color: #fff3b0;
 	color: inherit;

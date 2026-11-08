@@ -147,6 +147,79 @@ test("pinyin for a phrase at the left edge stays on screen as the page scrolls",
 	}
 });
 
+test("a Chinese pick cut mid-word quotes and tints the whole words", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: "做白宫新闻发言人。" }]);
+	await page.reload();
+	const p = page.locator("article.assistant .rendered p").first();
+	await expect(p).toContainText("做白宫新闻发言人", { timeout: 60_000 });
+	const box = await p.boundingBox();
+	await page.evaluate(
+		({ x, y }) => {
+			const touch = (clientX: number, clientY: number) =>
+				new Touch({ identifier: 9, target: document.body, clientX, clientY });
+			window.dispatchEvent(
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(x, y)]
+				})
+			);
+			const text = document.querySelector(
+				"article.assistant .rendered p"
+			)?.firstChild;
+			// 宫新: the end of 白宫 and the start of 新闻.
+			if (text) window.getSelection()?.setBaseAndExtent(text, 2, text, 4);
+			window.dispatchEvent(
+				new TouchEvent("touchend", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [],
+					changedTouches: [touch(x, y)]
+				})
+			);
+		},
+		{ x: box!.x + 20, y: box!.y + 10 }
+	);
+	const menu = page.locator(".sel-menu");
+	await expect(menu).toBeVisible({ timeout: 10_000 });
+	// The selection stays as drawn; the rest of each word is tinted.
+	const seen = await page.evaluate(() => {
+		const tint = (
+			CSS as unknown as {
+				highlights: Map<string, Iterable<Range>>;
+			}
+		).highlights.get("ccez-sel-snap");
+		return {
+			selected: window.getSelection()?.toString() ?? "",
+			tint: tint ? [...tint].map((r) => r.toString()) : []
+		};
+	});
+	expect(seen).toEqual({ selected: "宫新", tint: ["白", "闻"] });
+	await page.screenshot({
+		path: test.info().outputPath("han-snap.png")
+	});
+	await menu.locator('button:has-text("Annotate")').tap();
+	// Phones take the note in the composer; the send arrow files it.
+	const composer = page.locator(".prompt textarea");
+	await composer.click();
+	await page.keyboard.type("?", { delay: 10 });
+	await page.locator(".send-btn").click();
+	await expect
+		.poll(() =>
+			page.evaluate(() => {
+				const saved = JSON.parse(
+					localStorage.getItem("ccez-llm-annotations-v1") ?? "{}"
+				) as Record<string, Array<{ quote: string }>>;
+				return saved["e2e-chat"]?.map((a) => a.quote) ?? [];
+			})
+		)
+		.toEqual(["白宫新闻"]);
+});
+
 test("welcome hero text is not selectable", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");

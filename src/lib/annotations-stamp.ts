@@ -14,6 +14,7 @@ import { locateQuote, type QuoteLocation } from "./quote-match";
 import {
 	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
+	hanWordEdge,
 	isWordChar,
 	joinsWord,
 	splitSafeOffset
@@ -1912,6 +1913,30 @@ export function wordEdgeRange(range: Range): Range {
 	}
 }
 
+/**
+ * The parts of the words a range cuts through that lie outside it:
+ * before its start and after its end, as ranges (empty when both ends
+ * already sit on word edges). The selection-snap tint paints these.
+ */
+export function wordEdgeExtensions(range: Range): Range[] {
+	try {
+		const snapped = wordEdgeBounds(range);
+		if (!snapped) return [];
+		const out: Range[] = [];
+		const before = document.createRange();
+		before.setStart(snapped.scN, snapped.so);
+		before.setEnd(range.startContainer, range.startOffset);
+		if (!before.collapsed) out.push(before);
+		const after = document.createRange();
+		after.setStart(range.endContainer, range.endOffset);
+		after.setEnd(snapped.ecN, snapped.eo);
+		if (!after.collapsed) out.push(after);
+		return out;
+	} catch {
+		return [];
+	}
+}
+
 /** Word-edge boundaries for a range, or null when it already sits on
 them (shared by the live snap and the quote copy above). */
 function wordEdgeBounds(
@@ -1927,17 +1952,26 @@ function wordEdgeBounds(
 		let ecN: Node | null = ec;
 		let so = so0;
 		let eo = eo0;
+		// One Han character picked on purpose (to Inspect it) stays
+		// itself: only longer picks snap out to whole Chinese words.
+		const lone =
+			sc === ec &&
+			sc instanceof Text &&
+			eo0 - so0 === 1 &&
+			/\p{Script=Han}/u.test((sc.textContent ?? "")[so0] ?? "");
+		const han = (text: string, at: number, side: "start" | "end"): number =>
+			lone ? at : hanWordEdge(text, at, side);
 		if (scN instanceof Text) {
 			const text = scN.textContent ?? "";
 			let s = Math.max(0, Math.min(so, text.length));
 			while (s > 0 && joinsWord(text, s)) s -= 1;
-			so = s;
+			so = han(text, s, "start");
 		}
 		if (ecN instanceof Text) {
 			const text = ecN.textContent ?? "";
 			let e = Math.max(0, Math.min(eo, text.length));
 			while (e < text.length && joinsWord(text, e)) e += 1;
-			eo = e;
+			eo = han(text, e, "end");
 		}
 		let guard = 0;
 		while (
