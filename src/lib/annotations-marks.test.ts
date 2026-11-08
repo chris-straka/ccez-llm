@@ -1015,7 +1015,8 @@ describe("deferStampWhileSelected", () => {
 		document.body.append(root);
 		return root;
 	}
-	const flush = () => new Promise((r) => setTimeout(r, 0));
+	// Past the settle wait (STAMP_SETTLE_MS).
+	const flush = () => new Promise((r) => setTimeout(r, 450));
 
 	it("waits while a touch selection sits in the message, then stamps", async () => {
 		const root = paragraph("做白宫新闻发言人");
@@ -1034,6 +1035,26 @@ describe("deferStampWhileSelected", () => {
 		await flush();
 		expect(first).not.toHaveBeenCalled();
 		expect(newest).toHaveBeenCalledOnce();
+		root.remove();
+	});
+
+	it("keeps waiting through a selection that empties for a moment", async () => {
+		const root = paragraph("مرحبا بالعالم");
+		const text = root.firstChild!;
+		window.getSelection()?.setBaseAndExtent(text, 0, text, 5);
+		const run = vi.fn();
+		expect(deferStampWhileSelected(root, run, true)).toBe(true);
+		// A handle drag across a bidi edge: gone, then back at once.
+		window.getSelection()?.removeAllRanges();
+		document.dispatchEvent(new Event("selectionchange"));
+		window.getSelection()?.setBaseAndExtent(text, 0, text, 7);
+		document.dispatchEvent(new Event("selectionchange"));
+		await flush();
+		expect(run).not.toHaveBeenCalled();
+		window.getSelection()?.removeAllRanges();
+		document.dispatchEvent(new Event("selectionchange"));
+		await flush();
+		expect(run).toHaveBeenCalledOnce();
 		root.remove();
 	});
 

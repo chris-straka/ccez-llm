@@ -11394,7 +11394,12 @@
 			// fresh. Any other clear falls through to the dismiss
 			// below — plain clicks always press first, so they never
 			// land here.
-			if (Date.now() - lastHoverChangeAt < 500) {
+			// Phones have no hover, and a range put back from script
+			// loses the touch handles: a handle drag that empties the
+			// selection for a moment (bidi edges in Arabic) must never
+			// be "rescued" (owner, 2026-11-08). Both puts below are
+			// desktop-only.
+			if (!androidUI && Date.now() - lastHoverChangeAt < 500) {
 				const liveKeep = window.getSelection();
 				if (
 					annotateMode.selMenu?.range &&
@@ -11422,7 +11427,8 @@
 			// work (reselects, swaps), never a hover-clear.
 			const liveBefore = window.getSelection();
 			const rescueRange =
-				!liveBefore || liveBefore.isCollapsed || liveBefore.toString() === ""
+				!androidUI &&
+				(!liveBefore || liveBefore.isCollapsed || liveBefore.toString() === "")
 					? annotateMode.selMenu?.range
 					: null;
 			if (

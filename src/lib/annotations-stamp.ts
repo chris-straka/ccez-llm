@@ -627,7 +627,20 @@ function selectionInside(root: Element): boolean {
 	}
 }
 
+/** How long a selection must stay out of a message before its waiting
+ * stamp runs: a handle drag can empty the selection for a moment. */
+const STAMP_SETTLE_MS = 400;
+let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
 function flushPendingStamps(): void {
+	if (settleTimer !== null) clearTimeout(settleTimer);
+	settleTimer = setTimeout(() => {
+		settleTimer = null;
+		runSettledStamps();
+	}, STAMP_SETTLE_MS);
+}
+
+function runSettledStamps(): void {
 	for (const [root, run] of pendingStamps) {
 		if (!root.isConnected) {
 			pendingStamps.delete(root);
