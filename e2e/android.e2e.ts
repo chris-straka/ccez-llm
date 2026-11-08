@@ -2106,6 +2106,83 @@ test.describe("touch", () => {
 			expect(elapsed).toBeLessThan(1500);
 		});
 
+		/** Deleting a note while a word in the same message is selected
+		keeps the selection the user made (owner, 2026-11-08: the drag
+		handles went away): its text nodes are never swapped for a
+		script-restored copy, and the badge still goes at once. */
+		test("deleting a note keeps a live selection's own nodes", async ({
+			page
+		}) => {
+			await seedChat(page, [
+				{ role: "assistant", content: "alpha beta gamma delta" }
+			]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem("ccez-mock-chat-ms", "60000");
+				window.localStorage.setItem(
+					"ccez-llm-annotations-v1",
+					JSON.stringify({
+						"e2e-chat": [
+							{
+								id: "ann-1",
+								messageId: "e2e-m0",
+								quote: "beta",
+								comment: "first"
+							}
+						]
+					})
+				);
+			});
+			await page.goto("/");
+			const badge = page.locator("[data-ann-badge]").first();
+			await expect(badge).toHaveClass(/ans-waiting/, { timeout: 15_000 });
+			const picked = await page.evaluate(() => {
+				const body = document.querySelector("article.assistant .rendered p");
+				const walker = document.createTreeWalker(body!, NodeFilter.SHOW_TEXT);
+				for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+					const at = (n.textContent ?? "").indexOf("delta");
+					if (at < 0) continue;
+					window.getSelection()?.setBaseAndExtent(n, at, n, at + 5);
+					(window as unknown as { __picked: Node }).__picked = n;
+					return window.getSelection()?.toString() ?? "";
+				}
+				return "";
+			});
+			expect(picked).toBe("delta");
+			await page.evaluate(() => {
+				const el = document.querySelector("[data-ann-badge]");
+				if (!el) return;
+				const r = el.getBoundingClientRect();
+				const touch = new Touch({
+					identifier: 1,
+					target: el,
+					clientX: r.left + r.width / 2,
+					clientY: r.top + r.height / 2
+				});
+				el.dispatchEvent(
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch],
+						changedTouches: [touch]
+					})
+				);
+			});
+			await expect(page.locator("[data-ann-badge]")).toHaveCount(0, {
+				timeout: 1500
+			});
+			const kept = await page.evaluate(() => {
+				const sel = window.getSelection();
+				return {
+					text: sel?.toString() ?? "",
+					same:
+						sel?.anchorNode ===
+						(window as unknown as { __picked: Node }).__picked
+				};
+			});
+			expect(kept).toEqual({ text: "delta", same: true });
+		});
+
 		/** Answered badge taps land the card by its measured height:
 		with a keyboard-short viewport the card fits below the badge
 		instead of collapsing to the top, and a bottom badge earns

@@ -10,6 +10,7 @@ import { locateQuote } from "./quote-match";
 import { edgeOffsetForAnchor, gapOffsetForAnchor } from "./sel-geometry";
 import {
 	applyMarks,
+	deferStampWhileSelected,
 	lockSelectionToMessage,
 	saveSelection,
 	restoreSelection,
@@ -1004,5 +1005,48 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe("deferStampWhileSelected", () => {
+	function paragraph(text: string): HTMLElement {
+		const root = document.createElement("p");
+		root.textContent = text;
+		document.body.append(root);
+		return root;
+	}
+	const flush = () => new Promise((r) => setTimeout(r, 0));
+
+	it("waits while a touch selection sits in the message, then stamps", async () => {
+		const root = paragraph("做白宫新闻发言人");
+		window
+			.getSelection()
+			?.setBaseAndExtent(root.firstChild!, 4, root.firstChild!, 5);
+		const first = vi.fn();
+		const newest = vi.fn();
+		expect(deferStampWhileSelected(root, first, true)).toBe(true);
+		expect(deferStampWhileSelected(root, newest, true)).toBe(true);
+		document.dispatchEvent(new Event("selectionchange"));
+		await flush();
+		expect(newest).not.toHaveBeenCalled();
+		window.getSelection()?.removeAllRanges();
+		document.dispatchEvent(new Event("selectionchange"));
+		await flush();
+		expect(first).not.toHaveBeenCalled();
+		expect(newest).toHaveBeenCalledOnce();
+		root.remove();
+	});
+
+	it("stamps at once off touch or with no selection in the message", () => {
+		const root = paragraph("bonjour");
+		const other = paragraph("ailleurs");
+		window
+			.getSelection()
+			?.setBaseAndExtent(root.firstChild!, 0, root.firstChild!, 3);
+		expect(deferStampWhileSelected(root, () => {}, false)).toBe(false);
+		expect(deferStampWhileSelected(other, () => {}, true)).toBe(false);
+		window.getSelection()?.removeAllRanges();
+		root.remove();
+		other.remove();
 	});
 });

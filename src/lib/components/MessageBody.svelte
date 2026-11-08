@@ -27,7 +27,8 @@
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import { type AnnotationMark, type AnnotationId } from "$lib/annotations";
 	import { annRefsFor } from "$lib/annotation-block";
-	import { applyMarks } from "$lib/annotations-stamp";
+	import { applyMarks, deferStampWhileSelected } from "$lib/annotations-stamp";
+	import { isAndroidUserAgent } from "$lib/platform";
 	import { inkForQuote, type RepeatInk } from "$lib/ann-repeats";
 	import {
 		clearRepeatInks,
@@ -173,6 +174,11 @@
 		onAidLoadingChange,
 		onAidError
 	}: Props = $props();
+	/** Android draws selection handles only for a selection the user
+	made: stamps there wait for a live selection (see
+	deferStampWhileSelected). */
+	const touchSelections =
+		typeof navigator !== "undefined" && isAndroidUserAgent(navigator.userAgent);
 	/** Hyphenation dictionary for giant type (see .app[data-hyphenate]):
 	settled replies only, so streaming never re-scores every token. */
 	const bodyLang = $derived(
@@ -361,9 +367,20 @@
 		const furigana = localAids.includes("furigana");
 		const pinyin = localAids.includes("pinyin");
 		// Marks apply after Svelte flushes the new HTML (see applyMarks).
-		const stamp = () =>
+		const stamp = (): void =>
 			void tick().then(() => {
 				if (!bodyEl) return;
+				// A touch selection in this message keeps its handles:
+				// the stamp waits until the selection leaves.
+				if (deferStampWhileSelected(bodyEl, stamp, touchSelections)) {
+					// A deleted note's badge still goes now: removing the
+					// button leaves the selected text's nodes alone.
+					for (const badge of bodyEl.querySelectorAll("[data-ann-badge]")) {
+						const id = (badge as HTMLElement).dataset.annBadge;
+						if (!items.some((m) => m.id === id)) badge.remove();
+					}
+					return;
+				}
 				applyMarks(bodyEl, items, skipMarks, wash);
 				// Fresh text nodes need fresh ink ranges.
 				const inks = skipMarks ? [] : untrack(() => repeats);

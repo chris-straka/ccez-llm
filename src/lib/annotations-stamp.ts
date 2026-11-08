@@ -610,6 +610,60 @@ export function restoreSelection(root: Node, saved: SavedSelection): void {
 	}
 }
 
+/** Stamps waiting for a live selection to leave their root. */
+const pendingStamps = new Map<Element, () => void>();
+
+function selectionInside(root: Element): boolean {
+	try {
+		const sel = document.getSelection();
+		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+		return (
+			(sel.anchorNode !== null && root.contains(sel.anchorNode)) ||
+			(sel.focusNode !== null && root.contains(sel.focusNode))
+		);
+	} catch {
+		return false;
+	}
+}
+
+function flushPendingStamps(): void {
+	for (const [root, run] of pendingStamps) {
+		if (!root.isConnected) {
+			pendingStamps.delete(root);
+			continue;
+		}
+		if (selectionInside(root)) continue;
+		pendingStamps.delete(root);
+		run();
+	}
+	if (pendingStamps.size === 0)
+		document.removeEventListener("selectionchange", flushPendingStamps);
+}
+
+/**
+ * Touch selections (Android): a re-stamp replaces the text nodes a live
+ * selection sits in, and the highlight put back from script loses the
+ * system's drag handles (owner, 2026-11-08: deleting a note while a
+ * word was selected left no handles). So while a selection is live in
+ * `root`, its stamp waits: `run` goes once the selection leaves (the
+ * newest `run` per root wins) and this returns true. Off touch, or with
+ * no selection there, returns false and the caller stamps now.
+ */
+export function deferStampWhileSelected(
+	root: Element,
+	run: () => void,
+	touch: boolean
+): boolean {
+	if (!touch || !selectionInside(root)) {
+		pendingStamps.delete(root);
+		return false;
+	}
+	if (pendingStamps.size === 0)
+		document.addEventListener("selectionchange", flushPendingStamps);
+	pendingStamps.set(root, run);
+	return true;
+}
+
 export function applyMarks(
 	root: HTMLElement,
 	items: AnnotationMark[],
