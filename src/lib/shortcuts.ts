@@ -125,7 +125,6 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Set capture area",
 	// Shell-only chords: the browser claims ⌘E and ⇧⌘R out there.
 	"Edit newest message",
-	"Flashcards",
 	// The browser pane is the desktop shell's.
 	"Browser beside the chat",
 	"New tab / close tab",
@@ -145,7 +144,6 @@ export const HOVER_GROUP = "Hovered message";
 export function desktopShortcuts(
 	isMac: boolean,
 	inShell = true,
-	flashcards = true,
 	isWindows = false
 ): ShortcutRow[] {
 	const altm = altKeyLabel(isMac);
@@ -261,11 +259,6 @@ export function desktopShortcuts(
 		{ group: reading, name: "Reword an open note", keys: "E" },
 		{ group: reading, name: "Reading aids", keys: "M pinyin · N furigana" },
 		{ group: reading, name: "Stroke order step", keys: "H / L in Inspect" },
-		{
-			group: reading,
-			name: "Flashcards",
-			keys: `${shiftMeta}R · Space flips · 1 / 2 grade`
-		},
 		{ group: reading, name: "Capture window text", keys: `${shiftMeta}O` },
 		{ group: reading, name: "Set capture area", keys: `${shiftMeta}U` },
 		{
@@ -375,7 +368,6 @@ export function desktopShortcuts(
 	return rows.filter(
 		(row) =>
 			(inShell || !WEB_HIDDEN_ROWS.has(row.name)) &&
-			(flashcards || row.name !== "Flashcards") &&
 			// Window capture is macOS-only (capture.rs).
 			(isMac || !MAC_ONLY_ROWS.has(row.name)) &&
 			// The send-text chord lives in the Windows shell only.

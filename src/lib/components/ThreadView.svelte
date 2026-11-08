@@ -212,9 +212,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			pick: (song: Song) => void;
 			leave: () => void;
 		};
-		/** Flashcards due now (0 hides the hero's entry). */
-		flashcardsDue: number;
-		onFlashcards: () => void;
 		scrollBox?: HTMLElement | undefined;
 		popOpen?: ChatMsgId | null;
 		refsDraft?: string;
@@ -271,8 +268,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsBadgeHover,
 		listen,
 		music,
-		flashcardsDue,
-		onFlashcards,
 		scrollBox = $bindable<HTMLElement | undefined>(undefined),
 		popOpen = $bindable(null),
 		refsDraft = $bindable(""),
@@ -368,19 +363,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				{previewing}
 				actions={langMenusActions}
 			/>
-			<!-- Extras under the pills hang below the centered hero, so
-			their arrival never moves the greeting (EmptyHero). -->
-			<div class="hero-extras">
-				{#if !newsPanel && flashcardsDue > 0 && !previewing}
-					<!-- Quiet entry: shows only while cards are due, never
-				as a badge or ping. -->
-					<button type="button" class="flashcards-open" onclick={onFlashcards}>
-						{flashcardsDue === 1
-							? "1 flashcard due"
-							: `${flashcardsDue} flashcards due`}
-					</button>
-				{/if}
-			</div>
 			{#if listen.mode.open && listen.mode.lang}
 				<ListenPanel
 					mode={listen.mode}
@@ -910,34 +892,5 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	.study-modes button:hover {
 		border-color: #1c1c1e;
 		border-color: var(--strong);
-	}
-	.flashcards-open {
-		margin-top: 0.4rem;
-		padding: 0.3rem 0.8rem;
-		border: none;
-		border-radius: 999px;
-		background: none;
-		color: var(--muted);
-		font: inherit;
-		font-size: 0.85rem;
-		cursor: pointer;
-		animation: flashcards-open-in 0.4s ease-out;
-		transition:
-			color 0.15s ease,
-			background-color 0.15s ease;
-	}
-	.flashcards-open:hover {
-		color: var(--ink);
-		background: var(--bg-raised);
-	}
-	@keyframes flashcards-open-in {
-		from {
-			opacity: 0;
-		}
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.flashcards-open {
-			animation: none;
-		}
 	}
 </style>

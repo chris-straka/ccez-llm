@@ -71,8 +71,7 @@ test("list runs in sections, hovered-message keys first", async ({ page }) => {
 		"New chat",
 		"Capture window text",
 		"Set capture area",
-		"Edit newest message",
-		"Flashcards"
+		"Edit newest message"
 	]) {
 		await expect(keys.locator(`dt:text-is("${name}")`)).toHaveCount(0);
 	}

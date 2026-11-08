@@ -70,7 +70,6 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Reword an open note",
 			"Reading aids",
 			"Stroke order step",
-			"Flashcards",
 			"Capture window text",
 			"Set capture area"
 		]
@@ -159,7 +158,6 @@ describe("shortcuts menu copy", () => {
 			"Capture window text",
 			"Set capture area",
 			"Edit newest message",
-			"Flashcards",
 			"Browser beside the chat",
 			"New tab / close tab",
 			"Address bar",
@@ -179,11 +177,6 @@ describe("shortcuts menu copy", () => {
 		// Shell keeps the full list either way (default included).
 		expect(desktopShortcuts(true).map((r) => r.name)).toEqual(MAC_NAMES);
 		expect(desktopShortcuts(true, true).map((r) => r.name)).toEqual(MAC_NAMES);
-	});
-
-	it("hides the Flashcards row when flashcards are off", () => {
-		const names = desktopShortcuts(true, true, false).map((r) => r.name);
-		expect(names).toEqual(MAC_NAMES.filter((n) => n !== "Flashcards"));
 	});
 
 	it("uses Ctrl labels off-mac and drops the Mac-only capture rows", () => {
@@ -208,7 +201,7 @@ describe("shortcuts menu copy", () => {
 	});
 
 	it("never shows a Mac glyph or Meta key off-mac", () => {
-		const text = desktopShortcuts(false, true, true, true)
+		const text = desktopShortcuts(false, true, true)
 			.map((r) => `${r.name} ${r.keys}`)
 			.join("\n");
 		for (const glyph of ["⌘", "⌥", "⇧", "Meta", "Cmd", "Option"]) {
@@ -219,7 +212,7 @@ describe("shortcuts menu copy", () => {
 	it("lists the send-text chord in the Windows shell only", () => {
 		const row = "Send selected text here";
 		const names = (isMac: boolean, inShell: boolean, isWindows: boolean) =>
-			desktopShortcuts(isMac, inShell, true, isWindows).map((r) => r.name);
+			desktopShortcuts(isMac, inShell, isWindows).map((r) => r.name);
 		expect(names(false, true, true)).toContain(row);
 		expect(names(false, false, true)).not.toContain(row);
 		expect(names(false, true, false)).not.toContain(row);

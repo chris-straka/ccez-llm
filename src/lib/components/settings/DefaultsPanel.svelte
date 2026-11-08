@@ -130,10 +130,6 @@
 					<span>Inspect for han characters</span>
 				</label>
 				<label class="check">
-					<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
-					<span>Flashcards</span>
-				</label>
-				<label class="check">
 					<input type="checkbox" bind:checked={settings.aiTitles} />
 					<span>AI chat titles</span>
 				</label>
@@ -177,10 +173,6 @@
 				<label class="check">
 					<input type="checkbox" bind:checked={settings.inspectEnabled} />
 					<span>Inspect for han characters</span>
-				</label>
-				<label class="check">
-					<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
-					<span>Flashcards</span>
 				</label>
 				<label class="check">
 					<input type="checkbox" bind:checked={settings.aiTitles} />

@@ -80,7 +80,7 @@ keys while the page has the keyboard, video full screen, downloads).
 
 ### Overlays (native page over HTML)
 
-- [x] Settings, the shortcuts list, licenses, search palette, flashcards, reader: the page steps aside (its snapshot under the veil).
+- [x] Settings, the shortcuts list, licenses, search palette, reader: the page steps aside (its snapshot under the veil).
 - [ ] Toasts and banners sit over the chat, not under the page.
 - [x] Menus and word cards that reach past the divider: the page steps aside while they're open.
 - [ ] Nothing of the app's is ever hidden under the page.

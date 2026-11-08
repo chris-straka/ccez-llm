@@ -198,8 +198,8 @@ Extract for tests, not for line count. A move pays when it puts
 device-only or race-prone logic under unit tests (NativeTurns found
 three bugs on extraction); it doesn't when the code is already covered
 (gestures: pure deciders in `platform.ts` plus `android.e2e`) or the
-controller needs a long callback list to do anything (FlashcardsMode
-takes 17). No big-bang moves of `onKey` or the touch listeners: pull a
+controller needs a long callback list to do anything (the removed
+FlashcardsMode took 17). No big-bang moves of `onKey` or the touch listeners: pull a
 decision out when you change it.
 
 ## Source control

@@ -197,9 +197,4 @@ move here verbatim. -->
 			padding-top: calc(0.9rem + env(safe-area-inset-top, 0px));
 		}
 	}
-	/* Flashcards box: one card wide, sized like a real card. */
-	.flashcards-modal {
-		width: min(30rem, calc(100vw - 3rem));
-		padding: 1rem 1.2rem;
-	}
 </style>

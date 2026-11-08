@@ -68,7 +68,7 @@ export interface Chat {
 	correction: boolean;
 	/**
 	 * Dedicated game-annotations chat (one per store): overlay
-	 * annotations file here so Flashcards pick them up. False for
+	 * annotations file here. False for
 	 * every chat written before the overlay existed (see loadChats
 	 * healing).
 	 */

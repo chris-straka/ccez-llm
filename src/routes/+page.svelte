@@ -198,7 +198,6 @@
 	import LicensesModal from "$lib/components/LicensesModal.svelte";
 	import { licensesView, readyApk } from "$lib/overlays.svelte";
 	import { focusInks } from "$lib/ann-repeat-paint";
-	import BadgeSave from "$lib/components/BadgeSave.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
 
@@ -577,8 +576,7 @@
 		exportFailureToast,
 		fileSaveAccessAvailable
 	} from "$lib/chatExport";
-	import { nativeSaveMarkdown, nativeSaveText } from "$lib/nativeExport";
-	import FlashcardDeck from "$lib/components/FlashcardDeck.svelte";
+	import { nativeSaveMarkdown } from "$lib/nativeExport";
 	import { createPromptGlide, type PromptGlide } from "$lib/promptGlide";
 	import {
 		AMBIENT_GAP_MS,
@@ -596,7 +594,6 @@
 		type ReaderEvent,
 		type ReaderState
 	} from "$lib/reader";
-	import { FlashcardsMode } from "$lib/flashcards-mode.svelte";
 	import { WordList } from "$lib/wordList.svelte";
 	import { listWord } from "$lib/word-card";
 	import {
@@ -2893,7 +2890,6 @@
 		setTimeout(restore, 100);
 	}
 	let shortcutsOpen = $state(false);
-	/** Flashcards: sitting, schedule, and export (see flashcards-mode). */
 	/** The shared word list (ccez-words): a word card's star. */
 	const wordList = new WordList();
 	/** The browser beside the chat (desktop shell; docs/design/browser-pane.md). */
@@ -2902,34 +2898,6 @@
 		dark: () => document.documentElement.dataset.theme === "dark",
 		note: (text) => flashToast(text),
 		lang: () => activeReplyCode
-	});
-	const flashcards = new FlashcardsMode({
-		getChats: () => chatState.chats,
-		draftsFor: (id) => drafts.draftsFor(id),
-		isEnabled: () => settings.flashcardsEnabled,
-		isChatEmpty: () => activeChat(chatState).messages.length === 0,
-		isShell: () => tauriBackendAvailable(),
-		isPhone: () => androidUI,
-		focusComposer: () => editor?.focus(),
-		speakQuote: (quote, id, context) =>
-			void speakQuote(quote, id, true, context),
-		getSpeakingSelection: () => speakingSelection,
-		stopVoice: () => stopVoice(),
-		saveText: (filename, text) =>
-			nativeSaveText(filename, text, {
-				name: "Anki import",
-				extensions: ["txt"]
-			}),
-		copyText: (text) => copyExportText(text),
-		downloadText: (text, filename) => downloadMarkdownFile(text, filename),
-		isDismissal: (error) => isPermissionDismissal(error),
-		toast: (message) => flashToast(message),
-		toastError: (message) => flashErrorToast(message)
-	});
-	// Turning flashcards off mid-sitting closes the deck.
-	$effect(() => {
-		if (!settings.flashcardsEnabled && untrack(() => flashcards.isOpen))
-			flashcards.close();
 	});
 	/**
 	 * Big-word reader (see reader.ts): the open session (null closed)
@@ -5476,8 +5444,7 @@
 
 	/** File an overlay selection into the Game chat: the line lands
 	 * as an assistant message (context + history), the annotation
-	 * files answered against it, and Flashcards harvest it from the
-	 * game drafts. Never touches the active chat or its view. */
+	 * files answered against it. Never touches the active chat or its view. */
 	async function fileGameAnnotation(file: GameLineFile): Promise<void> {
 		if (!file || typeof file.quote !== "string") return;
 		const quote = file.quote.trim();
@@ -10058,7 +10025,6 @@
 			shortcutsOpen ||
 			palette.open ||
 			readerOpen ||
-			flashcards.session !== null ||
 			inspectChar !== null ||
 			licensesView.open ||
 			dictManager.open ||
@@ -10649,7 +10615,6 @@
 				!androidUI ||
 				!start.clean ||
 				shortcutsOpen ||
-				flashcards.isOpen ||
 				readerOpen ||
 				inspectChar
 			)
@@ -10947,7 +10912,6 @@
 					edgeTouch.chipSwipe ||
 					edgeTouch.inSwitcher ||
 					shortcutsOpen ||
-					flashcards.isOpen ||
 					readerOpen ||
 					inspectChar ||
 					!holdSwipeOpensChats(
@@ -11266,14 +11230,7 @@
 				} else if (multiTouchSeen) {
 					return;
 				}
-				if (
-					!androidUI ||
-					shortcutsOpen ||
-					flashcards.isOpen ||
-					readerOpen ||
-					inspectChar ||
-					!start
-				)
+				if (!androidUI || shortcutsOpen || readerOpen || inspectChar || !start)
 					return;
 				const touch = event.changedTouches[0];
 				if (!touch) return;
@@ -11611,8 +11568,7 @@
 			);
 		}
 		const gestureClean = (event: TouchEvent): boolean => {
-			if (!androidUI || shortcutsOpen || flashcards.isOpen || readerOpen)
-				return false;
+			if (!androidUI || shortcutsOpen || readerOpen) return false;
 			const target = event.target;
 			return (
 				!(target instanceof Element) ||
@@ -11642,11 +11598,7 @@
 					// slide; only clean ones pair taps, and taps never
 					// pair mid-select (see the guards below).
 					const modalBusy =
-						shortcutsOpen ||
-						flashcards.isOpen ||
-						readerOpen ||
-						palette.open ||
-						inspectChar !== null;
+						shortcutsOpen || readerOpen || palette.open || inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
@@ -12277,18 +12229,6 @@
 			) {
 				consumeEvent(event);
 				listenMode.toggleFold(listenMode.hoveredChannel);
-				return;
-			}
-			// Flashcards own the keyboard while open; closed, the
-			// shell chord opens them.
-			if (
-				flashcards.key({
-					...keyFacts(event),
-					repeat: event.repeat,
-					onButton: closestFromTarget(event.target, ".deck button") !== null
-				})
-			) {
-				consumeEvent(event);
 				return;
 			}
 			// Idle-prompt restore allowlist: while hidden, only bare
@@ -15738,8 +15678,6 @@
 					endMusicChat(chatState, chat.id);
 				}
 			}}
-			flashcardsDue={flashcards.due}
-			onFlashcards={() => flashcards.open()}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}
 			bind:refsDraft={refsEditDraft}
@@ -16076,10 +16014,6 @@
 				maxWidth={pop.w}
 				gap={pop.gap}
 				badgeId={pop.id}
-				saved={flashcards.isSaved(answered.quote)}
-				onToggleSave={settings.flashcardsEnabled
-					? () => flashcards.toggleSaved(answered.quote)
-					: undefined}
 				starred={answered.card?.lang
 					? wordList.status(
 							answered.card.lang,
@@ -16103,19 +16037,6 @@
 				replyButton={androidUI}
 			/>
 		{/if}
-	{/if}
-	{#if settings.flashcardsEnabled && !androidUI}
-		<BadgeSave
-			badgeId={annotateMode.hoverBadgeId}
-			saved={(id) => {
-				const ann = drafts.list.find((a) => a.id === id);
-				return ann ? flashcards.isSaved(ann.quote) : false;
-			}}
-			toggle={(id) => {
-				const ann = drafts.list.find((a) => a.id === id);
-				if (ann) flashcards.toggleSaved(ann.quote);
-			}}
-		/>
 	{/if}
 
 	<!-- The music chat playing its own song shows the full player:
@@ -16202,25 +16123,6 @@
 	{#if reader}
 		<ReaderView {reader} onEvent={stepReader} onClose={closeReader} />
 	{/if}
-	{#if flashcards.session}
-		<FlashcardDeck
-			session={flashcards.session}
-			schedule={flashcards.schedule}
-			total={flashcards.total}
-			nextDue={flashcards.nextDue}
-			now={flashcards.now}
-			speaking={flashcards.speaking}
-			actions={{
-				flip: () => flashcards.step("flip"),
-				speak: () => flashcards.speak(),
-				again: () => flashcards.step("again"),
-				good: () => flashcards.step("good"),
-				dismiss: () => flashcards.step("dismiss"),
-				exportAnki: () => void flashcards.exportAnki(),
-				close: () => flashcards.close()
-			}}
-		/>
-	{/if}
 
 	{#if licensesView.open && settingsOpen}
 		<LicensesModal onClose={() => (licensesView.open = false)} />
@@ -16241,7 +16143,6 @@
 		<ShortcutsModal
 			android={androidUI}
 			mac={isMac}
-			flashcards={settings.flashcardsEnabled}
 			bind:query={shortcutQuery}
 			bind:inputEl={shortcutInputEl}
 			closeTitle={tip(isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift+/)", "Close")}

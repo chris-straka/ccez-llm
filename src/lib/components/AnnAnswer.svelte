@@ -11,8 +11,8 @@ as their own paragraphs; a short first line (the expression and its
 meaning) reads as the note's headline. No close button and no tools
 in the card: clicking off closes it (Esc too); rewording is the E key,
 prompt approval the badge's plus/minus. Two buttons hang outside the
-card on the side away from the word: Save (the quote as a flashcard)
-and Reply (opens the field to argue with the answer). The body's
+card on the side away from the word: the star (the word into the
+shared word list) and Reply (opens the field to argue with the answer). The body's
 scroll position is remembered per note, so a long argument reopens
 where it was left. -->
 <script module lang="ts">
@@ -58,11 +58,6 @@ where it was left. -->
 		gap: number;
 		/** Badge whose word this note explains (pulses on open). */
 		badgeId: string;
-		/** The quote is saved as a card (the corner icon fills). */
-		saved?: boolean;
-		/** Save or unsave the quote as a card; absent hides the icon
-		 * (flashcards off). */
-		onToggleSave?: (() => void) | undefined;
 		/** The word is learning in the shared word list (the star fills). */
 		starred?: boolean;
 		/** Star or unstar the word in the shared word list; absent hides it. */
@@ -93,8 +88,6 @@ where it was left. -->
 		maxWidth,
 		gap,
 		badgeId,
-		saved = false,
-		onToggleSave,
 		starred,
 		onToggleStar,
 		thread = [],
@@ -697,8 +690,8 @@ where it was left. -->
 			{/if}
 		</form>
 	{/if}
-	{#if onToggleSave || onToggleStar || (onReply && replyButton)}
-		<!-- Save and Reply hang outside the card, on the side away from
+	{#if onToggleStar || (onReply && replyButton)}
+		<!-- The star and Reply hang outside the card, on the side away from
 		the word, so they add no layout to the note. -->
 		<div
 			class="ann-answer-actions"
@@ -728,24 +721,6 @@ where it was left. -->
 							d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"
 						/></svg
 					>
-				</button>
-			{/if}
-			{#if onToggleSave}
-				<button
-					type="button"
-					class="ann-answer-save"
-					class:on={saved}
-					aria-label={saved ? "Remove from cards" : "Save as a card"}
-					title={saved ? "Saved as a card · click to remove" : "Save as a card"}
-					onmousedown={(e) => e.preventDefault()}
-					onclick={(e) => {
-						e.stopPropagation();
-						onToggleSave();
-					}}
-				>
-					<svg viewBox="0 0 16 16" aria-hidden="true"
-						><path d="M4.5 2.5h7v11L8 10.8l-3.5 2.7z" /></svg
-					>{saved ? "Saved" : "Save"}
 				</button>
 			{/if}
 			{#if onReply && replyButton}
@@ -832,7 +807,6 @@ where it was left. -->
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	.ann-answer-save.on svg,
 	.ann-answer-star.on svg {
 		fill: currentColor;
 	}

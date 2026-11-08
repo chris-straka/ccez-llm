@@ -63,12 +63,7 @@ export function buildAppHelp(
 		platform === "touch"
 			? shortcutsText(touchShortcuts(), "Gestures (phone)")
 			: shortcutsText(
-					desktopShortcuts(
-						platform === "mac",
-						true,
-						true,
-						platform === "windows"
-					),
+					desktopShortcuts(platform === "mac", true, platform === "windows"),
 					"Keyboard and mouse shortcuts"
 				);
 	return `${GUIDE}\n\n${shortcuts}\n`;

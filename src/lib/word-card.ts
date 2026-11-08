@@ -7,7 +7,7 @@
  * trips on there (the model checks the word against it), the reading
  * line its script needs, and its direction. Pure: parsing, checking
  * the split against the quote, and the plain-text rendering that
- * flashcards, exports and follow-ups read.
+ * exports and follow-ups read.
  */
 
 /** What a piece of the word does; each kind has its own color. */
@@ -918,7 +918,7 @@ export function looksLikeJson(reply: string): boolean {
 }
 
 /**
- * The card as plain lines (meaning first): what flashcards, exports
+ * The card as plain lines (meaning first): what exports
  * and follow-up replays read, and the note when a card can't render.
  */
 export function wordCardText(card: WordCard): string {

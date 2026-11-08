@@ -310,11 +310,6 @@ export interface AppSettings {
 	 */
 	inspectEnabled: boolean;
 	/**
-	 * Flashcards from answered annotations: the empty-chat "N due"
-	 * entry, the deck chord, and its shortcuts row. Off by default.
-	 */
-	flashcardsEnabled: boolean;
-	/**
 	 * Listening drills: the learner's own YouTube channels. Empty on
 	 * every new install; nothing ships built in.
 	 */
@@ -617,7 +612,6 @@ export function defaultSettings(): AppSettings {
 		hapticsEnabled: true,
 		replyNotifications: true,
 		inspectEnabled: true,
-		flashcardsEnabled: false,
 		listenChannels: [],
 		annotationAnswersInPassageLang: false,
 		wordCardDictionaries: true,
@@ -878,8 +872,6 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		// Touch-only toggles postdate older saves the same way.
 		if (typeof merged.inspectEnabled !== "boolean")
 			merged.inspectEnabled = true;
-		if (typeof merged.flashcardsEnabled !== "boolean")
-			merged.flashcardsEnabled = false;
 		if (typeof merged.aiTitles !== "boolean") merged.aiTitles = true;
 		merged.listenChannels = Array.isArray(merged.listenChannels)
 			? merged.listenChannels.filter(
