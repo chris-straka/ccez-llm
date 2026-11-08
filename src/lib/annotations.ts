@@ -64,6 +64,12 @@ export interface Annotation {
 	 * with drafts; never baked into message text.
 	 */
 	card?: WordCard;
+	/**
+	 * The form a starred phrase went into the shared word list as (its
+	 * dictionary form: s'est éloigné went in as s'éloigner). Absent
+	 * until the phrase is first starred. Persisted with drafts.
+	 */
+	listForm?: string;
 }
 
 /** One reply in an answer card's thread. */

@@ -597,6 +597,11 @@
 	import { WordList } from "$lib/wordList.svelte";
 	import { listWord } from "$lib/word-card";
 	import {
+		cleanPhraseForm,
+		isPhraseQuote,
+		phraseFormMessages
+	} from "$lib/phrase-list";
+	import {
 		isKeyboardOpen,
 		kbFreshOpen,
 		keyboardOverlapPx,
@@ -2892,6 +2897,55 @@
 	let shortcutsOpen = $state(false);
 	/** The shared word list (ccez-words): a word card's star. */
 	const wordList = new WordList();
+	/** Phrase notes whose first star is still asking for the form. */
+	const phraseStarring = new SvelteSet<string>();
+	/** A phrase note's language for the word list (null: no star). */
+	function phraseLang(ann: Annotation): string | null {
+		if (ann.card || !ann.answer || !isPhraseQuote(ann.quote)) return null;
+		return (
+			ann.story?.lang ??
+			chatState.chats.find((c) => c.id === chatState.activeChatId)?.replyLang ??
+			null
+		);
+	}
+	/**
+	 * Star a phrase note: its dictionary form into the shared word list
+	 * (owner, 2026-11-08). The first star asks the model for the form
+	 * once and keeps it on the note; without a model, the phrase as
+	 * quoted goes in.
+	 */
+	async function togglePhraseStar(
+		ann: Annotation,
+		lang: string
+	): Promise<void> {
+		if (ann.listForm) {
+			await wordList.toggleLearning(lang, ann.listForm);
+			return;
+		}
+		if (phraseStarring.has(ann.id)) return;
+		phraseStarring.add(ann.id);
+		let form = ann.quote.trim();
+		try {
+			const provider = await providerKeys.resolveActive();
+			if (provider) {
+				const reply = await provider.chat(
+					phraseFormMessages(
+						ann.quote,
+						annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
+						replyLanguageFor(lang)?.name ?? lang
+					),
+					{}
+				);
+				form = cleanPhraseForm(reply.content, ann.quote);
+			}
+		} catch {
+			// The phrase as quoted still goes in.
+		}
+		drafts.setListForm(ann.id, form);
+		phraseStarring.delete(ann.id);
+		if (wordList.status(lang, form) !== "learning")
+			await wordList.toggleLearning(lang, form);
+	}
 	/** The browser beside the chat (desktop shell; docs/design/browser-pane.md). */
 	const browser = new BrowserPane({
 		available: () => tauriBackendAvailable() && !androidUI && !iosUI,
@@ -16004,6 +16058,7 @@
 		{@const pop = annotateMode.answerPop}
 		{@const answered = drafts.list.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
+			{@const plang = phraseLang(answered)}
 			<AnnAnswer
 				answer={tidyAnnotationAnswer(answered.answer, answered.quote)}
 				closing={annotateMode.answerClosing}
@@ -16019,7 +16074,11 @@
 							answered.card.lang,
 							listWord(answered.card, answered.quote)
 						) === "learning"
-					: false}
+					: plang
+						? phraseStarring.has(answered.id) ||
+							(answered.listForm !== undefined &&
+								wordList.status(plang, answered.listForm) === "learning")
+						: false}
 				onToggleStar={answered.card?.lang
 					? () => {
 							const c = answered.card!;
@@ -16028,7 +16087,9 @@
 								listWord(c, answered.quote)
 							);
 						}
-					: undefined}
+					: plang
+						? () => void togglePhraseStar(answered, plang)
+						: undefined}
 				thread={answered.thread ?? []}
 				wordCard={answered.card}
 				onReply={(text: string) => drafts.askFollowUp(answered.id, text)}

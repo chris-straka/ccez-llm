@@ -133,6 +133,14 @@ export class AnnotationDrafts {
 		this.list = next;
 	}
 
+	/** Remember the form a starred phrase went into the word list as. */
+	setListForm(id: AnnotationId, form: string): void {
+		const put = (list: Annotation[]): Annotation[] =>
+			list.map((a) => (a.id === id ? { ...a, listForm: form } : a));
+		this.list = put(this.list);
+		if (this.stash) this.stash.list = put(this.stash.list);
+	}
+
 	/** Drafts for any chat: the filed list for the active chat,
 	storage for the rest (harvest and search read through here). */
 	draftsFor(chatId: string): Annotation[] {

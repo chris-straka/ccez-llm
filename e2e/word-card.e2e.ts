@@ -142,6 +142,60 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 	await expect(card.locator(".wc-ghost")).toHaveCount(0);
 });
 
+/** A phrase's star saves its dictionary form, asked once and kept on
+the note (owner, 2026-11-08: s'est éloigné is learned as s'éloigner). */
+test("a phrase note's star saves its dictionary form", async ({ page }) => {
+	await seedChat(
+		page,
+		[{ role: "assistant", content: "Le bateau s'est éloigné du port." }],
+		"fr"
+	);
+	const posted: Array<{ lang: string; word: string; status: string }> = [];
+	await page.route("https://words.test/**", async (route) => {
+		const req = route.request();
+		const cors = { "access-control-allow-origin": "*" };
+		if (req.method() === "POST") {
+			posted.push(...(JSON.parse(req.postData() ?? "[]") as typeof posted));
+			return route.fulfill({ status: 204, headers: cors });
+		}
+		return route.fulfill({
+			status: 200,
+			headers: cors,
+			contentType: "application/json",
+			body: JSON.stringify({ words: [], seq: 0 })
+		});
+	});
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-words-server", "https://words.test");
+		// The mock answers the note and the form ask alike.
+		localStorage.setItem("ccez-mock-reply", "s'éloigner");
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 0, "s'est éloigné");
+	await page.keyboard.press("a");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 10_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer.placed")).toBeVisible();
+	const star = page.locator(".ann-answer-star");
+	await expect(star).toHaveAttribute("aria-pressed", "false");
+	await star.click();
+	await expect(star).toHaveAttribute("aria-pressed", "true");
+	await expect
+		.poll(() => posted)
+		.toMatchObject([{ lang: "fr", word: "s'éloigner", status: "learning" }]);
+	// The form stays on the note: a second tap takes it back out.
+	await star.click();
+	await expect(star).toHaveAttribute("aria-pressed", "false");
+	await expect
+		.poll(() => posted.at(-1))
+		.toMatchObject({ lang: "fr", word: "s'éloigner", status: "new" });
+});
+
 /** Readings sit above the pieces where the script hides the sound,
 and right-to-left languages split right to left. */
 test("word cards carry readings and run right to left", async ({ page }) => {

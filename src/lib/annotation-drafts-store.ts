@@ -83,7 +83,12 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			// must not un-ask an answered annotation back to blue.
 			...(typeof a.answer === "string" && a.answer ? { answer: a.answer } : {}),
 			...(cleanThread(a.thread) ?? {}),
-			...cleanCard(a.card, a.quote, a.answer)
+			...cleanCard(a.card, a.quote, a.answer),
+			...(typeof a.listForm === "string" &&
+			a.listForm.trim() &&
+			a.listForm.length <= 80
+				? { listForm: a.listForm.trim() }
+				: {})
 		});
 	}
 	return out;
