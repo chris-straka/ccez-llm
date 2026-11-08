@@ -397,10 +397,8 @@ export function clampPanelCenterX(
 	margin = 8
 ): number {
 	const lo = panelWidth / 2 + margin;
-	return Math.min(
-		Math.max(lo, x),
-		Math.max(lo, viewportWidth - panelWidth - margin)
-	);
+	const hi = viewportWidth - panelWidth / 2 - margin;
+	return Math.min(Math.max(lo, x), Math.max(lo, hi));
 }
 
 /**

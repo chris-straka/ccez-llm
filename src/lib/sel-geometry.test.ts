@@ -399,14 +399,15 @@ describe("readings width pass", () => {
 	it("clampPanelCenterX keeps the 8px margins on both sides", () => {
 		expect(clampPanelCenterX(600, 200, 1280)).toBe(600);
 		expect(clampPanelCenterX(10, 200, 1280)).toBe(108);
-		expect(clampPanelCenterX(1270, 200, 1280)).toBe(1072);
+		expect(clampPanelCenterX(1270, 200, 1280)).toBe(1172);
 	});
 
 	it("clampPanelCenterX never inverts on a narrow phone", () => {
-		// 300-wide panel on a 320 viewport: the upper bound
-		// (12) sits below the lower (158), so it parks at 158
+		// 310-wide panel on a 320 viewport: the upper bound
+		// (157) sits below the lower (163), so it parks at 163
 		// instead of sliding off the left edge.
-		expect(clampPanelCenterX(160, 300, 320)).toBe(158);
+		expect(clampPanelCenterX(160, 310, 320)).toBe(163);
+		expect(clampPanelCenterX(5, 310, 320)).toBe(163);
 	});
 
 	it("panelCenterMoved tolerates a pixel, flags the rest", () => {

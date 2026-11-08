@@ -1875,22 +1875,34 @@
 	A frame later the true width clamps it exactly into the
 	viewport. The above branch anchors on the highlight's top edge
 	the same way, so tall readings never need measuring. */
-	function panelXY(rect: {
-		left: number;
-		top: number;
-		bottom: number;
-		width: number;
-		height: number;
-	}): {
+	/** A readings panel's spot over its highlight. `index` names a
+	panel already showing (the flat panel is 0, furigana groups in
+	order): its measured width keeps a re-placed panel on screen, or a
+	highlight at the edge pushed half of it off (owner, 2026-11-08). */
+	function panelXY(
+		rect: {
+			left: number;
+			top: number;
+			bottom: number;
+			width: number;
+			height: number;
+		},
+		index?: number
+	): {
 		x: number;
 		y: number;
 		above: boolean;
 	} {
-		return readingPanelPlacement({
+		const placed = readingPanelPlacement({
 			rect,
 			viewportWidth: window.innerWidth,
 			viewportHeight: window.innerHeight
 		});
+		if (index === undefined) return placed;
+		const node = document.querySelectorAll(".sel-pinyin")[index];
+		const w = node instanceof HTMLElement ? node.offsetWidth : 0;
+		if (w === 0) return placed;
+		return { ...placed, x: clampPanelCenterX(placed.x, w, window.innerWidth) };
 	}
 	/**
 	 * Readings panels track their highlight through scrolls like the
@@ -1921,7 +1933,7 @@
 			if (selPinyin && walkText.includes(selPinyin.quote)) {
 				const rect = range.getBoundingClientRect();
 				if (rect.width > 0 || rect.height > 0) {
-					const placed = panelXY(rect);
+					const placed = panelXY(rect, 0);
 					if (
 						placed.x !== selPinyin.x ||
 						placed.y !== selPinyin.y ||
@@ -1934,11 +1946,11 @@
 				const quote = selFurigana[0]?.quote;
 				if (!quote || !walkText.includes(quote)) return;
 				let moved = false;
-				const next = selFurigana.map((panel) => {
+				const next = selFurigana.map((panel, i) => {
 					const rect = panel.span
 						? spanRect(slices, panel.span.start, panel.span.end)
 						: null;
-					const placed = panelXY(rect ?? range.getBoundingClientRect());
+					const placed = panelXY(rect ?? range.getBoundingClientRect(), i);
 					if (
 						placed.x !== panel.x ||
 						placed.y !== panel.y ||
@@ -15125,7 +15137,7 @@
 		const reanchorSelPanels = (): void => {
 			if (selFurigana) {
 				let moved = false;
-				const next = selFurigana.map((panel) => {
+				const next = selFurigana.map((panel, i) => {
 					const gtext = panel.runs.map((run) => run.text).join("");
 					const qs = gtext ? panel.quote.indexOf(gtext) : -1;
 					const rect =
@@ -15139,7 +15151,7 @@
 								)
 							: screenRectForQuote(panel.messageId, panel.quote, panel.at);
 					if (!rect) return panel;
-					const placed = panelXY(rect);
+					const placed = panelXY(rect, i);
 					if (placed.y !== panel.y || placed.above !== panel.above) {
 						moved = true;
 						return { ...panel, ...placed };
@@ -15158,8 +15170,12 @@
 				dismissSelPanels();
 				return;
 			}
-			const placed = panelXY(anchor);
-			if (selPinyin.y !== placed.y || selPinyin.above !== placed.above)
+			const placed = panelXY(anchor, 0);
+			if (
+				selPinyin.y !== placed.y ||
+				selPinyin.above !== placed.above ||
+				panelCenterMoved(placed.x, selPinyin.x)
+			)
 				selPinyin = { ...selPinyin, ...placed };
 		};
 		const trackSelPinyin = (): void => {
@@ -15197,13 +15213,13 @@
 						return;
 					}
 					let moved = false;
-					const next = selFurigana.map((panel) => {
+					const next = selFurigana.map((panel, i) => {
 						const runs = panel.runs;
 						const start = Math.min(...runs.map((run) => run.start)) + qi;
 						const end = Math.max(...runs.map((run) => run.end)) + qi;
 						const rect = spanRect(slices, start, end);
 						if (!rect) return panel;
-						const placed = panelXY(rect);
+						const placed = panelXY(rect, i);
 						if (placed.y !== panel.y || placed.above !== panel.above) {
 							moved = true;
 							return { ...panel, ...placed };
@@ -15214,8 +15230,12 @@
 				}
 				if (!selPinyin) return;
 				const rect = range.getBoundingClientRect();
-				const placed = panelXY(rect);
-				if (selPinyin.y !== placed.y || selPinyin.above !== placed.above)
+				const placed = panelXY(rect, 0);
+				if (
+					selPinyin.y !== placed.y ||
+					selPinyin.above !== placed.above ||
+					panelCenterMoved(placed.x, selPinyin.x)
+				)
 					selPinyin = { ...selPinyin, ...placed };
 			} catch {
 				dismissSelPanels();

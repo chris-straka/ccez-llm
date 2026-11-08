@@ -95,6 +95,58 @@ test("dock Speak shows pinyin at the top and still speaks", async ({
 	expect(spoken.some((s) => s.includes("你好"))).toBe(true);
 });
 
+test("pinyin for a phrase at the left edge stays on screen as the page scrolls", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "做白宫新闻发言人。他在网上写道。" }
+	]);
+	await page.reload();
+	const p = page.locator("article.assistant .rendered p").first();
+	await expect(p).toContainText("做白宫新闻发言人", { timeout: 60_000 });
+	const box = await p.boundingBox();
+	await page.evaluate(
+		({ x, y }) => {
+			const touch = (clientX: number, clientY: number) =>
+				new Touch({ identifier: 8, target: document.body, clientX, clientY });
+			window.dispatchEvent(
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(x, y)]
+				})
+			);
+			const text = document.querySelector(
+				"article.assistant .rendered p"
+			)?.firstChild;
+			if (text) window.getSelection()?.setBaseAndExtent(text, 0, text, 6);
+			window.dispatchEvent(
+				new TouchEvent("touchend", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [],
+					changedTouches: [touch(x, y)]
+				})
+			);
+		},
+		{ x: box!.x + 20, y: box!.y + 10 }
+	);
+	await expect(page.locator(".ann-dock-wrap")).toBeVisible({ timeout: 10_000 });
+	await page.locator('button[aria-label="Speak selection"]').click();
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toContainText("zuò", { timeout: 10_000 });
+	// Scrolling re-places the panel over its highlight: it must keep
+	// the clamp the first placement had, not slide half off the edge.
+	for (let i = 0; i < 3; i++) {
+		await page.evaluate(() => window.dispatchEvent(new Event("scroll")));
+		await page.waitForTimeout(100);
+		const left = (await panel.boundingBox())?.x ?? -1;
+		expect(left).toBeGreaterThanOrEqual(0);
+	}
+});
+
 test("welcome hero text is not selectable", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");

@@ -49,7 +49,8 @@ panels. -->
 	<div
 		class="sel-pinyin"
 		class:above={pinyin.above}
-		style="left: {pinyin.x}px; top: {pinyin.y}px"
+		style:left="{pinyin.x}px"
+		style:top="{pinyin.y}px"
 		aria-live="polite"
 	>
 		<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html pinyin.html}
@@ -64,7 +65,8 @@ panels. -->
 		<div
 			class="sel-pinyin"
 			class:above={panel.above}
-			style="left: {panel.x}px; top: {panel.y}px"
+			style:left="{panel.x}px"
+			style:top="{panel.y}px"
 			aria-live="polite"
 		>
 			{#each panel.runs as run (run.start)}
@@ -81,6 +83,9 @@ panels. -->
 {/if}
 
 <style>
+	/* left/top ride style: directives, never a style string: the
+	width pass narrows a panel with an inline width, and rewriting the
+	whole attribute on a move would drop it. */
 	.sel-pinyin {
 		position: fixed;
 		/* Above every thread popup (answer card, pills, dock, and
