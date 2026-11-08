@@ -1194,6 +1194,9 @@ export interface NewsStory {
 	link: string;
 	snippet: string;
 	image?: string;
+	/** A translated desk's headline still in its own language: it
+	 * translates when its card scrolls into view. */
+	pending?: true;
 }
 
 /** Tags out of feed descriptions (Google wraps links in HTML). Pure. */
@@ -1867,25 +1870,45 @@ export function mergeNewsStories(
 	return merged;
 }
 
+/** Headlines translated before the cards show: a phone sees about
+ * three, a desktop grid six; the rest wait for their card to scroll
+ * into view (owner, 2026-11-08: "I generally only look at the first
+ * two"). */
+export function newsTranslateBatch(phone: boolean): number {
+	return phone ? 3 : 6;
+}
+
 /**
- * Applies translated headlines (same order, exact count — the
- * translator throws otherwise) and drops stories whose translated
- * titles collide: a multilingual merge reads the same event two or
- * three times, and the pre-translation dedupe can't see across
- * languages. Keeps the first of each pair.
+ * One translated batch into the list: the stories at `links` take
+ * `titles` in order and stop being pending. A translation repeating a
+ * headline already shown drops (the same event told in two languages
+ * keeps its first telling); a short reply keeps the original title
+ * rather than blanking a card. Pure.
  */
-export function withTranslatedTitles(
+export function mergeTranslatedTitles(
 	stories: NewsStory[],
-	translated: string[]
+	links: string[],
+	titles: string[]
 ): NewsStory[] {
-	const seen = new Set<string>();
+	const batch = new Map(links.map((link, i) => [link, titles[i]]));
+	const seen = new Set(
+		stories
+			.filter((s) => !s.pending && !batch.has(s.link))
+			.map((s) => normTitle(s.title))
+	);
 	const out: NewsStory[] = [];
-	for (let i = 0; i < stories.length; i++) {
-		const title = translated[i] ?? stories[i]!.title;
+	for (const story of stories) {
+		if (!batch.has(story.link)) {
+			out.push(story);
+			continue;
+		}
+		const title = batch.get(story.link) ?? story.title;
 		const key = normTitle(title);
 		if (seen.has(key)) continue;
 		seen.add(key);
-		out.push({ ...stories[i]!, title });
+		const done: NewsStory = { ...story, title };
+		delete done.pending;
+		out.push(done);
 	}
 	return out;
 }

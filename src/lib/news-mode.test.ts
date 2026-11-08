@@ -6,7 +6,10 @@ import type { KeyValueStore } from "./settings";
 import type { NewsPanelState } from "./news";
 
 /** Stub deps with call counters; shell-less like the node runtime. */
-function harness(phone = false): {
+function harness(
+	phone = false,
+	reply: ((prompt: string) => Promise<string>) | null = null
+): {
 	mode: NewsMode;
 	calls: {
 		park: number;
@@ -63,7 +66,14 @@ function harness(phone = false): {
 		denyBuzz: () => {
 			calls.denials++;
 		},
-		resolveProvider: async () => null,
+		resolveProvider: async () =>
+			reply
+				? ({
+						chat: async (msgs: { content: string }[]) => ({
+							content: await reply(msgs[0]!.content)
+						})
+					} as unknown as Awaited<ReturnType<NewsModeDeps["resolveProvider"]>>)
+				: null,
 		getStorage: () => storage,
 		isPhone: () => phone,
 		parkPrompt: () => {
@@ -293,6 +303,77 @@ describe("switchNewsRegion", () => {
 		]);
 		expect(calls.denials).toBe(1);
 		expect(calls.ticks).toBe(0);
+	});
+});
+
+describe("translatePending", () => {
+	const pending = (n: number) =>
+		Array.from({ length: n }, (_, i) => ({
+			title: `Headline ${i + 1}`,
+			source: "Desk",
+			link: `l${i + 1}`,
+			snippet: "",
+			pending: true as const
+		}));
+	const flush = () => new Promise((r) => setTimeout(r, 0));
+
+	it("translates the card in view and the next two on a phone", async () => {
+		const prompts: string[] = [];
+		const { mode } = harness(true, async (prompt) => {
+			prompts.push(prompt);
+			return "1. Titre 2\n2. Titre 3\n3. Titre 4";
+		});
+		mode.news = readyPanel({ stories: pending(5) });
+		mode.translatePending("l2");
+		// Already on its way: a second sighting asks nothing more.
+		mode.translatePending("l2");
+		await flush();
+		expect(prompts).toHaveLength(1);
+		expect(prompts[0]).toContain("1. Headline 2\n2. Headline 3\n3. Headline 4");
+		expect(
+			mode.news?.stories.map((s) => [s.title, s.pending ?? false])
+		).toEqual([
+			["Headline 1", true],
+			["Titre 2", false],
+			["Titre 3", false],
+			["Titre 4", false],
+			["Headline 5", true]
+		]);
+	});
+
+	it("leaves a failed batch pending so it can ask again", async () => {
+		let fail = true;
+		const { mode } = harness(true, async () => {
+			if (fail) throw new Error("down");
+			return "1. Un\n2. Deux\n3. Trois";
+		});
+		mode.news = readyPanel({ stories: pending(3) });
+		mode.translatePending("l1");
+		await flush();
+		expect(mode.news?.stories.every((s) => s.pending)).toBe(true);
+		fail = false;
+		mode.translatePending("l1");
+		await flush();
+		expect(mode.news?.stories.map((s) => s.title)).toEqual([
+			"Un",
+			"Deux",
+			"Trois"
+		]);
+	});
+
+	it("drops a batch that lands after the desk changed", async () => {
+		let answer: (text: string) => void = () => {};
+		const { mode } = harness(
+			true,
+			() => new Promise<string>((r) => (answer = r))
+		);
+		mode.news = readyPanel({ stories: pending(1) });
+		mode.translatePending("l1");
+		await flush();
+		mode.newsSeq++;
+		answer("1. Un");
+		await flush();
+		expect(mode.news?.stories[0]?.pending).toBe(true);
 	});
 });
 

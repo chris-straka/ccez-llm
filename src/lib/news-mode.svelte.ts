@@ -35,8 +35,9 @@ import {
 	storeNewsLaunchImage,
 	storeNewsPicks,
 	storeNewsUrl,
+	mergeTranslatedTitles,
+	newsTranslateBatch,
 	translateNewsTitles,
-	withTranslatedTitles,
 	type CefrLevel,
 	type NewsKind,
 	type NewsPanelState,
@@ -81,6 +82,8 @@ export interface NewsModeActions {
 	launch: () => void;
 	close: () => void;
 	retry: () => void;
+	/** A pending headline's card came into view: translate it and the next few. */
+	translate: (link: string) => void;
 }
 
 /** Raw (untranslated) headline loads stay shared this long. */
@@ -127,6 +130,9 @@ export class NewsMode {
 	/** Article bodies in flight or done, by story link. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
 	private articles = new Map<string, Promise<string>>();
+	/** Pending headlines already being translated, by story link. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
+	private translating = new Set<string>();
 	readonly actions: NewsModeActions;
 	private readonly deps: NewsModeDeps;
 
@@ -169,6 +175,9 @@ export class NewsMode {
 			},
 			close: () => {
 				this.close();
+			},
+			translate: (link: string) => {
+				this.translatePending(link);
 			},
 			retry: () => {
 				if (!this.news || this.newsBusy) return;
@@ -484,17 +493,20 @@ export class NewsMode {
 			void this.resolveNewsImages(code, region, stories);
 			const target = newsRegionsFor(code)?.find((r) => r.gl === region);
 			if (target?.translate) {
+				// The first few translate before the cards show; the rest
+				// wait for their card to scroll into view.
+				stories = stories.map((s) => ({ ...s, pending: true }) as const);
 				this.news = { ...current, status: "translating", stories, error: "" };
-				const provider = await this.deps.resolveProvider();
-				if (!provider) throw new Error("news-translate");
-				const titles = await translateNewsTitles(
-					stories.map((s) => s.title),
-					current.langName,
-					async (prompt) =>
-						(await provider.chat([{ role: "user", content: prompt }], {}))
-							.content
+				const first = stories.slice(0, newsTranslateBatch(this.deps.isPhone()));
+				const titles = await this.translateTitles(
+					first.map((s) => s.title),
+					current.langName
 				);
-				stories = withTranslatedTitles(stories, titles);
+				stories = mergeTranslatedTitles(
+					stories,
+					first.map((s) => s.link),
+					titles
+				);
 			}
 			if (stale()) return;
 			storeFeed(storage, code, region, stories);
@@ -509,6 +521,65 @@ export class NewsMode {
 				error: newsErrorCopy(error)
 			};
 		}
+	}
+
+	/** Headlines into the learner's language through their model. */
+	private async translateTitles(
+		titles: string[],
+		langName: string
+	): Promise<string[]> {
+		const provider = await this.deps.resolveProvider();
+		if (!provider) throw new Error("news-translate");
+		return translateNewsTitles(
+			titles,
+			langName,
+			async (prompt) =>
+				(await provider.chat([{ role: "user", content: prompt }], {})).content
+		);
+	}
+
+	/**
+	 * A pending headline came into view: translate it with the pending
+	 * ones after it, a batch at a time. A failed batch stays pending, so
+	 * scrolling back to it asks again.
+	 */
+	translatePending(link: string): void {
+		const current = this.news;
+		if (current?.status !== "ready") return;
+		const from = current.stories.findIndex((s) => s.link === link);
+		if (from < 0 || !current.stories[from]!.pending) return;
+		if (this.translating.has(link)) return;
+		const batch = current.stories
+			.slice(from)
+			.filter((s) => s.pending && !this.translating.has(s.link))
+			.slice(0, newsTranslateBatch(this.deps.isPhone()));
+		const links = batch.map((s) => s.link);
+		for (const l of links) this.translating.add(l);
+		const { code, region } = current;
+		const seq = this.newsSeq;
+		void this.translateTitles(
+			batch.map((s) => s.title),
+			current.langName
+		)
+			.then((titles) => {
+				const now = this.news;
+				if (
+					this.newsSeq !== seq ||
+					now?.status !== "ready" ||
+					now.code !== code ||
+					now.region !== region
+				)
+					return;
+				const stories = mergeTranslatedTitles(now.stories, links, titles);
+				storeFeed(this.deps.getStorage(), code, region, stories);
+				this.news = { ...now, stories };
+			})
+			.catch(() => {
+				// Stays pending: the card asks again when it comes back into view.
+			})
+			.finally(() => {
+				for (const l of links) this.translating.delete(l);
+			});
 	}
 
 	/**

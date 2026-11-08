@@ -155,7 +155,18 @@ function canned(messages: ChatMessage[]): string {
 		return `Mock title ${opener}`;
 	}
 	const last = [...messages].reverse().find((m) => m.role === "user");
-	const excerpt = messageText(last?.content ?? "").slice(0, 60);
+	// Headline translation (news desks in another language): number
+	// for number, each line tagged with the language, so specs can see
+	// which headlines went through.
+	const asked = messageText(last?.content ?? "");
+	const translate = /^Translate these \d+ headlines into (.+?)\. /.exec(asked);
+	if (translate)
+		return asked
+			.split("\n")
+			.slice(1)
+			.map((line) => line.replace(/^(\d+)\. /, `$1. [${translate[1]}] `))
+			.join("\n");
+	const excerpt = asked.slice(0, 60);
 	return `Mock reply to: ${excerpt || "(empty)"}`;
 }
 
@@ -167,10 +178,13 @@ export function mockProviderEnabled(): boolean {
 		// note. Same probe as tauriBackendAvailable in secrets.ts, kept
 		// local so this module stays Tauri-import-free; the browser
 		// preview and specs keep working.
+		// The specs' stand-in shell (e2e/mock-shell.ts) marks itself, so
+		// news specs get canned replies instead of a real model.
 		if (
 			typeof window !== "undefined" &&
 			(window.__TAURI_INTERNALS__ !== undefined ||
-				window.__TAURI__ !== undefined)
+				window.__TAURI__ !== undefined) &&
+			(window as { __ccezMockShell?: boolean }).__ccezMockShell !== true
 		) {
 			return false;
 		}

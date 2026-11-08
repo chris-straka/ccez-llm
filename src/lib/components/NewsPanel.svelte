@@ -48,6 +48,8 @@ everything else is theme tokens, never raw hex. -->
 			launch: () => void;
 			close: () => void;
 			retry: () => void;
+			/** A pending headline's card came into view. */
+			translate: (link: string) => void;
 		};
 	}
 
@@ -104,12 +106,32 @@ everything else is theme tokens, never raw hex. -->
 		const from = activeRegion?.label ?? "";
 		if (panel.status === "loading") return "Getting today's headlines…";
 		if (panel.status === "translating")
-			return `Translating ${panel.stories.length} ${from} headlines into ${panel.langName}…`;
+			return `Translating ${from} headlines into ${panel.langName}…`;
 		if (panel.status === "ready" && activeRegion?.translate)
 			return `Translated from ${from} headlines`;
 		if (panel.status === "ready") return `Top stories · ${from}`;
 		return "";
 	});
+	/** A pending headline translates once its card is near the screen. */
+	function translateWhenSeen(node: HTMLElement, story: NewsStory) {
+		let current = story;
+		const seen = new IntersectionObserver(
+			(entries) => {
+				if (current.pending && entries.some((e) => e.isIntersecting))
+					actions.translate(current.link);
+			},
+			{ rootMargin: "120px 0px" }
+		);
+		seen.observe(node);
+		return {
+			update(next: NewsStory) {
+				current = next;
+			},
+			destroy() {
+				seen.disconnect();
+			}
+		};
+	}
 	/** Cards the loading grid reserves (no jump when stories land). */
 	const SKELETONS = 8;
 
@@ -403,9 +425,11 @@ everything else is theme tokens, never raw hex. -->
 		>
 			{#each panel.stories as story, i (story.link)}
 				{@const image = imageFor(story)}
+				{@const waiting = translating || story.pending === true}
 				<li
 					class="news-item"
 					class:picked={leaving === story.link}
+					use:translateWhenSeen={story}
 					in:fly={{
 						y: 14,
 						duration: motionMs(280),
@@ -417,8 +441,8 @@ everything else is theme tokens, never raw hex. -->
 						class="news-card news-open"
 						class:has-marks={(marks[story.link]?.length ?? 0) > 0}
 						data-story-link={story.link}
-						disabled={translating}
-						aria-label={translating ? "Headline translating" : story.title}
+						disabled={waiting}
+						aria-label={waiting ? "Headline translating" : story.title}
 						onclick={(e) => pickCard(e, story)}
 					>
 						<span class="news-thumb">
@@ -449,7 +473,7 @@ everything else is theme tokens, never raw hex. -->
 							{/if}
 						</span>
 						<span class="news-text">
-							{#if translating}
+							{#if waiting}
 								<span class="skel-line"></span>
 								<span class="skel-line short"></span>
 							{:else}

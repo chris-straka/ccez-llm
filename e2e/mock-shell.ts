@@ -39,6 +39,18 @@ export const MOCK_NEWS_RSS =
 	`<description>Stones hold firm as ladders gather.</description>` +
 	`</item></channel></rss>`;
 
+/** Eight imageless headlines, enough to scroll past a phone screen. */
+export const MOCK_NEWS_RSS_LONG =
+	`<rss version="2.0"><channel><title>mock feed</title>` +
+	Array.from(
+		{ length: 8 },
+		(_, i) =>
+			`<item><title>Headline number ${i + 1} about the harbour - Desk ${i + 1}</title>` +
+			`<link>https://news.google.com/rss/articles/mock-long-${i + 1}?oc=1</link>` +
+			`<description>Story ${i + 1}.</description></item>`
+	).join("") +
+	`</channel></rss>`;
+
 /** Decoded article page: prose but no og:image (miss path). */
 const MOCK_ARTICLE_HTML =
 	`<html><head><title>mock article</title></head>` +
@@ -61,7 +73,10 @@ export const MOCK_ZEN_MODEL_IDS = [
 	"nemotron-3-ultra-free"
 ];
 
-export async function seedMockShell(page: Page): Promise<void> {
+export async function seedMockShell(
+	page: Page,
+	rss = MOCK_NEWS_RSS
+): Promise<void> {
 	await page.addInitScript(
 		(seed: { rss: string; article: string; zen: string[] }) => {
 			const decode = (link: string): string => {
@@ -143,9 +158,10 @@ export async function seedMockShell(page: Page): Promise<void> {
 				transformCallback: (): number => 0,
 				unregisterCallback: (): void => {}
 			};
+			(window as unknown as Record<string, unknown>).__ccezMockShell = true;
 			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ =
 				shell;
 		},
-		{ rss: MOCK_NEWS_RSS, article: MOCK_ARTICLE_HTML, zen: MOCK_ZEN_MODEL_IDS }
+		{ rss, article: MOCK_ARTICLE_HTML, zen: MOCK_ZEN_MODEL_IDS }
 	);
 }

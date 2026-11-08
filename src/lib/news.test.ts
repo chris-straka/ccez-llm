@@ -48,7 +48,8 @@ import {
 	storeNewsUrl,
 	stripMarkdownMedia,
 	stripTags,
-	withTranslatedTitles
+	mergeTranslatedTitles,
+	newsTranslateBatch
 } from "./news";
 import { MAX_FEED_ITEMS } from "./tools";
 import {
@@ -610,24 +611,54 @@ describe("news feeds", () => {
 			title,
 			link: `https://x/${title}`,
 			source: "s",
-			snippet: ""
+			snippet: "",
+			pending: true as const
 		});
 		const stories = [story("Un"), story("Deux"), story("Trois")];
+		const links = stories.map((s) => s.link);
+		const titles = (list: { title: string }[]) => list.map((s) => s.title);
 		expect(
-			withTranslatedTitles(stories, ["One", "Two", "Three"]).map((s) => s.title)
+			titles(mergeTranslatedTitles(stories, links, ["One", "Two", "Three"]))
 		).toEqual(["One", "Two", "Three"]);
 		// Same event in two languages collapses to the first telling.
 		expect(
-			withTranslatedTitles(stories, ["One", "one!", "Three"]).map(
-				(s) => s.title
-			)
+			titles(mergeTranslatedTitles(stories, links, ["One", "one!", "Three"]))
 		).toEqual(["One", "Three"]);
 		// A short list keeps the original rather than blanking a card.
-		expect(withTranslatedTitles(stories, ["One"]).map((s) => s.title)).toEqual([
+		expect(titles(mergeTranslatedTitles(stories, links, ["One"]))).toEqual([
 			"One",
 			"Deux",
 			"Trois"
 		]);
+	});
+
+	it("translates a batch at a time, leaving the rest pending", () => {
+		const story = (title: string) => ({
+			title,
+			link: title,
+			source: "s",
+			snippet: "",
+			pending: true as const
+		});
+		const first = mergeTranslatedTitles(
+			[story("Un"), story("Deux"), story("Trois")],
+			["Un"],
+			["One"]
+		);
+		expect(first.map((s) => [s.title, s.pending ?? false])).toEqual([
+			["One", false],
+			["Deux", true],
+			["Trois", true]
+		]);
+		// A later batch repeating a headline already shown drops it.
+		const next = mergeTranslatedTitles(
+			first,
+			["Deux", "Trois"],
+			["one", "Three"]
+		);
+		expect(next.map((s) => s.title)).toEqual(["One", "Three"]);
+		expect(newsTranslateBatch(true)).toBe(3);
+		expect(newsTranslateBatch(false)).toBe(6);
 	});
 
 	it("parses numbered translation lines, count-exact", () => {

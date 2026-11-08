@@ -176,6 +176,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			launch: () => void;
 			close: () => void;
 			retry: () => void;
+			translate: (link: string) => void;
 		};
 		/** Listening drills: the mode, plus the active drill if any. */
 		listen: {
