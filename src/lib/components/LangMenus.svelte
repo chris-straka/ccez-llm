@@ -142,6 +142,12 @@ owns the row markup and its surfaces. -->
 		flex-wrap: nowrap;
 		gap: 0.4rem;
 	}
+	/* The hero row on a phone carries the four pills plus News and
+	Listen: it takes the screen's width (a hair of margin), or the
+	ends clip off both edges at 360px. */
+	:global(.app[data-android] .empty-state) .lang-menus {
+		width: calc(100% - 1rem);
+	}
 	/* The row slots under the hero on every platform (no dock
 	anymore): kill the empty-screen auto margin and its padding —
 	the empty-state gap owns the rhythm now. */
@@ -209,6 +215,7 @@ owns the row markup and its surfaces. -->
 		justify-content: center;
 	}
 	.row-rule {
+		flex-shrink: 0;
 		width: 1px;
 		height: 1.3rem;
 		background: #c7c7cc;

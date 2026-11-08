@@ -10,7 +10,7 @@ import { MOCK_NEWS_RSS_LONG, seedMockShell } from "./mock-shell";
 test("a phone translates three headlines first, the rest as they scroll in", async ({
 	page
 }) => {
-	await page.setViewportSize({ width: 412, height: 915 });
+	await page.setViewportSize({ width: 412, height: 600 });
 	await seedChat(page, []);
 	await seedMockShell(page, MOCK_NEWS_RSS_LONG);
 	await page.goto("/");

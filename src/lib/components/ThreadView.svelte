@@ -888,6 +888,25 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		background: var(--hover-wash);
 		border-color: transparent;
 	}
+	/* Phones: the pills' tighter chrome, and the picked one keeps its
+	rim, so the row reads as one set of buttons. */
+	:global(.app[data-android]) .study-modes {
+		gap: 0.4rem;
+	}
+	:global(.app[data-android]) .study-modes button {
+		padding: 0 0.45rem;
+	}
+	:global(.app[data-android]) .study-modes button[aria-selected="true"] {
+		border-color: var(--line);
+	}
+	@media (max-width: 380px) {
+		:global(.app[data-android]) .study-modes {
+			gap: 0.2rem;
+		}
+		:global(.app[data-android]) .study-modes button {
+			padding: 0 0.4rem;
+		}
+	}
 	.study-modes button:hover {
 		border-color: #1c1c1e;
 		border-color: var(--strong);
