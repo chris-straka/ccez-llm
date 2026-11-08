@@ -259,6 +259,7 @@
 		annEditCommitToast,
 		addAnnotation,
 		attachAnnotationAnswer,
+		unansweredAnnotations,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark,
@@ -973,6 +974,9 @@
 	switches off). */
 	let autoFoldSeen = new Set<string>();
 	const autoFolded = new SvelteSet<string>();
+	/** Each chat's newest message of mine when the rule last ran: a new one is a send. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
+	const autoFoldRounds = new Map<string, string | null>();
 	/** Settings' fold-older rule (autoFold.ts): the newest message of
 	each role stays open, older ones fold as newer ones arrive. */
 	$effect(() => {
@@ -985,15 +989,25 @@
 			user: settings.autoFoldOwn,
 			assistant: settings.autoFoldAssistant
 		};
+		const chatId = chatState.activeChatId;
 		untrack(() => {
+			// A note still waiting on its answer keeps its message open.
+			const waiting = new Set(
+				unansweredAnnotations(drafts.list).flatMap((a) =>
+					a.messageId ? [a.messageId] : []
+				)
+			);
 			const plan = autoFoldPlan(
 				messages,
 				roles,
 				autoFoldSeen,
 				autoFolded,
-				foldedIds
+				foldedIds,
+				autoFoldRounds.get(chatId),
+				waiting
 			);
 			autoFoldSeen = plan.seen;
+			autoFoldRounds.set(chatId, plan.round);
 			for (const id of plan.fold) {
 				foldedIds.add(id);
 				autoFolded.add(id);

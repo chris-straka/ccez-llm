@@ -2,7 +2,8 @@ import { test, expect } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /** Settings' fold-older rule: older messages fold, the newest of each
-role stays open, and a hand unfold sticks. Off by default. */
+role stays open, and a hand unfold lasts until the next send. Off
+by default. */
 const thread = [
 	{ role: "user" as const, content: "first question" },
 	{ role: "assistant" as const, content: "first answer" },
@@ -55,6 +56,27 @@ test("a new reply folds the previous one", async ({ page }) => {
 	await expect(articles.nth(5)).toContainText("Mock reply", {
 		timeout: 30_000
 	});
+	await expect(articles.nth(3)).toHaveClass(/folded-msg/);
+	await expect(articles.nth(5)).not.toHaveClass(/folded-msg/);
+});
+
+test("a reply reopened by hand folds again at the next send", async ({
+	page
+}) => {
+	await seedChat(page, thread, null, { autoFoldAssistant: true });
+	await page.goto("/");
+	const articles = page.locator("article");
+	await expect(articles.nth(3)).toBeVisible({ timeout: 60_000 });
+	await expect(articles.nth(1)).toHaveClass(/folded-msg/);
+	await articles.nth(1).locator(".folded-preview").click();
+	await expect(articles.nth(1)).not.toHaveClass(/folded-msg/);
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("third question");
+	await page.keyboard.press("Enter");
+	await expect(articles.nth(5)).toContainText("Mock reply", {
+		timeout: 30_000
+	});
+	await expect(articles.nth(1)).toHaveClass(/folded-msg/);
 	await expect(articles.nth(3)).toHaveClass(/folded-msg/);
 	await expect(articles.nth(5)).not.toHaveClass(/folded-msg/);
 });

@@ -58,6 +58,83 @@ describe("autoFoldPlan", () => {
 		expect(again.fold).toEqual([]);
 	});
 
+	it("folds a message reopened by hand again at the next send", () => {
+		const roles = { user: true, assistant: true };
+		const first = autoFoldPlan(thread, roles, none, none, none);
+		// The reader reopened a1; the effect reruns before any send.
+		const folded = new Set(["u1"]);
+		const still = autoFoldPlan(
+			thread,
+			roles,
+			first.seen,
+			new Set(["u1", "a1"]),
+			folded,
+			first.round
+		);
+		expect(still.fold).toEqual([]);
+		// Sending u3 starts a round: a1 folds again, u2 and a2 fold too.
+		const sent = [
+			...thread,
+			{ id: "u3", role: "user" },
+			{ id: "a3", role: "assistant" }
+		];
+		const next = autoFoldPlan(
+			sent,
+			roles,
+			still.seen,
+			new Set(["u1", "a1"]),
+			folded,
+			still.round
+		);
+		expect(next.fold).toEqual(["a1", "u2", "a2"]);
+	});
+
+	it("keeps a message open while a note on it waits for its answer", () => {
+		const roles = { user: false, assistant: true };
+		const first = autoFoldPlan(thread, roles, none, none, none);
+		const sent = [
+			...thread,
+			{ id: "u3", role: "user" },
+			{ id: "a3", role: "assistant" }
+		];
+		const waiting = autoFoldPlan(
+			sent,
+			roles,
+			first.seen,
+			new Set(["a1"]),
+			new Set(["a1"]),
+			first.round,
+			new Set(["a2"])
+		);
+		expect(waiting.fold).toEqual([]);
+		// The answer lands mid-round: the message stays put under the reader.
+		const answered = autoFoldPlan(
+			sent,
+			roles,
+			waiting.seen,
+			new Set(["a1"]),
+			new Set(["a1"]),
+			waiting.round
+		);
+		expect(answered.fold).toEqual([]);
+		// The next send folds it.
+		const later = [
+			...sent,
+			{ id: "u4", role: "user" },
+			{ id: "a4", role: "assistant" }
+		];
+		expect(
+			autoFoldPlan(
+				later,
+				roles,
+				answered.seen,
+				new Set(["a1"]),
+				new Set(["a1"]),
+				answered.round
+			).fold
+		).toEqual(["a2", "a3"]);
+	});
+
 	it("folds the previous reply once a new one arrives", () => {
 		const first = autoFoldPlan(
 			thread,
