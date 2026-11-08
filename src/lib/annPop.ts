@@ -246,6 +246,8 @@ export function placeAnswerPopover(facts: {
 	margin?: number;
 	/** Height hung outside the card's far edge (its button row). */
 	outside?: number;
+	/** Where the usable screen starts (a phone's status bar height). */
+	viewportTop?: number;
 	/** The quote's article column: a card that fits stays inside it,
 	so a short last line near the column's edge never swings the card
 	out past the text. */
@@ -280,7 +282,8 @@ export function placeAnswerPopover(facts: {
 	// The badge sits the same distance above the word wherever it scrolls.
 	const homeClear = facts.clearTop - anchor.top + home.top;
 	const below = facts.viewportHeight - m - out - (home.bottom + reach);
-	const above = Math.min(home.top, homeClear) - reach - m - out;
+	const above =
+		Math.min(home.top, homeClear) - reach - (facts.viewportTop ?? 0) - m - out;
 	const h = Math.max(1, Math.ceil(facts.cardHeight));
 	const side: "below" | "above" =
 		h <= below || (h > above && below >= above) ? "below" : "above";

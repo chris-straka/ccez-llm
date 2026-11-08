@@ -287,6 +287,18 @@ where it was left. -->
 		void vh;
 		readFloor();
 	});
+	/** The status bar's height on a phone drawn under it: the card and
+	its buttons stay below it. */
+	let safeTop = $state(0);
+	$effect(() => {
+		void vh;
+		const probe = document.createElement("div");
+		probe.style.cssText =
+			"position:fixed;top:0;visibility:hidden;pointer-events:none;height:env(safe-area-inset-top,0px)";
+		document.body.append(probe);
+		safeTop = probe.offsetHeight;
+		probe.remove();
+	});
 	const bottomEdge = $derived(
 		floor !== null && floor > anchor.bottom + 24 ? floor : vh
 	);
@@ -318,6 +330,7 @@ where it was left. -->
 					gap,
 					tail: TAIL,
 					outside: actionsH,
+					viewportTop: safeTop,
 					...(column ? { column } : {})
 				})
 			: null

@@ -361,6 +361,19 @@ describe("placeAnswerPopover", () => {
 		expect(placeAnswerPopover(tight).side).toBe("below");
 		expect(placeAnswerPopover({ ...tight, outside: 40 }).side).toBe("above");
 	});
+	it("keeps the card and its button row under a phone's status bar", () => {
+		const high = placeAnswerPopover({
+			...base,
+			cardHeight: 2000,
+			outside: 40,
+			viewportTop: 36,
+			anchor: { left: 400, top: 500, right: 460, bottom: 520 },
+			clearTop: 488
+		});
+		expect(high.side).toBe("above");
+		// The row's top: 36 (status bar) + 8 margin, the card under it.
+		expect(high.y).toBe(36 + 8 + 40);
+	});
 	it("stays inside the viewport and keeps the tail on the word at edges", () => {
 		const left = placeAnswerPopover({
 			...base,
