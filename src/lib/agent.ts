@@ -58,6 +58,7 @@ export async function handleAgent(
 			const provider = providerOf();
 			const messages = [{ role: "user" as const, content: question }];
 			// --whole: one answer at the end, the way notes ask.
+			send({ stage: "calling" });
 			const result =
 				a.whole === true
 					? await provider.chat(messages, { signal })
@@ -66,6 +67,7 @@ export async function handleAgent(
 							{ onToken: (token) => send({ token }) },
 							{ signal }
 						);
+			send({ stage: "returned", length: result.content.length });
 			return { provider: provider.id, answer: result.content };
 		}
 		case "annotate": {

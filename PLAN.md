@@ -16,18 +16,22 @@ the app's own screen.
 | lookup "word" --lang | settings …`. A Unix socket in the app's data
    folder, mode 0600 (Mac and Linux; Windows not yet). Not in a release yet.
    Left: point the phone's Apple provider at z over the tailnet with it.
-   **Found while testing (open):** through `annotate --provider muse` the
-   dictionary card lands in ~5 ms, then Muse's word card never comes back
-   (3 min, the socket's limit); `ask --whole --provider muse` (the same
-   non-streaming `chat()` notes use) returned an empty answer, while
-   streaming `ask` works. Muse's API answered non-streaming fine when
-   called directly (all thinking levels). The dev app's Muse key was a
-   different, older one: replaced with the owner's 2026-11-10; retest
-   first, then find where `chat()` loses the content if it still does.
-   The owner says the instant dictionary card no longer shows: its logic
-   works (above), so look at when the partial card is shown in the UI.
-   The dev keys file (`src-tauri/.dev-secrets.json`) is plain JSON,
-   gitignored, as the owner wants.
+   **Found while testing (open), 2026-11-10:**
+   - A Muse word card takes ~24 s (annotationAnswer run outside the app
+     with the owner's key: "to step back, retreat", card ok). Notes ask
+     with no thinking level, so Muse thinks at "medium" over the long
+     card prompt. That is the slowness the owner feels: try `low` for
+     cards (time it), and the layers below matter more than thought.
+   - Through the dev app, the same annotate never came back and the
+     socket's 3-minute limit (`agent.rs` BETWEEN) didn't fire either: find
+     why (a blocked reply thread?) before trusting long `llm` calls.
+     Short calls work: `ask`, `ask --whole`, `lookup`, the dictionary card.
+   - The dev app's first failures were its old Muse key (replaced with
+     the owner's; restart the dev app after changing keys).
+   - The instant dictionary card works (~5 ms through `annotate`); the
+     owner doesn't see it: check when the UI shows a partial card.
+     The dev keys file (`src-tauri/.dev-secrets.json`) is plain JSON,
+     gitignored, as the owner wants.
 2. **Cards in layers, one word.** (a) The dictionary card at once (facts:
    base, gender, reading, symbols, star). The owner says it no longer shows
    first: check with `llm annotate` whether the instant card
