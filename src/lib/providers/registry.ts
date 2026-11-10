@@ -24,7 +24,8 @@ export const BUILTIN_PROVIDER_IDS = [
 	"muse",
 	"deepseek",
 	"opencode-zen",
-	"local-mlkit"
+	"local-mlkit",
+	"apple"
 ] as const;
 
 export type BuiltinProviderId = (typeof BUILTIN_PROVIDER_IDS)[number];
@@ -96,6 +97,18 @@ export const PROVIDERS: ProviderDef[] = [
 		defaultModel: "gemma4:latest",
 		keyHint: "served on this device",
 		keyless: true
+	},
+	{
+		// Apple's on-device model (Apple Intelligence), served by
+		// ccez-apple-llm on this Mac (or another one on the tailnet: change
+		// the URL): free, private, offline on the Mac it runs on.
+		id: builtin("apple"),
+		label: "Apple (on-device)",
+		defaultBaseUrl: "http://127.0.0.1:11546/v1",
+		defaultModel: "apple-on-device",
+		keyHint: "served by ccez-apple-llm on your Mac",
+		keyless: true,
+		publicModels: true
 	}
 ];
 

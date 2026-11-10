@@ -8036,8 +8036,13 @@
 	 */
 	let offlineParkedFrom: ProviderId | null = null;
 
+	/** A Mac (not an iPad asking for the desktop site): Apple's model is the offline one. */
+	function offlineOnMac(): boolean {
+		return currentPlatform().isMac && !isIOSUserAgent(navigator.userAgent);
+	}
+
 	function handleOffline(): void {
-		const target = offlineTarget(settings.activeProviderId);
+		const target = offlineTarget(settings.activeProviderId, offlineOnMac());
 		if (!target) return;
 		offlineParkedFrom = settings.activeProviderId;
 		settings.activeProviderId = target;
@@ -8045,7 +8050,11 @@
 	}
 
 	function handleOnline(): void {
-		const restore = onlineRestore(offlineParkedFrom, settings.activeProviderId);
+		const restore = onlineRestore(
+			offlineParkedFrom,
+			settings.activeProviderId,
+			offlineOnMac()
+		);
 		offlineParkedFrom = null;
 		if (!restore) return;
 		settings.activeProviderId = restore;

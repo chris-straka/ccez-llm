@@ -28,4 +28,15 @@ describe("offline fallback", () => {
 		expect(onlineRestore("muse", "deepseek")).toBeNull();
 		expect(onlineRestore("muse", "mock")).toBeNull();
 	});
+	it("parks on Apple's on-device model on a Mac, and back", () => {
+		expect(needsNetwork("apple", true)).toBe(false);
+		expect(needsNetwork("apple", false)).toBe(true);
+		expect(offlineTarget("muse", true)).toBe("apple");
+		expect(offlineTarget("apple", true)).toBeNull();
+		expect(onlineRestore("muse", "apple", true)).toBe("muse");
+		// Moved on to something else meanwhile: left alone.
+		expect(onlineRestore("muse", "deepseek", true)).toBeNull();
+		// Android still parks on Gemma.
+		expect(offlineTarget("muse")).toBe(OFFLINE_FALLBACK_ID);
+	});
 });

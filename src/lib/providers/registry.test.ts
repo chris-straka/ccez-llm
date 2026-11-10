@@ -31,6 +31,7 @@ describe("registry", () => {
 			"deepseek",
 			"opencode-zen",
 			"local-mlkit",
+			"apple",
 			"custom-kimi"
 		]);
 		expect(getProviderDef("custom-kimi", custom).label).toBe("Kimi");
