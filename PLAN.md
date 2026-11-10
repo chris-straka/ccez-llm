@@ -10,15 +10,24 @@ Mac and the tailnet only). A Mac that goes offline parks on it
 (`offline.ts`). Released in v0.68.1. Not yet checked: a full chat through
 the app's own screen.
 
-1. **Agent API.** An `llm` command that talks to the running app (release
-   builds too) over a local socket only the owner's account can open (the
-   same reach as the app's data files, unlike the debug bridge's port):
-   `llm ask "…" [--provider]` prints the reply, `llm annotate <word|phrase>
-   [--in "<sentence>"] [--lang]` prints the card as it fills (dictionary,
-   then quick line, then the model's), `llm settings get/set` (reuse
-   `scripts/settings.ts`'s file), `llm log`. Then point the phone's Apple
-   provider at z over the tailnet with it (the hostname is a setting, never
-   in this public repo).
+1. **Agent API: built 2026-11-10** (`src-tauri/src/agent.rs`, `src/lib/agent.ts`,
+   `scripts/llm.ts`): `bun scripts/llm.ts [--dev] status | ask "…"
+[--provider id] [--whole] | annotate "quote" [--in "sentence"] [--lang]
+| lookup "word" --lang | settings …`. A Unix socket in the app's data
+   folder, mode 0600 (Mac and Linux; Windows not yet). Not in a release yet.
+   Left: point the phone's Apple provider at z over the tailnet with it.
+   **Found while testing (open):** through `annotate --provider muse` the
+   dictionary card lands in ~5 ms, then Muse's word card never comes back
+   (3 min, the socket's limit); `ask --whole --provider muse` (the same
+   non-streaming `chat()` notes use) returned an empty answer, while
+   streaming `ask` works. Muse's API answered non-streaming fine when
+   called directly (all thinking levels). The dev app's Muse key was a
+   different, older one: replaced with the owner's 2026-11-10; retest
+   first, then find where `chat()` loses the content if it still does.
+   The owner says the instant dictionary card no longer shows: its logic
+   works (above), so look at when the partial card is shown in the UI.
+   The dev keys file (`src-tauri/.dev-secrets.json`) is plain JSON,
+   gitignored, as the owner wants.
 2. **Cards in layers, one word.** (a) The dictionary card at once (facts:
    base, gender, reading, symbols, star). The owner says it no longer shows
    first: check with `llm annotate` whether the instant card

@@ -87,6 +87,8 @@
 		type AppSettings
 	} from "$lib/settings";
 	import { settingsFileEdit, settingsForFile } from "$lib/settings-file";
+	import { serveAgent } from "$lib/agent";
+	import { resolveProviderFor } from "$lib/providers/resolve";
 	import { onSaveFailure } from "$lib/save-failure";
 	import { createSleepClaim } from "$lib/sleep-claim";
 	import { cycleThinkingId } from "$lib/providers/thinking";
@@ -191,6 +193,7 @@
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
 	import {
 		dictManager,
+		dictionaryState,
 		makeWordLookup,
 		updateOutdatedDictionaries
 	} from "$lib/dictionary.svelte";
@@ -8030,6 +8033,43 @@
 	}
 
 	/**
+	 * The agent API (`scripts/llm.ts`, `agent.ts`): the owner's agents ask
+	 * this window questions and annotations off the record, through a
+	 * socket only the owner's account can open. Desktop shell only.
+	 */
+	function wireAgent(): void {
+		void serveAgent({
+			resolve: (id) =>
+				id
+					? resolveProviderFor({
+							useMock,
+							activeProviderId: id,
+							providers: settings.providers,
+							customProviders: settings.customProviders,
+							mobile: androidUI
+						})
+					: providerKeys.resolve(),
+			annotate: (provider, q, signal, onPartial) =>
+				annotationAnswer(provider, q, signal, {
+					inPassageLang: settings.annotationAnswersInPassageLang,
+					lang: q.lang ?? null,
+					lookup: wordLookup,
+					onPartial
+				}),
+			lookup: async (quote, lang) => ({
+				hits: await wordLookup(quote, lang),
+				state: dictionaryState(lang)
+			}),
+			status: () => ({
+				provider: settings.activeProviderId,
+				providers: listProviders(settings.customProviders).map((p) => p.id),
+				dictionaries: settings.wordCardDictionaries,
+				online: navigator.onLine
+			})
+		});
+	}
+
+	/**
 	 * Offline fallback parking: the drop parks a cloud provider on the
 	 * on-device Gemma option; the reconnect restores only what the drop
 	 * parked. Not rendered state — the provider switch re-renders itself.
@@ -15069,6 +15109,7 @@
 		void listenGameLine();
 		void wireDeepLinks();
 		void wireSettingsFile();
+		void wireAgent();
 		// A chord the app consumed off a dead key must not leave the
 		// field composing its accent (see chord-composition.ts).
 		const chordComposition = createChordCompositionGuard(document);

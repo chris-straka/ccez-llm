@@ -97,6 +97,15 @@ export function installDictionary(lang: string): Promise<boolean> {
 		});
 }
 
+/** What this session believes about a pack (the agent API's `lookup`). */
+export function dictionaryState(lang: string): Record<string, unknown> {
+	return {
+		installed: installed.get(lang) ?? null,
+		checked: checked.has(lang),
+		installing: installing.has(lang)
+	};
+}
+
 /** Installed packs (Settings); empty without a backend. */
 export async function listDictionaries(): Promise<InstalledDictionary[]> {
 	if (!tauriBackendAvailable()) return [];

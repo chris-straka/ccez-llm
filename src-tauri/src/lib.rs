@@ -1,5 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+#[cfg(all(desktop, unix))]
+mod agent;
 #[cfg(all(target_os = "macos", debug_assertions))]
 mod dev_icon;
 // iOS keeps keys in the Keychain even in debug builds: the dev key file
@@ -448,6 +450,8 @@ pub fn run() {
             settings_file::settings_file_write,
             #[cfg(desktop)]
             settings_file::settings_file_watch,
+            #[cfg(all(desktop, unix))]
+            agent::agent_reply,
             listen::listen_search,
             listen::listen_channel,
             listen::listen_videos,
@@ -508,6 +512,9 @@ pub fn run() {
             update_android::update_install_apk
         ])
         .setup(|_app| {
+            // The agent API's socket (scripts/llm.ts), desktop Mac and Linux.
+            #[cfg(all(desktop, unix))]
+            agent::start(_app.handle());
             // External-text bridge (Android PROCESS_TEXT / action-mode):
             // capture the handle before any intent can fire the native fns.
             annotate::remember(_app.handle());
