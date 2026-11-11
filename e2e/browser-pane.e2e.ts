@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "./fixtures";
 import { seedChat } from "./helpers";
-import { seedMockShell } from "./mock-shell";
+import { emitShellEvent, seedMockShell } from "./mock-shell";
 
 /**
  * The browser pane's own HTML (docs/design/browser-pane.md): its pages
@@ -42,11 +42,11 @@ async function open(page: Page): Promise<void> {
 
 test.use({ viewport: { width: 1400, height: 860 } });
 
-test("the globe opens the pane on a new tab, the address bar ready; Enter goes there", async ({
+test("⇧⌘B opens the pane on a new tab, the address bar ready; Enter goes there", async ({
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	const pane = page.locator("aside.browser");
 	await expect(pane).toBeVisible();
 	await expect(pane.getByRole("tab")).toHaveCount(1);
@@ -73,7 +73,7 @@ test("the divider keeps both sides to their minimums; a double-click puts it at 
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	const pane = page.locator("aside.browser");
 	const divider = pane.getByRole("separator", { name: "Resize the browser" });
 	const room = await page.evaluate(() => {
@@ -106,7 +106,7 @@ test("Settings opening over the window: the page steps aside, and comes back aft
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	await last(page, "browser_open");
 	await page.keyboard.press("ControlOrMeta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
@@ -123,7 +123,7 @@ test("tabs: + adds one, × and the middle button close; the last closes the pane
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	const pane = page.locator("aside.browser");
 	await pane.getByRole("button", { name: "New tab" }).click();
 	await pane.getByRole("button", { name: "New tab" }).click();
@@ -147,7 +147,6 @@ test("tabs: + adds one, × and the middle button close; the last closes the pane
 		.getByRole("button", { name: "Close tab" })
 		.click();
 	await expect(pane).toHaveCount(0);
-	await expect(page.locator("header .browser-toggle")).toBeVisible();
 	expect(
 		(await calls(page)).filter((c) => c.cmd === "browser_close").length
 	).toBeGreaterThan(0);
@@ -157,7 +156,7 @@ test("a link in a reply opens a new tab while the pane is open; the app never le
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	await page.locator("article .rendered a", { hasText: "Le Monde" }).click();
 	const pane = page.locator("aside.browser");
 	await expect(pane.getByRole("tab")).toHaveCount(2);
@@ -171,7 +170,7 @@ test("a double-click on the right side never opens Settings while the pane is op
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	const main = (await page.locator("main").boundingBox())!;
 	const col = (await page.locator("article").first().boundingBox())!;
 	// Between the column and the divider.
@@ -187,7 +186,7 @@ test("tabs, the active one and the split come back after a relaunch", async ({
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	const pane = page.locator("aside.browser");
 	await pane.getByLabel("Address").fill("spiegel.de");
 	await pane.getByLabel("Address").press("Enter");
@@ -210,7 +209,7 @@ test("a menu of the app's reaching over the page: the page steps aside while it'
 	page
 }) => {
 	await open(page);
-	await page.locator("header .browser-toggle").click();
+	await emitShellEvent(page, "menu-action", "browser-toggle");
 	await last(page, "browser_open");
 	const box = (await page.locator("aside.browser .page").boundingBox())!;
 	await page.evaluate((b) => {
@@ -236,7 +235,7 @@ test.describe("a window too narrow for both", () => {
 		page
 	}) => {
 		await open(page);
-		await page.locator("header .browser-toggle").click();
+		await emitShellEvent(page, "menu-action", "browser-toggle");
 		const pane = page.locator("aside.browser");
 		await expect(pane).toHaveClass(/expanded/);
 		await pane.getByLabel("Address").fill("lemonde.fr");
@@ -244,7 +243,7 @@ test.describe("a window too narrow for both", () => {
 		await pane.getByRole("button", { name: "Show the chat" }).click();
 		await expect(pane).toHaveCount(0);
 		await expect(page.locator("article").first()).toBeVisible();
-		await page.locator("header .browser-toggle").click();
+		await emitShellEvent(page, "menu-action", "browser-toggle");
 		await expect(page.locator("aside.browser").getByRole("tab")).toHaveCount(1);
 	});
 });

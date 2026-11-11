@@ -15661,23 +15661,7 @@
 			tabindex="-1"
 			onmousedown={dragWindow}
 			ondblclick={zoomWindow}
-		>
-			{#if browser.available && !browser.open}
-				<!-- The browser beside the chat (⇧⌘B). -->
-				<button
-					type="button"
-					class="browser-toggle"
-					aria-label="Open the browser"
-					title="Browser (⇧⌘B)"
-					onclick={() => browser.show()}
-					><svg viewBox="0 0 24 24" aria-hidden="true"
-						><circle cx="12" cy="12" r="8.5" /><path
-							d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5M12 3.5C9.6 5.8 8.4 8.6 8.4 12s1.2 6.2 3.6 8.5"
-						/></svg
-					></button
-				>
-			{/if}
-		</header>
+		></header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
 		{#if find.open}
@@ -16498,36 +16482,6 @@
 	browser layout). The header clears them with left padding; the
 	empty sidebar head indents by the same amount so the chat list
 	starts at the same x. */
-	/* The browser's button: the strip's one control, at its right end. */
-	header .browser-toggle {
-		margin-left: auto;
-		display: grid;
-		place-items: center;
-		width: 1.7rem;
-		height: 1.5rem;
-		padding: 0;
-		border: none;
-		border-radius: 0.4rem;
-		background: none;
-		color: var(--muted);
-		cursor: pointer;
-		opacity: 0.7;
-		transition:
-			opacity 0.15s ease,
-			background-color 0.15s ease;
-	}
-	header .browser-toggle:hover {
-		opacity: 1;
-		background: var(--hover-wash);
-		color: var(--ink);
-	}
-	header .browser-toggle svg {
-		width: 0.95rem;
-		height: 0.95rem;
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 1.6;
-	}
 	.app[data-titlebar="overlay"] header {
 		padding-left: 5.75rem;
 		/* Sit the top chrome a touch lower so it centers on the

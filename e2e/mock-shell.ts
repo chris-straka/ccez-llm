@@ -83,6 +83,8 @@ export async function seedMockShell(
 				const slug = link.split("/").pop()?.split("?")[0]?.trim() || "story";
 				return `https://example.com/articles/${slug}`;
 			};
+			const callbacks: Array<(payload: unknown) => void> = [];
+			const listeners: Record<string, number[]> = {};
 			const shell = {
 				invoke: async (
 					cmd: string,
@@ -152,16 +154,50 @@ export async function seedMockShell(
 					// Launch-time calls the app tolerates failing.
 					if (cmd === "keychain_get") return null;
 					if (cmd === "keychain_set" || cmd === "keychain_delete") return null;
-					if (cmd === "plugin:event|listen") return 1;
+					if (cmd === "plugin:event|listen") {
+						const name = String(args["event"] ?? "");
+						(listeners[name] ??= []).push(Number(args["handler"]));
+						return listeners[name].length;
+					}
+					if (cmd === "plugin:event|unlisten") return null;
 					throw new Error(`mock-shell: unhandled ${cmd}`);
 				},
-				transformCallback: (): number => 0,
+				transformCallback: (fn?: (payload: unknown) => void): number => {
+					callbacks.push(fn ?? (() => undefined));
+					return callbacks.length - 1;
+				},
 				unregisterCallback: (): void => {}
+			};
+			// The shell's events, sent by a spec (`emitShellEvent`): a menu
+			// item, say, as macOS's menu bar would send it.
+			(window as unknown as Record<string, unknown>).__emitShellEvent = (
+				event: string,
+				payload: unknown
+			): void => {
+				for (const id of listeners[event] ?? [])
+					callbacks[id]?.({ event, id, payload });
 			};
 			(window as unknown as Record<string, unknown>).__ccezMockShell = true;
 			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ =
 				shell;
 		},
 		{ rss, article: MOCK_ARTICLE_HTML, zen: MOCK_ZEN_MODEL_IDS }
+	);
+}
+
+/** Sends the shell's `event` to the page, as the desktop shell would. */
+export async function emitShellEvent(
+	page: Page,
+	event: string,
+	payload: unknown
+): Promise<void> {
+	await page.evaluate(
+		([e, p]) =>
+			(
+				window as unknown as {
+					__emitShellEvent: (event: string, payload: unknown) => void;
+				}
+			).__emitShellEvent(e as string, p),
+		[event, payload] as const
 	);
 }

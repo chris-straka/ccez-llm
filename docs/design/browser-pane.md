@@ -32,7 +32,7 @@ keys while the page has the keyboard, video full screen, downloads).
 
 ### Opening and closing
 
-- [x] A toolbar button opens and closes it, and ⌘⇧B (the menu's View → Browser); it remembers whether it was open.
+- [x] ⌘⇧B (the menu's View → Browser) opens and closes it (no toolbar button: owner, 2026-11-10); it remembers whether it was open.
 - [x] Opening it puts the cursor in the address bar of a new tab; reopening shows the tabs as they were.
 - [x] Closing the last tab closes the pane; closing the pane keeps its tabs for next time.
 - [x] Tabs, the active tab, the width and expanded state survive a relaunch.

@@ -10,7 +10,6 @@ Work these off and delete each when it ships.
   `docs/feedback/2026-11-10/star-decu.jpg`. Same for inquiétant, lugubre,
   menaçant, maléfique (italic words in an answer; owner tried each):
   `docs/feedback/2026-11-10/star-italic-words.jpg`.
-- No globe button at the top right.
 - Video/channel list: text sizes all over the place ("a cluster
   disaster"); the videos tab wants another icon, music the current
   YouTube icon, the YouTube tab a cinema emoji:
@@ -26,17 +25,6 @@ Work these off and delete each when it ships.
 - Notes flickered in ccez-keeps while switching to ccez-llm with
   cmd+shift+enter; maybe the ccez-keys Mac app (it asks Chromium apps for
   accessibility, which can make them repaint).
-
-# Annotations faster (owner, 2026-11-10: "Do all those things")
-
-1. Cards ready before A: when a reply or article loads, ask in the
-   background for the rarer words not known (a few per paragraph); and on
-   hover (desktop), start the hovered word's card after a short dwell.
-2. Two Muse requests at once: a short "meaning here" at low thinking
-   (shows first, ~2-3 s) and the full card.
-3. The full card at low thinking if its quality holds (time and compare).
-4. Cards kept by sense: the same word in the same sense comes back at
-   once (the dictionary or Apple's model checks the sense).
 
 # Next (owner, 2026-11-10): Apple's model, an agent API, cards in layers
 
