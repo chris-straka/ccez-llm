@@ -11,9 +11,6 @@ Work these off and delete each when it ships.
 - Clips: S on a clip with a YouTube video picked doesn't flip the play
   button, and the start of the loop looks wrong. Owner wants a deep dive
   on this part (bugs, and maybe a newer way to do it).
-- Phone, annotation reply: the Reply field covers the passage and the
-  word's badge; the main prompt shows behind it and shouldn't:
-  `docs/feedback/2026-11-10/phone-reply-covers-text.jpg`.
 - Notes flickered in ccez-keeps while switching to ccez-llm with
   cmd+shift+enter; maybe the ccez-keys Mac app (it asks Chromium apps for
   accessibility, which can make them repaint).

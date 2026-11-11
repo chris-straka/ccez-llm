@@ -271,6 +271,11 @@ where it was left. -->
 	flips above instead of landing on the input. */
 	let floor = $state<number | null>(null);
 	function readFloor(): void {
+		// A phone's reply hides the composer (below): the keyboard is the floor.
+		if (replying && replyButton) {
+			floor = null;
+			return;
+		}
 		const prompt = document.querySelector(".prompt");
 		const top =
 			prompt instanceof HTMLElement ? prompt.getBoundingClientRect().top : null;
@@ -278,7 +283,16 @@ where it was left. -->
 	}
 	$effect(() => {
 		void vh;
+		void replying;
 		readFloor();
+	});
+	// Replying on a phone: the chat's own prompt steps out of the way
+	// (owner, 2026-11-10: it showed behind the note and squeezed it),
+	// so the note has the room down to the keyboard.
+	$effect(() => {
+		if (!replying || !replyButton) return;
+		document.documentElement.classList.add("ann-replying");
+		return () => document.documentElement.classList.remove("ann-replying");
 	});
 	/** The status bar's height on a phone drawn under it: the card and
 	its buttons stay below it. */
@@ -1218,6 +1232,9 @@ where it was left. -->
 	/* Replying takes the full reading measure at once: shrunk to the
 	note, the card grew sideways with every typed letter (the field
 	sizes to its text), and long replies wrap from here. */
+	:global(html.ann-replying .prompt) {
+		visibility: hidden;
+	}
 	.ann-answer.replying {
 		width: min(var(--ann-max-w, 32rem), 30em);
 	}

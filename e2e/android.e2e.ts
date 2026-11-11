@@ -3777,3 +3777,103 @@ test("Arabic lists keep markers in the column; mixed lines read in order", async
 	// the items hug them.
 	expect(fit).toEqual({ inside: true, start: "start" });
 });
+
+/** Replying to a note with the keyboard up (owner, 2026-11-10): the
+chat's prompt steps away, and the note keeps its answer readable and
+clear of its word instead of the field sitting over both. */
+test("a phone reply hides the prompt and keeps the note readable", async ({
+	page
+}) => {
+	const lines = Array.from(
+		{ length: 40 },
+		(_, n) => `entry ${n} of a long assistant reply`
+	).join("\n");
+	await seedChat(page, [{ role: "assistant", content: lines }]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-mid",
+						messageId: "e2e-m0",
+						quote: "entry 12 of a long assistant reply",
+						comment: "?",
+						answer: "deadlines, time limits\nthe dates a filing is due by",
+						at: 0
+					}
+				]
+			})
+		);
+	});
+	await page.setViewportSize({ width: 412, height: 520 });
+	await page.goto("/");
+	const badge = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(badge).toHaveCount(1, { timeout: 15_000 });
+	await page.evaluate(() => {
+		const scroller = document.querySelector(".messages");
+		const b = document.querySelector("button.ccez-ann-badge.ans-ready");
+		if (!(scroller instanceof HTMLElement) || !(b instanceof HTMLElement))
+			return;
+		scroller.scrollTo({
+			top: Math.max(0, b.getBoundingClientRect().top + scroller.scrollTop - 200)
+		});
+	});
+	// The scroll settles before the tap (a moving badge takes no tap).
+	let last = -1;
+	await expect
+		.poll(async () => {
+			const y = (await badge.boundingBox())?.y ?? -1;
+			const still = y === last && y > 0;
+			last = y;
+			return still;
+		})
+		.toBe(true);
+	const box = await badge.boundingBox();
+	if (!box) throw new Error("badge has no box");
+	await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	await card.locator(".ann-answer-reply").tap();
+	await expect(
+		card.getByRole("textbox", { name: "Reply to this answer" })
+	).toBeVisible({ timeout: 15_000 });
+	await page.waitForTimeout(400);
+	expect(
+		await page
+			.locator(".prompt")
+			.evaluate((el) => getComputedStyle(el).visibility)
+	).toBe("hidden");
+	const geo = await page.evaluate(() => {
+		const body = document.querySelector(".ann-answer-body");
+		const c = document.querySelector(".ann-answer");
+		const quote = document.querySelector(
+			'[data-ann-id="ann-mid"], mark[data-ann="ann-mid"]'
+		);
+		const b = document.querySelector("button.ccez-ann-badge.ans-ready");
+		const word = (quote ?? b)!.getBoundingClientRect();
+		const r = c!.getBoundingClientRect();
+		return {
+			bodyH: body!.clientHeight,
+			bodyScroll: body!.scrollHeight,
+			cardTop: r.top,
+			cardBottom: r.bottom,
+			wordTop: word.top,
+			wordBottom: word.bottom
+		};
+	});
+	// The whole short answer shows, not a sliver above the field.
+	expect(geo.bodyH).toBeGreaterThanOrEqual(geo.bodyScroll - 2);
+	// The note sits beside its word, never over it.
+	expect(
+		geo.cardTop >= geo.wordBottom - 2 || geo.cardBottom <= geo.wordTop + 2
+	).toBe(true);
+	// Done replying: the prompt comes back.
+	await page.keyboard.press("Escape");
+	await expect(card).toHaveCount(0);
+	expect(
+		await page
+			.locator(".prompt")
+			.evaluate((el) => getComputedStyle(el).visibility)
+	).toBe("visible");
+});
