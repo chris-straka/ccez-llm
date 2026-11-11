@@ -213,7 +213,7 @@ channel or start a video. State lives in `ListenMode`. -->
 	<h3>Your channels</h3>
 	{#if channels.length === 0}
 		<p class="no-channels">
-			<span aria-hidden="true">🎧</span>
+			<span aria-hidden="true">🎬</span>
 			Search for a channel you watch, then add it here.
 		</p>
 	{/if}
@@ -280,18 +280,19 @@ channel or start a video. State lives in `ListenMode`. -->
 
 <style>
 	.listen-panel {
-		/* Controls stay put at any text size (--u, a fixed 1rem), as in
-		the News panel. Only reading text (titles, meta, channel names)
-		rides --t (scaled with --font-scale), and a row's own icons and
-		thumbnail grow with it. Big text wraps and stacks instead of
+		/* Controls grow half as fast as the text (--u; owner, 2026-11-10:
+		fixed controls beside giant rows read as a mess), as in the News
+		panel and the chips above. Reading text (titles, meta, channel
+		names) rides --t (scaled with --font-scale), and a row's own icons
+		and thumbnail grow with it. Big text wraps and stacks instead of
 		cutting names short, and widens the panel up to the column. */
-		--u: 1rem;
+		--u: calc(1rem * max(1, 0.5 + 0.5 * var(--font-scale, 1)));
 		--t: calc(1rem * var(--font-scale, 1));
 		font-size: var(--u);
 		display: flex;
 		flex-direction: column;
 		gap: calc(0.6 * var(--u, 1rem));
-		width: calc(100% - calc(2.4 * var(--u, 1rem)));
+		width: calc(100% - 2.4rem);
 		max-width: max(calc(40 * var(--u, 1rem)), calc(24 * var(--t, 1rem)));
 		padding-bottom: calc(1.5 * var(--u, 1rem));
 		user-select: none;

@@ -594,7 +594,7 @@ test("a channel's videos fold by its chevron or hover + F, and stay folded", asy
 	await expect(videos).toBeVisible();
 });
 
-test("Listen titles follow the text size; its controls stay put", async ({
+test("Listen titles follow the text size; its controls grow half as fast", async ({
 	page
 }) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
@@ -612,7 +612,7 @@ test("Listen titles follow the text size; its controls stay put", async ({
 			?.style.setProperty("--font-scale", "2")
 	);
 	await expect.poll(() => px(title)).toBeCloseTo(base * 2, 1);
-	expect(await px(search)).toBe(control);
+	expect(await px(search)).toBeCloseTo(control * 1.5, 1);
 });
 
 test("big text wraps the channel list instead of cutting it short", async ({

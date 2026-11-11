@@ -332,7 +332,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 							onclick={(e) => {
 								e.currentTarget.blur();
 								listen.showListen();
-							}}><span aria-hidden="true">🎧</span></button
+							}}><span aria-hidden="true">🎬</span></button
 						>
 					{/if}
 				{/if}
@@ -346,7 +346,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 						onclick={(e) => {
 							e.currentTarget.blur();
 							music.start();
-						}}><span aria-hidden="true">🎵</span></button
+						}}><span aria-hidden="true">🎧</span></button
 					>
 				{/if}
 			</div>
@@ -856,7 +856,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		border-radius: 10px;
 		background: transparent;
 		font: inherit;
-		font-size: 0.82rem;
+		font-size: calc(0.82rem * max(1, 0.5 + 0.5 * var(--font-scale, 1)));
 		cursor: pointer;
 		transition:
 			border-color 0.15s ease,

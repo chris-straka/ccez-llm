@@ -4,10 +4,6 @@ Work these off and delete each when it ships.
 
 - Scrolling a web page in the browser pane leaves after-images (the Moscow
   Times page drew its headline and buttons twice): `docs/feedback/2026-11-10/browser-scroll-afterimage.jpg`.
-- Video/channel list: text sizes all over the place ("a cluster
-  disaster"); the videos tab wants another icon, music the current
-  YouTube icon, the YouTube tab a cinema emoji:
-  `docs/feedback/2026-11-10/channels-text-scaling.jpg`.
 - Clips: S on a clip with a YouTube video picked doesn't flip the play
   button, and the start of the loop looks wrong. Owner wants a deep dive
   on this part (bugs, and maybe a newer way to do it).

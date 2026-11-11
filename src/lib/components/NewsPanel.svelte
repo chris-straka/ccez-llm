@@ -511,17 +511,17 @@ everything else is theme tokens, never raw hex. -->
 
 <style>
 	.news-panel {
-		/* Controls stay put at any text size (--u, a fixed 1rem): pills,
-		segments and boxes don't grow. Only reading text rides --t
+		/* Controls grow half as fast as the text (--u): pills, segments
+		and boxes stay in proportion beside big rows. Reading text rides --t
 		(1rem at 100%, scaled with --font-scale) and clamps with an
 		ellipsis where it runs out of room. */
-		--u: 1rem;
+		--u: calc(1rem * max(1, 0.5 + 0.5 * var(--font-scale, 1)));
 		--t: calc(1rem * var(--font-scale, 1));
 		font-size: var(--u);
 		display: flex;
 		flex-direction: column;
 		gap: calc(0.55 * var(--u, 1rem));
-		width: calc(100% - calc(2.4 * var(--u, 1rem)));
+		width: calc(100% - 2.4rem);
 		padding-bottom: calc(1 * var(--u, 1rem));
 		animation: news-in 0.32s 0.06s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 		/* Chrome, not content: nothing here selects on a click. */
@@ -680,7 +680,7 @@ everything else is theme tokens, never raw hex. -->
 	.news-cards {
 		/* Webviews without pow() keep the undamped text size. */
 		font-size: var(--t);
-		font-size: calc(var(--u, 1rem) * pow(var(--font-scale, 1), 0.6));
+		font-size: calc(1rem * pow(var(--font-scale, 1), 0.6));
 		container-type: inline-size;
 		list-style: none;
 		margin: 0;

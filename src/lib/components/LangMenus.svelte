@@ -206,7 +206,10 @@ owns the row markup and its surfaces. -->
 	}
 	.lang-menus {
 		width: calc(100% - 2.4rem);
-		max-width: calc(var(--chat-width, 36) * 1rem);
+		/* Pills grow with the text (half its rate): the row widens with them. */
+		max-width: calc(
+			var(--chat-width, 36) * 1rem * max(1, 0.5 + 0.5 * var(--font-scale, 1))
+		);
 		margin-left: auto;
 		margin-right: auto;
 		box-sizing: border-box;
@@ -230,7 +233,7 @@ owns the row markup and its surfaces. -->
 		position: relative;
 	}
 	.lang-menu > button {
-		font-size: 0.82rem;
+		font-size: calc(0.82rem * max(1, 0.5 + 0.5 * var(--font-scale, 1)));
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
 		border-radius: 10px;
