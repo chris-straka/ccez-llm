@@ -19,6 +19,7 @@ import {
 	equationBodyOf,
 	equationBodyRange,
 	quoteFragmentText,
+	trimQuotePunctuation,
 	quoteRange,
 	quoteNodesFor,
 	quoteTextNodes,
@@ -298,7 +299,7 @@ export class AnnotateMode {
 		if (!headline || this.headlineOf(selection.focusNode) !== headline)
 			return null;
 		const frag = wordEdgeRange(selection.getRangeAt(0)).cloneContents();
-		const quote = quoteFragmentText(frag);
+		const quote = trimQuotePunctuation(quoteFragmentText(frag));
 		if (!quote) return null;
 		const story = this.storyOfHeadline(headline);
 		if (!story) return null;
@@ -332,7 +333,8 @@ export class AnnotateMode {
 		// boundary cut mid-word quotes the whole word; the highlight
 		// itself stays as drawn.
 		const frag = wordEdgeRange(selection.getRangeAt(0)).cloneContents();
-		const quote = quoteFragmentText(frag);
+		const picked = quoteFragmentText(frag);
+		const quote = anchorBody ? picked : trimQuotePunctuation(picked);
 		if (!quote) return null;
 		const messageId = this.selectedMessageId(selection);
 		if (!messageId) return null;

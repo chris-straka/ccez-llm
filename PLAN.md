@@ -2,8 +2,6 @@
 
 Work these off and delete each when it ships.
 
-- Annotating a word with punctuation after it enlarges everything being
-  annotated (no punctuation: normal size).
 - Scrolling a web page in the browser pane leaves after-images (the Moscow
   Times page drew its headline and buttons twice): `docs/feedback/2026-11-10/browser-scroll-afterimage.jpg`.
 - Video/channel list: text sizes all over the place ("a cluster

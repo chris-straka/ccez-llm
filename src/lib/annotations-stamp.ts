@@ -296,6 +296,22 @@ export function unwrapMark(mark: HTMLElement): void {
  * in two sentences") and ruby readings would bake in too ("漢かん字じ"
  * for 漢字). Only the base text is content.
  */
+/**
+ * A quote without the sentence punctuation a selection took in after
+ * it ("sel." quotes "sel"; French "déçu ?" quotes "déçu"): the mark
+ * then covers the words alone, as a pick that stopped short does.
+ * Closing brackets and quote marks stay, and a quote of nothing but
+ * punctuation stays as it is.
+ */
+export function trimQuotePunctuation(quote: string): string {
+	const trimmed = quote
+		.replace(
+			/[\s\u00a0\u202f]*[.,;:!?\u2026\u3002\u3001\uff0c\uff01\uff1f\uff1b\uff1a]+$/u,
+			""
+		)
+		.trimEnd();
+	return trimmed ? trimmed : quote;
+}
 export function quoteFragmentText(frag: DocumentFragment): string {
 	frag
 		.querySelectorAll(
