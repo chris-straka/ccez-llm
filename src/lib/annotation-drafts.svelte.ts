@@ -356,6 +356,15 @@ export class AnnotationDrafts {
 		saveDraftAnnotations(chatId, change(stored), this.deps.getChatIds());
 	}
 
+	/** Drop a chat's notes on messages that were deleted (the
+	keep-recent trim), open chat or stored. */
+	dropForMessages(chatId: ChatId, messageIds: ReadonlySet<string>): void {
+		this.landInChat(chatId, (list) =>
+			list.filter((a) => !a.messageId || !messageIds.has(a.messageId))
+		);
+		if (chatId === this.deps.getActiveChatId()) this.autosave();
+	}
+
 	/** Delete one filed note by id (pill-cancel fresh path). */
 	deleteById(id: string): void {
 		this.list = deleteAnnotation(this.list, id);

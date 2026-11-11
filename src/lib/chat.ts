@@ -1646,6 +1646,40 @@ export function replyPhase(facts: {
 }
 
 /** Persisted shape owner (chats array only — runtime flags never touch disk). */
+/** Messages each chat keeps when Settings → Chat → "Last 5 msgs only" is on. */
+export const KEEP_RECENT = 5;
+
+/**
+ * Delete every chat's messages older than its newest `keep` (owner,
+ * 2026-11-11). Video drills, music and the game chat keep everything:
+ * their messages are the material, not a conversation; a chat whose
+ * reply is still coming waits until it lands. Returns the
+ * deleted message ids per chat (their notes go too); saves only when
+ * something went.
+ */
+export function trimToRecent(
+	state: ChatState,
+	keep = KEEP_RECENT,
+	store?: KeyValueStore
+): Map<ChatId, Set<ChatMsgId>> {
+	const removed = new Map<ChatId, Set<ChatMsgId>>();
+	for (const chat of state.chats) {
+		if (chat.game || chat.listen || chat.music) continue;
+		// A reply in flight finds its message by position: wait for it.
+		if (state.sendingChatIds.includes(chat.id)) continue;
+		const extra = chat.messages.length - keep;
+		if (extra <= 0) continue;
+		const gone = chat.messages.slice(0, extra);
+		removed.set(chat.id, new Set(gone.map((m) => m.id)));
+		chat.messages = chat.messages.slice(extra);
+		// Watermarks on a deleted message mean nothing now.
+		if (chat.trimmedThrough && removed.get(chat.id)!.has(chat.trimmedThrough))
+			delete chat.trimmedThrough;
+	}
+	if (removed.size > 0) persistChats(state, store);
+	return removed;
+}
+
 export function persistChats(state: ChatState, store?: KeyValueStore): void {
 	try {
 		(store ?? browserStore() ?? memoryStore).setItem(

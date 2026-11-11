@@ -31,6 +31,25 @@ export const test = base.extend<{ pageErrors: string[] }>({
 					this.muted = true;
 					return play.call(this);
 				};
+				// Specs seed long threads: "keep only the last 5 msgs" (on
+				// by default) stays off unless a spec's settings say so.
+				const getItem = Storage.prototype.getItem;
+				Storage.prototype.getItem = function (this: Storage, key: string) {
+					const raw = getItem.call(this, key);
+					if (key !== "ccez-llm-settings-v1" || raw === null) return raw;
+					try {
+						const parsed = JSON.parse(raw) as Record<string, unknown>;
+						if (
+							parsed &&
+							typeof parsed === "object" &&
+							!("keepRecentOnly" in parsed)
+						)
+							return JSON.stringify({ ...parsed, keepRecentOnly: false });
+					} catch {
+						// A spec's deliberately broken settings stay broken.
+					}
+					return raw;
+				};
 				const synth = window.speechSynthesis;
 				if (synth)
 					Object.defineProperty(synth, "speak", {

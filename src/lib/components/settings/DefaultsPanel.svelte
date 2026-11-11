@@ -84,6 +84,14 @@
 			</div>
 		</SettingRow>
 	{/if}
+	<!-- On by default (owner, 2026-11-11): each chat keeps its newest
+	five messages; older ones and their notes are deleted. -->
+	<SettingRow name="Old msgs">
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.keepRecentOnly} />
+			<span>Keep only the last 5</span>
+		</label>
+	</SettingRow>
 	<!-- Older messages fold as newer ones arrive; a fold opened by
 	hand stays open. Both off by default. -->
 	<SettingRow name="Fold older msgs">

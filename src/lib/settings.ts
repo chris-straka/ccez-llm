@@ -224,6 +224,9 @@ export interface AppSettings {
 	hoverAssistantActions: boolean;
 	/** Message action buttons grow with the text-size setting. Off = fixed size. */
 	scaleActionsWithFont: boolean;
+	/** Every chat keeps only its newest messages (`KEEP_RECENT`); older
+	ones, and the notes on them, are deleted (owner, 2026-11-11). */
+	keepRecentOnly: boolean;
 	/**
 	 * Message action rows render at all, desktop and mobile alike.
 	 * Off = keyboard shortcuts only (C copies, Shift+C branches,
@@ -590,6 +593,7 @@ export function defaultSettings(): AppSettings {
 		hoverUserActions: true,
 		hoverAssistantActions: true,
 		scaleActionsWithFont: true,
+		keepRecentOnly: true,
 		showMessageButtons: true,
 		messageGap: MESSAGE_GAP_DEFAULT,
 		lineHeight: LINE_HEIGHT_DEFAULT,
@@ -869,6 +873,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		}
 		if (typeof merged.scaleActionsWithFont !== "boolean")
 			merged.scaleActionsWithFont = true;
+		if (typeof merged.keepRecentOnly !== "boolean")
+			merged.keepRecentOnly = true;
 		// Touch-only toggles postdate older saves the same way.
 		if (typeof merged.inspectEnabled !== "boolean")
 			merged.inspectEnabled = true;

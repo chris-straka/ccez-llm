@@ -9,6 +9,8 @@
 	import {
 		createChatState,
 		activeChat,
+		KEEP_RECENT,
+		trimToRecent,
 		newChat,
 		selectChat,
 		ensureGameChat,
@@ -4289,6 +4291,17 @@
 		if (hoverDwell) clearTimeout(hoverDwell);
 		hoverDwell = setTimeout(prefetchHovered, HOVER_DWELL_MS);
 	}
+	// Settings → Chat → Old msgs (on by default): every chat keeps its
+	// newest five messages; older ones and their notes are deleted.
+	$effect(() => {
+		if (!settings.keepRecentOnly) return;
+		void chatState.sendingChatIds.length;
+		if (!chatState.chats.some((c) => c.messages.length > KEEP_RECENT)) return;
+		untrack(() => {
+			for (const [chatId, ids] of trimToRecent(chatState))
+				drafts.dropForMessages(chatId, ids);
+		});
+	});
 	/** A reply just finished in a learning chat: a few of its words get
 	 * their cards started (learning ones first, then long unknown ones). */
 	let replyWasSending = false;
