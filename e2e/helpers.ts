@@ -95,6 +95,19 @@ export async function pinMacPlatform(page: Page): Promise<void> {
 	});
 }
 
+/** Report Linux to the page, so a spec of non-Mac behaviour (the Mac
+ * parks offline on Apple's model) passes on a Mac host too. */
+export async function pinLinuxPlatform(page: Page): Promise<void> {
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, "platform", {
+			get: () => "Linux x86_64"
+		});
+		Object.defineProperty(navigator, "userAgentData", {
+			get: () => ({ platform: "Linux", mobile: false, brands: [] })
+		});
+	});
+}
+
 export async function toggleSidebar(page: Page): Promise<void> {
 	const inShell = await page.evaluate(() => "__TAURI_INTERNALS__" in window);
 	await page.keyboard.press(inShell ? "Meta+b" : "Meta+Shift+BracketLeft");

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { seedChat } from "./helpers";
+import { pinLinuxPlatform, seedChat } from "./helpers";
 
 async function openSettings(
 	page: import("@playwright/test").Page
@@ -78,6 +78,7 @@ test("offline parks on-device for the session and online restores", async ({
 	page,
 	context
 }) => {
+	await pinLinuxPlatform(page);
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.addInitScript(() =>
 		window.localStorage.removeItem("ccez-mock-provider")
