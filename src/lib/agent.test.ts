@@ -30,7 +30,12 @@ describe("agent API", () => {
 		const result = await handleAgent("ask", { text: "hungry?" }, deps(), (l) =>
 			lines.push(l)
 		);
-		expect(lines).toEqual([{ token: "J'ai " }, { token: "faim." }]);
+		expect(lines).toEqual([
+			{ stage: "calling" },
+			{ token: "J'ai " },
+			{ token: "faim." },
+			{ stage: "returned", length: 10 }
+		]);
 		expect(result).toEqual({ provider: "apple", answer: "J'ai faim." });
 	});
 

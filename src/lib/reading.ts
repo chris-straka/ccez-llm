@@ -1,4 +1,4 @@
-import type { ChatProvider } from "./providers/types";
+import type { ChatMessage, ChatProvider } from "./providers/types";
 import { annRefsFor } from "./annotation-block";
 import { escapeHtml } from "./render-math";
 import { partialReading } from "./kanjiSplit";
@@ -1070,6 +1070,13 @@ export async function annotationAnswer(
 		lookup?: WordLookup;
 		/** The dictionary's instant card, before the model's lands. */
 		onPartial?: (reply: AnnotationReply) => void;
+		/** The model's thinking level for the card (the provider's own ids). */
+		thinking?: string;
+		/** Ask the quick first answer too, at this thinking level (the provider's own ids). */
+		quickThinking?: string;
+		/** An earlier finished card for this word in this sense (`sense` from the
+		 * quick answer): it stands, and the full card isn't asked for. */
+		sameSense?: (lang: string, sense: string) => AnnotationReply | null;
 	} = {}
 ): Promise<AnnotationReply> {
 	if (!q.quote.trim()) throw new Error("Nothing to answer about.");
@@ -1089,6 +1096,30 @@ export async function annotationAnswer(
 				])
 			: null;
 		let modelDone = false;
+		// Two answers come before the model's card: the dictionary's (at
+		// once) and a quick one-line meaning in this sentence (a short
+		// question at the lowest thinking, a couple of seconds). Each shows
+		// as it lands; the quick line sits on the dictionary card.
+		let instantCard: WordCard | null = null;
+		let quick: string | null = null;
+		const publish = (): void => {
+			if (modelDone || (!instantCard && !quick)) return;
+			const card: WordCard = instantCard
+				? {
+						...instantCard,
+						...(quick ? { inSentence: quick, sense: quick } : {}),
+						partial: true
+					}
+				: {
+						meaning: quick ?? "",
+						parts: [],
+						facts: [],
+						sense: quick ?? "",
+						...(lang ? { lang } : {}),
+						partial: true
+					};
+			opts.onPartial?.({ answer: wordCardText(card), card });
+		};
 		const showInstant = (hits: Awaited<ReturnType<WordLookup>>): void => {
 			if (!hits || !lang || modelDone) return;
 			// Two base words (le parent, or parer's "they adorn"): the
@@ -1102,9 +1133,30 @@ export async function annotationAnswer(
 				hits.japanese,
 				hits.form
 			);
-			if (instant)
-				opts.onPartial?.({ answer: wordCardText(instant), card: instant });
+			if (instant) {
+				instantCard = instant;
+				publish();
+			}
 		};
+		// One signal for both requests: a card that stands from before ends the slow one.
+		const inner = new AbortController();
+		signal?.addEventListener("abort", () => inner.abort(), { once: true });
+		// Asked for (notes set `quickThinking`); other callers keep one request.
+		const quickAnswer: Promise<string | null> =
+			opts.quickThinking === undefined
+				? Promise.resolve(null)
+				: provider
+						.chat(buildQuickMeaningMessages(q, opts), {
+							signal: inner.signal,
+							thinking: opts.quickThinking
+						})
+						.then((r) => cleanQuickMeaning(r.content))
+						.catch(() => null);
+		void quickAnswer.then((text) => {
+			if (!text) return;
+			quick = text;
+			publish();
+		});
 		if (found) showInstant(found);
 		else if (lookup) void lookup.then(showInstant);
 		const dictionary = found ? dictionaryPromptLines(q.quote, found.hits) : "";
@@ -1117,7 +1169,7 @@ export async function annotationAnswer(
 				: [];
 		let reply: Awaited<ReturnType<ChatProvider["chat"]>>;
 		try {
-			reply = await provider.chat(
+			const full = provider.chat(
 				buildWordCardMessages(q, lang, {
 					...opts,
 					...(dictionary ? { dictionary } : {}),
@@ -1132,8 +1184,31 @@ export async function annotationAnswer(
 					role: "system" | "user" | "assistant";
 					content: string;
 				}>,
-				{ signal }
+				{ signal: inner.signal, thinking: opts.thinking }
 			);
+			// The same word in the same sense explained before: that card
+			// stands once the quick answer names the sense, and the slow
+			// request ends.
+			const earlier = quickAnswer.then((text) =>
+				text && lang ? (opts.sameSense?.(lang, text) ?? null) : null
+			);
+			const first = await Promise.race([
+				full.then((r) => ({ reply: r, standing: null })),
+				earlier.then((c) =>
+					c ? { reply: null, standing: c } : new Promise<never>(() => undefined)
+				)
+			]);
+			if (first.standing) {
+				inner.abort();
+				full.catch(() => undefined);
+				const was = first.standing.card;
+				const sense = quick ?? was?.sense;
+				const card = was ? (sense ? { ...was, sense } : was) : undefined;
+				return card
+					? { answer: first.standing.answer, card }
+					: { answer: first.standing.answer };
+			}
+			reply = first.reply!;
 		} finally {
 			modelDone = true;
 		}
@@ -1175,7 +1250,11 @@ export async function annotationAnswer(
 						)?.pos
 					: undefined;
 			const typed = pos ? { ...withParts, pos } : withParts;
-			const card = lang ? { ...typed, lang } : typed;
+			const withLang = lang ? { ...typed, lang } : typed;
+			// The quick answer's sense, kept for a later note on this word.
+			const sense =
+				quick ?? (await Promise.race([quickAnswer, Promise.resolve(null)]));
+			const card = sense ? { ...withLang, sense } : withLang;
 			return { answer: wordCardText(card), card };
 		}
 		if (!looksLikeJson(reply.content)) {
@@ -1183,16 +1262,99 @@ export async function annotationAnswer(
 			if (answer) return { answer };
 		}
 	}
+	// A phrase with no question: a quick one-line meaning first, then the full answer.
+	let phraseDone = false;
+	if (
+		!q.question.trim() &&
+		opts.onPartial &&
+		opts.quickThinking !== undefined
+	) {
+		void provider
+			.chat(buildQuickMeaningMessages(q, opts), {
+				...(signal ? { signal } : {}),
+				thinking: opts.quickThinking
+			})
+			.then((r) => {
+				const text = cleanQuickMeaning(r.content);
+				if (text && !phraseDone) opts.onPartial?.({ answer: text });
+			})
+			.catch(() => undefined);
+	}
 	const result = await provider.chat(
 		buildAnnotationAnswerMessages(q, opts) as Array<{
 			role: "system" | "user" | "assistant";
 			content: string;
 		}>,
-		{ signal }
+		{ signal, thinking: opts.thinking }
 	);
+	phraseDone = true;
 	const answer = tidyAnnotationAnswer(result.content, q.quote);
 	if (!answer) throw new Error("Empty annotation answer.");
 	return { answer };
+}
+
+/** Two quick answers name the same sense ("to retreat" and "retreat, move
+back"): most of their words agree, little words aside. */
+export function senseMatch(a: string, b: string): boolean {
+	const small = new Set([
+		"to",
+		"a",
+		"an",
+		"the",
+		"of",
+		"be",
+		"is",
+		"in",
+		"on",
+		"for",
+		"with",
+		"or",
+		"and",
+		"something",
+		"someone",
+		"sth",
+		"sb"
+	]);
+	const words = (t: string) =>
+		new Set(
+			t
+				.toLowerCase()
+				.split(/[^\p{L}\p{N}]+/u)
+				.filter((w) => w && !small.has(w))
+		);
+	const x = words(a);
+	const y = words(b);
+	if (x.size === 0 || y.size === 0) return false;
+	let both = 0;
+	for (const w of x) if (y.has(w)) both++;
+	return both / Math.min(x.size, y.size) >= 0.6;
+}
+
+/** The quick first answer: what the quote means in its sentence, in a few words. */
+export function buildQuickMeaningMessages(
+	q: AnnotationQuestion,
+	opts: { inPassageLang?: boolean } = {}
+): ChatMessage[] {
+	const words = isWordQuote(q.quote) ? "six" : "twelve";
+	const inLang = opts.inPassageLang
+		? "in the sentence's own language"
+		: "in English";
+	return [
+		{
+			role: "system",
+			content: `Say what the quoted words mean in this sentence, ${inLang}, in at most ${words} words. Only the meaning: no quotes, no explanation.`
+		},
+		{ role: "user", content: `Sentence: ${q.context}\nQuote: ${q.quote}` }
+	];
+}
+
+/** A quick answer as one short line: its first line, without quotes or a closing full stop. */
+export function cleanQuickMeaning(text: string): string | null {
+	const line = (text.trim().split(/\n/)[0] ?? "")
+		.replace(/^["'\u201c\u00ab\s]+|["'\u201d\u00bb\s]+$/g, "")
+		.replace(/\.$/, "")
+		.trim();
+	return line && line.length <= 120 ? line : null;
 }
 
 /** Compare forms: case, curly apostrophes, quote marks and edge

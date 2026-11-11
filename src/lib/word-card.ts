@@ -88,6 +88,9 @@ export interface WordCard {
 	partial?: boolean;
 	/** The base word's part of speech from the dictionary ("verb"), shown as a small tag. */
 	pos?: string;
+	/** What the word means in this sentence, from the quick first answer:
+	 * kept so a later note on the same word in the same sense reuses the card. */
+	sense?: string;
 }
 
 /** A part of speech as a short tag, as ccez-tube's card has them ("verb" v, "adjective" adj). */

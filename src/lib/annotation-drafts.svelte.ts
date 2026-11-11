@@ -17,7 +17,11 @@ import {
 } from "./annotation-drafts-store";
 import type { ChatId } from "./chat";
 import type { ChatProvider } from "./providers/types";
-import type { AnnotationQuestion, AnnotationReply } from "./reading";
+import {
+	type AnnotationQuestion,
+	type AnnotationReply,
+	senseMatch
+} from "./reading";
 import type { WordCard } from "./word-card";
 
 /** How long a request that rode out a trip to the background gets,
@@ -361,6 +365,36 @@ export class AnnotationDrafts {
 	and no question: this chat's first, then the other chats', the
 	newest first. Cards only: a card can be marked as still writing,
 	plain prose would read as this sentence's own answer. */
+	/** An earlier finished card for `quote` in `lang` whose sense matches
+	 * `sense` (a quick answer), here or in another chat; null when none. */
+	sameSense(
+		quote: string,
+		lang: string,
+		sense: string
+	): AnnotationReply | null {
+		const fold = (q: string) => q.trim().toLocaleLowerCase();
+		const base = (l: string | null | undefined) =>
+			l?.split(/[-_]/)[0]?.toLowerCase() || null;
+		const fits = (a: Annotation) =>
+			!a.comment.trim() &&
+			!!a.answer?.trim() &&
+			!!a.card &&
+			!a.card.partial &&
+			!!a.card.sense &&
+			base(a.card.lang) === base(lang) &&
+			fold(a.quote) === fold(quote) &&
+			senseMatch(a.card.sense, sense);
+		const pick = (list: Annotation[]) => list.filter(fits).at(-1);
+		const found =
+			pick(this.list) ??
+			this.deps
+				.getChatIds()
+				.filter((id) => id !== this.deps.getActiveChatId())
+				.map((id) => pick(loadDraftAnnotations(id)))
+				.find((a) => a !== undefined);
+		return found?.card ? { answer: found.answer!, card: found.card } : null;
+	}
+
 	earlierAnswer(ann: Annotation): Annotation | undefined {
 		const fold = (q: string) => q.trim().toLocaleLowerCase();
 		const want = fold(ann.quote);

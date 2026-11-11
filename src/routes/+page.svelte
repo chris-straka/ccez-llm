@@ -88,6 +88,8 @@
 	} from "$lib/settings";
 	import { settingsFileEdit, settingsForFile } from "$lib/settings-file";
 	import { serveAgent } from "$lib/agent";
+	import { NotePrefetch, noteKey, wordsToPrefetch } from "$lib/note-prefetch";
+	import { paragraphForQuote } from "$lib/quote-match";
 	import { resolveProviderFor } from "$lib/providers/resolve";
 	import { onSaveFailure } from "$lib/save-failure";
 	import { createSleepClaim } from "$lib/sleep-claim";
@@ -1094,15 +1096,24 @@
 		(lang) =>
 			settings.wordCardDictionaries && !settings.dictionarySkip.includes(lang)
 	);
+	/** Notes: the card at low thinking, a quick one-line meaning first at the
+	 * lowest (Muse: ~20 s and ~2.5 s, owner 2026-11-11; providers without
+	 * those levels keep their own). */
+	const noteSpeed = { thinking: "low", quickThinking: "minimal" } as const;
+	/** Cards started on hover (desktop): A takes them over mid-flight. */
+	const notePrefetch = new NotePrefetch();
 	const drafts: AnnotationDrafts = new AnnotationDrafts({
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),
 		resolveProvider: () => providerKeys.resolveActive(),
 		answerQuestion: (provider, q, signal, onPartial) =>
+			notePrefetch.take(noteKey(q), onPartial) ??
 			annotationAnswer(provider, q, signal, {
+				...noteSpeed,
 				inPassageLang: settings.annotationAnswersInPassageLang,
 				lang: q.lang ?? null,
 				lookup: wordLookup,
+				sameSense: (lang, sense) => drafts.sameSense(q.quote, lang, sense),
 				...(onPartial ? { onPartial } : {})
 			}),
 		langFor: (ann) =>
@@ -4270,8 +4281,82 @@
 	/** Last pointer position over the chat (plain field, never state):
 	hover hotkeys resolve the word under it without a selection. */
 	let lastPointer = { x: 0, y: 0 };
+	let hoverDwell: ReturnType<typeof setTimeout> | null = null;
 	function noteMainMove(event: PointerEvent): void {
 		lastPointer = { x: event.clientX, y: event.clientY };
+		// A word rested on starts its card, so A finds it under way.
+		if (androidUI || event.pointerType !== "mouse") return;
+		if (hoverDwell) clearTimeout(hoverDwell);
+		hoverDwell = setTimeout(prefetchHovered, HOVER_DWELL_MS);
+	}
+	/** A reply just finished in a learning chat: a few of its words get
+	 * their cards started (learning ones first, then long unknown ones). */
+	let replyWasSending = false;
+	$effect(() => {
+		const sending = chatState.sendingChatIds.includes(chat.id);
+		if (replyWasSending && !sending) untrack(prefetchReply);
+		replyWasSending = sending;
+	});
+	function prefetchReply(): void {
+		const lang = chat.replyLang;
+		const message = chat.messages.at(-1);
+		if (!lang || !message || message.role !== "assistant") return;
+		const provider = providerKeys.resolve();
+		if (!provider) return;
+		const text = aidDisplayText(message.content);
+		for (const word of wordsToPrefetch(text, lang, (w) =>
+			wordList.status(lang, w)
+		)) {
+			const q = {
+				quote: word,
+				question: "",
+				context: paragraphForQuote(text, word, 0),
+				lang
+			};
+			notePrefetch.start(noteKey(q), (signal, onPartial) =>
+				annotationAnswer(provider, q, signal, {
+					...noteSpeed,
+					inPassageLang: settings.annotationAnswersInPassageLang,
+					lang,
+					lookup: wordLookup,
+					sameSense: (l, sense) => drafts.sameSense(word, l, sense),
+					onPartial
+				})
+			);
+		}
+	}
+	/** How long the pointer rests on a word before its card starts. */
+	const HOVER_DWELL_MS = 600;
+	/** The hovered word's card, asked early: a chat in a language being
+	 * learned, a word not known yet, the active provider (off the record
+	 * until A files it). */
+	function prefetchHovered(): void {
+		hoverDwell = null;
+		if (hoveredIdx < 0) return;
+		const message = chat.messages[hoveredIdx];
+		const lang = chat.replyLang;
+		if (!message || !lang) return;
+		const hit = hoverWordRange();
+		if (!hit || [...hit.word].length < 3) return;
+		if (wordList.status(lang, hit.word) === "known") return;
+		const provider = providerKeys.resolve();
+		if (!provider) return;
+		const context = paragraphForQuote(
+			aidDisplayText(message.content),
+			hit.word,
+			0
+		);
+		const q = { quote: hit.word, question: "", context, lang };
+		notePrefetch.start(noteKey(q), (signal, onPartial) =>
+			annotationAnswer(provider, q, signal, {
+				...noteSpeed,
+				inPassageLang: settings.annotationAnswersInPassageLang,
+				lang,
+				lookup: wordLookup,
+				sameSense: (l, sense) => drafts.sameSense(hit.word, l, sense),
+				onPartial
+			})
+		);
 	}
 	/**
 	 * Word under the pointer for hover hotkeys: caret-precise (not
@@ -8051,9 +8136,11 @@
 					: providerKeys.resolve(),
 			annotate: (provider, q, signal, onPartial) =>
 				annotationAnswer(provider, q, signal, {
+					...noteSpeed,
 					inPassageLang: settings.annotationAnswersInPassageLang,
 					lang: q.lang ?? null,
 					lookup: wordLookup,
+					sameSense: (lang, sense) => drafts.sameSense(q.quote, lang, sense),
 					onPartial
 				}),
 			lookup: async (quote, lang) => ({
