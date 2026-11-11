@@ -6,10 +6,6 @@ Work these off and delete each when it ships.
   annotated (no punctuation: normal size).
 - Scrolling a web page in the browser pane leaves after-images (the Moscow
   Times page drew its headline and buttons twice): `docs/feedback/2026-11-10/browser-scroll-afterimage.jpg`.
-- The star wouldn't save "déçu" ("I already have it saved?"):
-  `docs/feedback/2026-11-10/star-decu.jpg`. Same for inquiétant, lugubre,
-  menaçant, maléfique (italic words in an answer; owner tried each):
-  `docs/feedback/2026-11-10/star-italic-words.jpg`.
 - Video/channel list: text sizes all over the place ("a cluster
   disaster"); the videos tab wants another icon, music the current
   YouTube icon, the YouTube tab a cinema emoji:

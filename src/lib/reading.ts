@@ -16,6 +16,7 @@ import {
 	cleanWordCard,
 	isWordQuote,
 	looksLikeJson,
+	modelWordLang,
 	parseWordCard,
 	wordCardLang,
 	withPieceNotes,
@@ -1250,7 +1251,12 @@ export async function annotationAnswer(
 						)?.pos
 					: undefined;
 			const typed = pos ? { ...withParts, pos } : withParts;
-			const withLang = lang ? { ...typed, lang } : typed;
+			// No passage language known: the model names the word's own,
+			// so the card can still be starred into the word list.
+			const named = lang ?? modelWordLang(typed.lang);
+			const withLang: WordCard = { ...typed };
+			if (named) withLang.lang = named;
+			else delete withLang.lang;
 			// The quick answer's sense, kept for a later note on this word.
 			const sense =
 				quick ?? (await Promise.race([quickAnswer, Promise.resolve(null)]));

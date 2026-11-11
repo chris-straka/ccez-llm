@@ -240,7 +240,9 @@ describe("buildWordCardMessages", () => {
 		// The idiom goes in the phrase, with what it means here.
 		expect(system!.content).toContain('"pleut des cordes"');
 		expect(system!.content).toContain("never an abbreviation");
-		expect(system!.content).toContain("Work out the passage's language first");
+		expect(system!.content).toContain(
+			"Work out the highlighted word's language first"
+		);
 	});
 
 	it("asks for no pieces when the dictionary split the word", () => {
@@ -268,7 +270,7 @@ describe("buildWordCardMessages", () => {
 		expect(german!.content).toContain("look-alike German word");
 		expect(german!.content).toContain("Never compare it with English.");
 		const [unknown] = buildWordCardMessages(q, null);
-		expect(unknown!.content).toContain("traps inside the passage's language");
+		expect(unknown!.content).toContain("traps inside the word's language");
 		for (const lang of ["fr", null])
 			expect(buildWordCardMessages(q, lang)[0]!.content).not.toContain(
 				"false friends with English"

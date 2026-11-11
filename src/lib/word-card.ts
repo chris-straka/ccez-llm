@@ -1132,11 +1132,11 @@ export function buildWordCardMessages(
 		: "English";
 	const langLine = profile
 		? `The passage is in ${profile.name}.`
-		: "Work out the passage's language first.";
+		: "Work out the highlighted word's language first: it can differ from the passage's (a French word quoted in English prose).";
 	const reading = profile?.reading
 		? `"reading": ${profile.reading}, on the pieces that need it; leave it out elsewhere.`
 		: `"reading": leave it out.`;
-	const watchLang = profile?.name ?? "the passage's language";
+	const watchLang = profile?.name ?? "the word's language";
 	const checklist = (profile?.checklist ?? GENERIC_CHECKLIST)
 		.map((c) => `- ${c}`)
 		.join("\n");
@@ -1147,8 +1147,11 @@ export function buildWordCardMessages(
 		`{"meaning": "", "parts": [{"text": "", "reading": "", ` +
 		`"label": "", "meaning": "", "kind": ""}], "facts": [{"text": "", "kind": ""}], ` +
 		`"base": "", "construction": {"name": "", "words": "", "gloss": ""}, ` +
-		`"phrase": {"words": "", "meaning": ""}, "watch": ""}\n` +
+		`"phrase": {"words": "", "meaning": ""}, "watch": ""${profile ? "" : `, "lang": ""`}}\n` +
 		`Write every field in ${tongue}.\n` +
+		(profile
+			? ""
+			: `"lang": the highlighted word's language, a two-letter ISO 639-1 code ("fr").\n`) +
 		`"meaning": what the word itself means, literally: its dictionary ` +
 		`sense, in the same form where the language allows ("being ironic" ` +
 		`for a present participle, "crossed" for a past one), a few words. ` +
@@ -1246,4 +1249,11 @@ export function listWord(card: WordCard, quote: string): string {
 	const cores = card.parts.filter((p) => p.kind === "core");
 	const base = cores.length === 1 ? cores[0]!.label.trim() : "";
 	return base && !/\s/.test(base) ? base : quote.trim();
+}
+
+/** A language code a model named for a word ("FR", "fr-CA"): its
+ * two- or three-letter base, or null for anything else. */
+export function modelWordLang(code: string | undefined): string | null {
+	const base = (code ?? "").trim().toLowerCase().split(/[-_]/)[0] ?? "";
+	return /^[a-z]{2,3}$/.test(base) ? base : null;
 }

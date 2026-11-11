@@ -109,3 +109,21 @@ describe("faster notes", () => {
 		expect(cleanQuickMeaning("   ")).toBeNull();
 	});
 });
+
+describe("a word in a passage of no known language", () => {
+	it("takes the model's language so the card can be starred", async () => {
+		const reply = await annotationAnswer(
+			provider(
+				'{"meaning": "gloomy", "parts": [], "facts": [], "lang": "FR-fr"}',
+				5
+			),
+			{
+				quote: "lugubre",
+				question: "",
+				context: "Other translations: inquiétant, lugubre.",
+				lang: null
+			}
+		);
+		expect(reply.card?.lang).toBe("fr");
+	});
+});
