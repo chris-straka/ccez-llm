@@ -16284,10 +16284,9 @@
 		flag; ChatSwitcher owns the card, actions, and surfaces. -->
 		<ChatSwitcher
 			title={chatTitle(activeChat(chatState) ?? { messages: [] })}
-			position="{chatLabel(
-				activeChat(chatState)?.createdAt ?? Date.now()
-			)} · {chatState.chats.findIndex((c) => c.id === chatState.activeChatId) +
-				1} / {chatState.chats.length}"
+			position={`${chatLabel(activeChat(chatState)?.createdAt ?? Date.now())} ·\u00a0${
+				chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1
+			}\u00a0/\u00a0${chatState.chats.length}`}
 			openedAt={switcherOpenedAt}
 			actions={{
 				close: closeChatSwitcher,
