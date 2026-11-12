@@ -4,12 +4,17 @@ Work these off and delete each when it ships.
 
 - Scrolling a web page in the browser pane leaves after-images (the Moscow
   Times page drew its headline and buttons twice): `docs/feedback/2026-11-10/browser-scroll-afterimage.jpg`.
+  2026-11-11: the ccez-keys Mac app no longer sets AXEnhancedUserInterface
+  on the front app (it treats it as a screen reader; ccez-keys 7a13b70), a
+  likely cause of this and of the keeps flicker. Owner watching; if it
+  comes back, reproduce with `bun scripts/drive-app.ts` (child WKWebView
+  from browser.rs with a background colour).
 - Clips: S on a clip with a YouTube video picked doesn't flip the play
   button, and the start of the loop looks wrong. Owner wants a deep dive
   on this part (bugs, and maybe a newer way to do it).
 - Notes flickered in ccez-keeps while switching to ccez-llm with
-  cmd+shift+enter; maybe the ccez-keys Mac app (it asks Chromium apps for
-  accessibility, which can make them repaint).
+  cmd+shift+enter: the ccez-keys Mac app set AXEnhancedUserInterface on
+  Chromium apps; off since ccez-keys 7a13b70 (2026-11-11). Owner watching.
 
 # Next (owner, 2026-11-10): Apple's model, an agent API, cards in layers
 
