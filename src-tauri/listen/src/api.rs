@@ -355,9 +355,9 @@ impl Listen {
         })
     }
 
-    /// The video's picture for the drill (no sound: the drill plays
-    /// the language track beside it), downloaded once into the media
-    /// cache. A cached player from before pictures were kept, or a
+    /// The video's picture (no sound: a drill muxes it with the
+    /// language track, a song plays it beside its own), downloaded
+    /// once into the media cache. A cached player from before pictures were kept, or a
     /// stream URL YouTube turns down, re-asks for a fresh player once.
     pub async fn video_path(&self, id: &str) -> Result<PathBuf> {
         if !valid_video_id(id) {
@@ -390,6 +390,40 @@ impl Listen {
             done => done?,
         }
         plain_mp4(&path);
+        Ok(path)
+    }
+
+    /// The drill's one file: the video's picture with the `lang`
+    /// track's sound (`mux`), so one media element plays both. Made
+    /// once per video and language, beside the track; a picture or
+    /// track downloaded again since makes it again. `listen-no-clip`
+    /// when the two can't be put together (a webm track, a file the
+    /// muxer doesn't read): the drill then plays the track alone.
+    pub async fn clip_path(&self, id: &str, lang: &str) -> Result<PathBuf> {
+        let fetched = self.fetch(id, lang).await?;
+        if fetched.audio_mime != "audio/mp4" {
+            return Err("listen-no-clip".into());
+        }
+        let video = self.video_path(id).await?;
+        let path = self.media_dir(id, lang).join("clip.mp4");
+        let lock = video_lock(&format!("{id}/{}/clip", base_lang(lang)));
+        let _guard = lock.lock().await;
+        let modified = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+        if let Some(made) = modified(&path) {
+            let sources = [modified(&video), modified(&fetched.audio_path)];
+            if sources.iter().all(|t| t.is_some_and(|t| t <= made)) {
+                return Ok(path);
+            }
+        }
+        let audio = fetched.audio_path;
+        let bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
+            let picture = std::fs::read(&video).map_err(|e| e.to_string())?;
+            let sound = std::fs::read(&audio).map_err(|e| e.to_string())?;
+            crate::mux::mux(&picture, &sound).ok_or_else(|| "listen-no-clip".to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        write_atomic(&path, &bytes)?;
         Ok(path)
     }
 

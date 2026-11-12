@@ -61,10 +61,23 @@ pub async fn listen_audio(
 }
 
 /// The video's picture (H.264, no sound), raw: an ArrayBuffer on the
-/// JS side, played muted beside the language track.
+/// JS side (songs show it, muted, beside their own sound).
 #[tauri::command]
 pub async fn listen_video(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
     let path = listen(&app)?.video_path(&id).await?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// The drill's one file, raw: the picture with the `lang` track's
+/// sound in one MP4 (`Listen::clip_path`), played by a single element.
+#[tauri::command]
+pub async fn listen_clip(
+    app: AppHandle,
+    id: String,
+    lang: String,
+) -> Result<tauri::ipc::Response, String> {
+    let path = listen(&app)?.clip_path(&id, &lang).await?;
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     Ok(tauri::ipc::Response::new(bytes))
 }

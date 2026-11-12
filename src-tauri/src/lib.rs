@@ -457,6 +457,7 @@ pub fn run() {
             listen::listen_videos,
             listen::listen_fetch,
             listen::listen_video,
+            listen::listen_clip,
             listen::listen_song,
             listen::listen_song_audio,
             listen::listen_audio,

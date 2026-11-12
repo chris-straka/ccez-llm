@@ -8,26 +8,27 @@
 //! the sample data is copied, never re-encoded.
 
 /// One box: its type and where it sits in the parent slice.
-struct Box4 {
-    kind: [u8; 4],
+#[derive(Clone, Copy)]
+pub(crate) struct Box4 {
+    pub(crate) kind: [u8; 4],
     /// Offset of the box's first byte.
-    start: usize,
+    pub(crate) start: usize,
     /// Offset of the payload (after the size/type header).
-    body: usize,
+    pub(crate) body: usize,
     /// Offset one past the box's last byte.
-    end: usize,
+    pub(crate) end: usize,
 }
 
-fn u32_at(b: &[u8], at: usize) -> Option<u32> {
+pub(crate) fn u32_at(b: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(b.get(at..at + 4)?.try_into().ok()?))
 }
 
-fn u64_at(b: &[u8], at: usize) -> Option<u64> {
+pub(crate) fn u64_at(b: &[u8], at: usize) -> Option<u64> {
     Some(u64::from_be_bytes(b.get(at..at + 8)?.try_into().ok()?))
 }
 
 /// The boxes laid end to end in `b[from..to]`; None on a malformed size.
-fn boxes(b: &[u8], from: usize, to: usize) -> Option<Vec<Box4>> {
+pub(crate) fn boxes(b: &[u8], from: usize, to: usize) -> Option<Vec<Box4>> {
     let mut out = Vec::new();
     let mut at = from;
     while at + 8 <= to {
@@ -52,11 +53,11 @@ fn boxes(b: &[u8], from: usize, to: usize) -> Option<Vec<Box4>> {
     Some(out)
 }
 
-fn child<'a>(list: &'a [Box4], kind: &[u8; 4]) -> Option<&'a Box4> {
+pub(crate) fn child<'a>(list: &'a [Box4], kind: &[u8; 4]) -> Option<&'a Box4> {
     list.iter().find(|x| &x.kind == kind)
 }
 
-fn wrap(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+pub(crate) fn wrap(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(body.len() + 8);
     out.extend_from_slice(&((body.len() + 8) as u32).to_be_bytes());
     out.extend_from_slice(kind);
@@ -86,11 +87,11 @@ pub fn is_fragmented(src: &[u8]) -> bool {
     boxes(src, moov.body, moov.end).is_some_and(|kids| child(&kids, b"mvex").is_some())
 }
 
-struct Sample {
+pub(crate) struct Sample {
     /// Absolute offset of the sample's bytes in the source.
-    offset: usize,
-    size: u32,
-    duration: u32,
+    pub(crate) offset: usize,
+    pub(crate) size: u32,
+    pub(crate) duration: u32,
     sync: bool,
     cto: i32,
 }
@@ -225,12 +226,12 @@ fn runs_of<T: PartialEq + Copy>(values: impl Iterator<Item = T>) -> Vec<(u32, T)
 }
 
 /// The new sample table: `stsd` (and anything else not rebuilt) kept,
-/// the rest from the fragments. `base` is where the first chunk lands.
+/// the rest from `runs`, one chunk per run, run `k` at `offsets[k]`.
 fn sample_table(
     src: &[u8],
     stbl: &Box4,
     runs: &[Vec<Sample>],
-    base: u64,
+    offsets: &[u64],
     wide: bool,
 ) -> Option<Vec<u8>> {
     const REBUILT: [&[u8; 4]; 7] = [
@@ -283,11 +284,8 @@ fn sample_table(
     words.extend(all().map(|s| s.size));
     body.extend(full(b"stsz", 0, &words));
 
-    let mut at = base;
-    let mut offsets = Vec::with_capacity(runs.len());
-    for run in runs {
-        offsets.push(at);
-        at += run.iter().map(|s| u64::from(s.size)).sum::<u64>();
+    if offsets.len() != runs.len() {
+        return None;
     }
     if wide {
         let mut b = (0u32).to_be_bytes().to_vec();
@@ -304,93 +302,74 @@ fn sample_table(
     Some(wrap(b"stbl", &body))
 }
 
-/// `moov` with `mvex` dropped and the track's `stbl` rebuilt; every
-/// other box (headers, durations, edit list, codec setup) is kept.
-fn movie(src: &[u8], moov: &Box4, runs: &[Vec<Sample>], base: u64, wide: bool) -> Option<Vec<u8>> {
-    fn rebuild(
-        src: &[u8],
-        b: &Box4,
-        runs: &[Vec<Sample>],
-        base: u64,
-        wide: bool,
-    ) -> Option<Vec<u8>> {
-        let mut body = Vec::new();
-        for kid in boxes(src, b.body, b.end)? {
-            match &kid.kind {
-                b"mvex" => {}
-                b"trak" | b"mdia" | b"minf" => body.extend(rebuild(src, &kid, runs, base, wide)?),
-                b"stbl" => body.extend(sample_table(src, &kid, runs, base, wide)?),
-                _ => body.extend_from_slice(&src[kid.start..kid.end]),
-            }
-        }
-        Some(wrap(&b.kind, &body))
-    }
-    rebuild(src, moov, runs, base, wide)
+/// Where a rebuilt track's samples land: one chunk per run, run `k`
+/// at `offsets[k]`, in 64-bit offsets when `wide`.
+pub(crate) struct Layout<'a> {
+    pub(crate) runs: &'a [Vec<Sample>],
+    pub(crate) offsets: &'a [u64],
+    pub(crate) wide: bool,
 }
 
-/// A fragmented single-track MP4 as a plain one: `ftyp`, `moov` with
-/// the whole sample table, then one `mdat`. None when the input isn't
-/// a single-track fragmented file this understands; callers keep the
-/// original then.
-pub fn defragment(src: &[u8]) -> Option<Vec<u8>> {
-    let top = boxes(src, 0, src.len())?;
-    let moov = child(&top, b"moov")?;
-    let kids = boxes(src, moov.body, moov.end)?;
-    let mvex = child(&kids, b"mvex")?;
-    let traks: Vec<&Box4> = kids.iter().filter(|x| &x.kind == b"trak").collect();
-    let [trak] = traks.as_slice() else {
-        return None;
-    };
-    let tkhd = child(&boxes(src, trak.body, trak.end)?, b"tkhd")?.body;
-    let track = if src.get(tkhd)? == &1 {
-        u32_at(src, tkhd + 4 + 16)?
-    } else {
-        u32_at(src, tkhd + 4 + 8)?
-    };
-    let mut trex = Defaults::default();
-    for x in boxes(src, mvex.body, mvex.end)? {
-        if &x.kind == b"trex" && u32_at(src, x.body + 4)? == track {
-            trex = Defaults {
-                duration: u32_at(src, x.body + 12)?,
-                size: u32_at(src, x.body + 16)?,
-                flags: u32_at(src, x.body + 20)?,
-            };
+/// `b` rebuilt for a plain file: `mvex` dropped, the `stbl` from
+/// `layout`, and every other box copied, each leaf through `patch`
+/// (which may rewrite its bytes in place: the box and its header).
+pub(crate) fn rebuild(
+    src: &[u8],
+    b: &Box4,
+    layout: &Layout,
+    patch: &mut dyn FnMut(&[u8; 4], &mut [u8]),
+) -> Option<Vec<u8>> {
+    let mut body = Vec::new();
+    for kid in boxes(src, b.body, b.end)? {
+        match &kid.kind {
+            b"mvex" => {}
+            b"trak" | b"mdia" | b"minf" | b"edts" => {
+                body.extend(rebuild(src, &kid, layout, patch)?)
+            }
+            b"stbl" => body.extend(sample_table(
+                src,
+                &kid,
+                layout.runs,
+                layout.offsets,
+                layout.wide,
+            )?),
+            _ => {
+                let mut bytes = src[kid.start..kid.end].to_vec();
+                patch(&kid.kind, &mut bytes);
+                body.extend(bytes);
+            }
         }
     }
-    let runs = fragment_samples(src, &top, track, trex)?;
-    if runs.is_empty() {
-        return None;
-    }
-    let data: u64 = runs.iter().flatten().map(|s| u64::from(s.size)).sum();
+    Some(wrap(&b.kind, &body))
+}
 
-    let mut ftyp = Vec::new();
-    ftyp.extend_from_slice(b"isom");
-    ftyp.extend(512u32.to_be_bytes());
+/// Chunk offsets for runs laid end to end from `base`.
+fn packed(runs: &[Vec<Sample>], base: u64) -> Vec<u64> {
+    let mut at = base;
+    runs.iter()
+        .map(|run| {
+            let o = at;
+            at += run.iter().map(|s| u64::from(s.size)).sum::<u64>();
+            o
+        })
+        .collect()
+}
+
+/// The `ftyp` every rebuilt file starts with.
+pub(crate) fn ftyp() -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(b"isom");
+    body.extend(512u32.to_be_bytes());
     for brand in [b"isom", b"iso2", b"avc1", b"mp41"] {
-        ftyp.extend_from_slice(brand);
+        body.extend_from_slice(brand);
     }
-    let ftyp = wrap(b"ftyp", &ftyp);
+    wrap(b"ftyp", &body)
+}
 
-    // The moov's size doesn't depend on the offsets inside it, only on
-    // their width: measure once, then write with the real base.
-    let big_mdat = data + 8 > u64::from(u32::MAX);
-    let mdat_header: u64 = if big_mdat { 16 } else { 8 };
-    let probe = movie(src, moov, &runs, 0, false)?;
-    let mut wide =
-        ftyp.len() as u64 + probe.len() as u64 + mdat_header + data > u64::from(u32::MAX);
-    let mut moov_out = movie(src, moov, &runs, 0, wide)?;
-    if !wide && ftyp.len() as u64 + moov_out.len() as u64 + mdat_header + data > u64::from(u32::MAX)
-    {
-        wide = true;
-        moov_out = movie(src, moov, &runs, 0, wide)?;
-    }
-    let base = ftyp.len() as u64 + moov_out.len() as u64 + mdat_header;
-    let moov_out = movie(src, moov, &runs, base, wide)?;
-
-    let mut out = Vec::with_capacity(base as usize + data as usize);
-    out.extend(ftyp);
-    out.extend(moov_out);
-    if big_mdat {
+/// An `mdat` header for `data` bytes of samples.
+pub(crate) fn mdat_header(data: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    if data + 8 > u64::from(u32::MAX) {
         out.extend(1u32.to_be_bytes());
         out.extend_from_slice(b"mdat");
         out.extend((data + 16).to_be_bytes());
@@ -398,6 +377,262 @@ pub fn defragment(src: &[u8]) -> Option<Vec<u8>> {
         out.extend(((data + 8) as u32).to_be_bytes());
         out.extend_from_slice(b"mdat");
     }
+    out
+}
+
+/// The one track of a single-track MP4, plain or fragmented: its
+/// boxes and its samples in decode order, grouped into runs.
+pub(crate) struct Track {
+    pub(crate) moov: Box4,
+    pub(crate) trak: Box4,
+    pub(crate) runs: Vec<Vec<Sample>>,
+    /// The media timescale (`mdhd`).
+    pub(crate) timescale: u32,
+}
+
+impl Track {
+    /// Seconds from the track's start to run `k`'s first sample.
+    pub(crate) fn run_starts(&self) -> Vec<f64> {
+        let mut t = 0u64;
+        self.runs
+            .iter()
+            .map(|run| {
+                let at = t;
+                t += run.iter().map(|s| u64::from(s.duration)).sum::<u64>();
+                at as f64 / f64::from(self.timescale.max(1))
+            })
+            .collect()
+    }
+
+    /// The track's length in its own timescale (the sum of its
+    /// sample durations).
+    pub(crate) fn media_duration(&self) -> u64 {
+        self.runs
+            .iter()
+            .flatten()
+            .map(|s| u64::from(s.duration))
+            .sum()
+    }
+}
+
+/// Timescale and duration of an `mvhd` or `mdhd` (same layout up to
+/// there), from its payload offset.
+pub(crate) fn scale_and_duration(b: &[u8], body: usize) -> Option<(u32, u64)> {
+    if *b.get(body)? == 1 {
+        Some((u32_at(b, body + 20)?, u64_at(b, body + 24)?))
+    } else {
+        Some((u32_at(b, body + 12)?, u64::from(u32_at(b, body + 16)?)))
+    }
+}
+
+/// Every track of `src`, plain or fragmented.
+pub(crate) fn read_tracks(src: &[u8]) -> Option<Vec<Track>> {
+    let top = boxes(src, 0, src.len())?;
+    let moov = *child(&top, b"moov")?;
+    let kids = boxes(src, moov.body, moov.end)?;
+    let mut out = Vec::new();
+    for trak in kids.iter().filter(|x| &x.kind == b"trak") {
+        let trak = *trak;
+        let trak_kids = boxes(src, trak.body, trak.end)?;
+        let mdia = child(&trak_kids, b"mdia")?;
+        let mdia_kids = boxes(src, mdia.body, mdia.end)?;
+        let (timescale, _) = scale_and_duration(src, child(&mdia_kids, b"mdhd")?.body)?;
+        let runs = match child(&kids, b"mvex") {
+            Some(mvex) => {
+                let tkhd = child(&trak_kids, b"tkhd")?.body;
+                let track = if src.get(tkhd)? == &1 {
+                    u32_at(src, tkhd + 4 + 16)?
+                } else {
+                    u32_at(src, tkhd + 4 + 8)?
+                };
+                let mut trex = Defaults::default();
+                for x in boxes(src, mvex.body, mvex.end)? {
+                    if &x.kind == b"trex" && u32_at(src, x.body + 4)? == track {
+                        trex = Defaults {
+                            duration: u32_at(src, x.body + 12)?,
+                            size: u32_at(src, x.body + 16)?,
+                            flags: u32_at(src, x.body + 20)?,
+                        };
+                    }
+                }
+                fragment_samples(src, &top, track, trex)?
+            }
+            None => {
+                let minf = child(&mdia_kids, b"minf")?;
+                let stbl = *child(&boxes(src, minf.body, minf.end)?, b"stbl")?;
+                plain_samples(src, &stbl)?
+            }
+        };
+        if runs.is_empty() {
+            return None;
+        }
+        out.push(Track {
+            moov,
+            trak,
+            runs,
+            timescale,
+        });
+    }
+    Some(out)
+}
+
+/// The one track of a single-track `src`.
+pub(crate) fn read_track(src: &[u8]) -> Option<Track> {
+    let mut tracks = read_tracks(src)?;
+    if tracks.len() != 1 {
+        return None;
+    }
+    tracks.pop()
+}
+
+/// A full box's entry words: count at `body + 4`, then `width` words
+/// per entry. None when the box is shorter than it says.
+fn entries(src: &[u8], b: &Box4, width: usize) -> Option<Vec<u32>> {
+    let count = u32_at(src, b.body + 4)? as usize;
+    let from = b.body + 8;
+    if count.checked_mul(width * 4)? > b.end.saturating_sub(from) {
+        return None;
+    }
+    (0..count * width)
+        .map(|k| u32_at(src, from + k * 4))
+        .collect()
+}
+
+/// The samples a plain file's sample table describes, one run per
+/// chunk.
+fn plain_samples(src: &[u8], stbl: &Box4) -> Option<Vec<Vec<Sample>>> {
+    let kids = boxes(src, stbl.body, stbl.end)?;
+    let stsz = child(&kids, b"stsz")?;
+    let fixed = u32_at(src, stsz.body + 4)?;
+    let count = u32_at(src, stsz.body + 8)? as usize;
+    // Every sample takes at least a byte of the file.
+    if count > src.len() {
+        return None;
+    }
+    let sizes: Vec<u32> = if fixed != 0 {
+        vec![fixed; count]
+    } else {
+        if count * 4 > stsz.end.saturating_sub(stsz.body + 12) {
+            return None;
+        }
+        (0..count)
+            .map(|k| u32_at(src, stsz.body + 12 + k * 4))
+            .collect::<Option<_>>()?
+    };
+    // Expand run-length (count, value) pairs to one value per sample.
+    let expand = |words: &[u32]| -> Vec<u32> {
+        let mut out = Vec::with_capacity(count);
+        for pair in words.chunks_exact(2) {
+            let room = count - out.len();
+            out.extend(std::iter::repeat_n(pair[1], (pair[0] as usize).min(room)));
+        }
+        out
+    };
+    let durations = expand(&entries(src, child(&kids, b"stts")?, 2)?);
+    let ctts = match child(&kids, b"ctts") {
+        Some(b) => {
+            let signed = src.get(b.body) == Some(&1);
+            expand(&entries(src, b, 2)?)
+                .into_iter()
+                .map(|v| {
+                    if signed {
+                        v as i32
+                    } else {
+                        i32::try_from(v).unwrap_or(i32::MAX)
+                    }
+                })
+                .collect()
+        }
+        None => Vec::new(),
+    };
+    let keys = match child(&kids, b"stss") {
+        Some(b) => Some(entries(src, b, 1)?),
+        None => None,
+    };
+    let offsets: Vec<u64> = if let Some(b) = child(&kids, b"stco") {
+        entries(src, b, 1)?.into_iter().map(u64::from).collect()
+    } else {
+        let b = child(&kids, b"co64")?;
+        entries(src, b, 2)?
+            .chunks_exact(2)
+            .map(|w| u64::from(w[0]) << 32 | u64::from(w[1]))
+            .collect()
+    };
+    let stsc = entries(src, child(&kids, b"stsc")?, 3)?;
+    let mut runs = Vec::with_capacity(offsets.len());
+    let mut next = 0usize;
+    for (c, &offset) in offsets.iter().enumerate() {
+        let chunk = c as u32 + 1;
+        let per = stsc
+            .chunks_exact(3)
+            .take_while(|e| e[0] <= chunk)
+            .last()
+            .map_or(0, |e| e[1]) as usize;
+        let mut at = usize::try_from(offset).ok()?;
+        let mut run = Vec::with_capacity(per.min(count));
+        let end = (next + per).min(count);
+        for (k, &size) in sizes.iter().enumerate().take(end).skip(next) {
+            if at.checked_add(size as usize)? > src.len() {
+                return None;
+            }
+            run.push(Sample {
+                offset: at,
+                size,
+                duration: *durations.get(k).unwrap_or(&0),
+                sync: keys
+                    .as_ref()
+                    .is_none_or(|keys| keys.binary_search(&(k as u32 + 1)).is_ok()),
+                cto: *ctts.get(k).unwrap_or(&0),
+            });
+            at += size as usize;
+        }
+        next += run.len();
+        if !run.is_empty() {
+            runs.push(run);
+        }
+    }
+    (next == count).then_some(runs)
+}
+
+/// A fragmented single-track MP4 as a plain one: `ftyp`, `moov` with
+/// the whole sample table, then one `mdat`. None when the input isn't
+/// a single-track fragmented file this understands; callers keep the
+/// original then.
+pub fn defragment(src: &[u8]) -> Option<Vec<u8>> {
+    if !is_fragmented(src) {
+        return None;
+    }
+    let track = read_track(src)?;
+    let runs = &track.runs;
+    let data: u64 = runs.iter().flatten().map(|s| u64::from(s.size)).sum();
+    let ftyp = ftyp();
+    let mdat = mdat_header(data);
+    let movie = |offsets: &[u64], wide: bool| {
+        let layout = Layout {
+            runs,
+            offsets,
+            wide,
+        };
+        rebuild(src, &track.moov, &layout, &mut |_, _| {})
+    };
+
+    // The moov's size doesn't depend on the offsets inside it, only on
+    // their width: measure once, then write with the real base.
+    let zeros = vec![0; runs.len()];
+    let fits = |moov: usize| ftyp.len() + moov + mdat.len() + data as usize <= u32::MAX as usize;
+    let mut wide = false;
+    let mut probe = movie(&zeros, wide)?;
+    if !fits(probe.len()) {
+        wide = true;
+        probe = movie(&zeros, wide)?;
+    }
+    let base = (ftyp.len() + probe.len() + mdat.len()) as u64;
+    let moov_out = movie(&packed(runs, base), wide)?;
+
+    let mut out = Vec::with_capacity(base as usize + data as usize);
+    out.extend(ftyp);
+    out.extend(moov_out);
+    out.extend(mdat);
     for s in runs.iter().flatten() {
         out.extend_from_slice(&src[s.offset..s.offset + s.size as usize]);
     }

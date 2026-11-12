@@ -7,6 +7,7 @@ mod client;
 pub mod envelope;
 pub mod fmp4;
 pub mod heard;
+pub mod mux;
 pub mod youtube;
 
 pub use api::{Fetched, Listen};
