@@ -20,6 +20,7 @@ function backend(more: Partial<ListenBackend> = {}): ListenBackend {
 		audio: never,
 		envelope: never,
 		video: never,
+		clip: never,
 		heard: never,
 		song: () => Promise.resolve("audio/mp4"),
 		songAudio: () => Promise.resolve(new ArrayBuffer(8)),

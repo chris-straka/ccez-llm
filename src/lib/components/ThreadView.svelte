@@ -440,7 +440,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					open={msg.clip.heard === undefined}
 					playing={listen.mode.playing}
 					position={listen.mode.position}
-					videoUrl={listen.mode.videoUrl}
+					picture={listen.mode.screen}
 					anyOpen={clipOpen}
 					timed={listen.mode.clipWords(msg.clip.i)}
 					volume={listen.volume}

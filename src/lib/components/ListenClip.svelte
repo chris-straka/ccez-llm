@@ -23,8 +23,9 @@ notes fold under it (`ListenGloss`). -->
 		/** The playhead of the clip playing or paused. */
 		position: { i: number; t: number } | null;
 		audioStatus: "idle" | "loading" | "ready" | "error";
-		/** The video's picture once downloaded (null: still frames). */
-		videoUrl: string | null;
+		/** The drill's media element once it carries the picture (it
+		 * is the sound too); null: still frames. */
+		picture: HTMLVideoElement | null;
 		/** Some clip still waits to be answered: that one hosts the
 		 * picture, whichever clip is playing. */
 		anyOpen: boolean;
@@ -54,7 +55,7 @@ notes fold under it (`ListenGloss`). -->
 		playing,
 		position,
 		audioStatus,
-		videoUrl,
+		picture,
 		anyOpen,
 		timed,
 		volume,
@@ -76,25 +77,12 @@ notes fold under it (`ListenGloss`). -->
 	const screen = $derived(Boolean(span) && (open || (!anyOpen && at !== null)));
 	/** Volume before a mute, so unmuting goes back to it. */
 	let unmuted = $state(1);
-	let video = $state<HTMLVideoElement | null>(null);
-	// The picture follows the sound: muted, same playhead, same speed,
-	// whichever clip is sounding (an answered clip finishing its line
-	// shows here too, so the picture never jumps rows mid-sentence).
-	// The audio element owns time; the video only corrects when it
-	// drifts past a few frames and isn't already seeking, so playback
-	// stays smooth and seeks never pile up.
-	$effect(() => {
-		const v = video;
-		if (!v || !span) return;
-		const t = position?.t ?? span.start;
-		v.playbackRate = playing?.slow ? 0.75 : 1;
-		if (!v.seeking && Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
-		// Moving only once its jump has landed, as the sound does: playing
-		// mid-seek showed the old spot's frames at each clip's start.
-		if (playing) {
-			if (v.paused && !v.seeking) v.play().catch(() => {});
-		} else if (!v.paused) v.pause();
-	});
+	/** Hosts the drill's one element (picture and sound) in this card.
+	 * The controller owns it: playing, seeking and speed happen there,
+	 * and a card that takes over mid-sentence just adopts it. */
+	const host = (el: HTMLVideoElement) => (box: HTMLElement) => {
+		if (el.parentElement !== box) box.replaceChildren(el);
+	};
 	let row = $state<HTMLDivElement | null>(null);
 	// Once the text shows, the word sounding is marked on it as the
 	// clip plays (and stays on the word a pause stopped at).
@@ -203,20 +191,9 @@ notes fold under it (`ListenGloss`). -->
 					actions.playPause();
 				}}
 			>
-				{#if videoUrl}
-					<video
-						bind:this={video}
-						src={videoUrl}
-						muted
-						playsinline
-						preload="auto"
-						disablepictureinpicture
-						aria-hidden="true"
-						onloadedmetadata={(e) => {
-							// A seek before metadata is dropped: land on the clip now.
-							if (span) e.currentTarget.currentTime = position?.t ?? span.start;
-						}}
-					></video>
+				{#if picture}
+					<span class="picture" aria-hidden="true" {@attach host(picture)}
+					></span>
 				{:else if frame && frameState === "ok"}
 					<span class="poster" style={frameStyle} aria-hidden="true"></span>
 				{/if}
@@ -746,10 +723,16 @@ notes fold under it (`ListenGloss`). -->
 	.screen:disabled {
 		cursor: default;
 	}
-	.screen video,
+	.screen .picture,
 	.screen .poster {
 		position: absolute;
 		inset: 0;
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+	.picture :global(video) {
 		display: block;
 		width: 100%;
 		height: 100%;

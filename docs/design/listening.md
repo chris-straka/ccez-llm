@@ -50,11 +50,16 @@ the phone.
   proof-of-origin token. Native audio in the language wins over a dub.
 - Picture: the same response's picture-only formats (no muxed ones
   come back). The drill takes H.264 nearest 360p (every webview
-  decodes it; about 20-25 MB for eight minutes), downloads it once
-  after the audio, and plays it muted in step with the language track
-  (the audio owns time; the picture corrects past a quarter second of
-  drift). It shows centered on the clip in play; until it lands, or
-  when there is none, the storyboard still stays.
+  decodes it; about 20-25 MB for eight minutes) and downloads it once
+  after the audio. The backend then muxes it with the language's
+  track into one MP4 per video and language (`ccez-listen`'s `mux`:
+  pure Rust byte work, the samples copied, `clip.mp4` beside the
+  track), so one media element plays the picture and the sound with
+  nothing to keep in step. The first clip plays on the track alone
+  (small, so it starts at once); the next play, or the card's cue,
+  moves to the muxed file. It shows centered on the clip in play;
+  until it lands, or when there is none (no picture, a webm track),
+  the storyboard still stays and the track plays alone.
 - Captions: YouTube's speech recognition of the picked track
   (`kind: asr` in its language) carries the text and rough word
   timings. Uploaded subtitles are used when they exist. On dubs the

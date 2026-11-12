@@ -131,10 +131,12 @@ async function mockListenShell(page: Page): Promise<void> {
 						if (!heard) throw new Error("listen-heard-unsupported");
 						return heard(args);
 					}
-					if (cmd === "listen_video") {
+					// The picture muxed with the track: a spec opts in (a WAV
+					// stands in; the drill only needs one file that plays).
+					if (cmd === "listen_clip") {
 						if (!(window as unknown as { __withVideo?: boolean }).__withVideo)
 							throw new Error("listen-no-video");
-						return silentWav(1);
+						return silentWav(12);
 					}
 					// Launch-time calls the app tolerates failing.
 					if (cmd === "keychain_get") return null;
@@ -684,7 +686,14 @@ test("the clip in play shows the video, centered; others keep a still", async ({
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
 	const screen = clips.first().locator(".screen video");
 	await expect(screen).toBeVisible({ timeout: 10_000 });
-	await expect(screen).toHaveJSProperty("muted", true);
+	// The picture is the sound too: one element, and it is the one
+	// that plays (once clip 1 has played out on its own).
+	const play = clips.first().locator(".controls button.play");
+	await expect(play).toHaveAttribute("aria-label", "Play clip", {
+		timeout: 10_000
+	});
+	await play.click();
+	await expect(screen).toHaveJSProperty("paused", false);
 	const [clipBox, screenBox] = await Promise.all([
 		clips.first().boundingBox(),
 		clips.first().locator(".screen").boundingBox()

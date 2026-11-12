@@ -135,19 +135,26 @@ export class ListenMode {
 	position = $state<{ i: number; t: number } | null>(null);
 	/** The clip whose player the pointer is over (Space plays it). */
 	hoveredPlayer = $state<number | null>(null);
-	/** The drill's audio: loading or failed. */
+	/** The drill's media: loading or failed. */
 	audioStatus = $state<"idle" | "loading" | "ready" | "error">("idle");
-	/** The drill video's picture (a blob URL), once it has downloaded;
-	 * null before then, or when YouTube has none (the still frame
-	 * stays). Plays muted beside the language track. */
-	videoUrl = $state<string | null>(null);
-	private videoFor: string | null = null;
+	/** The element sounding (or cued) when its file carries the
+	 * picture: the clip card hosts it. Null before the picture is
+	 * made, or when YouTube has none (the still frame stays). */
+	screen = $state.raw<HTMLVideoElement | null>(null);
 
 	private readonly deps: ListenModeDeps;
-	private audio: HTMLAudioElement | null = null;
-	private audioUrl: string | null = null;
-	private audioFor: string | null = null;
-	private audioLoad: Promise<boolean> | null = null;
+	/** The one element that plays the drill: picture and sound. */
+	private media: HTMLVideoElement | null = null;
+	/** The drill's track alone (a blob URL): small, so it plays first. */
+	private trackUrl: string | null = null;
+	/** The picture with the track's sound in one file (a blob URL),
+	 * once the backend has made it; every element after uses it. */
+	private clipUrl: string | null = null;
+	/** The drill (`lang|id`) the media is for. */
+	private mediaFor: string | null = null;
+	private mediaLoad: Promise<boolean> | null = null;
+	/** Where a cue wants the picture (scrubs land on the newest). */
+	private cueAt: number | null = null;
 	private stopAt = 0;
 	private stopTimer: ReturnType<typeof setInterval> | null = null;
 	/** The next clip, waiting for the one playing to finish. */
@@ -501,7 +508,7 @@ export class ListenMode {
 			session.lang,
 			tokens
 		);
-		if (this.audioFor !== key) return;
+		if (this.mediaFor !== key) return;
 		let clips = session.clips;
 		if (!session.aligned && aligned) {
 			const moved = retimeClips(session.clips, tokens, aligned);
@@ -538,7 +545,7 @@ export class ListenMode {
 			} catch {
 				return;
 			}
-			if (this.audioFor !== key) return;
+			if (this.mediaFor !== key) return;
 			heard.push(...chunk.words);
 			const done = n + 1 >= chunk.chunks;
 			// Cached pieces come back at once: show the first piece
@@ -568,44 +575,38 @@ export class ListenMode {
 	}
 
 	/** Fetch the drill's track once per video (blob URL, so every clip
-	 * plays instantly and offline after this). */
+	 * plays instantly and offline after this), then the picture made
+	 * into one file with it. */
 	loadAudio(session: ListenSession): Promise<boolean> {
 		const key = infoKey(session.videoId, session.lang);
-		if (this.audioFor === key && this.audioLoad) return this.audioLoad;
+		if (this.mediaFor === key && this.mediaLoad) return this.mediaLoad;
 		this.stop();
-		if (this.audioUrl) URL.revokeObjectURL(this.audioUrl);
-		this.audio = null;
-		this.audioUrl = null;
-		this.audioFor = key;
+		this.dropMedia();
+		this.mediaFor = key;
 		this.wordTimes = null;
 		this.audioStatus = "loading";
-		this.audioLoad = (async () => {
+		this.mediaLoad = (async () => {
 			try {
 				const backend = this.needBackend();
 				// The fetch is cached on the backend: a drill reopened later
 				// re-reads the same file.
 				const fetched = await backend.fetch(session.videoId, session.lang);
 				const bytes = await backend.audio(session.videoId, session.lang);
-				if (this.audioFor !== key) return false;
+				if (this.mediaFor !== key) return false;
 				const chatId = activeChat(this.deps.getChatState()).id;
 				void this.timeWords(chatId, session, fetched.captions);
-				const url = URL.createObjectURL(
+				this.trackUrl = URL.createObjectURL(
 					new Blob([bytes], { type: fetched.audio_mime })
 				);
-				const el = new Audio();
-				el.preload = "auto";
-				this.wireGain(el);
-				el.src = url;
-				this.audio = el;
-				this.audioUrl = url;
+				this.media = this.element();
 				this.audioStatus = "ready";
-				// The picture follows the sound: bigger, and optional.
-				void this.loadVideo(session.videoId);
+				// The picture comes after: bigger, and optional.
+				void this.loadPicture(session, key);
 				return true;
 			} catch (error) {
-				if (this.audioFor === key) {
+				if (this.mediaFor === key) {
 					this.audioStatus = "error";
-					this.audioLoad = null;
+					this.mediaLoad = null;
 					this.deps.toast(
 						listenErrorCopy(error, this.deps.langName(session.lang))
 					);
@@ -613,36 +614,136 @@ export class ListenMode {
 				return false;
 			}
 		})();
-		return this.audioLoad;
+		return this.mediaLoad;
 	}
 
-	/** Fetch the video's picture once per video (a blob URL). A miss
-	 * leaves the still frames: the drill never waits on it. */
-	private async loadVideo(videoId: string): Promise<void> {
-		if (this.videoFor === videoId) return;
-		this.videoFor = videoId;
-		if (this.videoUrl) URL.revokeObjectURL(this.videoUrl);
-		this.videoUrl = null;
+	/** The picture and the track's sound, made into one file by the
+	 * backend (once per video and language). The clip playing finishes
+	 * on the track; the next play, or a cue now, uses the new file. A
+	 * miss keeps the track alone and the still frames: the drill never
+	 * waits on it. */
+	private async loadPicture(
+		session: ListenSession,
+		key: string
+	): Promise<void> {
 		try {
-			const bytes = await this.needBackend().video(videoId);
-			if (this.videoFor !== videoId) return;
-			this.videoUrl = URL.createObjectURL(
+			const bytes = await this.needBackend().clip(
+				session.videoId,
+				session.lang
+			);
+			if (this.mediaFor !== key) return;
+			this.clipUrl = URL.createObjectURL(
 				new Blob([bytes], { type: "video/mp4" })
 			);
+			this.cueScreen();
 		} catch {
-			if (this.videoFor === videoId) this.videoFor = null;
+			// The track alone plays on.
 		}
+	}
+
+	/** Let go of the drill's media (another drill is loading). */
+	private dropMedia(): void {
+		this.media?.pause();
+		this.media = null;
+		this.screen = null;
+		this.cueAt = null;
+		for (const url of [this.trackUrl, this.clipUrl])
+			if (url) URL.revokeObjectURL(url);
+		this.trackUrl = null;
+		this.clipUrl = null;
+	}
+
+	/** A new element on the drill's newest file, fed through the gain.
+	 * Video even for the track alone, so every element is the same
+	 * kind; only one on the picture's file goes on screen. */
+	private element(): HTMLVideoElement {
+		const el = document.createElement("video");
+		el.preload = "auto";
+		el.playsInline = true;
+		el.disablePictureInPicture = true;
+		el.setAttribute("aria-hidden", "true");
+		this.wireGain(el);
+		el.src = this.clipUrl ?? this.trackUrl ?? "";
+		return el;
+	}
+
+	/** True when `el` plays the picture's file. */
+	private pictured(el: HTMLVideoElement): boolean {
+		return this.clipUrl !== null && el.getAttribute("src") === this.clipUrl;
+	}
+
+	/** Put `el` on screen once it has a frame to show (until then the
+	 * one before keeps its frame up). */
+	private show(el: HTMLVideoElement): void {
+		if (!this.pictured(el)) {
+			if (this.media === el) this.screen = null;
+			return;
+		}
+		if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+			this.screen = el;
+			return;
+		}
+		el.addEventListener(
+			"loadeddata",
+			() => {
+				if (this.media === el) this.screen = el;
+			},
+			{ once: true }
+		);
+	}
+
+	/** Nothing playing: show the picture at `t` (a clip waiting, a
+	 * scrub). Seeks don't pile up: one in flight takes the newest `t`
+	 * when it lands. */
+	private cue(t: number): void {
+		if (this.playing || !this.clipUrl) return;
+		let el = this.media;
+		if (!el || !this.pictured(el)) {
+			el?.pause();
+			el = this.element();
+			this.media = el;
+		}
+		const target = el;
+		this.cueAt = t;
+		if (target.seeking) return;
+		const land = (): void => {
+			if (this.media !== target || this.playing) return;
+			const want = this.cueAt;
+			if (want !== null && Math.abs(target.currentTime - want) > 0.01) {
+				target.addEventListener("seeked", land, { once: true });
+				target.currentTime = want;
+				return;
+			}
+			this.cueAt = null;
+			this.show(target);
+		};
+		land();
+	}
+
+	/** Cue the picture on the clip the card shows: the one waiting for
+	 * a guess, else the one paused mid-way, at its playhead. */
+	private cueScreen(): void {
+		if (this.playing) return;
+		const chat = activeChat(this.deps.getChatState());
+		const session = chat.listen;
+		if (!session || this.mediaFor !== infoKey(session.videoId, session.lang))
+			return;
+		const at = this.position;
+		const i = openClip(chat)?.clip?.i ?? at?.i;
+		const clip = i === undefined ? undefined : session.clips[i];
+		if (i === undefined || !clip) return;
+		this.cue(at?.i === i ? at.t : clip.start);
 	}
 
 	/** The drill audio's volume (0-2), live on the clip playing. */
 	setVolume(volume: number): void {
 		this.volume = Math.min(2, Math.max(0, volume));
-		this.applyVolume(this.audio);
+		this.applyVolume(this.media);
 	}
 
 	/** Route a fresh element through the shared gain node, unhooking
 	 * the one before (a media element feeds one source node for life). */
-	private wireGain(el: HTMLAudioElement): void {
+	private wireGain(el: HTMLMediaElement): void {
 		this.source?.disconnect();
 		this.source = null;
 		try {
@@ -661,23 +762,26 @@ export class ListenMode {
 		this.applyVolume(el);
 	}
 
-	/** A new element on the drill's track for each play. WebKit (the Mac
-	 * shell) lands a seek on an element that has already played 0.1-2 s
-	 * off and can sound a moment of the old spot first; a fresh element
-	 * starts on the sample asked for (measured against the decoded
-	 * track: within 40 ms, where the reused one strayed up to 2 s). */
-	private freshTrack(old: HTMLAudioElement): HTMLAudioElement {
-		if (!this.audioUrl || old.played.length === 0) return old;
+	/** The element for the next play: the current one while it hasn't
+	 * played and is on the newest file, else a new one. WebKit (the
+	 * Mac shell) lands a seek on an element that has already played
+	 * 0.1-2 s off and can sound a moment of the old spot first; a fresh
+	 * element starts on the sample asked for (measured against the
+	 * decoded track: within 40 ms, where the reused one strayed up to
+	 * 2 s). The one before stays on screen until the new one's frame
+	 * is up. */
+	private freshElement(): HTMLVideoElement | null {
+		const old = this.media;
+		if (!old) return null;
+		const url = this.clipUrl ?? this.trackUrl;
+		if (old.played.length === 0 && old.getAttribute("src") === url) return old;
 		old.pause();
-		const el = new Audio();
-		el.preload = "auto";
-		this.wireGain(el);
-		el.src = this.audioUrl;
-		this.audio = el;
+		const el = this.element();
+		this.media = el;
 		return el;
 	}
 
-	private applyVolume(el: HTMLAudioElement | null): void {
+	private applyVolume(el: HTMLMediaElement | null): void {
 		if (!el) return;
 		if (this.gain) {
 			el.volume = 1;
@@ -685,11 +789,11 @@ export class ListenMode {
 		} else el.volume = Math.min(1, this.volume);
 	}
 
-	/** Silence the track (playhead and queue untouched). */
+	/** Silence the drill (playhead and queue untouched). */
 	private halt(): void {
 		if (this.stopTimer) clearInterval(this.stopTimer);
 		this.stopTimer = null;
-		this.audio?.pause();
+		this.media?.pause();
 		this.playing = null;
 	}
 
@@ -714,8 +818,8 @@ export class ListenMode {
 		const clip = session?.clips[i];
 		if (!session || !clip) return;
 		if (
-			!this.audio ||
-			this.audioFor !== infoKey(session.videoId, session.lang)
+			!this.media ||
+			this.mediaFor !== infoKey(session.videoId, session.lang)
 		) {
 			void this.loadAudio(session).then((ok) => {
 				if (ok) this.play(i, slow, from);
@@ -723,7 +827,9 @@ export class ListenMode {
 			return;
 		}
 		this.halt();
-		const el = this.freshTrack(this.audio);
+		const el = this.freshElement();
+		if (!el) return;
+		this.cueAt = null;
 		this.queued = null;
 		this.paused = null;
 		// A context made before any click starts suspended.
@@ -745,7 +851,8 @@ export class ListenMode {
 		// pause) must not clear this one.
 		const run = ++this.playRun;
 		const go = (): void => {
-			if (run !== this.playRun || this.audio !== el) return;
+			if (run !== this.playRun || this.media !== el) return;
+			this.show(el);
 			el.play().catch(() => {
 				if (run === this.playRun) this.halt();
 			});
@@ -780,13 +887,14 @@ export class ListenMode {
 		const next = this.queued;
 		this.stop();
 		if (next !== null) this.play(next, false);
+		else this.cueScreen();
 	}
 
 	/** Stop clip playback where it is; playing it again resumes. */
 	pause(): void {
 		const p = this.playing;
-		if (!p || !this.audio) return;
-		const t = this.audio.currentTime;
+		if (!p || !this.media) return;
+		const t = this.media.currentTime;
 		this.halt();
 		this.queued = null;
 		this.paused = p;
@@ -838,6 +946,7 @@ export class ListenMode {
 		this.queued = null;
 		this.paused = { i, slow };
 		this.position = { i, t: at };
+		this.cue(at);
 	}
 
 	/** The pointer entered (or left) clip `i`'s player. */

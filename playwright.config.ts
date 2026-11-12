@@ -85,7 +85,7 @@ export default defineConfig({
 				// Chromium, so the row layout is pinned in both.
 				"**/settings-layout.e2e.ts",
 				// Drill playback: the shell's media element seeks unlike
-				// Chromium's (listen-mode's freshTrack).
+				// Chromium's (listen-mode's freshElement).
 				"**/listen.e2e.ts"
 			]
 		}

@@ -24,6 +24,9 @@ export interface ListenBackend {
 	envelope: (id: string, lang: string) => Promise<ArrayBuffer>;
 	/** The video's picture (H.264, no sound), downloaded once. */
 	video: (id: string) => Promise<ArrayBuffer>;
+	/** The picture with the fetched track's sound, one MP4 (made once
+	 * per video and language; call after `fetch`). */
+	clip: (id: string, lang: string) => Promise<ArrayBuffer>;
 	/** Piece `n` of the words a speech recognizer hears in the track,
 	 * timed (Mac only; rejects elsewhere). */
 	heard: (id: string, lang: string, n: number) => Promise<HeardChunk>;
@@ -48,6 +51,7 @@ export function shellBackend(invoke: Invoke): ListenBackend {
 		envelope: (id, lang) =>
 			invoke<ArrayBuffer>("listen_envelope", { id, lang }),
 		video: (id) => invoke<ArrayBuffer>("listen_video", { id }),
+		clip: (id, lang) => invoke<ArrayBuffer>("listen_clip", { id, lang }),
 		heard: (id, lang, n) => invoke<HeardChunk>("listen_heard", { id, lang, n }),
 		song: (id) => invoke<string>("listen_song", { id }),
 		songAudio: (id) => invoke<ArrayBuffer>("listen_song_audio", { id })

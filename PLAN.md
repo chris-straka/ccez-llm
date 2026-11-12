@@ -9,18 +9,9 @@ Work these off and delete each when it ships.
   likely cause of this and of the keeps flicker. Owner watching; if it
   comes back, reproduce with `bun scripts/drive-app.ts` (child WKWebView
   from browser.rs with a background colour).
-- Clips deep dive (owner asked for bugs and maybe a newer way). Fixed
-  2026-11-11 (87f7eb9f): the play button now pauses a clip playing at 0.75×
-  (it showed a play triangle and restarted at full speed), and the picture
-  waits for its seek like the sound (old frames showed at each loop's
-  start). The design underneath: the language's sound (a blob, its own
-  <audio>) owns time; the silent H.264 picture (another blob, a <video>)
-  follows it, corrected when it drifts past 0.25 s; clips are padded 0.15 s
-  before and 0.35 s after (never past half the gap), aligned on the
-  recognizer's word times. The newer way, proposed: mux the picture and the
-  chosen language's sound into one MP4 per language when the drill starts
-  (Rust, in ccez-listen), and play clips from that one element: no drift,
-  one seek, nothing to keep in step. Waiting on the owner's go.
+- Check a drill on Android (emulator or the S24): clips now play from one
+  MP4 the backend muxes per video and language (`src-tauri/listen/src/mux.rs`,
+  2026-11-12), unverified in the Android WebView. Delete once seen.
 - Notes flickered in ccez-keeps while switching to ccez-llm with
   cmd+shift+enter: the ccez-keys Mac app set AXEnhancedUserInterface on
   Chromium apps; off since ccez-keys 7a13b70 (2026-11-11). Owner watching.

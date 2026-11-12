@@ -167,6 +167,7 @@ describe("search box", () => {
 			audio: () => new Promise<never>(() => {}),
 			envelope: () => new Promise<never>(() => {}),
 			video: () => new Promise<never>(() => {}),
+			clip: () => new Promise<never>(() => {}),
 			heard: () => new Promise<never>(() => {}),
 			song: () => new Promise<never>(() => {}),
 			songAudio: () => new Promise<never>(() => {})
@@ -306,6 +307,7 @@ describe("starting a drill", () => {
 			audio: () => new Promise<never>(() => {}),
 			envelope: () => Promise.reject(new Error("none")),
 			video: () => new Promise<never>(() => {}),
+			clip: () => new Promise<never>(() => {}),
 			heard: () => Promise.reject(new Error("listen-heard-unsupported")),
 			song: () => new Promise<never>(() => {}),
 			songAudio: () => new Promise<never>(() => {}),
