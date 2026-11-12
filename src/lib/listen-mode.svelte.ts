@@ -144,7 +144,7 @@ export class ListenMode {
 
 	private readonly deps: ListenModeDeps;
 	/** The one element that plays the drill: picture and sound. */
-	private media: HTMLVideoElement | null = null;
+	private media: HTMLMediaElement | null = null;
 	/** The drill's track alone (a blob URL): small, so it plays first. */
 	private trackUrl: string | null = null;
 	/** The picture with the track's sound in one file (a blob URL),
@@ -653,30 +653,39 @@ export class ListenMode {
 		this.clipUrl = null;
 	}
 
-	/** A new element on the drill's newest file, fed through the gain.
-	 * Video even for the track alone, so every element is the same
-	 * kind; only one on the picture's file goes on screen. */
-	private element(): HTMLVideoElement {
-		const el = document.createElement("video");
+	/** A new element on the drill's newest file, fed through the gain:
+	 * a video on the picture's file, an audio on the track alone (a
+	 * detached video never moves in Linux WebKit). */
+	private element(): HTMLMediaElement {
+		let el: HTMLMediaElement;
+		if (this.clipUrl) {
+			const video = document.createElement("video");
+			video.playsInline = true;
+			video.disablePictureInPicture = true;
+			video.setAttribute("aria-hidden", "true");
+			el = video;
+		} else el = new Audio();
 		el.preload = "auto";
-		el.playsInline = true;
-		el.disablePictureInPicture = true;
-		el.setAttribute("aria-hidden", "true");
 		this.wireGain(el);
 		el.src = this.clipUrl ?? this.trackUrl ?? "";
 		return el;
 	}
 
-	/** True when `el` plays the picture's file. */
-	private pictured(el: HTMLVideoElement): boolean {
-		return this.clipUrl !== null && el.getAttribute("src") === this.clipUrl;
+	/** `el` when it plays the picture's file. */
+	private pictured(el: HTMLMediaElement): HTMLVideoElement | null {
+		return el instanceof HTMLVideoElement &&
+			this.clipUrl !== null &&
+			el.getAttribute("src") === this.clipUrl
+			? el
+			: null;
 	}
 
 	/** Put `el` on screen once it has a frame to show (until then the
 	 * one before keeps its frame up). */
-	private show(el: HTMLVideoElement): void {
-		if (!this.pictured(el)) {
-			if (this.media === el) this.screen = null;
+	private show(media: HTMLMediaElement): void {
+		const el = this.pictured(media);
+		if (!el) {
+			if (this.media === media) this.screen = null;
 			return;
 		}
 		if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -691,7 +700,6 @@ export class ListenMode {
 			{ once: true }
 		);
 	}
-
 	/** Nothing playing: show the picture at `t` (a clip waiting, a
 	 * scrub). Seeks don't pile up: one in flight takes the newest `t`
 	 * when it lands. */
@@ -770,7 +778,7 @@ export class ListenMode {
 	 * decoded track: within 40 ms, where the reused one strayed up to
 	 * 2 s). The one before stays on screen until the new one's frame
 	 * is up. */
-	private freshElement(): HTMLVideoElement | null {
+	private freshElement(): HTMLMediaElement | null {
 		const old = this.media;
 		if (!old) return null;
 		const url = this.clipUrl ?? this.trackUrl;
