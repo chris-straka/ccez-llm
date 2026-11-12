@@ -12401,7 +12401,7 @@
 				else if (listenKey === "peek") listenMode.peek();
 				else if (listenKey === "stop") listenMode.pause();
 				else if (listenKey === "play" && listenMode.hoveredPlayer !== null)
-					listenMode.toggle(listenMode.hoveredPlayer, false);
+					listenMode.playPause(listenMode.hoveredPlayer);
 				else if (listenKey === "slow" && hoveredClip !== undefined)
 					listenMode.toggle(hoveredClip, true);
 				else if (listenKey === "restart") listenMode.restart(hoveredClip);

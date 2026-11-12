@@ -477,6 +477,25 @@ test("keys: S slows the hovered clip, A shows the text, a moves on", async ({
 	await expect(clips).toHaveCount(3);
 });
 
+test("a clip playing slowly shows Pause, and its play button pauses it", async ({
+	page
+}) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	await page.locator("#msg-0").hover();
+	await page.keyboard.press("s");
+	await expect(clips.first().locator(".slow.on")).toBeVisible();
+	// Playing slowly is still playing: the play button pauses it, and
+	// doesn't start it over at full speed.
+	const play = clips.first().locator(".controls button.play");
+	await expect(play).toHaveAttribute("aria-label", "Pause");
+	await play.click();
+	await expect(play).toHaveAttribute("aria-label", "Play clip");
+	await expect(clips.first().locator(".slow.on")).toHaveCount(0);
+});
+
 test("the composer is a chat: a question reads against the heard clips", async ({
 	page
 }) => {

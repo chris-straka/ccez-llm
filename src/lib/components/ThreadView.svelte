@@ -450,6 +450,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 							const c = msg.clip;
 							if (c) listen.mode.toggle(c.i, slow);
 						},
+						playPause: () => {
+							const c = msg.clip;
+							if (c) listen.mode.playPause(c.i);
+						},
 						restart: () => {
 							const c = msg.clip;
 							if (c) listen.mode.play(c.i, false);

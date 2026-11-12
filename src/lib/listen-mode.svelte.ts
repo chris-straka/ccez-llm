@@ -807,6 +807,21 @@ export class ListenMode {
 		else this.play(i, slow);
 	}
 
+	/** A clip's play button, a click on its picture, or Space over it:
+	 * pause it if it is playing at either speed, resume it where it
+	 * paused (at the speed it had), otherwise play it from the start.
+	 * The 0.75× button and S stay [toggle] with `slow`. */
+	playPause(i: number): void {
+		if (this.playing?.i === i) {
+			this.pause();
+			return;
+		}
+		const at = this.position;
+		if (this.paused?.i === i && at?.i === i)
+			this.play(i, this.paused.slow, at.t);
+		else this.play(i, false);
+	}
+
 	/** Scrub clip `i` to `t`: a playing clip jumps there, any other
 	 * waits there for its next play. */
 	seek(i: number, t: number): void {

@@ -35,6 +35,8 @@ notes fold under it (`ListenGloss`). -->
 		actions: {
 			/** Play / pause at a speed (resumes where it paused). */
 			play: (slow: boolean) => void;
+			/** Play or pause at whatever speed it has. */
+			playPause: () => void;
 			/** Play from the clip's start. */
 			restart: () => void;
 			seek: (t: number) => void;
@@ -87,8 +89,10 @@ notes fold under it (`ListenGloss`). -->
 		const t = position?.t ?? span.start;
 		v.playbackRate = playing?.slow ? 0.75 : 1;
 		if (!v.seeking && Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
+		// Moving only once its jump has landed, as the sound does: playing
+		// mid-seek showed the old spot's frames at each clip's start.
 		if (playing) {
-			if (v.paused) v.play().catch(() => {});
+			if (v.paused && !v.seeking) v.play().catch(() => {});
 		} else if (!v.paused) v.pause();
 	});
 	let row = $state<HTMLDivElement | null>(null);
@@ -163,7 +167,9 @@ notes fold under it (`ListenGloss`). -->
 	const heardWords = $derived(
 		clip.ops?.filter((o) => o.kind === "ok" || o.kind === "near").length ?? 0
 	);
-	const playOn = $derived(here && !playing?.slow);
+	/** Playing at either speed: the play button shows pause (S used to
+	 * leave it a play triangle that restarted the clip). */
+	const playOn = $derived(here);
 </script>
 
 <div
@@ -194,7 +200,7 @@ notes fold under it (`ListenGloss`). -->
 				disabled={audioStatus === "error"}
 				onclick={(e) => {
 					e.stopPropagation();
-					actions.play(false);
+					actions.playPause();
 				}}
 			>
 				{#if videoUrl}
@@ -243,7 +249,7 @@ notes fold under it (`ListenGloss`). -->
 				disabled={audioStatus === "error"}
 				onclick={(e) => {
 					e.stopPropagation();
-					actions.play(false);
+					actions.playPause();
 				}}
 			>
 				{#if playOn}
