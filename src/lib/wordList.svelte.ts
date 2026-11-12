@@ -75,22 +75,70 @@ export class WordList {
 		this.seq = s.seq;
 	}
 
+	/**
+	 * Headwords the server answered this session ("lang:word" → its
+	 * headword, or null: nothing to save). Unanswered asks aren't kept:
+	 * off the tailnet says nothing about the word.
+	 */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a plain cache, never rendered.
+	private heads = new Map<string, string | null>();
+
 	status(lang: string, word: string): WordStatus {
-		return this.statuses[wordKey(lang, word)] ?? "new";
+		const head = this.heads.get(wordKey(lang, word));
+		return (
+			(head ? this.statuses[wordKey(lang, head)] : undefined) ??
+			this.statuses[wordKey(lang, word)] ??
+			"new"
+		);
+	}
+
+	/**
+	 * The form to save a word under, from the server (`GET /headword`,
+	 * the one headword every app uses): its dictionary headword, null
+	 * for nothing to save (a number, a name, a fragment), undefined
+	 * when the server can't be reached — then the word goes as it is
+	 * and the server maps it later.
+	 */
+	private async headword(
+		lang: string,
+		word: string
+	): Promise<string | null | undefined> {
+		const cache = wordKey(lang, word);
+		if (this.heads.has(cache)) return this.heads.get(cache);
+		try {
+			const base = (lang.split(/[-_]/)[0] ?? lang).toLowerCase();
+			const res = await this.send(
+				`${this.server}/headword?lang=${base}&word=${encodeURIComponent(word.trim())}`,
+				{ signal: AbortSignal.timeout(4_000) }
+			);
+			if (!res.ok) return undefined;
+			const got = (await res.json()) as { headword?: unknown };
+			if (!("headword" in got)) return undefined;
+			const head =
+				typeof got.headword === "string" && got.headword ? got.headword : null;
+			this.heads.set(cache, head);
+			return head;
+		} catch {
+			return undefined;
+		}
 	}
 
 	/** Learning, or back to new: the star. */
 	async toggleLearning(lang: string, word: string): Promise<void> {
+		// Saved under its headword, the same form in every app; a word
+		// with none saves nothing (unstarring one kept from before the
+		// move still works, by the form it was kept in).
+		const asked = await this.headword(lang, word);
+		if (asked === null && this.status(lang, word) !== "learning") return;
+		const w = asked ?? word.trim();
 		const next: WordStatus =
 			this.status(lang, word) === "learning" ? "new" : "learning";
-		const key = wordKey(lang, word);
+		const key = wordKey(lang, w);
 		this.statuses = { ...this.statuses, [key]: next };
-		const [l, w] = [
-			key.slice(0, key.indexOf(":")),
-			key.slice(key.indexOf(":") + 1)
-		];
 		this.pending.push({
-			lang: l,
+			lang: key.slice(0, key.indexOf(":")),
+			// As written, not lowercased here: a German noun keeps its
+			// capital ("Wasser"); the server folds case for its key.
 			word: w,
 			status: next,
 			at: Date.now(),

@@ -26,10 +26,16 @@ describe("the shared word list", () => {
 		expect(list.status("fr", "fragiliser")).toBe("learning");
 		expect(list.status("fr", "marre")).toBe("known");
 		const posted = JSON.parse(
-			(send.mock.calls[0]![1] as RequestInit).body as string
+			(
+				send.mock.calls.find(
+					([, init]) => init?.method === "POST"
+				)![1] as RequestInit
+			).body as string
 		) as Array<{ word: string; status: string; from: string }>;
+		// Sent as written, not lowercased here (this stand-in answers no
+		// /headword, so the word also goes as it is).
 		expect(posted).toMatchObject([
-			{ word: "fragiliser", status: "learning", from: "ccez-llm" }
+			{ word: "Fragiliser", status: "learning", from: "ccez-llm" }
 		]);
 		// Again: back to new.
 		await list.toggleLearning("fr", "fragiliser");
@@ -38,21 +44,23 @@ describe("the shared word list", () => {
 
 	it("a quick star and unstar both reach the server, once each, in order", async () => {
 		const posted: Array<{ word: string; status: string }> = [];
-		let held: (() => void) | null = null;
+		let openGate!: () => void;
+		const gate = new Promise<void>((r) => (openGate = r));
 		const send = vi.fn(async (_u: RequestInfo | URL, init?: RequestInit) => {
 			if (init?.method === "POST") {
 				posted.push(...(JSON.parse(init.body as string) as typeof posted));
 				// The first send is slow: the unstar lands while it's out.
-				if (!held) await new Promise<void>((r) => (held = r));
+				if (posted.length === 1) await gate;
 				return reply(null);
 			}
 			return reply({ words: [], seq: 1 });
 		});
 		const list = new WordList("https://words.test", send);
 		const first = list.toggleLearning("fr", "marre");
-		await Promise.resolve();
+		// The first send is under way (the star asks /headword first).
+		while (!posted.length) await Promise.resolve();
 		const second = list.toggleLearning("fr", "marre");
-		held!();
+		openGate();
 		await Promise.all([first, second]);
 		expect(posted.map((p) => p.status)).toEqual(["learning", "new"]);
 		expect(list.status("fr", "marre")).toBe("new");
@@ -73,7 +81,7 @@ describe("the shared word list", () => {
 		await again.sync();
 		expect(
 			JSON.parse((up.mock.calls[0]![1] as RequestInit).body as string)
-		).toMatchObject([{ word: "wetter", status: "learning" }]);
+		).toMatchObject([{ word: "Wetter", status: "learning" }]);
 	});
 
 	it("a tab's save never drops another tab's waiting star", async () => {
@@ -93,6 +101,47 @@ describe("the shared word list", () => {
 		expect(
 			JSON.parse((up.mock.calls[0]![1] as RequestInit).body as string)
 		).toMatchObject([{ word: "marée", status: "learning" }]);
+	});
+
+	it("stars under the headword the server names, and a word with none saves nothing", async () => {
+		const posted: Array<{ lang: string; word: string; status: string }> = [];
+		const asUrl = (u: RequestInfo | URL): URL =>
+			new URL(typeof u === "string" ? u : u instanceof URL ? u.href : u.url);
+		const send = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+			if (init?.method === "POST") {
+				posted.push(...(JSON.parse(init.body as string) as typeof posted));
+				return reply(null);
+			}
+			const u = asUrl(url);
+			if (u.pathname === "/headword") {
+				const word = u.searchParams.get("word");
+				const lang = u.searchParams.get("lang");
+				if (lang === "fr" && word?.startsWith("frein"))
+					return reply({ headword: "freiner" });
+				if (lang === "de" && (word === "wasser" || word === "Wasser"))
+					return reply({ headword: "Wasser" });
+				return reply({ headword: null });
+			}
+			return reply({ words: [], seq: 1 });
+		});
+		const list = new WordList("https://words.test", send);
+		await list.toggleLearning("fr", "freinent");
+		expect(posted).toMatchObject([{ word: "freiner", status: "learning" }]);
+		// The headword's star covers its forms, both ways.
+		expect(list.status("fr", "freinent")).toBe("learning");
+		expect(list.status("fr", "freiner")).toBe("learning");
+		await list.toggleLearning("fr", "freiner");
+		expect(list.status("fr", "freinent")).toBe("new");
+		await list.toggleLearning("de", "wasser");
+		expect(posted.at(-1)).toMatchObject({ word: "Wasser", status: "learning" });
+		// Asked once per word (freinent, freiner, wasser), not per star.
+		expect(
+			send.mock.calls.filter(([u]) => asUrl(u).pathname === "/headword")
+		).toHaveLength(3);
+		// Nothing to save: no star, nothing sent.
+		await list.toggleLearning("fr", "Trump");
+		expect(list.status("fr", "Trump")).toBe("new");
+		expect(posted.some((p) => p.word === "Trump")).toBe(false);
 	});
 
 	it("brings in other apps' stars while it stays open", async () => {
