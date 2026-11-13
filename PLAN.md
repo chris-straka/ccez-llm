@@ -138,3 +138,7 @@ the record). Screenshots the owner attached are in
   out to the eojeol on 2026-10-14; the Chinese part needs a repro from
   the Mac: double-click already picks the segmenter word, single-hanzi
   drags are not snapped.)
+
+## Bug review, 2026-11-13
+
+Findings in docs/review-2026-11-13.md. Fixed that day: see the commits of 2026-11-13; everything else there is still open.
