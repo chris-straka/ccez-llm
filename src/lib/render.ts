@@ -446,7 +446,9 @@ export function sanitize(dirty: string): string {
 		purifier.addHook("uponSanitizeAttribute", (_node, data) => {
 			if (
 				data.attrName === "style" &&
-				/position\s*:\s*(fixed|absolute|sticky)|z-index|url\s*\(|image-set|@import/i.test(data.attrValue)
+				/position\s*:\s*(fixed|absolute|sticky)|z-index|url\s*\(|image-set|@import/i.test(
+					data.attrValue
+				)
 			)
 				data.keepAttr = false;
 			// Nothing in a reply loads from another site on its own: an
@@ -454,7 +456,10 @@ export function sanitize(dirty: string): string {
 			// (a fetched page can tell the model to write one; review,
 			// 2026-11-13). Links still work, on a click.
 			if (
-				(data.attrName === "src" || data.attrName === "srcset" || data.attrName === "poster" || data.attrName === "background") &&
+				(data.attrName === "src" ||
+					data.attrName === "srcset" ||
+					data.attrName === "poster" ||
+					data.attrName === "background") &&
 				remoteUrl(data.attrValue)
 			)
 				data.keepAttr = false;

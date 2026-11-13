@@ -17,6 +17,7 @@ Fixed (v0.72.2): the star follows the shared headword and a tap can no
 longer clear a word in every app.
 
 To fix:
+
 - A compact voice of the exact locale can beat his Premium voice of
   another region when no System Voice is set (`src-tauri/src/tts.rs:207`,
   `src/lib/voiceTiers.ts:98`): quality should win outright.
@@ -31,6 +32,7 @@ To fix:
   more).
 
 The owner's call:
+
 - Known can't be set or seen here: one star, Learning or new. A word
   Known elsewhere shows an empty star and a tap makes it Learning.
 - The card leads with the dictionary meaning and puts "in this sentence"

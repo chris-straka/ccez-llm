@@ -658,7 +658,8 @@
 		const runButton = closestFromTarget(event.target, "[data-code-run]");
 		if (runButton) {
 			// Only the app's own button runs anything (render.ts RUN_KEY).
-			if (isOurRunButton(runButton)) onRunBlock(Number(runButton.dataset.codeRun ?? -1));
+			if (isOurRunButton(runButton))
+				onRunBlock(Number(runButton.dataset.codeRun ?? -1));
 			return;
 		}
 		if (!copyButton) {
