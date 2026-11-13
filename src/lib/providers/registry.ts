@@ -22,6 +22,7 @@ export type ProviderId = string & { readonly kind: "provider" };
 
 export const BUILTIN_PROVIDER_IDS = [
 	"muse",
+	"muse-login",
 	"deepseek",
 	"opencode-zen",
 	"local-mlkit",
@@ -73,6 +74,18 @@ export const PROVIDERS: ProviderDef[] = [
 		defaultBaseUrl: "https://api.meta.ai/v1",
 		defaultModel: "muse-spark-1.3-contributor",
 		keyHint: "Meta Model API key"
+	},
+	{
+		// Muse through llm.ccez.uk with the owner's key kept on the server
+		// (functions/api/ai/muse): a device he's logged in on needs no key
+		// (owner, 2026-11-13). The web build only; its login is Cloudflare
+		// Access.
+		id: builtin("muse-login"),
+		label: "Muse (logged in)",
+		defaultBaseUrl: "/api/ai/muse",
+		defaultModel: "muse-spark-1.3-contributor",
+		keyHint: "your login on llm.ccez.uk",
+		keyless: true
 	},
 	{
 		id: builtin("deepseek"),

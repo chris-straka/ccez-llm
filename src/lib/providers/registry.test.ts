@@ -28,6 +28,7 @@ describe("registry", () => {
 	it("lists built-ins plus customs, rejects unknowns", () => {
 		expect(listProviders(custom).map((p) => p.id)).toEqual([
 			"muse",
+			"muse-login",
 			"deepseek",
 			"opencode-zen",
 			"local-mlkit",
