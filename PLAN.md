@@ -1,3 +1,14 @@
+# Bug review, 2026-11-13: left for later (v0.72.3 fixed six)
+
+- A phrase's quick one-line answer counts as answered: backgrounded or
+  restarted before the full answer, the one-liner stays for good
+  (reading.ts:1285; mark it unfinished like card.partial).
+- Mac speech: a readback interrupting another gets the old one's cancel
+  under its id (tts.rs:591-592): keep the id per utterance.
+- A note taken from a prefetch ignores its abort signal, so a hung request
+  keeps it blue (+page.svelte:1112): pass the signal to take().
+- Headline notes saved before v0.72.3 keep "French" as their language.
+
 # Review, 2026-11-12 (the language side against what the owner has asked for)
 
 Read-only, cut short; nothing here is checked on screen. Delete each as it ships.
