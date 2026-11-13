@@ -163,6 +163,6 @@ Findings in docs/review-2026-11-13.md. Fixed that day: see the commits of 2026-1
 - Furigana and pinyin: keep as they are.
 - New words per reply: a setting; he wants more than the 95% research
   figure suggests.
-- Idea offered, not decided: a short daily read per language from the
+- Parked (owner unsure, 2026-11-13): a short daily read per language from the
   news he follows, built on his due items.
 - He builds for himself; no other users to design for.
