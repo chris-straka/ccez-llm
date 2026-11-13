@@ -80,10 +80,31 @@ export class WordList {
 	 * headword, or null: nothing to save). Unanswered asks aren't kept:
 	 * off the tailnet says nothing about the word.
 	 */
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a plain cache, never rendered.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a plain cache; `headsSeq` tells readers when it grows.
 	private heads = new Map<string, string | null>();
+	/** Bumped when a headword arrives, so a star drawn before it redraws. */
+	private headsSeq = $state(0);
+	/** Asks under way, and when a failed one may be tried again. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
+	private asking = new Map<string, number>();
+
+	/**
+	 * A card is open on this word: its headword is asked for now, so its
+	 * star shows the status of the form every app saves it under
+	 * ("freinent" lit when "freiner" is Learning). Before, the headword
+	 * was only asked on a tap, the star showed empty, and that tap then
+	 * cleared the word in every app. Safe to call while rendering.
+	 */
+	want(lang: string, word: string): void {
+		const key = wordKey(lang, word);
+		if (this.heads.has(key) || (this.asking.get(key) ?? 0) > Date.now()) return;
+		// Off the tailnet: asked again in a minute, not on every redraw.
+		this.asking.set(key, Date.now() + 60_000);
+		void this.headword(lang, word);
+	}
 
 	status(lang: string, word: string): WordStatus {
+		void this.headsSeq;
 		const head = this.heads.get(wordKey(lang, word));
 		return (
 			(head ? this.statuses[wordKey(lang, head)] : undefined) ??
@@ -117,6 +138,7 @@ export class WordList {
 			const head =
 				typeof got.headword === "string" && got.headword ? got.headword : null;
 			this.heads.set(cache, head);
+			this.headsSeq++;
 			return head;
 		} catch {
 			return undefined;
@@ -128,11 +150,14 @@ export class WordList {
 		// Saved under its headword, the same form in every app; a word
 		// with none saves nothing (unstarring one kept from before the
 		// move still works, by the form it was kept in).
+		// The direction is what the star showed when it was tapped: a star
+		// drawn empty before the headword was known must never clear the
+		// word once the headword turns out to be Learning.
+		const shown = this.status(lang, word);
 		const asked = await this.headword(lang, word);
-		if (asked === null && this.status(lang, word) !== "learning") return;
+		if (asked === null && shown !== "learning") return;
 		const w = asked ?? word.trim();
-		const next: WordStatus =
-			this.status(lang, word) === "learning" ? "new" : "learning";
+		const next: WordStatus = shown === "learning" ? "new" : "learning";
 		const key = wordKey(lang, w);
 		this.statuses = { ...this.statuses, [key]: next };
 		this.pending.push({

@@ -16204,10 +16204,14 @@
 				gap={pop.gap}
 				badgeId={pop.id}
 				starred={answered.card?.lang
-					? wordList.status(
+					? (wordList.want(
 							answered.card.lang,
 							listWord(answered.card, answered.quote)
-						) === "learning"
+						),
+						wordList.status(
+							answered.card.lang,
+							listWord(answered.card, answered.quote)
+						) === "learning")
 					: plang
 						? phraseStarring.has(answered.id) ||
 							(answered.listForm !== undefined &&

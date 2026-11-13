@@ -42,6 +42,40 @@ describe("the shared word list", () => {
 		expect(list.status("fr", "fragiliser")).toBe("new");
 	});
 
+	it("a form's star follows its headword, and a tap before it's known never clears the word", async () => {
+		const posted: Array<{ word: string; status: string }> = [];
+		const send = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+			if (init?.method === "POST") {
+				posted.push(...(JSON.parse(init.body as string) as typeof posted));
+				return reply(null);
+			}
+			if (typeof url === "string" && url.includes("/headword?"))
+				return reply({ headword: "freiner" });
+			return reply({
+				words: [{ lang: "fr", word: "freiner", status: "learning" }],
+				seq: 3
+			});
+		});
+		const list = new WordList("https://words.test", send);
+		await list.sync();
+		// A new session: the form's headword isn't known yet, its star is empty.
+		expect(list.status("fr", "freinent")).toBe("new");
+		// Tapped as it showed (empty): stars, never "back to new" for freiner.
+		await list.toggleLearning("fr", "freinent");
+		expect(list.status("fr", "freiner")).toBe("learning");
+		expect(posted.map((p) => p.status)).not.toContain("new");
+		// The card asks as it opens: the star is lit without a tap.
+		const fresh = new WordList("https://words.test", send);
+		await fresh.sync();
+		fresh.want("fr", "freinent");
+		await vi.waitFor(() =>
+			expect(fresh.status("fr", "freinent")).toBe("learning")
+		);
+		// Lit and tapped: back to new, under the headword.
+		await fresh.toggleLearning("fr", "freinent");
+		expect(posted.at(-1)).toMatchObject({ word: "freiner", status: "new" });
+	});
+
 	it("a quick star and unstar both reach the server, once each, in order", async () => {
 		const posted: Array<{ word: string; status: string }> = [];
 		let openGate!: () => void;
