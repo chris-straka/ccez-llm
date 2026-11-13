@@ -305,11 +305,15 @@ export async function webFetch(
 	let res: Response;
 	try {
 		res = await fetch(`${path}?${new URLSearchParams(params)}`, {
-			headers: { accept: "text/plain" }
+			headers: { accept: "text/plain" },
+			// Access sends a visitor without the owner's login to its sign-in page.
+			redirect: "manual"
 		});
 	} catch {
 		throw new Error("failed");
 	}
+	if (res.type === "opaqueredirect" || res.status === 401)
+		throw new Error("news-needs-login");
 	if (!res.headers.has(WEB_FETCH_HEADER)) throw new Error("news-needs-shell");
 	const body = await res.text();
 	if (!res.ok) throw new Error(body || "failed");

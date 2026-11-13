@@ -516,7 +516,11 @@ export class NewsMode {
 			const message = error instanceof Error ? error.message : "";
 			this.news = {
 				...current,
-				status: message.includes("news-needs-shell") ? "needs-shell" : "error",
+				status: message.includes("news-needs-login")
+					? "needs-login"
+					: message.includes("news-needs-shell")
+						? "needs-shell"
+						: "error",
 				stories: [],
 				error: newsErrorCopy(error)
 			};

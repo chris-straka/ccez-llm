@@ -218,7 +218,7 @@ everything else is theme tokens, never raw hex. -->
 	}}
 >
 	<div class="news-bar">
-		{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
+		{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell" && panel.status !== "needs-login"}
 			<div class="news-chips" role="group" aria-label="News region">
 				{#each panel.regions as region, i (region.gl)}
 					{#if i > 0 && !!region.icon !== !!panel.regions[i - 1]?.icon}
@@ -497,6 +497,8 @@ everything else is theme tokens, never raw hex. -->
 		>
 	{:else if panel.status === "unsupported"}
 		<p class="news-note">Google News has no {panel.langName} edition yet.</p>
+	{:else if panel.status === "needs-login"}
+		<a class="news-retry" href="/api/login">Log in</a>
 	{:else if panel.status === "needs-shell"}
 		<p class="news-note">
 			News needs the app shell — the browser preview can't reach it.

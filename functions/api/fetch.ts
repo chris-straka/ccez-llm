@@ -9,16 +9,22 @@ import { googleFeedUrl, publicUrl } from "../../src/lib/web-fetch";
 import {
 	answer,
 	cached,
-	foreign,
 	get,
 	head,
 	relay,
 	transportCode,
 	type Context
 } from "./_shared";
+import { notOwner } from "./_access";
 
 export async function onRequestGet(ctx: Context): Promise<Response> {
-	if (foreign(ctx.request)) return answer("forbidden", 403);
+	// The owner's login only (_access.ts); the old header check was any script's to send.
+	const why = await notOwner(ctx);
+	if (why)
+		return answer(
+			why === "login" ? "needs-login" : "forbidden",
+			why === "login" ? 401 : 403
+		);
 	const url = publicUrl(new URL(ctx.request.url).searchParams.get("url") ?? "");
 	if (!url) return answer("bad-url", 400);
 	const feed = googleFeedUrl(url.href);

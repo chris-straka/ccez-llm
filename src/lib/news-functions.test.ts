@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { answer, foreign } from "../../functions/api/_shared";
+import { answer } from "../../functions/api/_shared";
+import { notOwner } from "../../functions/api/_access";
 
 const at = (headers: Record<string, string>) =>
 	new Request("https://llm.ccez.uk/api/fetch?url=https://example.com/", {
@@ -7,17 +8,23 @@ const at = (headers: Record<string, string>) =>
 	});
 
 describe("the website's news functions", () => {
-	it("answer only the site's own page", () => {
-		expect(foreign(at({ "sec-fetch-site": "same-origin" }))).toBe(false);
-		// A script with no browser headers used it as a proxy (2026-11-06).
-		expect(foreign(at({}))).toBe(true);
-		expect(foreign(at({ "sec-fetch-site": "cross-site" }))).toBe(true);
-		expect(foreign(at({ "sec-fetch-site": "none" }))).toBe(true);
+	it("answer only the owner's login", async () => {
+		const ctx = (headers: Record<string, string>, aud?: string) => ({
+			request: at(headers),
+			env: aud ? { ACCESS_AUD: aud } : {},
+			waitUntil: () => undefined
+		});
+		// Not set up: nothing gets through.
+		expect(await notOwner(ctx({ "sec-fetch-site": "same-origin" }))).toBe(
+			"not set up"
+		);
+		// The old header alone is no longer enough (any script could send it).
 		expect(
-			foreign(
-				at({ "sec-fetch-site": "same-origin", origin: "https://evil.example" })
-			)
-		).toBe(true);
+			await notOwner(ctx({ "sec-fetch-site": "same-origin" }, "aud"))
+		).toBe("login");
+		expect(
+			await notOwner(ctx({ cookie: "CF_Authorization=not.a" }, "aud"))
+		).toBe("malformed");
 	});
 
 	it("never let a fetched page run on the site's origin", () => {

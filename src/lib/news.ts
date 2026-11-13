@@ -1294,7 +1294,13 @@ export type NewsKind = "talk" | "read";
 
 /** News panel fetch state. */
 export type NewsStatus =
-	"loading" | "translating" | "ready" | "error" | "unsupported" | "needs-shell";
+	| "loading"
+	| "translating"
+	| "ready"
+	| "error"
+	| "unsupported"
+	| "needs-shell"
+	| "needs-login";
 
 /** Everything the news panel renders (page-owned). */
 export interface NewsPanelState {
@@ -1987,6 +1993,8 @@ export async function translateNewsTitles(
  */
 export function newsErrorCopy(error: unknown): string {
 	const message = error instanceof Error ? error.message : String(error);
+	if (message.includes("news-needs-login"))
+		return "Log in to read the news here.";
 	if (message.includes("news-needs-shell")) {
 		return "News needs the app shell — the browser preview can't reach it.";
 	}

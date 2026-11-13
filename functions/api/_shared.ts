@@ -15,7 +15,7 @@ const UA =
 
 export interface Context {
 	request: Request;
-	env: { RELAY_TOKEN?: string; RELAY_URL?: string };
+	env: { RELAY_TOKEN?: string; RELAY_URL?: string; ACCESS_AUD?: string };
 	waitUntil(p: Promise<unknown>): void;
 }
 
@@ -65,18 +65,6 @@ export function answer(
 			"cache-control": keep ? `public, max-age=${seconds}` : "no-store"
 		}
 	});
-}
-
-/**
- * Anything but the site's own page calling: refused. Every browser the
- * site runs in says `sec-fetch-site: same-origin` on its own fetches;
- * a call without it is a script using the site as a proxy (2026-11-06:
- * a bare curl fetched any page through here).
- */
-export function foreign(request: Request): boolean {
-	if (request.headers.get("sec-fetch-site") !== "same-origin") return true;
-	const origin = request.headers.get("origin");
-	return !!origin && new URL(origin).host !== new URL(request.url).host;
 }
 
 /**

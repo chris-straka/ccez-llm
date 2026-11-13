@@ -5,10 +5,17 @@
  */
 
 import { articleId } from "../../src/lib/web-fetch";
-import { answer, cached, foreign, relay, type Context } from "./_shared";
+import { answer, cached, relay, type Context } from "./_shared";
+import { notOwner } from "./_access";
 
 export async function onRequestGet(ctx: Context): Promise<Response> {
-	if (foreign(ctx.request)) return answer("forbidden", 403);
+	// The owner's login only (_access.ts); the old header check was any script's to send.
+	const why = await notOwner(ctx);
+	if (why)
+		return answer(
+			why === "login" ? "needs-login" : "forbidden",
+			why === "login" ? 401 : 403
+		);
 	const link = new URL(ctx.request.url).searchParams.get("link") ?? "";
 	// Google's ids are long base64: anything else is refused before it
 	// costs a call to Google from the relay's budget.
