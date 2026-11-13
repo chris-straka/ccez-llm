@@ -230,6 +230,22 @@ const DIR_AUTO_BLOCKS = /<(p|li|h[1-6]|blockquote|td|th)(?=[\s>])/g;
  * Play triangle for the Code Run button: same 16px box as the copy
  * glyph, filled (a stroked triangle reads mushy at 1rem).
  */
+/**
+ * A key the app's own Run buttons carry, made fresh each launch and never
+ * shown to a model: a reply's own HTML could build a button that looks
+ * like Run (and once ran a hidden bash block with one click; review,
+ * 2026-11-13). A click runs code only when the key matches.
+ */
+export const RUN_KEY: string =
+	typeof crypto !== "undefined" && "randomUUID" in crypto
+		? crypto.randomUUID()
+		: Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+/** The Run button the app made itself (not one a reply's HTML built). */
+export function isOurRunButton(el: Element | null): boolean {
+	return !!el && el.getAttribute("data-code-key") === RUN_KEY;
+}
+
 const CODE_RUN_GLYPH =
 	`<svg class="action-glyph" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">` +
 	`<path d="M5 3.2v9.6L12.2 8z" />` +
@@ -310,7 +326,7 @@ function renderInto(
 				// alone — never a button that only explains itself.
 				const runButton =
 					runnerFor(language) !== null
-						? `<button type="button" class="ccez-code-run" data-code-run="${index}" data-code-lang="${escapeHtml(language)}" aria-label="Run code block" title="Run locally">${CODE_RUN_GLYPH}</button>`
+						? `<button type="button" class="ccez-code-run" data-code-run="${index}" data-code-key="${RUN_KEY}" data-code-lang="${escapeHtml(language)}" aria-label="Run code block" title="Run locally">${CODE_RUN_GLYPH}</button>`
 						: "";
 				return (
 					`<div class="ccez-code" data-code-index="${index}">` +
@@ -390,6 +406,24 @@ function resolveBidi(html: string): string {
 	return box.innerHTML;
 }
 
+/**
+ * An address that loads from another site: http(s) or protocol-relative,
+ * anything but this app's own (asset:, data:, blob:, relative paths).
+ */
+export function remoteUrl(value: string): boolean {
+	const v = value.trim().toLowerCase();
+	if (!/^(https?:)?\/\//.test(v) && !/,\s*(https?:)?\/\//.test(v)) return false;
+	if (typeof location !== "undefined") {
+		try {
+			const u = new URL(value.trim(), location.href);
+			if (u.origin === location.origin) return false;
+		} catch {
+			return true;
+		}
+	}
+	return !/^https?:\/\/(asset|tauri)\.localhost\//.test(v);
+}
+
 let purifier: ReturnType<typeof DOMPurify> | null = null;
 
 export function sanitize(dirty: string): string {
@@ -412,7 +446,16 @@ export function sanitize(dirty: string): string {
 		purifier.addHook("uponSanitizeAttribute", (_node, data) => {
 			if (
 				data.attrName === "style" &&
-				/position\s*:\s*(fixed|absolute|sticky)|z-index/i.test(data.attrValue)
+				/position\s*:\s*(fixed|absolute|sticky)|z-index|url\s*\(|image-set|@import/i.test(data.attrValue)
+			)
+				data.keepAttr = false;
+			// Nothing in a reply loads from another site on its own: an
+			// image's address could carry the chat out the moment it shows
+			// (a fetched page can tell the model to write one; review,
+			// 2026-11-13). Links still work, on a click.
+			if (
+				(data.attrName === "src" || data.attrName === "srcset" || data.attrName === "poster" || data.attrName === "background") &&
+				remoteUrl(data.attrValue)
 			)
 				data.keepAttr = false;
 		});
@@ -429,6 +472,7 @@ export function sanitize(dirty: string): string {
 				"aria-expanded",
 				"data-code-copy",
 				"data-code-run",
+				"data-code-key",
 				"data-code-lang",
 				"data-code-output",
 				"data-code-index",

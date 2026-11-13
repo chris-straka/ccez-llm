@@ -12,6 +12,7 @@
 	import { aidHtml, aidPinyinHtml, type AidHtmlMode } from "$lib/aidHtml";
 	import {
 		renderMessage,
+		isOurRunButton,
 		renderMarkdown,
 		applyPasteFolds,
 		applyHighlightFragments,
@@ -656,7 +657,8 @@
 		const copyButton = closestFromTarget(event.target, "[data-code-copy]");
 		const runButton = closestFromTarget(event.target, "[data-code-run]");
 		if (runButton) {
-			onRunBlock(Number(runButton.dataset.codeRun ?? -1));
+			// Only the app's own button runs anything (render.ts RUN_KEY).
+			if (isOurRunButton(runButton)) onRunBlock(Number(runButton.dataset.codeRun ?? -1));
 			return;
 		}
 		if (!copyButton) {
