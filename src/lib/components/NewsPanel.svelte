@@ -498,7 +498,12 @@ everything else is theme tokens, never raw hex. -->
 	{:else if panel.status === "unsupported"}
 		<p class="news-note">Google News has no {panel.langName} edition yet.</p>
 	{:else if panel.status === "needs-login"}
-		<a class="news-retry" href="/api/login">Log in</a>
+		<!-- Out of the app to Cloudflare's login, which sends it back. -->
+		<button
+			type="button"
+			class="news-retry"
+			onclick={() => location.assign("/api/login")}>Log in</button
+		>
 	{:else if panel.status === "needs-shell"}
 		<p class="news-note">
 			News needs the app shell — the browser preview can't reach it.

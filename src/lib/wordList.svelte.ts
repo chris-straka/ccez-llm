@@ -107,6 +107,11 @@ export class WordList {
 		void this.headword(lang, word);
 	}
 
+	/** The words server this list talks to. */
+	get serverUrl(): string {
+		return this.server;
+	}
+
 	status(lang: string, word: string): WordStatus {
 		void this.headsSeq;
 		const head = this.heads.get(wordKey(lang, word));

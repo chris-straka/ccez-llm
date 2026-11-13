@@ -57,8 +57,8 @@ export async function notOwner(ctx: Context): Promise<string | null> {
 	let header: { kid?: unknown; alg?: unknown };
 	let claims: { aud?: unknown; exp?: unknown; email?: unknown };
 	try {
-		header = JSON.parse(new TextDecoder().decode(b64url(h)));
-		claims = JSON.parse(new TextDecoder().decode(b64url(p)));
+		header = JSON.parse(new TextDecoder().decode(b64url(h))) as typeof header;
+		claims = JSON.parse(new TextDecoder().decode(b64url(p))) as typeof claims;
 	} catch {
 		return "malformed";
 	}

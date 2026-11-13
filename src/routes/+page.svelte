@@ -603,6 +603,7 @@
 	} from "$lib/reader";
 	import { WordList } from "$lib/wordList.svelte";
 	import { useWordSource } from "$lib/weakSpots";
+	import { useLearningSource } from "$lib/learningMarks";
 	import { listWord } from "$lib/word-card";
 	import {
 		cleanPhraseForm,
@@ -2918,6 +2919,11 @@
 	useWordSource(() => ({
 		statuses: wordList.statuses,
 		review: wordList.review
+	}));
+	// Learning words underlined in replies, read and tapped as review.
+	useLearningSource(() => ({
+		server: wordList.serverUrl,
+		statuses: wordList.statuses
 	}));
 	/** Phrase notes whose first star is still asking for the form. */
 	const phraseStarring = new SvelteSet<string>();

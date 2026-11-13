@@ -1,4 +1,13 @@
 <script lang="ts">
+	import {
+		learningIn,
+		markStreaming,
+		readThrough,
+		stampLearning,
+		tappedWord,
+		wasStreamed
+	} from "$lib/learningMarks";
+	import { chatLanguage } from "$lib/weakSpots";
 	import { hyphenationLang } from "$lib/langId";
 	import { tick, untrack } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
@@ -188,6 +197,28 @@
 
 	let html = $state("");
 	let bodyEl: HTMLElement | undefined = $state();
+	/**
+	 * The Learning words in this reply (surface form → headword), once it
+	 * has settled: underlined after every render (learningMarks.ts).
+	 */
+	let learning: { lang: string; forms: Map<string, string> } | null = null;
+	$effect(() => {
+		if (streaming) {
+			markStreaming(String(message.id));
+			return;
+		}
+		if (message.role !== "assistant") return;
+		const text = message.content;
+		const lang = chatLanguage(text);
+		if (!lang || lang.toLowerCase().startsWith("en")) return;
+		const id = String(message.id);
+		const fresh = wasStreamed(id);
+		void learningIn(text, lang).then((forms) => {
+			learning = { lang, forms };
+			if (bodyEl) stampLearning(bodyEl, forms, lang);
+			if (fresh && forms.size) readThrough(id, lang, forms.values());
+		});
+	});
 	/** Captured Code Run output per block index (re-stamped after each render). */
 	let runOutputs = $state<Record<number, string>>({});
 	/** Block indexes with a run in flight (stamped as Running). */
@@ -400,6 +431,7 @@
 				// Quotes ending together never stack their badges.
 				stackBadges(badges);
 				stampRunOutputs();
+				if (learning) stampLearning(bodyEl, learning.forms, learning.lang);
 				for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
 					if (!(wrap instanceof HTMLElement)) continue;
 					const index = Number(wrap.dataset.mathIndex ?? "-1");
@@ -556,6 +588,15 @@
 		}
 	}
 	function onBodyClick(event: MouseEvent): void {
+		// A Learning word tapped (its card opens as before): a miss for
+		// its review, and no pass for it in this reply.
+		const learned = closestFromTarget(event.target, ".ccez-learning");
+		if (learned && learning)
+			tappedWord(
+				String(message.id),
+				learning.lang,
+				learned.dataset.head ?? learned.textContent ?? ""
+			);
 		const unfoldedDrag =
 			event.detail > 0 &&
 			chromeDown !== null &&
@@ -770,6 +811,13 @@
 {/if}
 
 <style>
+	/* Learning words: their own underline colour, the text as it is (as in the owner's other apps). */
+	:global(.ccez-learning) {
+		text-decoration: underline;
+		text-decoration-color: #fa8c73;
+		text-decoration-thickness: 1.5px;
+		text-underline-offset: 3px;
+	}
 	.rendered {
 		word-break: break-word;
 		font-size: calc(0.92rem * var(--font-scale, 1));
