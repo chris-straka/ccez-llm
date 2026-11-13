@@ -47,14 +47,28 @@ describe("cards asked before the note", () => {
 		expect(aborted).toBe(true);
 	});
 
-	it("keys by language, word and paragraph", () => {
+	it("keys by language, word, paragraph and question", () => {
 		expect(
 			noteKey({
 				quote: " Reculer ",
 				context: "Le parti recule.",
 				lang: "fr-FR"
 			})
-		).toBe("fr|reculer|Le parti recule.");
+		).toBe("fr|reculer|Le parti recule.|");
+		// A card started on hover (no question) isn't a typed question's answer.
+		const plain = noteKey({
+			quote: "reculer",
+			context: "Le parti recule.",
+			lang: "fr",
+			question: ""
+		});
+		const asked = noteKey({
+			quote: "reculer",
+			context: "Le parti recule.",
+			lang: "fr",
+			question: "pourquoi pas reculé ?"
+		});
+		expect(asked).not.toBe(plain);
 	});
 	it("picks a reply's words: learning ones first, then long unknown ones", () => {
 		const status = (w: string) =>

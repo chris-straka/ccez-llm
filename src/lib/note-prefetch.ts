@@ -21,10 +21,17 @@ interface Entry {
 	at: number;
 }
 
+/**
+ * What a note asks, as the prefetch keys it. The question is part of it:
+ * a card started on hover asks none, and a note with a typed question
+ * took that plain card as its answer.
+ */
 export function noteKey(
-	q: Pick<AnnotationQuestion, "quote" | "context" | "lang">
+	q: Pick<AnnotationQuestion, "quote" | "context" | "lang"> & {
+		question?: string;
+	}
 ): string {
-	return `${(q.lang ?? "").split(/[-_]/)[0]?.toLowerCase()}|${q.quote.trim().toLocaleLowerCase()}|${q.context.trim()}`;
+	return `${(q.lang ?? "").split(/[-_]/)[0]?.toLowerCase()}|${q.quote.trim().toLocaleLowerCase()}|${q.context.trim()}|${(q.question ?? "").trim()}`;
 }
 
 export class NotePrefetch {

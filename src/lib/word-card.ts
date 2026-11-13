@@ -884,6 +884,9 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 	const lang = text(r.lang, 12);
 	const pos = text(r.pos, 24);
 	const partial = r.partial === true;
+	// Kept, so a later note on the word in the same sense reuses the card
+	// (dropped here, a card read back from storage never matched).
+	const sense = text(r.sense, MAX.short);
 	return {
 		meaning,
 		...(inSentence && inSentence !== meaning ? { inSentence } : {}),
@@ -896,6 +899,7 @@ export function cleanWordCard(raw: unknown, quote: string): WordCard | null {
 		...(watch ? { watch } : {}),
 		...(lang ? { lang } : {}),
 		...(pos ? { pos } : {}),
+		...(sense ? { sense } : {}),
 		...(partial ? { partial } : {})
 	};
 }

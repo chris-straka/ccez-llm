@@ -19,7 +19,10 @@ export interface StoryAnchor {
 	link: string;
 	title: string;
 	outlet: string;
+	/** The story's language code ("fr"): cards and the word list key by it. */
 	lang: string;
+	/** Its name ("French"), for the context line. */
+	langName?: string;
 }
 
 export interface Annotation {

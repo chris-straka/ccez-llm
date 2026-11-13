@@ -416,8 +416,9 @@
 			// Ruby stamps onto the rendered HTML (sync, no worker), so
 			// code and math blocks stay blocks; ruby never enters code
 			// (aidTextNodes skips it), so the shiki pass paints code
-			// bodies in place without reconverting.
-			const run = aidRun;
+			// bodies in place without reconverting. Its own run: a
+			// furigana pass still out mustn't land over the pinyin.
+			const run = ++aidRun;
 			html = aidPinyinHtml(snapshot.html, aidPreferred);
 			if (streaming || snapshot.codes.length === 0) {
 				stamp();

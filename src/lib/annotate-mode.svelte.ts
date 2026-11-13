@@ -256,7 +256,8 @@ export class AnnotateMode {
 			link,
 			title: story.title,
 			outlet: story.source,
-			lang: news.langName
+			lang: news.code,
+			langName: news.langName
 		};
 	}
 
@@ -763,7 +764,7 @@ export class AnnotateMode {
 	): string {
 		if (!ann.messageId && ann.story) {
 			const story = ann.story;
-			return `${story.title} — ${story.outlet} (${story.lang})`;
+			return `${story.title} — ${story.outlet} (${story.langName ?? story.lang})`;
 		}
 		const content = ann.messageId
 			? this.deps.getMessageContent(ann.messageId)

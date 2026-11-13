@@ -237,8 +237,12 @@ export class AnnotationDrafts {
 		if (target && target.answer !== undefined && draft.trim()) {
 			// A reworded question gets a fresh answer: the old card's
 			// thread argued with the old one.
-			const { thread: _stale, ...rest } = target;
+			// The old answer and card go too: kept, they showed as the new
+			// question's answer, and a failed ask left them for good.
+			const { thread: _stale, answer: _answer, card: _card, ...rest } = target;
 			void _stale;
+			void _answer;
+			void _card;
 			const edited = { ...rest, comment: draft };
 			this.list = this.list.map((a) => (a.id === id ? edited : a));
 			// A word card still finishing asked the old question: drop

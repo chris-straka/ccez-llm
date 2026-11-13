@@ -16215,7 +16215,8 @@
 					: plang
 						? phraseStarring.has(answered.id) ||
 							(answered.listForm !== undefined &&
-								wordList.status(plang, answered.listForm) === "learning")
+								(wordList.want(plang, answered.listForm),
+								wordList.status(plang, answered.listForm) === "learning"))
 						: false}
 				onToggleStar={answered.card?.lang
 					? () => {
