@@ -84,6 +84,15 @@ test("a plural noun shows its gender under the stem", async ({ page }) => {
 	await page.route("https://words.test/**", async (route) => {
 		const req = route.request();
 		const cors = { "access-control-allow-origin": "*" };
+		const path = new URL(req.url()).pathname;
+		// Headword lookups and review reports (replies' Learning words) aren't stars.
+		if (req.method() === "POST" && path !== "/words")
+			return route.fulfill({
+				status: 200,
+				headers: cors,
+				contentType: "application/json",
+				body: "{}"
+			});
 		if (req.method() === "POST") {
 			posted.push(...(JSON.parse(req.postData() ?? "[]") as typeof posted));
 			return route.fulfill({ status: 204, headers: cors });
@@ -154,6 +163,15 @@ test("a phrase note's star saves its dictionary form", async ({ page }) => {
 	await page.route("https://words.test/**", async (route) => {
 		const req = route.request();
 		const cors = { "access-control-allow-origin": "*" };
+		const path = new URL(req.url()).pathname;
+		// Headword lookups and review reports (replies' Learning words) aren't stars.
+		if (req.method() === "POST" && path !== "/words")
+			return route.fulfill({
+				status: 200,
+				headers: cors,
+				contentType: "application/json",
+				body: "{}"
+			});
 		if (req.method() === "POST") {
 			posted.push(...(JSON.parse(req.postData() ?? "[]") as typeof posted));
 			return route.fulfill({ status: 204, headers: cors });
