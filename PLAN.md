@@ -144,3 +144,25 @@ the record). Screenshots the owner attached are in
 ## Bug review, 2026-11-13
 
 Findings in docs/review-2026-11-13.md. Fixed that day: see the commits of 2026-11-13; everything else there is still open.
+
+## Owner decisions, 2026-11-13
+
+- Login: llm.ccez.uk/api/* (and the pages.dev twin) are behind Cloudflare
+  Access for the owner's email (app `ccez-llm-api`, 730h sessions); every
+  function checks the token too (functions/api/_access.ts, ACCESS_AUD in
+  the Pages env). The news panel offers "Log in" (/api/login). Next: a
+  server-held AI key route for him, so a new device needs only the login
+  (needs his key as a Pages secret). Visitors keep bringing their own key.
+- Weak spots in replies (approved to try): due words, phrases, grammar
+  points and expressions gathered from all his apps (taps while watching,
+  Again on screen words, accepted keyboard corrections, grammar the
+  corrections keep catching), each checked by an AI pass before it counts
+  (YouTube subtitles can be wrong). Two or three woven into a reply with a
+  faint underline; reading one is a review, tapping it is Again.
+- "Looked up three times becomes Learning": agreed.
+- Furigana and pinyin: keep as they are.
+- New words per reply: a setting; he wants more than the 95% research
+  figure suggests.
+- Idea offered, not decided: a short daily read per language from the
+  news he follows, built on his due items.
+- He builds for himself; no other users to design for.
