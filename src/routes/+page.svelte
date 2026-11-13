@@ -602,6 +602,7 @@
 		type ReaderState
 	} from "$lib/reader";
 	import { WordList } from "$lib/wordList.svelte";
+	import { useWordSource } from "$lib/weakSpots";
 	import { listWord } from "$lib/word-card";
 	import {
 		cleanPhraseForm,
@@ -2913,6 +2914,11 @@
 	let shortcutsOpen = $state(false);
 	/** The shared word list (ccez-words): a word card's star. */
 	const wordList = new WordList();
+	// Weak spots in replies read the word list's statuses and review cards.
+	useWordSource(() => ({
+		statuses: wordList.statuses,
+		review: wordList.review
+	}));
 	/** Phrase notes whose first star is still asking for the form. */
 	const phraseStarring = new SvelteSet<string>();
 	/** A phrase note's language for the word list (null: no star). */

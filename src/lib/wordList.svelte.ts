@@ -9,6 +9,8 @@
 
 export const WORDS_SERVER = "https://z.tailfe37c2.ts.net:8448";
 
+import type { ReviewCard } from "./weakSpots";
+
 export type WordStatus = "known" | "learning" | "new";
 
 interface Change {
@@ -54,6 +56,8 @@ const WATCH_MS = 5 * 60_000;
 
 export class WordList {
 	statuses = $state<Record<string, WordStatus>>({});
+	/** The review schedule's cards ("lang\tword" → card), for weak spots in replies (weakSpots.ts). */
+	review: Record<string, ReviewCard> = {};
 	private pending: Change[] = [];
 	private seq = 0;
 
@@ -240,6 +244,14 @@ export class WordList {
 				this.statuses = next;
 			}
 			this.seq = got.seq;
+			// The review schedule, for what to practise in replies.
+			const rev = await this.send(`${this.server}/review`, {
+				signal: AbortSignal.timeout(15_000)
+			});
+			if (rev.ok)
+				this.review =
+					((await rev.json()) as { cards?: Record<string, ReviewCard> })
+						.cards ?? {};
 		} catch {
 			// Off the tailnet: tried again next time.
 		}

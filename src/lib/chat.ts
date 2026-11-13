@@ -13,6 +13,7 @@ import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
 import { memoryStore } from "./settings";
 import { replyLanguageFor } from "./languages";
+import { practiceFor } from "./weakSpots";
 import { reportSaveFailure } from "./save-failure";
 
 /**
@@ -1202,6 +1203,18 @@ export async function refreshTrimSummary(
 	return fold.length;
 }
 
+/** The newest user message's text in a turn window ("" when none). */
+export function lastUserText(
+	turns: ReadonlyArray<{ role: string; content: unknown }>
+): string {
+	for (let i = turns.length - 1; i >= 0; i -= 1) {
+		const t = turns[i];
+		if (t?.role === "user")
+			return typeof t.content === "string" ? t.content : "";
+	}
+	return "";
+}
+
 export function buildApiMessages(
 	chat: Chat,
 	systemPrompt: string,
@@ -1212,6 +1225,8 @@ export function buildApiMessages(
 	if (summary) api.push({ role: "system", content: summaryBlock(summary) });
 	const drill = drillContextBlock(chat);
 	if (drill) api.push({ role: "system", content: drill });
+	const practice = practiceFor(lastUserText(turns));
+	if (practice) api.push({ role: "system", content: practice });
 	for (const m of turns) api.push({ role: m.role, content: apiContent(m) });
 	return api;
 }

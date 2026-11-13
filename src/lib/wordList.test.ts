@@ -189,19 +189,24 @@ describe("the shared word list", () => {
 				})
 			);
 			const list = new WordList("https://words.test", send);
+			// Rounds: each asks for the words (and, since weak spots, the review cards too).
+			const rounds = () =>
+				send.mock.calls.filter((c) =>
+					String((c as unknown[])[0]).includes("/words?")
+				).length;
 			const stop = list.watch(60_000);
 			await vi.advanceTimersByTimeAsync(0);
-			expect(send).toHaveBeenCalledTimes(1);
+			expect(rounds()).toBe(1);
 			// Starred on the phone meanwhile: here within a round.
 			await vi.advanceTimersByTimeAsync(60_000);
 			expect(list.status("fr", "marre")).toBe("learning");
 			// Back in view: a round at once.
 			document.dispatchEvent(new Event("visibilitychange"));
 			await vi.advanceTimersByTimeAsync(0);
-			expect(send).toHaveBeenCalledTimes(3);
+			expect(rounds()).toBe(3);
 			stop();
 			await vi.advanceTimersByTimeAsync(120_000);
-			expect(send).toHaveBeenCalledTimes(3);
+			expect(rounds()).toBe(3);
 		} finally {
 			vi.useRealTimers();
 		}

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
 	apiContent,
 	drillContextBlock,
+	lastUserText,
 	persistChats,
 	renderFoldText,
 	selectHistoryWindow,
@@ -13,6 +14,7 @@ import {
 	type ChatState
 } from "./chat";
 import { messageText } from "./providers/types";
+import { practiceFor } from "./weakSpots";
 import type { Attachment } from "./attachments";
 import {
 	activeThinkingId,
@@ -194,6 +196,8 @@ export function nativeHistoryInput(
 	const messages = turnHistory(turns);
 	const drill = drillContextBlock(chat);
 	if (drill) messages.unshift({ role: "system", content: drill });
+	const practice = practiceFor(lastUserText(turns));
+	if (practice) messages.unshift({ role: "system", content: practice });
 	if (summary && fold.length === 0)
 		messages.unshift({ role: "system", content: summaryBlock(summary) });
 	const newest = fold.length > 0 ? fold[fold.length - 1] : undefined;
