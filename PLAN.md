@@ -1,3 +1,34 @@
+# Review, 2026-11-12 (the language side against what the owner has asked for)
+
+Read-only, cut short; nothing here is checked on screen. Delete each as it ships.
+
+Fixed (v0.72.2): the star follows the shared headword and a tap can no
+longer clear a word in every app.
+
+To fix:
+- A compact voice of the exact locale can beat his Premium voice of
+  another region when no System Voice is set (`src-tauri/src/tts.rs:207`,
+  `src/lib/voiceTiers.ts:98`): quality should win outright.
+- `focus()` without a `document.hasFocus()` check
+  (`DictionaryManager.svelte:59`, `CaptureOverlay.svelte:27`).
+- A phrase over 64 characters is starred here and dropped by the server
+  with a 204 (`src/lib/phrase-list.ts:21`): the star stays local.
+- Helper text: `DictionaryManager.svelte:157-161`,
+  `settings/VoicePanel.svelte:302-312, 319-321, 423-431`,
+  `ListenPanel.svelte:215-218`, `ReaderView.svelte:104-109`.
+- English in language e2e specs (`e2e/annotation-answer.e2e.ts` and six
+  more).
+
+The owner's call:
+- Known can't be set or seen here: one star, Learning or new. A word
+  Known elsewhere shows an empty star and a tap makes it Learning.
+- The card leads with the dictionary meaning and puts "in this sentence"
+  last; his other apps put what it means here first. His 2026-10-24
+  sketch for this app says dictionary first.
+- Tense names on pieces are Wiktionary's ("imperfect", "preterite"), not
+  course names; card wording goes to him first.
+- Tamil shows Sri Lanka's flag (`src/lib/languages.ts:81`).
+
 # Owner notes, 2026-11-10 (from ccez-keeps)
 
 Work these off and delete each when it ships.
