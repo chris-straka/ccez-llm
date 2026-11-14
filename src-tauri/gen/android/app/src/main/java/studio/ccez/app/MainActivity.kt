@@ -7,6 +7,28 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
+  private var web: android.webkit.WebView? = null
+
+  /**
+   * ccez-keys' yes/no for the Muse key (Keyring.kt), asked once at
+   * start; a yes reloads the page so the keys are read again with it.
+   */
+  private val allowMuse = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+    if (it.resultCode == RESULT_OK) web?.post { web?.reload() }
+  }
+
+  private fun askForMuseKey() {
+    val asked = getSharedPreferences("keyring", MODE_PRIVATE)
+    if (asked.getBoolean("asked", false)) return
+    Thread {
+      if (Keyring.key(this) != Keyring.Answer.Approve) return@Thread
+      runOnUiThread {
+        asked.edit().putBoolean("asked", true).apply()
+        runCatching { allowMuse.launch(Keyring.approve()) }
+      }
+    }.start()
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -27,6 +49,7 @@ class MainActivity : TauriActivity() {
     Tts.init(this)
     // Secrets bridge: same pattern for the Android Keystore backend.
     Secrets.init(this)
+    if (savedInstanceState == null) askForMuseKey()
     // Dictation bridge: system SpeechRecognizer behind dictate_start/stop.
     Dictation.init(this)
     // On-device chat bridge: ML Kit Prompt API over AICore (see OnDevice).
@@ -65,6 +88,7 @@ class MainActivity : TauriActivity() {
    */
   override fun onWebViewCreate(webView: android.webkit.WebView) {
     super.onWebViewCreate(webView)
+    web = webView
     webView.isVerticalScrollBarEnabled = false
     webView.isHorizontalScrollBarEnabled = false
   }

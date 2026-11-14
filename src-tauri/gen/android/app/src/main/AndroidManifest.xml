@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The Muse key from ccez-keys (Keyring.kt). -->
+    <queries>
+        <package android:name="uk.ccez.keys" />
+    </queries>
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- In-app update: firing the system installer for a downloaded

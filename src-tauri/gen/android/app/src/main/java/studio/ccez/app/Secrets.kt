@@ -71,9 +71,51 @@ object Secrets {
         null
     }
 
-    /** Stored secret, or null when missing or unreadable. */
+    /**
+     * Stored secret, or null when missing or unreadable. The provider-key
+     * bundle gets Muse's key from ccez-keys (Keyring) when it answers;
+     * then the copy stored here is removed (ccez-keys holds the one key).
+     */
     @JvmStatic
     fun get(service: String, account: String): String? {
+        if (!::appContext.isInitialized) return null
+        val stored = stored(service, account)
+        if (account != BUNDLE) return stored
+        val muse = (Keyring.key(appContext) as? Keyring.Answer.Key)?.key ?: return stored
+        val keys = bundle(stored)
+        if (keys.containsKey(MUSE)) {
+            keys.remove(MUSE)
+            store(service, account, encode(keys))
+        }
+        keys[MUSE] = muse
+        return encode(keys)
+    }
+
+    /** Writes [secret]; Muse's key isn't kept in the bundle while ccez-keys holds it. */
+    @JvmStatic
+    fun set(service: String, account: String, secret: String): Boolean {
+        if (account != BUNDLE || !::appContext.isInitialized) return store(service, account, secret)
+        if (Keyring.key(appContext) !is Keyring.Answer.Key) return store(service, account, secret)
+        return store(service, account, encode(bundle(secret).apply { remove(MUSE) }))
+    }
+
+    /** ccez-llm's `SECRET_BUNDLE_ACCOUNT` and Muse's provider id (src/lib/secrets.ts, registry.ts). */
+    private const val BUNDLE = "providers"
+    private const val MUSE = "muse"
+
+    private fun bundle(raw: String?): java.util.TreeMap<String, String> {
+        val out = java.util.TreeMap<String, String>()
+        runCatching {
+            val o = org.json.JSONObject(raw ?: return out)
+            o.keys().forEach { k -> o.optString(k).takeIf { it.isNotEmpty() }?.let { out[k] = it } }
+        }
+        return out
+    }
+
+    /** As the frontend's encodeSecretBundle: sorted keys, non-empty values. */
+    private fun encode(keys: Map<String, String>): String = org.json.JSONObject(keys as Map<*, *>).toString()
+
+    private fun stored(service: String, account: String): String? {
         if (!::appContext.isInitialized) return null
         return try {
             val raw = prefs().getString("$service/$account", null) ?: return null
@@ -96,8 +138,7 @@ object Secrets {
     }
 
     /** True when the secret is durably stored. */
-    @JvmStatic
-    fun set(service: String, account: String, secret: String): Boolean {
+    private fun store(service: String, account: String, secret: String): Boolean {
         if (!::appContext.isInitialized) return false
         return try {
             val k = key() ?: return false
