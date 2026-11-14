@@ -4,10 +4,14 @@
  *   bun scripts/dict-build.ts fr de ja    (or `all`)
  *   bun scripts/dict-build.ts --fetch     (download every source only)
  *
- * Sources download into .dict-cache/ (gitignored) on first run:
- * Wiktionary extracts from kaikki.org for most languages, JMdict for
- * Japanese. Packs land in .dict-cache/out/ as <lang>.dict.gz with a
- * manifest.json beside them; dict-publish.ts uploads both.
+ * Sources download on first run into ~/.cache/ccez-dict
+ * ($XDG_CACHE_HOME/ccez-dict), kept compressed as served: Wiktionary
+ * extracts from kaikki.org for most languages, JMdict for Japanese. The
+ * owner's other language apps (ccez-lang, ccez-tube) read the same cache:
+ * each file under its upstream name, with <name>.meta.json holding the
+ * server's Last-Modified date. Packs land in .dict-cache/out/ (gitignored)
+ * as <lang>.dict.gz with a manifest.json beside them; dict-publish.ts
+ * uploads both.
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -19,6 +23,8 @@ import {
 	statSync,
 	writeFileSync
 } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { AffixCounts } from "./dict-morph";
 import {
@@ -33,8 +39,11 @@ import {
 	type PackHeader
 } from "./dict-pack";
 
-const CACHE = ".dict-cache";
-const OUT = `${CACHE}/out`;
+const CACHE = join(
+	process.env.XDG_CACHE_HOME || join(homedir(), ".cache"),
+	"ccez-dict"
+);
+const OUT = ".dict-cache/out";
 
 const WIKTIONARY = {
 	name: "Wiktionary (English), extracted by wiktextract via kaikki.org",
@@ -100,27 +109,35 @@ export const KAIKKI: Record<string, string[]> = {
 
 /** Where a kaikki language's extract lives, and its cache file. */
 export function kaikkiSource(name: string): { url: string; path: string } {
-	const file = `kaikki.org-dictionary-${name.replace(/[ -]/g, "")}.jsonl`;
+	const file = `kaikki.org-dictionary-${name.replace(/[ -]/g, "")}.jsonl.gz`;
 	return {
 		url: `https://kaikki.org/dictionary/${encodeURIComponent(name)}/${encodeURIComponent(file)}`,
-		path: `${CACHE}/${file}`
+		path: join(CACHE, file)
 	};
 }
 
 async function download(url: string, path: string): Promise<void> {
-	if (existsSync(path)) return;
+	const meta = `${path}.meta.json`;
+	if (existsSync(path) && existsSync(meta)) return;
+	mkdirSync(CACHE, { recursive: true });
 	console.log(`downloading ${url}`);
 	// curl streams to disk; buffering a gigabyte through fetch stalled.
-	execFileSync("curl", ["-sSfL", "-o", `${path}.part`, url], {
+	// -R dates the file by the server's Last-Modified, for the meta.
+	execFileSync("curl", ["-sSfLR", "-o", `${path}.part`, url], {
 		stdio: "inherit"
 	});
+	const modified = statSync(`${path}.part`).mtime.toISOString().slice(0, 10);
+	// Under another name until whole: another app's build may be reading.
 	renameSync(`${path}.part`, path);
+	writeFileSync(meta, JSON.stringify({ modified }));
 }
 
+/** A gzipped file's lines, unpacked as they're read (never to disk). */
 async function* lines(path: string): AsyncGenerator<string> {
+	const gzip = Bun.spawn(["gzip", "-dc", path], { stderr: "pipe" });
 	const decoder = new TextDecoder();
 	let rest = "";
-	for await (const chunk of Bun.file(path).stream()) {
+	for await (const chunk of gzip.stdout) {
 		rest += decoder.decode(chunk, { stream: true });
 		let nl: number;
 		while ((nl = rest.indexOf("\n")) !== -1) {
@@ -128,7 +145,12 @@ async function* lines(path: string): AsyncGenerator<string> {
 			rest = rest.slice(nl + 1);
 		}
 	}
+	rest += decoder.decode();
 	if (rest) yield rest;
+	if ((await gzip.exited) !== 0)
+		throw new Error(
+			`gzip -dc ${path}: ${await new Response(gzip.stderr).text()}`
+		);
 }
 
 async function buildKaikki(
@@ -173,7 +195,7 @@ async function buildKaikki(
 }
 
 async function buildJmdict(): Promise<{ b: PackBuilder; header: PackHeader }> {
-	const path = `${CACHE}/JMdict_e.gz`;
+	const path = join(CACHE, "JMdict_e.gz");
 	await download("https://www.edrdg.org/pub/Nihongo/JMdict_e.gz", path);
 	const xml = gunzipSync(readFileSync(path)).toString("utf8");
 	const parsed = xml

@@ -78,7 +78,8 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - Rust: `cd src-tauri && cargo test --lib` (CI runs `cargo check --locked`
   per target plus `cargo test --locked`).
 - Dictionaries (word cards): `bun scripts/dict-build.ts all` (or named
-  languages) builds one pack per language in the menus into `.dict-cache/out/` (sources download there too, gitignored);
+  languages) builds one pack per language in the menus into `.dict-cache/out/` (gitignored). Sources download, compressed as
+  served, into `~/.cache/ccez-dict/`, which ccez-lang and ccez-tube read too (same file names);
   `bun scripts/dict-publish.ts` uploads them to the `dictionaries`
   release, which the app downloads per language on first use
   (`src-tauri/src/dict.rs`). Packs carry each form's split
