@@ -1203,6 +1203,22 @@ describe("DeepSeek", () => {
 		expect(body).not.toHaveProperty("stream_options");
 	});
 
+	it("says the Mac is out of reach when ccez-words doesn't answer", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new TypeError("Load failed");
+			})
+		);
+		await expect(
+			new OpenAICompatProvider("deepseek-mac", {
+				baseUrl: "https://z.tailfe37c2.ts.net:8448/ai/deepseek",
+				apiKey: "",
+				model: "deepseek-flash"
+			}).chat([{ role: "user", content: "hi" }])
+		).rejects.toThrow(/Couldn't reach DeepSeek through the Mac.*Load failed/);
+	});
+
 	it("sends nothing to authorize on the keyless routes", async () => {
 		const fetchMock = vi.fn(async () => sseResponse(DEEP_SEARCH));
 		vi.stubGlobal("fetch", fetchMock);

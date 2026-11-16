@@ -140,6 +140,11 @@ export class OpenAICompatProvider implements ChatProvider {
 				`${this.id} needs Ollama running on this device (start it with 'ollama serve'): ${messageOf(error)}`
 			);
 		}
+		if (this.id === "deepseek-mac") {
+			return new ProviderError(
+				`Couldn't reach DeepSeek through the Mac (ccez-words on z, over the tailnet): ${messageOf(error)}`
+			);
+		}
 		return new ProviderError(
 			`Network error talking to ${this.id}: ${messageOf(error)}`
 		);

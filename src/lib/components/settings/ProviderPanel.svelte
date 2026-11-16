@@ -58,9 +58,12 @@
 	async function refreshModels() {
 		clearNotice(modelNotice, "banner");
 		if (browserOnlyBlocked) return;
+		// Keyless routes (DeepSeek through the site or the Mac) list
+		// models on a tap; they never auto-fetch, so an unreachable Mac
+		// never greets Settings with an error.
 		if (
 			!active.baseUrl.trim() ||
-			(!active.apiKey.trim() && !activeDef.publicModels)
+			(!active.apiKey.trim() && !activeDef.publicModels && !activeDef.keyless)
 		) {
 			flashNotice(
 				modelNotice,
