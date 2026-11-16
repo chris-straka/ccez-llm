@@ -56,7 +56,7 @@ test("401 surfaces the provider error with a retry", async ({ page }) => {
 	await send(page, "hello provider");
 	const err = page.locator("article.assistant .error").first();
 	await expect(err).toContainText("HTTP 401", { timeout: 30_000 });
-	await expect(err).toContainText("deepseek");
+	await expect(err).toContainText("DeepSeek didn't accept the API key");
 	await expect(
 		page.locator('article.assistant button[aria-label="Retry"]').first()
 	).toBeVisible();
@@ -119,7 +119,7 @@ async function seedBlankKeyProvider(page: Page): Promise<void> {
 test("switching to a keyless-less provider wipes the stranded draft", async ({
 	page
 }) => {
-	// Keyed Muse: type a draft, then switch to keyless-less DeepSeek in
+	// Keyed Zen: type a draft, then switch to keyless-less DeepSeek in
 	// Settings — the lock wipes the dead text so the locked hint shows.
 	await seedChat(page, []);
 	await page.addInitScript(() => {
@@ -128,10 +128,10 @@ test("switching to a keyless-less provider wipes the stranded draft", async ({
 		const parsed = stored
 			? (JSON.parse(stored) as Record<string, unknown>)
 			: {};
-		parsed["activeProviderId"] = "muse";
+		parsed["activeProviderId"] = "opencode-zen";
 		parsed["providers"] = {
 			...((parsed["providers"] as Record<string, unknown> | undefined) ?? {}),
-			muse: {
+			"opencode-zen": {
 				baseUrl: "https://api.example.com",
 				apiKey: "fake",
 				model: "m",
@@ -159,7 +159,7 @@ test("switching to a keyless-less provider wipes the stranded draft", async ({
 		.locator(
 			'.settings-panel [role="radiogroup"][aria-label="Active provider"]'
 		)
-		.getByRole("radio", { name: "DeepSeek" })
+		.getByRole("radio", { name: "DeepSeek", exact: true })
 		.click();
 	// The pill switch locks and wipes: disabled, empty, hintless.
 	await expect(composer).toBeDisabled({ timeout: 10_000 });

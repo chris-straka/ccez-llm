@@ -46,6 +46,7 @@
 		isSending,
 		hasReplyStarted,
 		hasFetchActive,
+		lookupLabelFor,
 		refreshTrimSummary,
 		generateChatTitle,
 		renameChat,
@@ -1101,8 +1102,8 @@
 			settings.wordCardDictionaries && !settings.dictionarySkip.includes(lang)
 	);
 	/** Notes: the card at low thinking, a quick one-line meaning first at the
-	 * lowest (Muse: ~20 s and ~2.5 s, owner 2026-11-11; providers without
-	 * those levels keep their own). */
+	 * lowest (providers without those levels keep their own; DeepSeek
+	 * answers every note with thinking off). */
 	const noteSpeed = { thinking: "low", quickThinking: "minimal" } as const;
 	/** Cards started on hover (desktop): A takes them over mid-flight. */
 	const notePrefetch = new NotePrefetch();
@@ -2632,7 +2633,8 @@
 							base_url: config.baseUrl,
 							api_key: config.apiKey,
 							model: config.model,
-							extra_body: config.extraBody,
+							// Grading is quick work: DeepSeek's thinking off.
+							extra_body: config.quickExtraBody,
 							items
 						}
 					});
@@ -9610,7 +9612,12 @@
 		const androidBridge = isAndroidUserAgent(navigator.userAgent);
 		const ids = visibleProviderIds(
 			listProviders(settings.customProviders).map((p) => p.id),
-			{ android: androidBridge, online: navigator.onLine, local: androidBridge }
+			{
+				android: androidBridge,
+				online: navigator.onLine,
+				local: androidBridge,
+				shell: tauriBackendAvailable()
+			}
 		);
 		const id = stepCyclicId(ids, settings.activeProviderId, direction);
 		if (id === undefined) return;
@@ -15803,12 +15810,14 @@
 				fetching:
 					(isSending(chatState, viewChat.id) &&
 						hasFetchActive(chatState, viewChat.id)) ||
-					nativeTurns.fetching.has(viewChat.id),
+					nativeTurns.fetching.has(viewChat.id) ||
+					lookupLabelFor(chatState, viewChat.id) !== null,
 				started: hasReplyStarted(chatState, viewChat.id),
 				tick: sendElapsed,
 				nowMs: Date.now(),
 				lastTokenMs: lastTokenAt.get(viewChat.id) ?? null
 			})}
+			lookupLabel={lookupLabelFor(chatState, viewChat.id)}
 			{sendElapsed}
 			waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
 			{useMock}

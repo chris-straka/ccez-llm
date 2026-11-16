@@ -970,42 +970,62 @@ describe("thinking", () => {
 		return JSON.parse(init.body as string) as Record<string, unknown>;
 	}
 
-	it("sends reasoning_effort for Muse Spark", async () => {
-		const body = await postedBody("muse", "muse-spark-1.3-contributor", "high");
-		expect(body).toMatchObject({ reasoning_effort: "high" });
-		expect(body).not.toHaveProperty("thinking");
-	});
+	/** The body one streamed turn posts (the chat's path). */
+	async function streamedBody(
+		id: string,
+		model: string,
+		thinking?: string
+	): Promise<Record<string, unknown>> {
+		const fetchMock = vi.fn(async () =>
+			sseResponse([
+				`data: ${JSON.stringify({ choices: [{ delta: { content: "x" } }] })}\n\ndata: [DONE]\n\n`
+			])
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider(id, { ...CONFIG, model });
+		await provider.stream(
+			[{ role: "user", content: "x" }],
+			{ onToken: () => {} },
+			{ thinking }
+		);
+		const [, init] = fetchMock.mock.calls[0] as unknown as [
+			string,
+			RequestInit
+		];
+		return JSON.parse(init.body as string) as Record<string, unknown>;
+	}
 
-	it("sends the thinking toggle plus effort for DeepSeek v4", async () => {
-		const max = await postedBody("deepseek", "deepseek-v4-pro", "max");
+	it("sends the chat's level on DeepSeek's chat, low by default", async () => {
+		const max = await streamedBody("deepseek", "deepseek-flash", "max");
 		expect(max).toMatchObject({
 			thinking: { type: "enabled" },
 			reasoning_effort: "max"
 		});
-		const off = await postedBody("deepseek", "deepseek-v4-pro", "off");
+		const unset = await streamedBody("deepseek-mac", "deepseek-flash");
+		expect(unset).toMatchObject({
+			thinking: { type: "enabled" },
+			reasoning_effort: "low"
+		});
+		const off = await streamedBody("deepseek-login", "deepseek-flash", "off");
 		expect(off).toMatchObject({ thinking: { type: "disabled" } });
 		expect(off).not.toHaveProperty("reasoning_effort");
 	});
 
+	it("answers DeepSeek's quick work with thinking off, whatever was asked", async () => {
+		for (const level of [undefined, "low", "high", "max", "lowest"]) {
+			const body = await postedBody("deepseek", "deepseek-flash", level);
+			expect(body).toMatchObject({ thinking: { type: "disabled" } });
+			expect(body).not.toHaveProperty("reasoning_effort");
+			expect(body).not.toHaveProperty("tools");
+			expect(body).not.toHaveProperty("stream_options");
+		}
+	});
+
 	it("reads the level per request: a mid-stream change lands on the next call", async () => {
-		const fetchMock = vi.fn(async () =>
-			jsonResponse({ choices: [{ message: { content: "x" } }] })
-		);
-		vi.stubGlobal("fetch", fetchMock);
-		const provider = new OpenAICompatProvider("muse", {
-			...CONFIG,
-			model: "muse-spark-1.3-contributor"
-		});
-		// Same instance, two sends: the second carries the new level,
-		// never a cached copy of the first.
-		await provider.chat([{ role: "user", content: "x" }], { thinking: "low" });
-		await provider.chat([{ role: "user", content: "x" }], { thinking: "high" });
-		const bodies = fetchMock.mock.calls.map((call) => {
-			const [, init] = call as unknown as [string, RequestInit];
-			return JSON.parse(init.body as string) as Record<string, unknown>;
-		});
-		expect(bodies[0]).toMatchObject({ reasoning_effort: "low" });
-		expect(bodies[1]).toMatchObject({ reasoning_effort: "high" });
+		const low = await streamedBody("deepseek", "deepseek-flash", "low");
+		const high = await streamedBody("deepseek", "deepseek-flash", "high");
+		expect(low).toMatchObject({ reasoning_effort: "low" });
+		expect(high).toMatchObject({ reasoning_effort: "high" });
 	});
 
 	it("sends nothing native for unknown providers and ids", async () => {
@@ -1013,12 +1033,422 @@ describe("thinking", () => {
 		expect(body).not.toHaveProperty("reasoning_effort");
 		expect(body).not.toHaveProperty("thinking");
 		// Unknown ids resolve to the model's default before sending.
-		const museBogus = await postedBody(
-			"muse",
-			"muse-spark-1.3-contributor",
-			"bogus"
+		const bogus = await streamedBody("deepseek", "deepseek-flash", "bogus");
+		expect(bogus).toMatchObject({ reasoning_effort: "low" });
+	});
+});
+
+/** One SSE `data:` event. */
+function event(payload: unknown): string {
+	return `data: ${JSON.stringify(payload)}\n\n`;
+}
+
+/** A DeepSeek deep search: two searches, a page read, then the answer. */
+const DEEP_SEARCH = [
+	event({ choices: [{ delta: { reasoning_content: "Need numbers. " } }] }),
+	event({
+		choices: [
+			{ delta: {}, server_tool_event: { type: "step_reasoning_done", step: 0 } }
+		]
+	}),
+	event({
+		choices: [
+			{
+				delta: {},
+				server_tool_event: {
+					type: "call_started",
+					step: 0,
+					call: {
+						index: 0,
+						action: { type: "search", queries: ["iceland population"] }
+					}
+				}
+			}
+		]
+	}),
+	event({
+		choices: [
+			{
+				delta: {},
+				server_tool_event: {
+					type: "call_completed",
+					step: 0,
+					call: {
+						index: 0,
+						action: { type: "search", queries: ["iceland population"] },
+						status: "completed",
+						sources: [
+							{
+								type: "url",
+								url: "https://statice.is/",
+								title: "Statistics Iceland"
+							}
+						]
+					}
+				}
+			}
+		]
+	}),
+	event({ choices: [{ delta: { reasoning_content: "Enough." } }] }),
+	event({ choices: [{ delta: { content: "About " } }] }),
+	event({ choices: [{ delta: { content: "400,000." } }] }),
+	event({
+		choices: [
+			{
+				finish_reason: "stop",
+				delta: {
+					content: "",
+					server_tool_calls: [
+						{
+							index: 0,
+							reasoning_content: "Need numbers. ",
+							calls: [
+								{
+									index: 0,
+									id: "srvtoolu_s_00_a",
+									type: "deepseek_web_search",
+									kind: "deep_search",
+									action: { type: "search", queries: ["iceland population"] },
+									status: "completed",
+									sources: [
+										{
+											type: "url",
+											url: "https://statice.is/",
+											title: "Statistics Iceland",
+											snippet: "394,000"
+										}
+									]
+								}
+							]
+						}
+					],
+					annotations: [
+						{
+							type: "url_citation",
+							url_citation: {
+								url: "https://statice.is/",
+								title: "Statistics Iceland",
+								start_index: 0,
+								end_index: 15
+							}
+						}
+					],
+					future_field: { anything: true }
+				}
+			}
+		],
+		usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }
+	}),
+	"data: [DONE]\n\n"
+];
+
+describe("DeepSeek", () => {
+	const DS = {
+		baseUrl: "https://api.deepseek.com",
+		apiKey: "sk-test-fake",
+		model: "deepseek-flash"
+	};
+
+	function posted(fetchMock: ReturnType<typeof vi.fn>, i = 0) {
+		const [url, init] = fetchMock.mock.calls[i] as unknown as [
+			string,
+			RequestInit
+		];
+		return {
+			url,
+			headers: init.headers as Record<string, string>,
+			body: JSON.parse(init.body as string) as Record<string, unknown>
+		};
+	}
+
+	it("offers its own web tools on the chat, never fetch_url, never named in tool_choice", async () => {
+		const fetchMock = vi.fn(async () => sseResponse(DEEP_SEARCH));
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider("deepseek", DS);
+		await provider.stream([{ role: "user", content: "hi" }], {
+			onToken: () => {}
+		});
+		const { url, headers, body } = posted(fetchMock);
+		expect(url).toBe("https://api.deepseek.com/chat/completions");
+		expect(headers["Authorization"]).toBe("Bearer sk-test-fake");
+		expect(body).toMatchObject({
+			model: "deepseek-flash",
+			stream: true,
+			stream_options: { include_usage: true },
+			thinking: { type: "enabled" },
+			reasoning_effort: "low",
+			tools: [{ type: "deepseek_web_search" }, { type: "deepseek_read_url" }]
+		});
+		expect(body).not.toHaveProperty("tool_choice");
+		expect(JSON.stringify(body)).not.toContain("fetch_url");
+		// DeepSeek runs the tools: one request, nothing fetched here.
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it("keeps fetch_url for every other provider", async () => {
+		const fetchMock = vi.fn(async () =>
+			sseResponse([
+				event({ choices: [{ delta: { content: "x" } }] }),
+				"data: [DONE]\n\n"
+			])
 		);
-		expect(museBogus).toMatchObject({ reasoning_effort: "medium" });
+		vi.stubGlobal("fetch", fetchMock);
+		await new OpenAICompatProvider("opencode-zen", CONFIG).stream(
+			[{ role: "user", content: "hi" }],
+			{ onToken: () => {} }
+		);
+		const { body } = posted(fetchMock);
+		expect(JSON.stringify(body["tools"])).toContain("fetch_url");
+		expect(body).toMatchObject({ tool_choice: "auto" });
+		expect(body).not.toHaveProperty("stream_options");
+	});
+
+	it("sends nothing to authorize on the keyless routes", async () => {
+		const fetchMock = vi.fn(async () => sseResponse(DEEP_SEARCH));
+		vi.stubGlobal("fetch", fetchMock);
+		await new OpenAICompatProvider("deepseek-mac", {
+			baseUrl: "https://z.tailfe37c2.ts.net:8448/ai/deepseek",
+			apiKey: "",
+			model: "deepseek-flash"
+		}).stream([{ role: "user", content: "hi" }], { onToken: () => {} });
+		const { url, headers } = posted(fetchMock);
+		expect(url).toBe(
+			"https://z.tailfe37c2.ts.net:8448/ai/deepseek/chat/completions"
+		);
+		expect(headers).not.toHaveProperty("Authorization");
+	});
+
+	it("reads the stream: text, last step's thinking, lookups, steps, citations, usage", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => sseResponse(DEEP_SEARCH))
+		);
+		const tokens: string[] = [];
+		const lookups: unknown[] = [];
+		const result = await new OpenAICompatProvider("deepseek", DS).stream(
+			[{ role: "user", content: "hi" }],
+			{ onToken: (t) => tokens.push(t), onLookup: (e) => lookups.push(e) }
+		);
+		expect(result.content).toBe("About 400,000.");
+		expect(tokens.join("")).toBe("About 400,000.");
+		// The reply keeps its last step's thinking, as the API's message does.
+		expect(result.reasoning).toBe("Enough.");
+		expect(lookups.map((e) => (e as { type: string }).type)).toEqual([
+			"step_reasoning_done",
+			"call_started",
+			"call_completed"
+		]);
+		const steps = result.serverToolCalls as Array<{
+			calls: Array<{ id: string }>;
+		}>;
+		expect(steps[0]?.calls[0]?.id).toBe("srvtoolu_s_00_a");
+		expect(result.cited).toEqual(["https://statice.is/"]);
+		expect(result.usage).toMatchObject({
+			prompt: 100,
+			completion: 20,
+			total: 120
+		});
+	});
+
+	it("tolerates junk and unknown fields without losing the reply", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				sseResponse([
+					"data: not json\n\n",
+					event(null),
+					event({
+						choices: [
+							{
+								delta: { content: "ok", reasoning_content: null },
+								server_tool_event: "junk"
+							}
+						]
+					}),
+					event({
+						choices: [
+							{
+								delta: {
+									server_tool_calls: "nope",
+									annotations: [{ url_citation: {} }, 7]
+								}
+							}
+						]
+					}),
+					"data: [DONE]\n\n"
+				])
+			)
+		);
+		const result = await new OpenAICompatProvider("deepseek", DS).stream(
+			[{ role: "user", content: "hi" }],
+			{ onToken: () => {} }
+		);
+		expect(result.content).toBe("ok");
+		expect(result.serverToolCalls).toBeUndefined();
+		expect(result.cited).toBeUndefined();
+	});
+
+	it("fails in words when the stream ends on an error chunk (no [DONE])", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				sseResponse([
+					event({ choices: [{ delta: { content: "Half an ans" } }] }),
+					event({
+						choices: [],
+						error: {
+							message:
+								"The model failed to generate a complete response. Please retry."
+						},
+						usage: { prompt_tokens: 3, completion_tokens: 4 }
+					})
+				])
+			)
+		);
+		const err = await new OpenAICompatProvider("deepseek", DS)
+			.stream([{ role: "user", content: "hi" }], { onToken: () => {} })
+			.catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(ProviderError);
+		expect((err as Error).message).toMatch(
+			/^DeepSeek stopped partway through the reply/
+		);
+		expect((err as Error).message).toContain("Please retry");
+	});
+
+	it("words 401, 402 and 429 for the owner", async () => {
+		const cases: Array<[number, RegExp]> = [
+			[401, /didn't accept the API key.*\(HTTP 401\)/],
+			[
+				402,
+				/balance is used up: top up at platform\.deepseek\.com \(HTTP 402\)/
+			],
+			[429, /too many requests.*\(HTTP 429\)/],
+			[503, /busy or down.*\(HTTP 503\)/]
+		];
+		for (const [status, words] of cases) {
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async () => jsonResponse({ error: { message: "x" } }, status))
+			);
+			const provider = new OpenAICompatProvider("deepseek", DS);
+			const streamed = await provider
+				.stream([{ role: "user", content: "hi" }], { onToken: () => {} })
+				.catch((e: unknown) => e);
+			expect(streamed).toBeInstanceOf(ProviderError);
+			expect((streamed as ProviderError).status).toBe(status);
+			expect((streamed as Error).message).toMatch(words);
+			const quick = await provider
+				.chat([{ role: "user", content: "hi" }])
+				.catch((e: unknown) => e);
+			expect((quick as Error).message).toMatch(words);
+		}
+		// The site's own answers: no login, no key there yet.
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("needs-login", { status: 401 }))
+		);
+		const login = new OpenAICompatProvider("deepseek-login", {
+			...DS,
+			baseUrl: "/api/ai/deepseek",
+			apiKey: ""
+		});
+		await expect(login.chat([{ role: "user", content: "hi" }])).rejects.toThrow(
+			/Log in to llm\.ccez\.uk/
+		);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("no key on the server", { status: 503 }))
+		);
+		await expect(login.chat([{ role: "user", content: "hi" }])).rejects.toThrow(
+			/DEEPSEEK_API_KEY/
+		);
+		// Other providers keep the server's own text.
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("pay up", { status: 402 }))
+		);
+		await expect(
+			new OpenAICompatProvider("probe", CONFIG).chat([
+				{ role: "user", content: "hi" }
+			])
+		).rejects.toThrow("probe request failed (HTTP 402): pay up");
+	});
+
+	it("fails a quick answer that carries an error body", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				jsonResponse({ error: { message: "timed out" }, usage: {} })
+			)
+		);
+		await expect(
+			new OpenAICompatProvider("deepseek", DS).chat([
+				{ role: "user", content: "hi" }
+			])
+		).rejects.toThrow(/stopped partway.*timed out/);
+	});
+
+	it("retries once without tools when the tools are refused", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(
+				jsonResponse({ error: { message: "tools: nope" } }, 400)
+			)
+			.mockResolvedValueOnce(
+				sseResponse([
+					event({ choices: [{ delta: { content: "plain" } }] }),
+					"data: [DONE]\n\n"
+				])
+			);
+		vi.stubGlobal("fetch", fetchMock);
+		const result = await new OpenAICompatProvider("deepseek", DS).stream(
+			[{ role: "user", content: "hi" }],
+			{ onToken: () => {} }
+		);
+		expect(result.content).toBe("plain");
+		expect(posted(fetchMock, 0).body).toHaveProperty("tools");
+		expect(posted(fetchMock, 1).body).not.toHaveProperty("tools");
+		expect(posted(fetchMock, 1).body).toMatchObject({
+			thinking: { type: "enabled" }
+		});
+	});
+
+	it("sends an earlier reply's thinking and steps back to DeepSeek only", async () => {
+		const history = [
+			{ role: "user" as const, content: "q" },
+			{
+				role: "assistant" as const,
+				content: "a",
+				reasoning_content: "thought",
+				server_tool_calls: [
+					{ index: 0, calls: [{ index: 0, signature: "sig" }] }
+				]
+			},
+			{ role: "user" as const, content: "more" }
+		];
+		const fetchMock = vi.fn(async () => sseResponse(DEEP_SEARCH));
+		vi.stubGlobal("fetch", fetchMock);
+		await new OpenAICompatProvider("deepseek", DS).stream(history, {
+			onToken: () => {}
+		});
+		const sent = posted(fetchMock).body["messages"] as Array<
+			Record<string, unknown>
+		>;
+		expect(sent[1]).toEqual(history[1]);
+		const other = vi.fn(async () =>
+			sseResponse([
+				event({ choices: [{ delta: { content: "x" } }] }),
+				"data: [DONE]\n\n"
+			])
+		);
+		vi.stubGlobal("fetch", other);
+		await new OpenAICompatProvider("opencode-zen", CONFIG).stream(history, {
+			onToken: () => {}
+		});
+		const plain = posted(other).body["messages"] as Array<
+			Record<string, unknown>
+		>;
+		expect(plain[1]).toEqual({ role: "assistant", content: "a" });
 	});
 });
 

@@ -72,17 +72,17 @@ test("phone settings read by whitespace", async ({ page }) => {
 	await page.waitForTimeout(400);
 	await page.screenshot({ path: ".screenshots/settings-3.png" });
 	const levels = page
-		.locator(".settings-panel .segmented")
-		.filter({ has: page.getByRole("radio", { name: "Minimal" }) })
+		.locator('.settings-panel .segmented[aria-label="Thinking level"]')
 		.locator("button");
+	await expect(levels).toHaveCount(4);
 	const tops = await levels.evaluateAll((els) =>
 		els.map((e) => Math.round(e.getBoundingClientRect().top))
 	);
 	expect(new Set(tops).size).toBe(1);
-	// All five in sight, none scrolled off.
-	const strip = page
-		.locator(".settings-panel .segmented")
-		.filter({ has: page.getByRole("radio", { name: "Minimal" }) });
+	// All four in sight, none scrolled off.
+	const strip = page.locator(
+		'.settings-panel .segmented[aria-label="Thinking level"]'
+	);
 	expect(
 		await strip.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
 	).toBe(true);

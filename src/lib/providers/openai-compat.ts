@@ -8,6 +8,12 @@ import {
 	ProviderError
 } from "./types";
 import { thinkingFor, resolveThinkingId } from "./thinking";
+import {
+	DEEPSEEK_WEB_TOOLS,
+	deepseekErrorCopy,
+	isDeepSeekProvider,
+	streamErrorCopy
+} from "./deepseek";
 import { APP_HELP_URL, appHelpHere } from "../app-help";
 import { fetchToolDef, parseFetchCall } from "../tools";
 import { fetchPageText } from "../fetchPage";
@@ -57,10 +63,45 @@ const MAX_CALLS_PER_ROUND = 3;
  * (each retracts its prefix, runs the calls, and re-streams). */
 const EXTRA_FINAL_ROUNDS = 2;
 
+/** One streamed round's text, tool calls and usage, plus DeepSeek's
+ * extras (its thinking, web-tool steps and citations) when it sent them. */
+interface StreamedRound {
+	content: string;
+	calls: WireToolCall[];
+	usage: TokenUsage | null;
+	reasoning: string;
+	serverToolCalls: unknown[] | undefined;
+	cited: string[];
+}
+
+/** A message as this provider receives it: DeepSeek's extension fields
+ * (`reasoning_content`, `server_tool_calls`) go to DeepSeek only. */
+function forProvider(message: WireMessage, deepseek: boolean): WireMessage {
+	if (deepseek || message.role !== "assistant") return message;
+	if (!("reasoning_content" in message) && !("server_tool_calls" in message))
+		return message;
+	const plain: ChatMessage = { ...message };
+	delete plain.reasoning_content;
+	delete plain.server_tool_calls;
+	return plain;
+}
+
+/** Cited addresses from DeepSeek's `annotations` (url_citation items). */
+function citedUrls(annotations: unknown): string[] {
+	if (!Array.isArray(annotations)) return [];
+	const out: string[] = [];
+	for (const item of annotations) {
+		const url = (item as { url_citation?: { url?: unknown } } | null)
+			?.url_citation?.url;
+		if (typeof url === "string" && url && !out.includes(url)) out.push(url);
+	}
+	return out;
+}
+
 /**
- * Minimal OpenAI-compatible chat client used by every provider in this app
- * (DeepSeek and Meta's Model API both speak this protocol — verified live
- * against the Muse Spark endpoint). No SDK dependency: plain fetch + SSE.
+ * Minimal OpenAI-compatible chat client used by every provider in this
+ * app (DeepSeek, OpenCode Zen, on-device servers, custom endpoints). No
+ * SDK dependency: plain fetch + SSE.
  */
 export class OpenAICompatProvider implements ChatProvider {
 	readonly id: string;
@@ -114,6 +155,10 @@ export class OpenAICompatProvider implements ChatProvider {
 		};
 	}
 
+	private get deepseek(): boolean {
+		return isDeepSeekProvider(this.id);
+	}
+
 	private body(
 		messages: WireMessage[],
 		stream: boolean,
@@ -124,17 +169,50 @@ export class OpenAICompatProvider implements ChatProvider {
 		// knob-less providers resolve to no extra fields).
 		const support = thinkingFor(this.id, this.config.model);
 		const extra = support.wireFields(resolveThinkingId(support, thinking));
+		const deepseek = this.deepseek;
+		// DeepSeek searches and reads pages itself (its web tools can't
+		// share a request with function tools); everyone else gets the
+		// app's own fetch_url.
 		const toolFields =
-			tools === true ? { tools: [fetchToolDef()], tool_choice: "auto" } : {};
+			tools !== true
+				? {}
+				: deepseek
+					? { tools: DEEPSEEK_WEB_TOOLS }
+					: { tools: [fetchToolDef()], tool_choice: "auto" };
 		return JSON.stringify({
 			model: this.config.model,
-			messages,
+			messages: messages.map((m) => forProvider(m, deepseek)),
 			stream,
+			...(stream && deepseek
+				? { stream_options: { include_usage: true } }
+				: {}),
 			...extra,
 			...toolFields
 		});
 	}
 
+	/** Quick work's thinking: the provider's quick level when it has
+	 * one (DeepSeek: off), else the caller's. */
+	private quickThinking(thinking: string | undefined): string | undefined {
+		return thinkingFor(this.id, this.config.model).quickId ?? thinking;
+	}
+
+	/** A failed HTTP answer as an error: DeepSeek's statuses in words,
+	 * everyone else's with the server's own text. */
+	private httpError(kind: string, status: number, text: string): ProviderError {
+		const copy = this.deepseek ? deepseekErrorCopy(status, text) : null;
+		return new ProviderError(
+			copy ??
+				`${this.id} ${kind} failed (HTTP ${status}): ${text.slice(0, 300)}`,
+			status
+		);
+	}
+
+	/**
+	 * One whole answer, no tools: every quick call (notes, titles,
+	 * summaries, translation, grading) comes through here, so DeepSeek
+	 * answers these with thinking off whatever the chat's dial says.
+	 */
 	async chat(
 		messages: ChatMessage[],
 		opts: ChatOptions = {}
@@ -144,7 +222,7 @@ export class OpenAICompatProvider implements ChatProvider {
 			res = await fetch(this.url("/chat/completions"), {
 				method: "POST",
 				headers: this.headers(),
-				body: this.body(messages, false, opts.thinking),
+				body: this.body(messages, false, this.quickThinking(opts.thinking)),
 				// DOM takes null for absent, not undefined.
 				signal: opts.signal ?? null
 			});
@@ -152,12 +230,10 @@ export class OpenAICompatProvider implements ChatProvider {
 			throw this.connectionError(error);
 		}
 		if (!res.ok) {
-			throw new ProviderError(
-				`${this.id} request failed (HTTP ${res.status}): ${(await safeText(res)).slice(0, 300)}`,
-				res.status
-			);
+			throw this.httpError("request", res.status, await safeText(res));
 		}
 		const json = (await res.json()) as {
+			error?: unknown;
 			choices?: Array<{ message?: { content?: string } }>;
 			usage?: {
 				prompt_tokens?: number;
@@ -166,6 +242,10 @@ export class OpenAICompatProvider implements ChatProvider {
 				completion_tokens_details?: { reasoning_tokens?: number };
 			};
 		};
+		// A generation that failed after it started still answers 200,
+		// with `error` in the body (DeepSeek).
+		const failed = this.deepseek ? streamErrorCopy(json) : null;
+		if (failed) throw new ProviderError(failed);
 		return {
 			content: json.choices?.[0]?.message?.content ?? "",
 			usage: toUsage(json.usage)
@@ -198,10 +278,7 @@ export class OpenAICompatProvider implements ChatProvider {
 			throw this.connectionError(error);
 		}
 		if (!res.ok) {
-			throw new ProviderError(
-				`${this.id} request failed (HTTP ${res.status}): ${(await safeText(res)).slice(0, 300)}`,
-				res.status
-			);
+			throw this.httpError("request", res.status, await safeText(res));
 		}
 		const json = (await res.json()) as {
 			choices?: Array<{
@@ -252,11 +329,7 @@ export class OpenAICompatProvider implements ChatProvider {
 		callbacks: StreamCallbacks,
 		opts: ChatOptions,
 		tools: boolean
-	): Promise<{
-		content: string;
-		calls: WireToolCall[];
-		usage: TokenUsage | null;
-	}> {
+	): Promise<StreamedRound> {
 		let res: Response;
 		try {
 			res = await fetch(this.url("/chat/completions"), {
@@ -270,13 +343,17 @@ export class OpenAICompatProvider implements ChatProvider {
 			throw this.connectionError(error);
 		}
 		if (!res.ok || !res.body) {
-			throw new ProviderError(
-				`${this.id} stream failed (HTTP ${res.status}): ${(await safeText(res)).slice(0, 300)}`,
-				res.status
-			);
+			throw this.httpError("stream", res.status, await safeText(res));
 		}
 		let content = "";
 		let usage: TokenUsage | null = null;
+		// DeepSeek: thinking streams in `reasoning_content`; the reply
+		// keeps its last step's (what the API's own message holds), so
+		// each `step_reasoning_done` starts it over.
+		let reasoning = "";
+		let serverToolCalls: unknown[] | undefined;
+		let cited: string[] = [];
+		let failure: string | null = null;
 		const fragments = new Map<
 			number,
 			{ id: string; name: string; args: string }
@@ -302,15 +379,20 @@ export class OpenAICompatProvider implements ChatProvider {
 			for await (const event of readSse(res.body)) {
 				if (event === "[DONE]") break;
 				let parsed: {
+					error?: unknown;
 					choices?: Array<{
 						delta?: {
-							content?: string;
+							content?: string | null;
+							reasoning_content?: string | null;
+							server_tool_calls?: unknown;
+							annotations?: unknown;
 							tool_calls?: Array<{
 								index?: number;
 								id?: string;
 								function?: { name?: string; arguments?: string };
 							}>;
 						};
+						server_tool_event?: unknown;
 					}>;
 					usage?: Parameters<typeof toUsage>[0];
 				};
@@ -319,8 +401,32 @@ export class OpenAICompatProvider implements ChatProvider {
 				} catch {
 					continue;
 				}
-				const delta = parsed.choices?.[0]?.delta;
-				const token = delta?.content ?? "";
+				if (parsed === null || typeof parsed !== "object") continue;
+				// A failure after the reply started: the last chunk
+				// carries `error` and no [DONE] follows.
+				const streamFailure = streamErrorCopy(
+					parsed,
+					this.deepseek ? "DeepSeek" : this.id
+				);
+				if (streamFailure) {
+					failure = streamFailure;
+					break;
+				}
+				const choice = parsed.choices?.[0];
+				const delta = choice?.delta;
+				const thought = delta?.reasoning_content;
+				if (typeof thought === "string") reasoning += thought;
+				const toolEvent = choice?.server_tool_event;
+				if (toolEvent && typeof toolEvent === "object") {
+					if ((toolEvent as { type?: unknown }).type === "step_reasoning_done")
+						reasoning = "";
+					callbacks.onLookup?.(toolEvent);
+				}
+				if (Array.isArray(delta?.server_tool_calls))
+					serverToolCalls = delta.server_tool_calls;
+				if (delta?.annotations !== undefined)
+					cited = citedUrls(delta.annotations);
+				const token = typeof delta?.content === "string" ? delta.content : "";
 				if (token) {
 					content += token;
 					callbacks.onToken(token);
@@ -339,6 +445,7 @@ export class OpenAICompatProvider implements ChatProvider {
 		} catch (error) {
 			throw this.connectionError(error);
 		}
+		if (failure !== null) throw new ProviderError(failure);
 		const calls: WireToolCall[] = [...fragments.values()]
 			.filter((slot) => slot.id && slot.name)
 			.map((slot) => ({
@@ -346,7 +453,36 @@ export class OpenAICompatProvider implements ChatProvider {
 				type: "function",
 				function: { name: slot.name, arguments: slot.args }
 			}));
-		return { content, calls, usage };
+		return { content, calls, usage, reasoning, serverToolCalls, cited };
+	}
+
+	/**
+	 * DeepSeek's turn: one stream with its own web tools, which it runs
+	 * itself (nothing executes here). A 400 with them on (an endpoint
+	 * that refuses the tools) gets one plain turn, like the fetch path.
+	 */
+	private async streamDeepSeek(
+		messages: ChatMessage[],
+		callbacks: StreamCallbacks,
+		opts: ChatOptions
+	): Promise<ChatResult> {
+		let round: StreamedRound;
+		try {
+			round = await this.streamOnce(messages, callbacks, opts, true);
+		} catch (error) {
+			if (!(error instanceof ProviderError) || error.status !== 400)
+				throw error;
+			round = await this.streamOnce(messages, callbacks, opts, false);
+		}
+		return {
+			content: round.content,
+			usage: round.usage,
+			...(round.reasoning ? { reasoning: round.reasoning } : {}),
+			...(round.serverToolCalls
+				? { serverToolCalls: round.serverToolCalls }
+				: {}),
+			...(round.cited.length > 0 ? { cited: round.cited } : {})
+		};
 	}
 
 	/** Fetch calls worth executing from one round's raw calls (capped). */
@@ -418,8 +554,9 @@ export class OpenAICompatProvider implements ChatProvider {
 		// try another source" can act instead of stalling. Providers
 		// that reject `tools` fall back to a plain turn once; anything
 		// else throws exactly as before.
+		if (this.deepseek) return this.streamDeepSeek(messages, callbacks, opts);
 		const history: WireMessage[] = [...messages];
-		let first: Awaited<ReturnType<OpenAICompatProvider["streamOnce"]>>;
+		let first: StreamedRound;
 		try {
 			first = await this.streamOnce(history, callbacks, opts, true);
 		} catch (error) {
@@ -527,10 +664,7 @@ export class OpenAICompatProvider implements ChatProvider {
 			);
 		}
 		if (!res.ok) {
-			throw new ProviderError(
-				`${this.id} model list failed (HTTP ${res.status}): ${(await safeText(res)).slice(0, 300)}`,
-				res.status
-			);
+			throw this.httpError("model list", res.status, await safeText(res));
 		}
 		let json: unknown;
 		try {

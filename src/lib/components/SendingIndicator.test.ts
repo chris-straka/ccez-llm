@@ -19,7 +19,8 @@ describe("sending indicator contract", () => {
 		const source = componentSource();
 		expect(source).toContain('phase: "fetch" | "waiting" | null');
 		expect(source).toContain("{#if phase === ");
-		expect(source).toContain('aria-label="Fetching a page"');
+		// DeepSeek's lookups name themselves in the fetch line.
+		expect(source).toContain('aria-label={lookupLabel ?? "Fetching a page"}');
 		expect(source).toContain('aria-label="Waiting for a reply"');
 		expect(source).toContain("elapsed > 0");
 	});

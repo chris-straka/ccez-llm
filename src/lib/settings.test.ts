@@ -29,6 +29,7 @@ import {
 	maskKey,
 	effectiveSystemPrompt,
 	LOOKUP_CAPABILITY_HINT,
+	DEEPSEEK_LOOKUP_HINT,
 	CORRECTION_HINT,
 	systemLocale,
 	resolveTheme,
@@ -37,6 +38,7 @@ import {
 	DARK_STYLES,
 	OWN_INK_CHOICES,
 	validCaptureArea,
+	activeThinkingId,
 	type AppSettings
 } from "./settings";
 
@@ -44,7 +46,7 @@ import {
 function blankSettings() {
 	const s = defaultSettings();
 	s.providers["deepseek"]!.apiKey = "";
-	s.providers["muse"]!.apiKey = "";
+	s.providers["opencode-zen"]!.apiKey = "";
 	return s;
 }
 
@@ -540,22 +542,58 @@ describe("settings", () => {
 		delete (raw as unknown as Record<string, unknown>)["thinking"];
 		saveSettings(raw, memoryStore);
 		const loaded = loadSettings(memoryStore);
-		expect(loaded.thinking).toEqual({ muse: "high", deepseek: "max" });
+		expect(loaded.thinking).toEqual({ deepseek: "high" });
 		expect("thinkingLevel" in loaded).toBe(false);
 		const low = blankSettings();
 		(low as unknown as Record<string, unknown>)["thinkingLevel"] = "low";
 		delete (low as unknown as Record<string, unknown>)["thinking"];
 		saveSettings(low, memoryStore);
-		expect(loadSettings(memoryStore).thinking).toEqual({
-			muse: "low",
-			deepseek: "high"
-		});
+		expect(loadSettings(memoryStore).thinking).toEqual({ deepseek: "low" });
+	});
+
+	it("moves saves off the retired providers without throwing", () => {
+		for (const retired of ["muse", "muse-login"]) {
+			const raw = blankSettings() as unknown as Record<string, unknown>;
+			raw["activeProviderId"] = retired;
+			raw["thinking"] = { [retired]: "xhigh", deepseek: "max", odd: 3 };
+			raw["providers"] = {
+				...(raw["providers"] as Record<string, unknown>),
+				[retired]: {
+					baseUrl: "https://retired.example/v1",
+					apiKey: "",
+					model: "retired-model",
+					models: []
+				}
+			};
+			memoryStore.setItem("ccez-llm-settings-v1", JSON.stringify(raw));
+			const loaded = loadSettings(memoryStore);
+			// Node has no shell: the website's default, DeepSeek logged in.
+			expect(loaded.activeProviderId).toBe("deepseek-login");
+			expect(loaded.providers[retired]).toBeUndefined();
+			// The retired choice drops; the owner's DeepSeek pick stays.
+			expect(loaded.thinking).toEqual({ deepseek: "max" });
+			expect(activeThinkingId(loaded)).toBe("low");
+		}
+		// Junk in the save's provider fields never throws either.
+		memoryStore.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ activeProviderId: 7, thinking: ["x"], providers: null })
+		);
+		expect(loadSettings(memoryStore).activeProviderId).toBe("deepseek-login");
+		memoryStore.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ activeProviderId: "muse", thinking: null, fontScale: 2 })
+		);
+		const kept = loadSettings(memoryStore);
+		expect(kept.activeProviderId).toBe("deepseek-login");
+		// The rest of the save survives (never reset to defaults).
+		expect(kept.fontScale).toBe(2);
 	});
 
 	it("composes thinking hint and reply language into the prompt", () => {
 		const s = defaultSettings();
 		s.systemPrompt = "Be brief.";
-		// Muse sends thinking natively: no prompt hint.
+		// DeepSeek sends thinking natively: no prompt hint.
 		expect(effectiveSystemPrompt(s)).toBe("Be brief.");
 		// Generic providers fall back to prompt hints.
 		s.customProviders = [
@@ -599,6 +637,10 @@ describe("settings", () => {
 		expect(effectiveSystemPrompt(s, null, false, true)).toBe(
 			`Be brief. ${CORRECTION_HINT}`
 		);
+		expect(effectiveSystemPrompt(s, "fr", true, true)).toBe(
+			`Be brief. Reply in French. ${CORRECTION_HINT} ${DEEPSEEK_LOOKUP_HINT}`
+		);
+		s.activeProviderId = asProviderId("opencode-zen");
 		expect(effectiveSystemPrompt(s, "fr", true, true)).toBe(
 			`Be brief. Reply in French. ${CORRECTION_HINT} ${LOOKUP_CAPABILITY_HINT}`
 		);
@@ -673,30 +715,34 @@ describe("settings", () => {
 
 	it("never clobbers a saved key when loading", () => {
 		const s = blankSettings();
-		s.providers["muse"]!.apiKey = "typed";
+		s.providers["deepseek"]!.apiKey = "typed";
 		saveSettings(s, memoryStore);
-		expect(loadSettings(memoryStore).providers["muse"]!.apiKey).toBe("typed");
+		expect(loadSettings(memoryStore).providers["deepseek"]!.apiKey).toBe(
+			"typed"
+		);
 	});
 
-	it("resolves dev-time env names, VITE_ first", () => {
+	it("resolves dev-time env names", () => {
 		expect(
 			envProviderDefaults({
-				META_OPENAI_API_KEY_MUSE_SPARK_ONE_POINT_THREE: "sk-legacy",
-				META_BASE_URL: "https://meta.example"
-			}).muse
+				VITE_DEEPSEEK_API_KEY: "sk-test-fake",
+				VITE_DEEPSEEK_BASE_URL: "https://deepseek.example"
+			}).deepseek
 		).toEqual({
-			baseUrl: "https://meta.example",
-			apiKey: "sk-legacy",
-			model: "muse-spark-1.3-contributor",
+			baseUrl: "https://deepseek.example",
+			apiKey: "sk-test-fake",
+			model: "deepseek-flash",
 			models: []
 		});
-		expect(
-			envProviderDefaults({
-				META_OPENAI_API_KEY_MUSE_SPARK_ONE_POINT_THREE: "sk-legacy",
-				VITE_MUSE_API_KEY: "sk-vite"
-			}).muse!.apiKey
-		).toBe("sk-vite");
-		expect(envProviderDefaults({}).muse!.apiKey).toBe("");
+		expect(envProviderDefaults({}).deepseek!.apiKey).toBe("");
+		// The keyless routes: the site's login and ccez-words on the Mac.
+		expect(envProviderDefaults({})["deepseek-login"]!.baseUrl).toBe(
+			"/api/ai/deepseek"
+		);
+		expect(envProviderDefaults({})["deepseek-mac"]!.baseUrl).toBe(
+			"https://z.tailfe37c2.ts.net:8448/ai/deepseek"
+		);
+		expect(envProviderDefaults({})).not.toHaveProperty("muse");
 	});
 
 	it("defaults OpenCode Zen to its gateway, a free model, and env keys", () => {
@@ -732,7 +778,7 @@ describe("settings", () => {
 		const s = blankSettings();
 		s.activeProviderId = asProviderId("custom-gone");
 		saveSettings(s, memoryStore);
-		expect(loadSettings(memoryStore).activeProviderId).toBe("muse");
+		expect(loadSettings(memoryStore).activeProviderId).toBe("deepseek-login");
 	});
 
 	it("backfills customProviders on older saves", () => {
@@ -777,10 +823,10 @@ describe("settings", () => {
 
 	it("round-trips through a store and survives corrupt JSON", () => {
 		const s = blankSettings();
-		s.providers["muse"]!.apiKey = "secret";
+		s.providers["deepseek"]!.apiKey = "secret";
 		saveSettings(s, memoryStore);
 		const loaded = loadSettings(memoryStore);
-		expect(loaded.providers["muse"]!.apiKey).toBe("secret");
+		expect(loaded.providers["deepseek"]!.apiKey).toBe("secret");
 
 		memoryStore.setItem("ccez-llm-settings-v1", "{not json");
 		expect(loadSettings(memoryStore)).toEqual(defaultSettings());

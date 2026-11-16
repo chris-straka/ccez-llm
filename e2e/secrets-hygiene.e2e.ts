@@ -16,7 +16,9 @@ const SETTINGS_KEY = "ccez-llm-settings-v1";
 const MIRROR_KEY = "ccez-keychain:providers";
 
 test.beforeEach(async ({ page }) => {
-	await seedChat(page, []);
+	// A keyed provider: the site's default (DeepSeek through its login)
+	// takes no key at all.
+	await seedChat(page, [], null, { activeProviderId: "deepseek" });
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
@@ -111,13 +113,13 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 			const parsed = stored
 				? (JSON.parse(stored) as Record<string, unknown>)
 				: {};
-			parsed["activeProviderId"] = "muse";
+			parsed["activeProviderId"] = "deepseek";
 			parsed["providers"] = {
 				...((parsed["providers"] as Record<string, unknown> | undefined) ?? {}),
-				muse: {
-					baseUrl: "https://api.meta.ai/v1",
+				deepseek: {
+					baseUrl: "https://api.deepseek.com",
 					apiKey: raw,
-					model: "muse-spark-1.3-contributor",
+					model: "deepseek-flash",
 					models: []
 				}
 			};

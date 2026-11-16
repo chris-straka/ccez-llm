@@ -5,7 +5,7 @@ import { builtin, type ProviderId } from "./providers/registry";
 import { defaultSettings, type AppSettings } from "./settings";
 
 const DEEPSEEK = builtin("deepseek");
-const MUSE = builtin("muse");
+const ZEN = builtin("opencode-zen");
 const MLKIT = builtin("local-mlkit");
 
 function setKey(settings: AppSettings, id: ProviderId, key: string): void {
@@ -120,10 +120,10 @@ describe("ProviderKeys.tryLegacyWhenLocked", () => {
 		await new Promise((r) => setTimeout(r, 0));
 		expect(calls.migrated).toEqual([DEEPSEEK]);
 		keys.tryLegacyWhenLocked();
-		settings.activeProviderId = MUSE;
+		settings.activeProviderId = ZEN;
 		keys.tryLegacyWhenLocked();
 		keys.tryLegacyWhenLocked();
-		expect(calls.migrated).toEqual([DEEPSEEK, MUSE]);
+		expect(calls.migrated).toEqual([DEEPSEEK, ZEN]);
 	});
 
 	it("does nothing in a browser or while unlocked", () => {
@@ -160,11 +160,11 @@ describe("ProviderKeys.noKeyToastDue", () => {
 		expect(keys.noKeyToastDue(true)).toBe(false);
 		expect(keys.noKeyToastDue(false)).toBe(true);
 		expect(keys.noKeyToastDue(false)).toBe(false);
-		settings.activeProviderId = MUSE;
+		settings.activeProviderId = ZEN;
 		expect(keys.noKeyToastDue(false)).toBe(true);
-		setKey(settings, MUSE, "k");
+		setKey(settings, ZEN, "k");
 		expect(keys.noKeyToastDue(false)).toBe(false);
-		setKey(settings, MUSE, "");
+		setKey(settings, ZEN, "");
 		expect(keys.noKeyToastDue(false)).toBe(true);
 	});
 

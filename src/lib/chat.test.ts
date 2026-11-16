@@ -53,6 +53,8 @@ import {
 	isSending,
 	hasReplyStarted,
 	hasFetchActive,
+	lookupLabelFor,
+	replyExtras,
 	beginNativeSend,
 	beginNativeResend,
 	settleNativeSend,
@@ -266,6 +268,156 @@ describe("chat", () => {
 		expect(during).toEqual([true, true]);
 		expect(hasFetchActive(state, state.activeChatId)).toBe(false);
 		expect(isSending(state, state.activeChatId)).toBe(false);
+	});
+
+	it("names DeepSeek's lookups while they run and keeps its sources with the reply", async () => {
+		const { state, store } = stateWith(freshStore());
+		const seen: Array<{ label: string | null; calls: number }> = [];
+		const search = { type: "search", queries: ["iceland population"] };
+		const deepseek: ChatProvider = {
+			id: "deepseek",
+			async chat(): Promise<ChatResult> {
+				return { content: "", usage: null };
+			},
+			async stream(_messages, callbacks): Promise<ChatResult> {
+				const look = (): void => {
+					const reply = activeChat(state).messages.at(-1);
+					seen.push({
+						label: lookupLabelFor(state, state.activeChatId),
+						calls: reply?.webCalls?.length ?? 0
+					});
+				};
+				callbacks.onLookup?.({
+					type: "call_started",
+					step: 0,
+					call: { index: 0, action: search }
+				});
+				look();
+				callbacks.onLookup?.({
+					type: "call_completed",
+					step: 0,
+					call: {
+						index: 0,
+						action: search,
+						status: "completed",
+						sources: [{ url: "https://statice.is/", snippet: "big" }]
+					}
+				});
+				look();
+				callbacks.onToken("About 400,000.");
+				return {
+					content: "About 400,000.",
+					usage: null,
+					reasoning: "Enough.",
+					serverToolCalls: [
+						{
+							index: 0,
+							reasoning_content: "step thinking",
+							calls: [
+								{
+									index: 0,
+									action: search,
+									status: "completed",
+									sources: [{ url: "https://statice.is/", snippet: "big" }]
+								},
+								{
+									index: 1,
+									action: { type: "read_link", url: "https://a.test/" },
+									status: "completed",
+									page: { url: "https://a.test/" },
+									signature: "sig"
+								}
+							]
+						}
+					],
+					cited: ["https://statice.is/"]
+				};
+			}
+		};
+		await sendMessage(
+			state,
+			deepseek,
+			"sys",
+			"how many people live in iceland",
+			{},
+			store
+		);
+		expect(seen).toEqual([
+			{ label: "Searching “iceland population”", calls: 1 },
+			{ label: null, calls: 1 }
+		]);
+		expect(lookupLabelFor(state, state.activeChatId)).toBeNull();
+		const reply = activeChat(state).messages.at(-1);
+		expect(reply?.reasoning).toBe("Enough.");
+		expect(reply?.webCited).toEqual(["https://statice.is/"]);
+		const kept = JSON.stringify(reply?.webCalls);
+		// The signature stays (the page comes back next turn); snippets
+		// and step thinking don't (DeepSeek ignores them coming back).
+		expect(kept).toContain("sig");
+		expect(kept).not.toContain("big");
+		expect(kept).not.toContain("step thinking");
+		// Saved with the chat: a reload still has them.
+		const reloaded = createChatState(store);
+		const back = reloaded.chats
+			.find((c) => c.id === state.activeChatId)
+			?.messages.at(-1);
+		expect(back?.webCalls).toEqual(reply?.webCalls);
+		expect(back?.webCited).toEqual(["https://statice.is/"]);
+	});
+
+	it("sends an earlier DeepSeek reply's thinking and steps back with it", () => {
+		const { state, store } = stateWith(freshStore());
+		const chat = activeChat(state);
+		chat.messages = [
+			{
+				id: newChatMsgId(),
+				role: "user",
+				content: "q",
+				usage: null,
+				error: null
+			},
+			{
+				id: newChatMsgId(),
+				role: "assistant",
+				content: "a",
+				usage: null,
+				error: null,
+				reasoning: "thought",
+				webCalls: [{ index: 0, calls: [] }]
+			},
+			{
+				id: newChatMsgId(),
+				role: "user",
+				content: "more",
+				usage: null,
+				error: null
+			}
+		];
+		void store;
+		const api = buildApiMessages(chat, "sys");
+		expect(api.find((m) => m.role === "assistant")).toEqual({
+			role: "assistant",
+			content: "a",
+			reasoning_content: "thought",
+			server_tool_calls: [{ index: 0, calls: [] }]
+		});
+		// User turns carry nothing extra.
+		expect(
+			api
+				.filter((m) => m.role === "user")
+				.every((m) => !("server_tool_calls" in m))
+		).toBe(true);
+	});
+
+	it("keeps no extras for replies that looked nothing up", () => {
+		expect(replyExtras({})).toEqual({});
+		expect(replyExtras({ serverToolCalls: [] }, [])).toEqual({});
+		// No final list: the steps the stream showed stand in.
+		expect(
+			replyExtras({}, [
+				{ index: 0, calls: [{ index: 0, status: "completed" }] }
+			]).webCalls
+		).toHaveLength(1);
 	});
 
 	it("clears a stranded fetch phase when the turn throws", async () => {

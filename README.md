@@ -33,9 +33,13 @@ chats stay local.
   (Japanese, Chinese, Russian, Arabic, Hindi, …) instead of assuming
   the reply language.
 - **Study sheets.** Export or print the visible chat as a study sheet.
-- **Providers.** Muse Spark, DeepSeek, and OpenCode Zen (its
-  /chat/completions models, free ones marked; Android app only for now,
-  since Zen's API refuses browsers and webviews) out of the box, custom
+- **Providers.** DeepSeek (`deepseek-flash`, V4.1 Flash) three ways: with
+  a key (on Android, from ccez-keys), keyless through the Mac's ccez-words
+  (the desktop default), and keyless through llm.ccez.uk's login (the web
+  default). Its own web search and page reading answer the chat, and each
+  answer lists what it looked up (its searches and pages). Also OpenCode
+  Zen (its /chat/completions models, free ones marked; Android app only
+  for now, since Zen's API refuses browsers and webviews), custom
   OpenAI-compatible endpoints, per-key models, thinking-level control.
 
 ## Engineering

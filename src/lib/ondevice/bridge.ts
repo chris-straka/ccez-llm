@@ -11,7 +11,7 @@ import { tauriBackendAvailable } from "../secrets";
  * branch on this yet: the one-line hookup stays `if
  * (isOnDeviceProvider(id)) return generateOnDevice(prompt)` —
  * everything else (status, errors, download progress) already flows
- * through this module. Binding is local-mlkit only: Muse/deepseek
+ * through this module. Binding is local-mlkit only: the cloud
  * paths are untouched, and a missing model throws the short
  * `no-model` copy — never a silent reroute to another provider.
  *

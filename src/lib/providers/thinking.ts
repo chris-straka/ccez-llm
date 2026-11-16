@@ -1,3 +1,5 @@
+import { isDeepSeekProvider } from "./deepseek";
+
 /**
  * Native thinking controls, per provider and model.
  *
@@ -8,9 +10,9 @@
  * tables: a future model slots in by adding a matcher here, with no UI
  * or plumbing changes.
  *
- * Levels are provider-native ids (Meta's `minimal…xhigh`, DeepSeek's
- * `off/high/max`), not a shared low/medium/high: only what the model
- * actually offers is ever shown or sent.
+ * Levels are provider-native ids (DeepSeek's `off/low/high/max`), not a
+ * shared low/medium/high: only what the model actually offers is ever
+ * shown or sent.
  */
 export interface ThinkingOption {
 	id: string;
@@ -22,6 +24,9 @@ export interface ThinkingSupport {
 	options: ThinkingOption[];
 	/** Used when the saved id is missing or unknown. */
 	defaultId: string;
+	/** The level quick work (notes, titles, summaries) always sends,
+	 * whatever the chat's dial says; absent: the call's own level. */
+	quickId?: string;
 	/** True when levels go out as API parameters; false when they only
 	 * become system-prompt hints (generic providers). */
 	native: boolean;
@@ -55,48 +60,27 @@ function generic(): ThinkingSupport {
 }
 
 /**
- * Muse Spark on the Meta Model API: top-level `reasoning_effort` from
- * `minimal` to `xhigh`. There is no off switch — `none` is a 400 —
- * so even Minimal still reasons.
+ * DeepSeek: a `thinking` toggle plus top-level `reasoning_effort`
+ * (`low`, `high`, `max`; DeepSeek maps any other level onto those).
+ * Thinking is ON at high when the fields are left out, so every
+ * request names its level: Off sends `{"type": "disabled"}` and the
+ * model answers without a reasoning pass. Quick work (notes, titles,
+ * summaries, translation) always goes Off; the chat starts at Low.
  */
-function metaSpark(): ThinkingSupport {
-	const options = [
-		{ id: "minimal", label: "Minimal" },
-		{ id: "low", label: "Low" },
-		{ id: "medium", label: "Medium" },
-		{ id: "high", label: "High" },
-		{ id: "xhigh", label: "Max" }
-	];
-	const ids = new Set(options.map((o) => o.id));
-	return {
-		options,
-		defaultId: "medium",
-		native: true,
-		wireFields: (optionId) =>
-			ids.has(optionId) ? { reasoning_effort: optionId } : {},
-		promptHint: () => ""
-	};
-}
-
-/**
- * DeepSeek (`deepseek-flash`, `deepseek-v4-*`): top-level `reasoning_effort` (`high`
- * the default, `max` for harder pushes) plus a `thinking` toggle. Effort
- * only spans two rungs, so Off/High/Max is the whole dial. Off fully
- * disables thinking rather than lowering it — the model then answers
- * without a reasoning pass.
- */
-function deepseekV4(): ThinkingSupport {
+function deepseek(): ThinkingSupport {
 	return {
 		options: [
 			{ id: "off", label: "Off" },
+			{ id: "low", label: "Low" },
 			{ id: "high", label: "High" },
 			{ id: "max", label: "Max" }
 		],
-		defaultId: "high",
+		defaultId: "low",
+		quickId: "off",
 		native: true,
 		wireFields: (optionId) => {
 			if (optionId === "off") return { thinking: { type: "disabled" } };
-			if (optionId === "high" || optionId === "max")
+			if (optionId === "low" || optionId === "high" || optionId === "max")
 				return { thinking: { type: "enabled" }, reasoning_effort: optionId };
 			return {};
 		},
@@ -113,8 +97,9 @@ export function thinkingFor(
 	providerId: string,
 	model: string
 ): ThinkingSupport {
-	if (providerId === "muse") return metaSpark();
-	if (providerId === "deepseek" && /v4|flash/i.test(model)) return deepseekV4();
+	// Every DeepSeek model takes these fields; the model id may change.
+	void model;
+	if (isDeepSeekProvider(providerId)) return deepseek();
 	return generic();
 }
 

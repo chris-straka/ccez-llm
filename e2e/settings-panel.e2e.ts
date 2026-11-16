@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { seedChat, setSettingValue, settingValue } from "./helpers";
 import { seedMockShell } from "./mock-shell";
 
-/** Settings panel: five thinking pills share one row, labels stay terse. */
+/** Settings panel: DeepSeek's four thinking pills share one row, labels stay terse. */
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
@@ -17,7 +17,7 @@ test("thinking pills fit on one line", async ({ page }) => {
 	const pills = page.locator(
 		'.settings-panel .segmented[aria-label="Thinking level"] button'
 	);
-	await expect(pills).toHaveCount(5);
+	await expect(pills).toHaveText(["Off", "Low", "High", "Max"]);
 	const tops = await pills.evaluateAll((els) =>
 		els.map((el) => Math.round(el.getBoundingClientRect().top))
 	);

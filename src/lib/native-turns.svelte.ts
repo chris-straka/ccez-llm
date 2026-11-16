@@ -6,6 +6,7 @@ import {
 	hasReplyStarted,
 	isSending,
 	markReplyStarted,
+	setLookupLabel,
 	settleNativeSend,
 	unmarkReplyStarted,
 	type Chat,
@@ -15,6 +16,7 @@ import {
 	type PasteFold
 } from "./chat";
 import type { AppSettings } from "./settings";
+import { applyToolEvent, lookupLabel } from "./web-sources";
 import {
 	applyTurnFile,
 	dismissNativeTurn,
@@ -167,6 +169,8 @@ export class NativeTurns {
 				apiKey: config.apiKey,
 				model: config.model,
 				extraBody: config.extraBody,
+				quickExtraBody: config.quickExtraBody,
+				serverTools: config.serverTools,
 				system,
 				messages: history.messages,
 				priorSummary: history.priorSummary,
@@ -336,12 +340,25 @@ export class NativeTurns {
 		);
 	}
 
-	/** Fetch-phase event (see `fetching`). */
-	onFetch({ turn_id, phase }: TurnFetchEvent): void {
+	/** Fetch-phase event (see `fetching`). DeepSeek's web tools ride
+	the same event with their `server_tool_event`: the status line names
+	what it looks up, and the placeholder's sources fill in (the same
+	steps the TypeScript engine keeps). */
+	onFetch({ turn_id, phase, event }: TurnFetchEvent): void {
 		const owned = this.turns.get(turn_id);
 		if (!owned) return;
 		if (phase === "start") this.fetching.add(owned.chatId);
 		else this.fetching.delete(owned.chatId);
+		if (event === undefined || event === null) return;
+		const label = lookupLabel(event);
+		if (label !== undefined) setLookupLabel(this.state, owned.chatId, label);
+		const target = this.chatById(owned.chatId);
+		if (!target) return;
+		target.messages = target.messages.map((m) =>
+			m.id === owned.replyId
+				? { ...m, webCalls: applyToolEvent(m.webCalls, event) }
+				: m
+		);
 	}
 
 	/** Retry event: the runner recomputes from scratch, so the
@@ -354,10 +371,12 @@ export class NativeTurns {
 		// A cleared reply goes back to thinking dots — for transport
 		// retries and tool-round retracts alike (same wire event).
 		unmarkReplyStarted(this.state, owned.chatId);
+		setLookupLabel(this.state, owned.chatId, null);
 		const target = this.chatById(owned.chatId);
 		if (!target) return;
+		// The recompute looks things up again: its sources start over.
 		target.messages = target.messages.map((m) =>
-			m.id === owned.replyId ? { ...m, content: "" } : m
+			m.id === owned.replyId ? { ...m, content: "", webCalls: [] } : m
 		);
 	}
 

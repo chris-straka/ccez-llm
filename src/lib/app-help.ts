@@ -69,6 +69,12 @@ export function buildAppHelp(
 	return `${GUIDE}\n\n${shortcuts}\n`;
 }
 
+/** The guide as a system-prompt block, for a model that can't fetch
+ * it (DeepSeek, whose web tools replace fetch_url). */
+export function appGuidePrompt(): string {
+	return `If the user asks about this app itself (how to annotate, its shortcuts, gestures or settings), answer from this guide; otherwise leave it aside.\n\n${appHelpHere()}`;
+}
+
 /** The guide for the device this runs on. */
 export function appHelpHere(): string {
 	if (typeof navigator === "undefined") return buildAppHelp("mac");

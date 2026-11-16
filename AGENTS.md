@@ -64,6 +64,8 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - App help: the chat model answers questions about the app by
   fetching `https://ccez-llm.invalid/help`, which both engines answer
   from `src/lib/app-help.ts` (its flows, plus the shortcuts registry).
+  DeepSeek can't take `fetch_url` beside its own web tools, so its
+  chat carries the guide in the system prompt instead (`replyPrompt.ts`).
   After changing the guide or the gestures, `bun scripts/app-help.ts`
   regenerates the Android runner's copy (`app-help.test.ts` fails
   until it does).
@@ -135,6 +137,15 @@ metadata` after a dependency change (`licenses.test.ts` fails until
 - Two engines, one contract, kept in lockstep: the TS provider
   (`providers/openai-compat.ts`) and `turn.rs` share tool rounds, caps,
   error copy, and the `fetch_url` description. Change one, change both.
+- DeepSeek (`providers/deepseek.ts`, three routes in `registry.ts`):
+  quick work (`chat()`: notes, titles, summaries, grading) always sends
+  `thinking: disabled`; the chat (`stream()`) sends the dial's level
+  (low by default) plus DeepSeek's own `deepseek_web_search` and
+  `deepseek_read_url` in place of `fetch_url` (they can't be combined).
+  Its `server_tool_calls`, thinking and citations are kept on the reply
+  (`webCalls`, `reasoning`, `webCited`; `web-sources.ts` reads them for
+  the sources row) and go back to DeepSeek in later turns. `turn.rs`
+  mirrors all of it (`server_tools`, `quick_extra_body`).
 - Voice: `SpeakCallbacks` in `voice.ts` fronts web `speechSynthesis` and
   native engines (`nativeTts.ts` → `tts.rs` AVSpeechSynthesizer on Mac,
   `tts_android.rs` on Android, whose WebView has no `speechSynthesis` at

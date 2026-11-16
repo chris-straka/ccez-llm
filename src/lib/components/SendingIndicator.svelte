@@ -10,13 +10,23 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 		phase: "fetch" | "waiting" | null;
 		elapsed: number;
 		waitingLabel: string;
+		/** What DeepSeek's web tools are looking up ("Searching “…”"):
+		the fetch line says it instead of Fetching. */
+		lookupLabel?: string | null;
 		/** Pointer over the status: it stands for the pending reply
 		(the delete keys reach a reply that has not landed). */
 		onenter?: () => void;
 		onleave?: () => void;
 	}
 
-	let { phase, elapsed, waitingLabel, onenter, onleave }: Props = $props();
+	let {
+		phase,
+		elapsed,
+		waitingLabel,
+		lookupLabel = null,
+		onenter,
+		onleave
+	}: Props = $props();
 </script>
 
 {#if phase === "fetch"}
@@ -27,12 +37,13 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 	<p
 		class="sending"
 		role="status"
-		aria-label="Fetching a page"
+		aria-label={lookupLabel ?? "Fetching a page"}
 		onmouseenter={onenter}
 		onmouseleave={onleave}
 	>
-		<span class="sending-chip"
-			>Fetching<span class="tdots" aria-hidden="true"
+		<span class="sending-chip" class:lookup={lookupLabel !== null}
+			>{#if lookupLabel}<span class="lookup-text">{lookupLabel}</span
+				>{:else}Fetching{/if}<span class="tdots" aria-hidden="true"
 				><span>.</span><span>.</span><span>.</span></span
 			>{#if elapsed > 0}<span class="sending-elapsed" aria-hidden="true"
 					>· {elapsed}s</span
@@ -89,6 +100,25 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 	}
 	.sending-elapsed {
 		font-variant-numeric: tabular-nums;
+	}
+	/* A lookup line can be long (a search's words): one line, cut with
+	an ellipsis, never wrapping the status under the reply. */
+	.sending-chip.lookup {
+		display: flex;
+		flex-wrap: nowrap;
+		max-width: 100%;
+	}
+	/* Only the words give way: the dots and the count keep their size. */
+	.sending-chip.lookup .tdots,
+	.sending-chip.lookup .sending-elapsed {
+		flex: none;
+		white-space: nowrap;
+	}
+	.lookup-text {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	/* The count stays out of the way until asked: hovering the chip
 	fades it in, leaving fades it back out. Touch clients have no

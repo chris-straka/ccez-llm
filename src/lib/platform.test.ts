@@ -320,7 +320,7 @@ describe("messageFoldSwipe", () => {
 });
 
 describe("visibleProviderIds", () => {
-	const CLOUD = ["muse", "deepseek"];
+	const CLOUD = ["deepseek", "deepseek-mac", "deepseek-login"];
 	it("lists everything on desktop, online or not", () => {
 		expect(
 			visibleProviderIds(CLOUD, { android: false, online: true, local: false })
@@ -342,6 +342,33 @@ describe("visibleProviderIds", () => {
 		).toEqual(all);
 		expect(
 			visibleProviderIds(all, { android: true, online: true, local: false })
+		).toEqual(CLOUD);
+	});
+	it("lists the site's login route on the website only", () => {
+		const apps = CLOUD.filter((id) => id !== "deepseek-login");
+		expect(
+			visibleProviderIds(CLOUD, {
+				android: false,
+				online: true,
+				local: false,
+				shell: true
+			})
+		).toEqual(apps);
+		expect(
+			visibleProviderIds(CLOUD, {
+				android: true,
+				online: true,
+				local: false,
+				shell: true
+			})
+		).toEqual(apps);
+		expect(
+			visibleProviderIds(CLOUD, {
+				android: false,
+				online: true,
+				local: false,
+				shell: false
+			})
 		).toEqual(CLOUD);
 	});
 	it("keeps only local on offline Android", () => {

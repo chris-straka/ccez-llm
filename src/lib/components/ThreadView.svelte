@@ -139,6 +139,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		sendingPhase: "fetch" | "waiting" | null;
 		sendElapsed: number;
 		waitingLabel: string;
+		/** What DeepSeek is looking up right now (the fetch line names it). */
+		lookupLabel?: string | null;
 		useMock: boolean;
 		openLangMenu: LanguageMenu["id"] | null;
 		/** Typeahead landing in the open language menu. */
@@ -253,6 +255,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		sendingPhase,
 		sendElapsed,
 		waitingLabel,
+		lookupLabel = null,
 		useMock,
 		openLangMenu,
 		langMenuTyped,
@@ -647,6 +650,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		phase={sendingPhase}
 		elapsed={sendElapsed}
 		{waitingLabel}
+		{lookupLabel}
 		onenter={() => {
 			if (messages[messages.length - 1]?.role === "assistant")
 				actions.hoverRow(messages.length - 1);

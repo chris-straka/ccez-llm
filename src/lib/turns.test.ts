@@ -103,23 +103,44 @@ describe("nativeTurnAvailable", () => {
 
 describe("nativeTurnConfig", () => {
 	it("snapshots config plus thinking fields for a keyed provider", () => {
-		const settings = settingsWith("muse", {
+		const settings = settingsWith("deepseek", {
 			baseUrl: "https://x.test/v1/",
 			apiKey: "k",
-			model: "m"
+			model: "deepseek-flash"
 		});
 		const config = nativeTurnConfig(settings);
 		expect(config).toMatchObject({
 			baseUrl: "https://x.test/v1/",
 			apiKey: "k",
+			model: "deepseek-flash"
+		});
+		// Same tables the TypeScript engine sends: the chat thinks at
+		// low, quick work (the summary fold, grading) never thinks, and
+		// DeepSeek's own web tools replace fetch_url.
+		expect(config?.extraBody).toEqual({
+			thinking: { type: "enabled" },
+			reasoning_effort: "low"
+		});
+		expect(config?.quickExtraBody).toEqual({ thinking: { type: "disabled" } });
+		expect(config?.serverTools).toEqual([
+			{ type: "deepseek_web_search" },
+			{ type: "deepseek_read_url" }
+		]);
+	});
+
+	it("keeps fetch_url and the chat's fields for other providers", () => {
+		const settings = settingsWith("opencode-zen", {
+			baseUrl: "https://x.test/v1/",
+			apiKey: "k",
 			model: "m"
 		});
-		// Same tables the TypeScript engine sends (medium default).
-		expect(config?.extraBody).toEqual({ reasoning_effort: "medium" });
+		const config = nativeTurnConfig(settings);
+		expect(config?.serverTools).toBeNull();
+		expect(config?.quickExtraBody).toEqual(config?.extraBody);
 	});
 
 	it("refuses a blank key and an unknown provider", () => {
-		const blank = settingsWith("muse", {
+		const blank = settingsWith("deepseek", {
 			baseUrl: "https://x.test/v1/",
 			apiKey: "  ",
 			model: "m"
@@ -441,6 +462,8 @@ describe("invoke wrappers", () => {
 				apiKey: "k",
 				model: "m",
 				extraBody: {},
+				quickExtraBody: { thinking: { type: "disabled" } },
+				serverTools: [{ type: "deepseek_web_search" }],
 				system: "sys",
 				messages: [{ role: "user", content: "hi" }],
 				priorSummary: "old",
@@ -457,6 +480,8 @@ describe("invoke wrappers", () => {
 				api_key: "k",
 				model: "m",
 				extra_body: {},
+				quick_extra_body: { thinking: { type: "disabled" } },
+				server_tools: [{ type: "deepseek_web_search" }],
 				system: "sys",
 				messages: [{ role: "user", content: "hi" }],
 				prior_summary: "old",
@@ -488,7 +513,7 @@ describe("invoke wrappers", () => {
 
 describe("nativeRouteFor", () => {
 	const facts = { androidUI: true, shell: true, mock: false, onDevice: false };
-	const settings = settingsWith("muse", {
+	const settings = settingsWith("deepseek", {
 		baseUrl: "https://x.test/v1/",
 		apiKey: "k",
 		model: "m"
@@ -504,6 +529,68 @@ describe("nativeRouteFor", () => {
 	it("stays TypeScript off the native path", () => {
 		expect(nativeRouteFor({ ...facts, shell: false }, [], settings)).toBeNull();
 		expect(nativeRouteFor({ ...facts, mock: true }, [], settings)).toBeNull();
+	});
+});
+
+describe("DeepSeek's extras on the native path", () => {
+	it("sends an earlier reply's thinking and steps to the runner", () => {
+		const reply = {
+			...msg("r1", "assistant", "a"),
+			reasoning: "thought",
+			webCalls: [{ index: 0, calls: [] }]
+		};
+		expect(turnHistory([msg("u1", "user", "q"), reply])).toEqual([
+			{ role: "user", content: "q" },
+			{
+				role: "assistant",
+				content: "a",
+				reasoning_content: "thought",
+				server_tool_calls: [{ index: 0, calls: [] }]
+			}
+		]);
+	});
+
+	it("keeps a finished turn's thinking, sources and citations with the reply", () => {
+		const { state, store } = stateWithMessages([
+			msg("u1", "user", "q"),
+			msg("r1", "assistant", "")
+		]);
+		const chatId = state.chats[0]!.id;
+		expect(
+			applyTurnFile(
+				state,
+				{
+					turn_id: "t1" as TurnId,
+					chat_id: chatId,
+					message_id: "r1" as ChatMsgId,
+					status: "done",
+					content: "About 400,000.",
+					reasoning: "Enough.",
+					server_tool_calls: [
+						{
+							index: 0,
+							reasoning_content: "long thought",
+							calls: [
+								{
+									index: 0,
+									status: "completed",
+									sources: [{ url: "https://statice.is/", snippet: "s" }]
+								}
+							]
+						}
+					],
+					cited: ["https://statice.is/"],
+					finished_at: 1
+				},
+				store
+			)
+		).toBe("applied");
+		const reply = state.chats[0]!.messages[1]!;
+		expect(reply.content).toBe("About 400,000.");
+		expect(reply.reasoning).toBe("Enough.");
+		expect(reply.webCited).toEqual(["https://statice.is/"]);
+		expect(JSON.stringify(reply.webCalls)).toContain("https://statice.is/");
+		expect(JSON.stringify(reply.webCalls)).not.toContain("long thought");
 	});
 });
 

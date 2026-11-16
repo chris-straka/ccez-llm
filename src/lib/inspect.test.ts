@@ -153,21 +153,21 @@ describe("inspect setting", () => {
 	it("backfills true on older saves, keeps an explicit off", () => {
 		const blank = defaultSettings();
 		blank.providers["deepseek"]!.apiKey = "";
-		blank.providers["muse"]!.apiKey = "";
+		blank.providers["opencode-zen"]!.apiKey = "";
 		delete (blank as unknown as Record<string, unknown>).inspectEnabled;
 		saveSettings(blank, memoryStore);
 		expect(loadSettings(memoryStore).inspectEnabled).toBe(true);
 
 		const off = defaultSettings();
 		off.providers["deepseek"]!.apiKey = "";
-		off.providers["muse"]!.apiKey = "";
+		off.providers["opencode-zen"]!.apiKey = "";
 		off.inspectEnabled = false;
 		saveSettings(off, memoryStore);
 		expect(loadSettings(memoryStore).inspectEnabled).toBe(false);
 
 		const junk = defaultSettings();
 		junk.providers["deepseek"]!.apiKey = "";
-		junk.providers["muse"]!.apiKey = "";
+		junk.providers["opencode-zen"]!.apiKey = "";
 		(junk as unknown as Record<string, unknown>).inspectEnabled = "yes";
 		saveSettings(junk, memoryStore);
 		expect(loadSettings(memoryStore).inspectEnabled).toBe(true);

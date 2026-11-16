@@ -8,10 +8,10 @@ import { resolveProviderFor, type ProviderResolution } from "./resolve";
 function base(over: Partial<ProviderResolution> = {}): ProviderResolution {
 	return {
 		useMock: false,
-		activeProviderId: builtin("muse"),
+		activeProviderId: builtin("opencode-zen"),
 		providers: {
-			[builtin("muse")]: {
-				baseUrl: "https://api.meta.ai/v1",
+			[builtin("opencode-zen")]: {
+				baseUrl: "https://opencode.ai/zen/v1",
 				apiKey: "k",
 				model: "m",
 				models: []
@@ -49,8 +49,27 @@ describe("resolveProviderFor", () => {
 			resolveProviderFor(base({ activeProviderId: builtin("deepseek") }))
 		).toBeNull();
 		const blank = base();
-		blank.providers[builtin("muse")]!.apiKey = "  ";
+		blank.providers[builtin("opencode-zen")]!.apiKey = "  ";
 		expect(resolveProviderFor(blank)).toBeNull();
+	});
+
+	it("resolves the keyless DeepSeek routes with no key", () => {
+		for (const id of [builtin("deepseek-mac"), builtin("deepseek-login")]) {
+			const got = resolveProviderFor(
+				base({
+					activeProviderId: id,
+					providers: {
+						[id]: {
+							baseUrl: "/api/ai/deepseek",
+							apiKey: "",
+							model: "deepseek-flash",
+							models: []
+						}
+					}
+				})
+			);
+			expect(got, id).toBeInstanceOf(OpenAICompatProvider);
+		}
 	});
 
 	it("constructs the configured provider with the mobile flag", () => {

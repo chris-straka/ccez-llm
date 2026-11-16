@@ -2,6 +2,7 @@ import {
 	builtin,
 	getProviderDef,
 	listProviders,
+	platformDefaultProvider,
 	BUILTIN_PROVIDER_IDS,
 	type ProviderDef,
 	type ProviderId
@@ -14,6 +15,7 @@ import {
 	type ThinkingSupport
 } from "./providers/thinking";
 import { reportSaveFailure } from "./save-failure";
+import { isDeepSeekProvider } from "./providers/deepseek";
 
 export type VoiceEngine = "web" | "native";
 
@@ -455,9 +457,8 @@ export const PROMPT_IDLE_MAX = 10;
  * Dev-time `.env` prefill, in `vite dev` only: a built app never has it
  * (spreading `import.meta.env` inlined every VITE_ value, keys included,
  * into production bundles). The installed app uses Settings → Keychain.
- * Recognized names (VITE_ first, then legacy META_ aliases), never commit:
- *   VITE_MUSE_API_KEY / META_OPENAI_API_KEY_MUSE_SPARK_ONE_POINT_THREE
- *   VITE_MUSE_BASE_URL / META_BASE_URL, VITE_DEEPSEEK_API_KEY, ...
+ * Recognized names, never commit: VITE_DEEPSEEK_API_KEY,
+ *   VITE_DEEPSEEK_BASE_URL, VITE_OPENCODE_ZEN_API_KEY, ...
  */
 function devEnv(): Record<string, string | undefined> {
 	const fromProcess = (
@@ -470,8 +471,6 @@ function devEnv(): Record<string, string | undefined> {
 	if (!import.meta.env.DEV) return { ...(fromProcess ?? {}) };
 	return {
 		...(fromProcess ?? {}),
-		VITE_MUSE_API_KEY: import.meta.env.VITE_MUSE_API_KEY,
-		VITE_MUSE_BASE_URL: import.meta.env.VITE_MUSE_BASE_URL,
 		VITE_DEEPSEEK_API_KEY: import.meta.env.VITE_DEEPSEEK_API_KEY,
 		VITE_DEEPSEEK_BASE_URL: import.meta.env.VITE_DEEPSEEK_BASE_URL,
 		VITE_OPENCODE_ZEN_API_KEY: import.meta.env.VITE_OPENCODE_ZEN_API_KEY,
@@ -481,14 +480,12 @@ function devEnv(): Record<string, string | undefined> {
 
 const ENV_ALIASES: Record<string, string[]> = {
 	deepseek: ["VITE_DEEPSEEK_API_KEY"],
-	"opencode-zen": ["VITE_OPENCODE_ZEN_API_KEY", "OPENCODE_API_KEY"],
-	muse: ["VITE_MUSE_API_KEY", "META_OPENAI_API_KEY_MUSE_SPARK_ONE_POINT_THREE"]
+	"opencode-zen": ["VITE_OPENCODE_ZEN_API_KEY", "OPENCODE_API_KEY"]
 };
 
 const BASE_URL_ALIASES: Record<string, string[]> = {
 	deepseek: ["VITE_DEEPSEEK_BASE_URL"],
-	"opencode-zen": ["VITE_OPENCODE_ZEN_BASE_URL"],
-	muse: ["VITE_MUSE_BASE_URL", "META_BASE_URL"]
+	"opencode-zen": ["VITE_OPENCODE_ZEN_BASE_URL"]
 };
 
 function firstSet(
@@ -558,11 +555,15 @@ export function systemLocale(): string {
 	return "en-US";
 }
 
+/** Built-in providers that no longer exist (owner, 2026-11-15): saves
+ * that name them move to the platform's default provider. */
+export const RETIRED_PROVIDER_IDS = ["muse", "muse-login"] as const;
+
 export function defaultSettings(): AppSettings {
 	const providers = envProviderDefaults(devEnv());
 	return {
 		version: 3,
-		activeProviderId: builtin("muse"),
+		activeProviderId: platformDefaultProvider(),
 		providers,
 		customProviders: [],
 		systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -637,6 +638,14 @@ export const LOOKUP_CAPABILITY_HINT =
 	"fetch pages or feeds (RSS/Atom) and answer from what they return.";
 
 /**
+ * The same line for DeepSeek, which searches and reads pages itself
+ * (its own web tools; no fetch_url to name).
+ */
+export const DEEPSEEK_LOOKUP_HINT =
+	"You can search the web and read pages yourself instead of refusing: " +
+	"do it when current or outside facts would answer better, and answer from what you find.";
+
+/**
  * Correction-mode line: without it the model replies but never corrects.
  * Per-chat toggle only (see correctionPromptOn) — the corrected text
  * rides a ```correction block the render hides and diffs under the
@@ -662,7 +671,12 @@ export function effectiveSystemPrompt(
 	const lang = replyLanguageFor(replyCode ?? settings.replyLang);
 	if (lang) parts.push(lang.prompt);
 	if (correction) parts.push(CORRECTION_HINT);
-	if (lookupTools) parts.push(LOOKUP_CAPABILITY_HINT);
+	if (lookupTools)
+		parts.push(
+			isDeepSeekProvider(settings.activeProviderId)
+				? DEEPSEEK_LOOKUP_HINT
+				: LOOKUP_CAPABILITY_HINT
+		);
 	return parts.filter(Boolean).join(" ");
 }
 
@@ -747,6 +761,14 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (merged.activeProviderId === "local-gemma") {
 			merged.activeProviderId = builtin("local-mlkit");
 		}
+		// A damaged thinking record (null, a list) reads as none rather
+		// than throwing the whole save away below.
+		if (
+			typeof merged.thinking !== "object" ||
+			merged.thinking === null ||
+			Array.isArray(merged.thinking)
+		)
+			merged.thinking = {};
 		const legacyGemmaEntry = merged.providers["local-gemma"];
 		if (legacyGemmaEntry && !merged.providers["local-mlkit"]) {
 			merged.providers["local-mlkit"] = legacyGemmaEntry;
@@ -759,14 +781,20 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.thinking["local-mlkit"] = merged.thinking["local-gemma"];
 		}
 		delete merged.thinking["local-gemma"];
-		// An active provider that no longer exists (deleted custom) falls
-		// back to Muse rather than throwing in getProviderDef.
+		// Retired built-ins drop their entries (their thinking choices
+		// drop below), and a save that was on one moves to this
+		// platform's default provider. An active provider that no longer
+		// exists (deleted custom) lands there too, never throwing in
+		// getProviderDef.
+		for (const retired of RETIRED_PROVIDER_IDS)
+			delete merged.providers[retired];
 		if (
+			typeof merged.activeProviderId !== "string" ||
 			!listProviders(merged.customProviders).some(
 				(p) => p.id === merged.activeProviderId
 			)
 		) {
-			merged.activeProviderId = builtin("muse");
+			merged.activeProviderId = fresh.activeProviderId;
 		}
 		// Backfill the model cache (provider entries from older saves
 		// replace the fresh ones wholesale, so the field is missing).
@@ -1020,27 +1048,31 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		}
 		// The global reading-aids toggle is gone too (per-message pins only).
 		dropRetiredKeys(merged, ["hoverActions", "readingAids"]);
-		// The shared low/medium/high dial became per-provider native ids:
-		// Muse keeps its id, DeepSeek maps onto off/high/max. Saves that
-		// already carry the record keep it; anything else resolves to
-		// each model's default at read time.
+		// The shared low/medium/high dial became per-provider native ids
+		// (DeepSeek's off/low/high/max). Saves that already carry the
+		// record keep their strings (retired providers' entries drop);
+		// anything else resolves to each model's default at read time.
 		const savedThinking = (parsed as { thinking?: unknown }).thinking;
 		if (
 			typeof savedThinking === "object" &&
 			savedThinking !== null &&
-			Object.values(savedThinking).every((v) => typeof v === "string")
+			!Array.isArray(savedThinking)
 		) {
-			merged.thinking = { ...(savedThinking as Record<string, string>) };
+			merged.thinking = Object.fromEntries(
+				Object.entries(savedThinking as Record<string, unknown>).filter(
+					(entry): entry is [string, string] =>
+						typeof entry[1] === "string" &&
+						!(RETIRED_PROVIDER_IDS as readonly string[]).includes(entry[0])
+				)
+			);
 		} else {
 			const legacyLevel = (parsed as { thinkingLevel?: unknown }).thinkingLevel;
 			merged.thinking =
-				legacyLevel === "high"
-					? { muse: "high", deepseek: "max" }
-					: legacyLevel === "medium"
-						? { muse: "medium", deepseek: "high" }
-						: legacyLevel === "low"
-							? { muse: "low", deepseek: "high" }
-							: {};
+				legacyLevel === "high" || legacyLevel === "medium"
+					? { deepseek: "high" }
+					: legacyLevel === "low"
+						? { deepseek: "low" }
+						: {};
 		}
 		dropRetiredKeys(merged, ["thinkingLevel"]);
 		return merged;

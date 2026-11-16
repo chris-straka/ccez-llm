@@ -1,6 +1,10 @@
 import { OpenAICompatProvider } from "./openai-compat";
 import { ZEN_BASE_URL, zenFreeModel, zenModelList } from "./zen";
 import { tauriBackendAvailable } from "../secrets";
+import { DEEPSEEK_MODEL } from "./deepseek";
+
+/** ccez-words on z: DeepSeek with the owner's key added there. */
+export const DEEPSEEK_MAC_URL = "https://z.tailfe37c2.ts.net:8448/ai/deepseek";
 
 /** `models.rs` `list_models`: the shell's CORS-free `/models` read. */
 async function nativeModelList(
@@ -21,9 +25,9 @@ async function nativeModelList(
 export type ProviderId = string & { readonly kind: "provider" };
 
 export const BUILTIN_PROVIDER_IDS = [
-	"muse",
-	"muse-login",
 	"deepseek",
+	"deepseek-login",
+	"deepseek-mac",
 	"opencode-zen",
 	"local-mlkit",
 	"apple"
@@ -69,30 +73,34 @@ export interface ProviderDef {
 
 export const PROVIDERS: ProviderDef[] = [
 	{
-		id: builtin("muse"),
-		label: "Muse",
-		defaultBaseUrl: "https://api.meta.ai/v1",
-		defaultModel: "muse-spark-1.3-contributor",
-		keyHint: "Meta Model API key"
+		id: builtin("deepseek"),
+		label: "DeepSeek",
+		defaultBaseUrl: "https://api.deepseek.com",
+		defaultModel: DEEPSEEK_MODEL,
+		keyHint: "Starts with sk-"
 	},
 	{
-		// Muse through llm.ccez.uk with the owner's key kept on the server
-		// (functions/api/ai/muse): a device he's logged in on needs no key
-		// (owner, 2026-11-13). The web build only; its login is Cloudflare
-		// Access.
-		id: builtin("muse-login"),
-		label: "Muse (logged in)",
-		defaultBaseUrl: "/api/ai/muse",
-		defaultModel: "muse-spark-1.3-contributor",
+		// DeepSeek through llm.ccez.uk with the owner's key kept on the
+		// server (functions/api/ai/deepseek, the Pages secret
+		// DEEPSEEK_API_KEY): a browser he's logged in on needs no key.
+		// The web build only; its login is Cloudflare Access.
+		id: builtin("deepseek-login"),
+		label: "DeepSeek (logged in)",
+		defaultBaseUrl: "/api/ai/deepseek",
+		defaultModel: DEEPSEEK_MODEL,
 		keyHint: "your login on llm.ccez.uk",
 		keyless: true
 	},
 	{
-		id: builtin("deepseek"),
-		label: "DeepSeek",
-		defaultBaseUrl: "https://api.deepseek.com",
-		defaultModel: "deepseek-flash",
-		keyHint: "Starts with sk-"
+		// DeepSeek through ccez-words on the owner's Mac (z), which adds
+		// the key it keeps in z's keychain: any device on the tailnet
+		// needs no key of its own.
+		id: builtin("deepseek-mac"),
+		label: "DeepSeek (Mac)",
+		defaultBaseUrl: DEEPSEEK_MAC_URL,
+		defaultModel: DEEPSEEK_MODEL,
+		keyHint: "ccez-words on the Mac adds the key",
+		keyless: true
 	},
 	{
 		id: builtin("opencode-zen"),
@@ -124,6 +132,33 @@ export const PROVIDERS: ProviderDef[] = [
 		publicModels: true
 	}
 ];
+
+/**
+ * The provider a fresh install starts on: DeepSeek through the Mac on
+ * desktop (keyless over the tailnet), through the site's login on the
+ * web build, and with ccez-keys' key on Android.
+ */
+export function defaultProviderFor(platform: {
+	shell: boolean;
+	android: boolean;
+}): ProviderId {
+	if (platform.shell && platform.android) return builtin("deepseek");
+	if (platform.shell) return builtin("deepseek-mac");
+	return builtin("deepseek-login");
+}
+
+/** This runtime's default provider (see `defaultProviderFor`). */
+export function platformDefaultProvider(): ProviderId {
+	let android: boolean;
+	try {
+		android =
+			typeof navigator !== "undefined" &&
+			/android/i.test(navigator.userAgent ?? "");
+	} catch {
+		android = false;
+	}
+	return defaultProviderFor({ shell: tauriBackendAvailable(), android });
+}
 
 /** Built-ins plus user-added custom providers. */
 export function listProviders(custom: ProviderDef[] = []): ProviderDef[] {

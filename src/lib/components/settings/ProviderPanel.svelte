@@ -10,12 +10,12 @@
 <script lang="ts">
 	import {
 		asProviderId,
-		builtin,
 		getProviderDef,
 		listProviders,
 		createProvider,
 		isFreeModel,
 		pickedModels,
+		platformDefaultProvider,
 		type ProviderId
 	} from "$lib/providers/registry";
 	import {
@@ -147,7 +147,7 @@
 		const visible = new Set(
 			visibleProviderIds(
 				allProviders.map((p) => p.id),
-				{ android: androidBridge, online, local: androidBridge }
+				{ android: androidBridge, online, local: androidBridge, shell: inShell }
 			)
 		);
 		return allProviders.filter(
@@ -341,7 +341,7 @@
 			(p) => p.id !== id
 		);
 		delete settings.providers[id];
-		switchProvider(builtin("muse"));
+		switchProvider(platformDefaultProvider());
 	}
 	onMount(() => {
 		maybeFetchModels();

@@ -2,7 +2,7 @@
  * OpenCode Zen (https://opencode.ai/docs/zen): one key, many vendors'
  * models behind https://opencode.ai/zen/v1. Zen serves each model on
  * its vendor's own wire format — `/chat/completions` (OpenAI-compatible,
- * beta on Zen), `/responses` (GPT, Grok, Muse Spark), `/messages`
+ * beta on Zen), `/responses` (GPT, Grok), `/messages`
  * (Claude, most Qwen), `/models/{id}` (Gemini), `/systemone` (Jev) —
  * and `/zen/v1/models` lists ids only, with no endpoint or price.
  * This app speaks `/chat/completions` alone, so the families below

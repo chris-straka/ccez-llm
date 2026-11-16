@@ -15,6 +15,7 @@ import { memoryStore } from "./settings";
 import { replyLanguageFor } from "./languages";
 import { practiceFor } from "./weakSpots";
 import { reportSaveFailure } from "./save-failure";
+import { applyToolEvent, lookupLabel, storedToolCalls } from "./web-sources";
 
 /**
  * Opaque identifiers: still plain strings at runtime (comparisons,
@@ -52,6 +53,16 @@ export interface ChatMsg {
 	clip?: ClipState;
 	/** Listening drill end-of-video tally row. */
 	drillEnd?: true;
+	/** DeepSeek: the reply's thinking (its last step's), sent back with
+	 * it in later turns. Never rendered. */
+	reasoning?: string;
+	/** DeepSeek: what its web tools did for this reply (its
+	 * `server_tool_calls`, kept small by `storedToolCalls`): the
+	 * sources row reads it, and later turns send it back. */
+	webCalls?: unknown[];
+	/** DeepSeek: the addresses the answer cites, in order (the sources
+	 * row lists them first). */
+	webCited?: string[];
 }
 
 export interface Chat {
@@ -150,6 +161,13 @@ export interface ChatState {
 	 * send (and on every fetch end, so a failed fetch can't strand it).
 	 */
 	fetchActiveChatIds: ChatId[];
+	/**
+	 * What DeepSeek's web tools are looking up right now, per sending
+	 * chat ("Searching “…”", "Reading example.com"): the status line
+	 * shows it while listed. Both engines set it; never persisted,
+	 * cleared with the send.
+	 */
+	lookupLabels: Record<string, string>;
 }
 
 /** True when the given chat (default: active) has a reply streaming. */
@@ -184,6 +202,31 @@ export function unmarkReplyStarted(state: ChatState, id?: ChatId): void {
 /** True when the given chat has a page fetch in flight right now. */
 export function hasFetchActive(state: ChatState, id?: ChatId): boolean {
 	return state.fetchActiveChatIds.includes(id ?? state.activeChatId);
+}
+
+/** What DeepSeek is looking up for the chat right now, or null. */
+export function lookupLabelFor(state: ChatState, id?: ChatId): string | null {
+	return state.lookupLabels[id ?? state.activeChatId] ?? null;
+}
+
+/**
+ * Set (or clear, with null) a chat's live lookup line. Replaces the
+ * record wholesale so the status line re-renders.
+ */
+export function setLookupLabel(
+	state: ChatState,
+	chatId: ChatId,
+	label: string | null
+): void {
+	const next = { ...state.lookupLabels };
+	if (label === null) {
+		if (!(chatId in next)) return;
+		delete next[chatId];
+	} else {
+		if (next[chatId] === label) return;
+		next[chatId] = label;
+	}
+	state.lookupLabels = next;
 }
 
 const STORAGE_KEY = "ccez-llm-chats-v1";
@@ -226,7 +269,8 @@ export function createChatState(store?: KeyValueStore): ChatState {
 		sending: false,
 		sendingChatIds: [],
 		replyStartedChatIds: [],
-		fetchActiveChatIds: []
+		fetchActiveChatIds: [],
+		lookupLabels: {}
 	};
 	loadChats(state, store ?? browserStore() ?? memoryStore);
 	if (state.chats.length === 0) {
@@ -1227,8 +1271,20 @@ export function buildApiMessages(
 	if (drill) api.push({ role: "system", content: drill });
 	const practice = practiceFor(lastUserText(turns));
 	if (practice) api.push({ role: "system", content: practice });
-	for (const m of turns) api.push({ role: m.role, content: apiContent(m) });
+	for (const m of turns) api.push(apiMessage(m));
 	return api;
+}
+
+/** One stored message as the provider reads it: an assistant reply
+ * from DeepSeek carries its thinking and web-tool steps back (the
+ * client drops them for every other provider). */
+export function apiMessage(m: ChatMsg): ChatMessage {
+	const out: ChatMessage = { role: m.role, content: apiContent(m) };
+	if (m.role === "assistant") {
+		if (m.reasoning) out.reasoning_content = m.reasoning;
+		if (m.webCalls && m.webCalls.length > 0) out.server_tool_calls = m.webCalls;
+	}
+	return out;
 }
 
 /**
@@ -1380,6 +1436,8 @@ export async function streamAssistantReply(
 	// signals capture values on first read, so only wholesale replacement
 	// notifies reliably. The running text lives in this local accumulator.
 	let streamed = "";
+	/** DeepSeek's web-tool steps so far (the final list replaces them). */
+	let webSteps: unknown[] = [];
 	const replaceReply = (patch: Partial<ChatMsg>) => {
 		// Pinned to the originating chat, never the active one: looking
 		// at another chat mid-stream must not swallow (or misroute) the
@@ -1434,6 +1492,14 @@ export async function streamAssistantReply(
 						(id) => id !== chatId
 					);
 				},
+				// DeepSeek's web tools: the status line names what it
+				// looks up, and the sources row fills in as results land.
+				onLookup: (event) => {
+					const label = lookupLabel(event);
+					if (label !== undefined) setLookupLabel(state, chatId, label);
+					webSteps = applyToolEvent(webSteps, event);
+					replaceReply({ webCalls: webSteps });
+				},
 				onToken: (token) => {
 					// First visible token: the reply has started arriving
 					// (thinking chip retires, haptic rumble, readback
@@ -1463,7 +1529,11 @@ export async function streamAssistantReply(
 			{ signal: controller.signal, thinking: opts.thinking }
 		);
 		dropFrame();
-		replaceReply({ content: result.content, usage: result.usage });
+		replaceReply({
+			content: result.content,
+			usage: result.usage,
+			...replyExtras(result, webSteps)
+		});
 	} catch (error) {
 		dropFrame();
 		if (cancelledSends.has(controller)) {
@@ -1488,9 +1558,32 @@ export async function streamAssistantReply(
 		state.fetchActiveChatIds = state.fetchActiveChatIds.filter(
 			(id) => id !== chatId
 		);
+		setLookupLabel(state, chatId, null);
 		state.sending = state.sendingChatIds.length > 0;
 		persistChats(state, store);
 	}
+}
+
+/**
+ * What a finished reply keeps of DeepSeek's extras: its thinking, its
+ * web-tool steps (the final list, else the steps the stream showed),
+ * kept small for storage, and the addresses it cites. Empty for every
+ * other provider. Pure.
+ */
+export function replyExtras(
+	result: {
+		reasoning?: string | undefined;
+		serverToolCalls?: unknown[] | undefined;
+		cited?: string[] | undefined;
+	},
+	liveSteps: unknown[] = []
+): Pick<ChatMsg, "reasoning" | "webCalls" | "webCited"> {
+	const out: Pick<ChatMsg, "reasoning" | "webCalls" | "webCited"> = {};
+	if (result.reasoning) out.reasoning = result.reasoning;
+	const calls = storedToolCalls(result.serverToolCalls ?? liveSteps);
+	if (calls) out.webCalls = calls;
+	if (result.cited && result.cited.length > 0) out.webCited = result.cited;
+	return out;
 }
 
 /**
@@ -1582,6 +1675,7 @@ export function settleNativeSend(
 	state.fetchActiveChatIds = state.fetchActiveChatIds.filter(
 		(id) => id !== chatId
 	);
+	setLookupLabel(state, chatId, null);
 	state.sending = state.sendingChatIds.length > 0;
 	persistChats(state, store);
 }

@@ -79,17 +79,10 @@ the app's own screen.
    folder, mode 0600 (Mac and Linux; Windows not yet). Not in a release yet.
    Left: point the phone's Apple provider at z over the tailnet with it.
    **Found while testing (open), 2026-11-10:**
-   - A Muse word card takes ~24 s (annotationAnswer run outside the app
-     with the owner's key: "to step back, retreat", card ok). Notes ask
-     with no thinking level, so Muse thinks at "medium" over the long
-     card prompt. That is the slowness the owner feels: try `low` for
-     cards (time it), and the layers below matter more than thought.
    - Through the dev app, the same annotate never came back and the
      socket's 3-minute limit (`agent.rs` BETWEEN) didn't fire either: find
      why (a blocked reply thread?) before trusting long `llm` calls.
      Short calls work: `ask`, `ask --whole`, `lookup`, the dictionary card.
-   - The dev app's first failures were its old Muse key (replaced with
-     the owner's; restart the dev app after changing keys).
    - The instant dictionary card works (~5 ms through `annotate`); the
      owner doesn't see it: check when the UI shows a partial card.
      The dev keys file (`src-tauri/.dev-secrets.json`) is plain JSON,
@@ -101,7 +94,7 @@ the app's own screen.
    about half a second, Apple's one line on top: what the word means in
    this sentence (the provider "apple", or ccez-apple-llm on z from a
    phone; skipped when unreachable). Facts never come from Apple's model
-   (it gets gender wrong). (c) Muse's card replaces both, keeping the
+   (it gets gender wrong). (c) The model's card replaces both, keeping the
    dictionary's facts (as now). An earlier card of the same word only
    stands in when neither (a) nor (b) has anything.
 3. **Cards in layers, several words.** (a) At once: the device's own
@@ -109,7 +102,7 @@ the app's own screen.
    Translation via the shell on the Mac) and short dictionary glosses of
    the harder words ("faire face à" → face up to · face (n.) · à). (b)
    About a second: Apple's line on the idiomatic sense ("here: to
-   confront"). (c) Muse's explanation as now; the phrase star as now.
+   confront"). (c) The model's explanation as now; the phrase star as now.
 4. **The star missing** on a finished French word card (owner's screenshot
    2026-11-10, "reculer"): it should hang outside the card whenever the card
    has a language (`+page.svelte` `onToggleStar`).

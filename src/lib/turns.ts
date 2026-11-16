@@ -1,10 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
 	apiContent,
+	apiMessage,
 	drillContextBlock,
 	lastUserText,
 	persistChats,
 	renderFoldText,
+	replyExtras,
 	selectHistoryWindow,
 	summaryBlock,
 	type Chat,
@@ -23,6 +25,7 @@ import {
 } from "./settings";
 import { getProviderDef } from "./providers/registry";
 import { resolveThinkingId, thinkingFor } from "./providers/thinking";
+import { DEEPSEEK_WEB_TOOLS, isDeepSeekProvider } from "./providers/deepseek";
 
 /**
  * Native-turn bridge: the TypeScript side of the Rust turn runner
@@ -54,6 +57,10 @@ export interface NativeTurnFile {
 	summary?: string | undefined;
 	/** Watermark id the refreshed summary covers. */
 	summary_through?: string | undefined;
+	/** DeepSeek: the reply's thinking, web-tool steps and cited addresses. */
+	reasoning?: string | undefined;
+	server_tool_calls?: unknown[] | undefined;
+	cited?: string[] | undefined;
 	finished_at: number;
 }
 
@@ -67,6 +74,9 @@ export interface TurnFetchEvent {
 	turn_id: TurnId;
 	phase: string;
 	url: string;
+	/** DeepSeek: the `server_tool_event` behind this phase (a call
+	 * starting or done), passed through as it streamed. */
+	event?: unknown;
 }
 
 export interface TurnDoneEvent {
@@ -102,7 +112,14 @@ export interface NativeTurnConfig {
 	baseUrl: string;
 	apiKey: string;
 	model: string;
+	/** The chat's thinking fields. */
 	extraBody: unknown;
+	/** Quick work's thinking fields (the summary fold, grading):
+	 * DeepSeek's thinking off. */
+	quickExtraBody: unknown;
+	/** DeepSeek's own web tools, sent in place of `fetch_url` (null:
+	 * the runner offers fetch_url as before). */
+	serverTools: ReadonlyArray<{ type: string }> | null;
 }
 
 /**
@@ -128,13 +145,16 @@ export function nativeTurnConfig(
 	}
 	if (!keyless && !conf.apiKey.trim()) return null;
 	const support = thinkingFor(settings.activeProviderId, conf.model);
+	const chatLevel = resolveThinkingId(support, activeThinkingId(settings));
 	return {
 		baseUrl: conf.baseUrl,
 		apiKey: conf.apiKey,
 		model: conf.model,
-		extraBody: support.wireFields(
-			resolveThinkingId(support, activeThinkingId(settings))
-		)
+		extraBody: support.wireFields(chatLevel),
+		quickExtraBody: support.wireFields(support.quickId ?? chatLevel),
+		serverTools: isDeepSeekProvider(settings.activeProviderId)
+			? DEEPSEEK_WEB_TOOLS
+			: null
 	};
 }
 
@@ -144,18 +164,30 @@ export function nativeTurnConfig(
  * Image parts flatten to their text siblings; true multimodal turns
  * never reach here (see `nativeTurnAvailable`).
  */
-export function turnHistory(
-	messages: ChatMsg[]
-): Array<{ role: string; content: string }> {
-	const out: Array<{ role: string; content: string }> = [];
+export function turnHistory(messages: ChatMsg[]): NativeWireMessage[] {
+	const out: NativeWireMessage[] = [];
 	for (const message of messages) {
 		if (message.role === "assistant" && message.error) continue;
-		out.push({
+		const wire: NativeWireMessage = {
 			role: message.role,
 			content: messageText(apiContent(message))
-		});
+		};
+		// DeepSeek's extras ride along; the runner sends them to
+		// DeepSeek only (same rule as the TypeScript client).
+		const { reasoning_content, server_tool_calls } = apiMessage(message);
+		if (reasoning_content) wire.reasoning_content = reasoning_content;
+		if (server_tool_calls) wire.server_tool_calls = server_tool_calls;
+		out.push(wire);
 	}
 	return out;
+}
+
+/** One history message for the runner (`TurnWireMessage` in turn.rs). */
+export interface NativeWireMessage {
+	role: string;
+	content: string;
+	reasoning_content?: string;
+	server_tool_calls?: unknown[];
 }
 
 /**
@@ -164,7 +196,7 @@ export function turnHistory(
  * the Rust runner resolves before its first POST. Pure over the chat.
  */
 export interface NativeHistoryInput {
-	messages: Array<{ role: string; content: string }>;
+	messages: NativeWireMessage[];
 	priorSummary: string;
 	foldText: string;
 	foldThrough: string;
@@ -241,7 +273,12 @@ export function applyTurnFile(
 									total: file.usage.total
 								}
 							: null,
-						error: null
+						error: null,
+						...replyExtras({
+							reasoning: file.reasoning,
+							serverToolCalls: file.server_tool_calls,
+							cited: file.cited
+						})
 					}
 				: m
 		);
@@ -323,8 +360,10 @@ export async function startNativeTurn(req: {
 	apiKey: string;
 	model: string;
 	extraBody: unknown;
+	quickExtraBody: unknown;
+	serverTools: ReadonlyArray<{ type: string }> | null;
 	system: string;
-	messages: Array<{ role: string; content: string }>;
+	messages: NativeWireMessage[];
 	/** Prior rolling summary ("" when none): stands unless a fold refreshes it. */
 	priorSummary: string;
 	/** Rendered overflow for the runner to fold ("" when no fold pending). */
@@ -341,6 +380,8 @@ export async function startNativeTurn(req: {
 			api_key: req.apiKey,
 			model: req.model,
 			extra_body: req.extraBody,
+			quick_extra_body: req.quickExtraBody,
+			server_tools: req.serverTools,
 			system: req.system,
 			messages: req.messages,
 			prior_summary: req.priorSummary,

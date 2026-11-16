@@ -13,6 +13,12 @@ export type ContentPart = TextPart | ImagePart;
 export interface ChatMessage {
 	role: "system" | "user" | "assistant";
 	content: string | ContentPart[];
+	/** DeepSeek: an earlier reply's thinking, sent back as it came.
+	 * Other providers never see it (the client strips it). */
+	reasoning_content?: string;
+	/** DeepSeek: an earlier reply's web-tool steps, sent back unchanged
+	 * (a link it read comes back into context from its signature). */
+	server_tool_calls?: unknown[];
 }
 
 /** Plain-text view of a message, skipping image parts. */
@@ -35,6 +41,12 @@ export interface TokenUsage {
 export interface ChatResult {
 	content: string;
 	usage: TokenUsage | null;
+	/** DeepSeek: the reply's thinking (its last step's, as the API keeps it). */
+	reasoning?: string | undefined;
+	/** DeepSeek: what its web tools did (`server_tool_calls`), as returned. */
+	serverToolCalls?: unknown[] | undefined;
+	/** DeepSeek: the addresses the answer cites (`annotations`), in order. */
+	cited?: string[] | undefined;
 }
 
 export interface StreamCallbacks {
@@ -50,6 +62,9 @@ export interface StreamCallbacks {
 	 * final answer later replaces. The final round streams fresh.
 	 * Optional — providers without tools never fire it. */
 	onRoundRetract?: (() => void) | undefined;
+	/** DeepSeek's web tools at work: each `server_tool_event` as it
+	 * streams (a call starting, a call done with its sources). */
+	onLookup?: ((event: unknown) => void) | undefined;
 }
 
 export interface ChatOptions {

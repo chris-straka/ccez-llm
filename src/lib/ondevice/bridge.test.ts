@@ -27,7 +27,7 @@ describe("on-device provider gate", () => {
 	it("matches only the parked local entry", () => {
 		expect(ONDEVICE_PROVIDER_ID).toBe("local-mlkit");
 		expect(isOnDeviceProvider("local-mlkit")).toBe(true);
-		expect(isOnDeviceProvider("muse")).toBe(false);
+		expect(isOnDeviceProvider("deepseek-mac")).toBe(false);
 		expect(isOnDeviceProvider("deepseek")).toBe(false);
 		expect(isOnDeviceProvider("mock")).toBe(false);
 		expect(isOnDeviceProvider("")).toBe(false);

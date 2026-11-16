@@ -46,11 +46,11 @@ describe("secrets in the shell", () => {
 	it("a failed Keychain read never lets a later save drop other keys", async () => {
 		keychain.set(
 			SECRET_BUNDLE_ACCOUNT,
-			encodeSecretBundle({ muse: "muse-key", deepseek: "old-key" })
+			encodeSecretBundle({ "opencode-zen": "zen-key", deepseek: "old-key" })
 		);
 		readFails = true;
 		const settings = defaultSettings();
-		settings.providers["muse"]!.apiKey = "";
+		settings.providers["opencode-zen"]!.apiKey = "";
 		settings.providers["deepseek"]!.apiKey = "";
 		await expect(hydrateSecrets(settings)).resolves.toEqual([]);
 		// Seeing no key, the user pastes one for DeepSeek.
@@ -58,35 +58,35 @@ describe("secrets in the shell", () => {
 		await persistSecrets(settings);
 		expect(invoke).not.toHaveBeenCalledWith("keychain_set", expect.anything());
 		expect(keychain.get(SECRET_BUNDLE_ACCOUNT)).toBe(
-			encodeSecretBundle({ muse: "muse-key", deepseek: "old-key" })
+			encodeSecretBundle({ "opencode-zen": "zen-key", deepseek: "old-key" })
 		);
 	});
 
 	it("once the Keychain reads again, the save merges nothing away", async () => {
 		keychain.set(
 			SECRET_BUNDLE_ACCOUNT,
-			encodeSecretBundle({ muse: "muse-key" })
+			encodeSecretBundle({ "opencode-zen": "zen-key" })
 		);
 		const settings = defaultSettings();
-		settings.providers["muse"]!.apiKey = "";
+		settings.providers["opencode-zen"]!.apiKey = "";
 		settings.providers["deepseek"]!.apiKey = "";
-		await expect(hydrateSecrets(settings)).resolves.toEqual(["muse"]);
+		await expect(hydrateSecrets(settings)).resolves.toEqual(["opencode-zen"]);
 		settings.providers["deepseek"]!.apiKey = "new-key";
 		await persistSecrets(settings);
 		expect(keychain.get(SECRET_BUNDLE_ACCOUNT)).toBe(
-			encodeSecretBundle({ muse: "muse-key", deepseek: "new-key" })
+			encodeSecretBundle({ "opencode-zen": "zen-key", deepseek: "new-key" })
 		);
 	});
 
 	it("an empty Keychain still takes the first key", async () => {
 		const settings = defaultSettings();
-		settings.providers["muse"]!.apiKey = "";
+		settings.providers["opencode-zen"]!.apiKey = "";
 		settings.providers["deepseek"]!.apiKey = "";
 		await hydrateSecrets(settings);
-		settings.providers["muse"]!.apiKey = "first";
+		settings.providers["opencode-zen"]!.apiKey = "first";
 		await persistSecrets(settings);
 		expect(keychain.get(SECRET_BUNDLE_ACCOUNT)).toBe(
-			encodeSecretBundle({ muse: "first" })
+			encodeSecretBundle({ "opencode-zen": "first" })
 		);
 	});
 

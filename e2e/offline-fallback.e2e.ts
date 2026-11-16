@@ -87,16 +87,16 @@ test("offline parks on-device for the session and online restores", async ({
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
-	expect(await activeProviderId(page)).toBe("muse");
+	expect(await activeProviderId(page)).toBe("deepseek-login");
 	await context.setOffline(true);
 	// Parked: a send meets the on-device gate, not a network error.
 	await page.locator(".ta-input").first().click();
 	await page.keyboard.type("hello");
 	await page.keyboard.press("Enter");
 	await expect(page.getByText("On-device chat isn't available")).toBeVisible();
-	expect(await activeProviderId(page)).toBe("muse");
+	expect(await activeProviderId(page)).toBe("deepseek-login");
 	await context.setOffline(false);
 	await expect
 		.poll(() => activeProviderId(page), { timeout: 10_000 })
-		.toBe("muse");
+		.toBe("deepseek-login");
 });

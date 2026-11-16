@@ -452,7 +452,7 @@ describe("background interruptions", () => {
 		const asked = drafts.ask(q);
 		await vi.waitFor(() => expect(d.settle).toHaveLength(1));
 		drafts.suspend();
-		d.settle[0]?.reject(new Error("Muse Spark: network error"));
+		d.settle[0]?.reject(new Error("DeepSeek: network error"));
 		await asked;
 		expect(calls.banners).toEqual([]);
 		expect(calls.errors).toEqual([]);

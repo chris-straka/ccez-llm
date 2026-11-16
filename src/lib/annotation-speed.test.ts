@@ -19,7 +19,7 @@ function provider(
 	cardMs = 50
 ): ChatProvider & { aborted: boolean } {
 	const p = {
-		id: "muse",
+		id: "deepseek",
 		aborted: false,
 		chat(messages: ChatMessage[], opts: ChatOptions = {}) {
 			const quick = messageText(messages[0]?.content ?? "").startsWith(

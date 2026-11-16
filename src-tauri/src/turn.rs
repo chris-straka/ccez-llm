@@ -56,6 +56,12 @@ const ATTEMPT_DEADLINE_SECS: u64 = 600;
 pub struct TurnWireMessage {
     pub role: String,
     pub content: String,
+    /// DeepSeek: an earlier reply's thinking and web-tool steps, sent
+    /// back as they came (to DeepSeek only, like the TypeScript client).
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
+    #[serde(default)]
+    pub server_tool_calls: Option<serde_json::Value>,
 }
 
 /// Everything the runner needs, snapshotted at send time. The API key
@@ -74,6 +80,16 @@ pub struct TurnRequest {
     /// TypeScript tables — Rust forwards them blindly, so provider
     /// quirks never need a second implementation here.
     pub extra_body: serde_json::Value,
+    /// Quick work's thinking fields (the summary fold): DeepSeek's
+    /// thinking off. Null from older senders: `extra_body` stands in.
+    #[serde(default)]
+    pub quick_extra_body: serde_json::Value,
+    /// DeepSeek's own web tools, sent in place of `fetch_url`: DeepSeek
+    /// runs them, so the turn is one stream with no fetch rounds. Its
+    /// presence also marks the provider as DeepSeek (its extension
+    /// fields, its errors in words). None: `fetch_url` as before.
+    #[serde(default)]
+    pub server_tools: Option<serde_json::Value>,
     pub system: String,
     pub messages: Vec<TurnWireMessage>,
     /// Rolling-summary inputs, computed by the page's shared window
@@ -107,6 +123,14 @@ pub struct TurnFile {
     pub summary: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary_through: Option<String>,
+    /// DeepSeek: the reply's thinking (its last step's), web-tool steps
+    /// and cited addresses, which the page keeps with the reply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_tool_calls: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cited: Option<Vec<String>>,
     pub finished_at: u64,
 }
 
@@ -364,7 +388,7 @@ async fn resolve_summary(
         ),
     ];
     let deadline = Instant::now() + Duration::from_secs(ATTEMPT_DEADLINE_SECS);
-    match post_plain(client, req, &history, false, stop, deadline).await {
+    match post_plain(client, req, &quick_body(req, &history), stop, deadline).await {
         Ok((content, _, _)) => {
             let trimmed = content.trim();
             if trimmed.is_empty() {
@@ -384,12 +408,20 @@ fn stream_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) ->
         "messages": history,
         "stream": true,
     });
+    if req.server_tools.is_some() {
+        body["stream_options"] = serde_json::json!({ "include_usage": true });
+    }
     if let Some(map) = req.extra_body.as_object() {
         for (key, value) in map {
             body[key] = value.clone();
         }
     }
-    if tools {
+    if let (true, Some(server_tools)) = (tools, req.server_tools.as_ref()) {
+        // DeepSeek searches and reads pages itself; its tools can't
+        // share a request with function tools, and `tool_choice` must
+        // never name them.
+        body["tools"] = server_tools.clone();
+    } else if tools {
         body["tools"] = serde_json::json!([{
             "type": "function",
             "function": {
@@ -412,11 +444,112 @@ fn stream_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) ->
 fn plain_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) -> serde_json::Value {
     let mut body = stream_body(req, history, tools);
     body["stream"] = serde_json::json!(false);
+    if let Some(map) = body.as_object_mut() {
+        map.remove("stream_options");
+    }
+    body
+}
+
+/// Quick work's body (the summary fold): no tools, and the quick
+/// thinking fields in place of the chat's (DeepSeek: thinking off).
+fn quick_body(req: &TurnRequest, history: &[serde_json::Value]) -> serde_json::Value {
+    let mut body = plain_body(req, history, false);
+    if let Some(map) = req.quick_extra_body.as_object() {
+        if let Some(out) = body.as_object_mut() {
+            for key in ["thinking", "reasoning_effort"] {
+                out.remove(key);
+            }
+            for (key, value) in map {
+                out.insert(key.clone(), value.clone());
+            }
+        }
+    }
     body
 }
 
 fn wire_message(role: &str, content: &str) -> serde_json::Value {
     serde_json::json!({ "role": role, "content": content })
+}
+
+/// One history message as the provider reads it: DeepSeek gets an
+/// earlier reply's thinking and web-tool steps back; anyone else gets
+/// role and text only.
+fn history_message(message: &TurnWireMessage, deepseek: bool) -> serde_json::Value {
+    let mut wire = wire_message(&message.role, &message.content);
+    if deepseek && message.role == "assistant" {
+        if let Some(reasoning) = message.reasoning_content.as_ref().filter(|r| !r.is_empty()) {
+            wire["reasoning_content"] = serde_json::json!(reasoning);
+        }
+        if let Some(steps) = message.server_tool_calls.as_ref().filter(|s| s.is_array()) {
+            wire["server_tool_calls"] = steps.clone();
+        }
+    }
+    wire
+}
+
+/// A DeepSeek failure in the owner's words, keeping the status:
+/// mirrors `deepseekErrorCopy` in providers/deepseek.ts.
+fn deepseek_error_copy(status: u16, body: &str) -> Option<String> {
+    let said: String = body.trim().chars().take(200).collect();
+    if status == 401 && body.contains("needs-login") {
+        return Some("Log in to llm.ccez.uk again: reload the page (HTTP 401).".to_string());
+    }
+    if status == 503 && body.contains("no key on the server") {
+        return Some("llm.ccez.uk has no DeepSeek key yet (its DEEPSEEK_API_KEY): use DeepSeek with a key, or DeepSeek (Mac), until it's set (HTTP 503).".to_string());
+    }
+    match status {
+        401 => Some(
+            "DeepSeek didn't accept the API key: check it in Settings → Model (HTTP 401)."
+                .to_string(),
+        ),
+        402 => Some(
+            "DeepSeek's balance is used up: top up at platform.deepseek.com (HTTP 402)."
+                .to_string(),
+        ),
+        429 => Some(
+            "DeepSeek is getting too many requests at once: wait a moment and retry (HTTP 429)."
+                .to_string(),
+        ),
+        500 | 503 | 504 => Some(format!(
+            "DeepSeek's servers are busy or down: retry in a moment (HTTP {status})."
+        )),
+        400 | 422 if !said.is_empty() => Some(format!(
+            "DeepSeek refused the request (HTTP {status}): {said}"
+        )),
+        _ => None,
+    }
+}
+
+/// A failure sent inside a stream (`error` on the last chunk, no
+/// [DONE] after it), in words: mirrors `streamErrorCopy` there.
+fn stream_error_copy(value: &serde_json::Value, name: &str) -> Option<String> {
+    let error = value.get("error")?;
+    if error.is_null() {
+        return None;
+    }
+    let message = error
+        .as_str()
+        .or_else(|| error["message"].as_str())
+        .filter(|m| !m.is_empty())
+        .unwrap_or("it failed to finish");
+    Some(format!(
+        "{name} stopped partway through the reply: {message}. Retry to ask again."
+    ))
+}
+
+/// A failed HTTP answer as the turn's error: DeepSeek's statuses in
+/// words, everyone else's with the server's own text.
+fn http_failure(req: &TurnRequest, kind: &str, status: u16, head: &str) -> AttemptEnd {
+    let message = req
+        .server_tools
+        .as_ref()
+        .and_then(|_| deepseek_error_copy(status, head))
+        .unwrap_or_else(|| format!("{kind} failed (HTTP {status}): {head}"));
+    if retryable_http_status(status) {
+        AttemptEnd::Retryable(Some(message))
+    } else {
+        AttemptEnd::Fatal(message)
+    }
 }
 
 /// Questions about the app fetch this (`APP_HELP_URL` in app-help.ts).
@@ -513,6 +646,23 @@ fn usage_from(value: &serde_json::Value) -> Option<TurnUsage> {
     })
 }
 
+/// The fetch event for one DeepSeek `server_tool_event`: a call
+/// starting opens the phase (with the page it reads, when it names
+/// one), anything else closes it.
+fn lookup_fetch_event(turn_id: &str, event: serde_json::Value) -> FetchEvent {
+    let start = event["type"] == "call_started";
+    let url = event["call"]["action"]["url"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    FetchEvent {
+        turn_id: turn_id.to_string(),
+        phase: if start { "start" } else { "end" }.to_string(),
+        url,
+        event: Some(event),
+    }
+}
+
 /// How one attempt ended: recompute, fail, or user stop.
 enum AttemptEnd {
     /// Recompute the turn; the note surfaces when attempts exhaust.
@@ -536,7 +686,22 @@ struct AttemptEvents {
     on_retry_note: Box<dyn FnMut() + Send>,
     on_round_retract: Box<dyn FnMut() + Send>,
     on_fetch: Box<dyn FnMut(bool, String) + Send>,
+    /// DeepSeek's `server_tool_event`s as they stream (a call starting,
+    /// a call done): the page names the lookup and fills the sources.
+    on_lookup: Box<dyn FnMut(serde_json::Value) + Send>,
+    /// DeepSeek's extras gathered by this attempt's stream.
+    web: WebExtras,
     stop: Arc<AtomicBool>,
+}
+
+/// DeepSeek's extras off one stream: its thinking (the last step's:
+/// each `step_reasoning_done` starts it over), the final
+/// `server_tool_calls`, and the addresses its `annotations` cite.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct WebExtras {
+    reasoning: String,
+    server_tool_calls: Option<serde_json::Value>,
+    cited: Vec<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -544,6 +709,43 @@ struct FetchEvent {
     turn_id: String,
     phase: String,
     url: String,
+    /// DeepSeek: the `server_tool_event` behind this phase, as it came.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    event: Option<serde_json::Value>,
+}
+
+/// Fold DeepSeek's extras from one parsed chunk into `web`, passing
+/// any `server_tool_event` on. Unknown shapes add nothing.
+fn take_web_extras(
+    value: &serde_json::Value,
+    web: &mut WebExtras,
+    on_lookup: &mut (dyn FnMut(serde_json::Value) + Send),
+) {
+    let choice = &value["choices"][0];
+    let delta = &choice["delta"];
+    if let Some(thought) = delta["reasoning_content"].as_str() {
+        web.reasoning.push_str(thought);
+    }
+    let event = &choice["server_tool_event"];
+    if event.is_object() {
+        if event["type"] == "step_reasoning_done" {
+            web.reasoning.clear();
+        }
+        on_lookup(event.clone());
+    }
+    if delta["server_tool_calls"].is_array() {
+        web.server_tool_calls = Some(delta["server_tool_calls"].clone());
+    }
+    if let Some(annotations) = delta["annotations"].as_array() {
+        web.cited.clear();
+        for item in annotations {
+            if let Some(url) = item["url_citation"]["url"].as_str() {
+                if !url.is_empty() && !web.cited.iter().any(|u| u == url) {
+                    web.cited.push(url.to_string());
+                }
+            }
+        }
+    }
 }
 
 fn reqwest_client() -> Result<reqwest::Client, String> {
@@ -587,21 +789,31 @@ fn classify_send_error(error: reqwest::Error) -> AttemptEnd {
     AttemptEnd::Retryable(None)
 }
 
-/// Fold stream payloads into the reply: tokens, tool fragments, usage.
+/// Fold stream payloads into the reply: tokens, tool fragments, usage,
+/// and DeepSeek's extras. A failure the server sent inside the stream
+/// comes back as its words (the attempt fails with them).
 fn take_payloads(
     payloads: Vec<String>,
     content: &mut String,
     frags: &mut Vec<ToolFrag>,
     usage: &mut Option<TurnUsage>,
     ev: &mut AttemptEvents,
-) {
+    deepseek: bool,
+) -> Option<String> {
     for payload in payloads {
         if payload.trim() == "[DONE]" {
             break;
         }
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
+            let name = if deepseek { "DeepSeek" } else { "The model" };
+            if let Some(failure) = stream_error_copy(&value, name) {
+                return Some(failure);
+            }
             if let Some(found) = usage_from(&value) {
                 *usage = Some(found);
+            }
+            if deepseek {
+                take_web_extras(&value, &mut ev.web, &mut *ev.on_lookup);
             }
         }
         let (token, frag) = delta_from_payload(&payload);
@@ -616,6 +828,7 @@ fn take_payloads(
             frags.push(piece);
         }
     }
+    None
 }
 
 /// Read one SSE stream into content + joined tool fragments, emitting
@@ -625,6 +838,7 @@ async fn read_stream(
     res: reqwest::Response,
     deadline: Instant,
     ev: &mut AttemptEvents,
+    deepseek: bool,
 ) -> Result<(String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
     let mut response = res;
     let mut decoder = SseDecoder::default();
@@ -633,15 +847,29 @@ async fn read_stream(
     let mut usage: Option<TurnUsage> = None;
     loop {
         match watched(response.chunk(), &ev.stop, deadline).await? {
-            Ok(Some(bytes)) => take_payloads(
-                decoder.push(&bytes),
-                &mut content,
-                &mut frags,
-                &mut usage,
-                ev,
-            ),
+            Ok(Some(bytes)) => {
+                if let Some(failure) = take_payloads(
+                    decoder.push(&bytes),
+                    &mut content,
+                    &mut frags,
+                    &mut usage,
+                    ev,
+                    deepseek,
+                ) {
+                    return Err(AttemptEnd::Fatal(failure));
+                }
+            }
             Ok(None) => {
-                take_payloads(decoder.finish(), &mut content, &mut frags, &mut usage, ev);
+                if let Some(failure) = take_payloads(
+                    decoder.finish(),
+                    &mut content,
+                    &mut frags,
+                    &mut usage,
+                    ev,
+                    deepseek,
+                ) {
+                    return Err(AttemptEnd::Fatal(failure));
+                }
                 break;
             }
             Err(error) => {
@@ -700,14 +928,9 @@ async fn post_stream(
             .await?
             .unwrap_or_default();
         let head: String = head.chars().take(300).collect();
-        let message = format!("stream failed (HTTP {status}): {head}");
-        return Err(if retryable_http_status(status) {
-            AttemptEnd::Retryable(Some(message))
-        } else {
-            AttemptEnd::Fatal(message)
-        });
+        return Err(http_failure(req, "stream", status, &head));
     }
-    read_stream(res, deadline, ev)
+    read_stream(res, deadline, ev, req.server_tools.is_some())
         .await
         .map(|(content, frags, usage)| (200, content, frags, usage))
 }
@@ -715,8 +938,7 @@ async fn post_stream(
 async fn post_plain(
     client: &reqwest::Client,
     req: &TurnRequest,
-    history: &[serde_json::Value],
-    tools: bool,
+    body: &serde_json::Value,
     stop: &AtomicBool,
     deadline: Instant,
 ) -> Result<(String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
@@ -729,7 +951,7 @@ async fn post_plain(
     if !req.api_key.is_empty() {
         post = post.bearer_auth(&req.api_key);
     }
-    let encoded = serde_json::to_vec(&plain_body(req, history, tools))
+    let encoded = serde_json::to_vec(body)
         .map_err(|error| AttemptEnd::Fatal(format!("encode request: {error}")))?;
     let res = watched(post.body(encoded).send(), stop, deadline)
         .await?
@@ -740,12 +962,7 @@ async fn post_plain(
             .await?
             .unwrap_or_default();
         let head: String = head.chars().take(300).collect();
-        let message = format!("request failed (HTTP {status}): {head}");
-        return Err(if retryable_http_status(status) {
-            AttemptEnd::Retryable(Some(message))
-        } else {
-            AttemptEnd::Fatal(message)
-        });
+        return Err(http_failure(req, "request", status, &head));
     }
     // No `json` feature either: read bytes, parse by hand. Transport
     // cuts stay retryable; malformed payloads fail the turn (a second
@@ -761,6 +978,16 @@ async fn post_plain(
         })?;
     let json: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|error| AttemptEnd::Fatal(format!("bad response: {error}")))?;
+    // A generation that failed after it started still answers 200, with
+    // `error` in the body.
+    let name = if req.server_tools.is_some() {
+        "DeepSeek"
+    } else {
+        "The model"
+    };
+    if let Some(failure) = stream_error_copy(&json, name) {
+        return Err(AttemptEnd::Fatal(failure));
+    }
     let message = &json["choices"][0]["message"];
     let content = message["content"].as_str().unwrap_or("").to_string();
     let mut frags = Vec::new();
@@ -854,11 +1081,23 @@ async fn run_attempt(
     if !summary.is_empty() {
         history.push(wire_message("system", &summary_block(summary)));
     }
+    let deepseek = req.server_tools.is_some();
     for message in &req.messages {
-        history.push(wire_message(&message.role, &message.content));
+        history.push(history_message(message, deepseek));
     }
     let (status, first_content, first_frags, first_usage) =
         post_stream(client, req, &history, true, deadline, ev).await?;
+    // DeepSeek ran its own web tools inside that one stream (its
+    // extras are in `ev.web`): there are no fetch rounds to run. A 400
+    // with the tools on gets one plain turn, as below.
+    if deepseek {
+        if status == 400 {
+            let (content, _, usage) =
+                post_stream_plain_fallback(client, req, &history, deadline, ev).await?;
+            return Ok((content, usage.or(first_usage)));
+        }
+        return Ok((first_content, first_usage));
+    }
     // 400 with tools: providers that reject tool calls get one plain
     // turn, same fallback the TypeScript engine applies.
     if status == 400 {
@@ -908,8 +1147,14 @@ async fn run_attempt(
         if round + 1 >= MAX_TOOL_ROUNDS {
             break;
         }
-        let (content, frags, round_usage) =
-            post_plain(client, req, &history, true, &ev.stop, deadline).await?;
+        let (content, frags, round_usage) = post_plain(
+            client,
+            req,
+            &plain_body(req, &history, true),
+            &ev.stop,
+            deadline,
+        )
+        .await?;
         if round_usage.is_some() {
             usage = round_usage;
         }
@@ -1191,10 +1436,21 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
                             "end".to_string()
                         },
                         url,
+                        event: None,
                     },
                 );
             }
         }),
+        // DeepSeek's lookups ride the fetch event, so the page's one
+        // status line covers both engines and both kinds of lookup.
+        on_lookup: Box::new({
+            let app = app.clone();
+            let turn_id = req.turn_id.clone();
+            move |event: serde_json::Value| {
+                let _ = app.emit("turn-fetch", lookup_fetch_event(&turn_id, event));
+            }
+        }),
+        web: WebExtras::default(),
         // The registry's own flag: a stop raised mid-attempt (or during
         // backoff) lands on the next chunk check without re-wiring.
         stop: Arc::clone(&live.stop),
@@ -1235,8 +1491,8 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
         Err(error) => TurnOutcome::Failed(error),
     };
     match outcome {
-        TurnOutcome::Done(content, usage) => {
-            finish_turn(&app, &req, &live, Ok((content, usage)), refreshed).await;
+        TurnOutcome::Done(content, usage, web) => {
+            finish_turn(&app, &req, &live, Ok((content, usage, web)), refreshed).await;
         }
         TurnOutcome::Stopped => {
             finish_turn(
@@ -1259,7 +1515,7 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
 /// flag underneath), so tests drive the whole retry loop headless.
 #[derive(Debug)]
 enum TurnOutcome {
-    Done(String, Option<TurnUsage>),
+    Done(String, Option<TurnUsage>, WebExtras),
     Stopped,
     Failed(String),
 }
@@ -1277,7 +1533,9 @@ async fn drive_attempts(
         attempt += 1;
         let mut ev = make_events();
         match run_attempt(client, req, summary, page_fetch, &mut ev).await {
-            Ok((content, usage)) => return TurnOutcome::Done(content, usage),
+            Ok((content, usage)) => {
+                return TurnOutcome::Done(content, usage, std::mem::take(&mut ev.web))
+            }
             Err(AttemptEnd::Stopped) => return TurnOutcome::Stopped,
             Err(AttemptEnd::Fatal(error)) => return TurnOutcome::Failed(error),
             Err(AttemptEnd::Retryable(note)) if attempt >= MAX_ATTEMPTS => {
@@ -1304,12 +1562,18 @@ async fn finish_turn(
     app: &AppHandle,
     req: &TurnRequest,
     live: &TurnLive,
-    outcome: Result<(String, Option<TurnUsage>), String>,
+    outcome: Result<(String, Option<TurnUsage>, WebExtras), String>,
     refreshed: Option<SummaryRefresh>,
 ) {
-    let (status, content, error, usage) = match outcome {
-        Ok((content, usage)) => ("done".to_string(), content, None, usage),
-        Err(error) => ("error".to_string(), String::new(), Some(error), None),
+    let (status, content, error, usage, web) = match outcome {
+        Ok((content, usage, web)) => ("done".to_string(), content, None, usage, web),
+        Err(error) => (
+            "error".to_string(),
+            String::new(),
+            Some(error),
+            None,
+            WebExtras::default(),
+        ),
     };
     let (summary, summary_through) = match refreshed {
         Some(refresh) => (Some(refresh.text), Some(refresh.through)),
@@ -1325,6 +1589,9 @@ async fn finish_turn(
         usage,
         summary,
         summary_through,
+        reasoning: Some(web.reasoning).filter(|r| !r.is_empty()),
+        server_tool_calls: web.server_tool_calls,
+        cited: Some(web.cited).filter(|c| !c.is_empty()),
         finished_at: now_secs(),
     };
     let _ = write_turn_file(app, &file);
@@ -1381,6 +1648,9 @@ pub fn turn_start(app: AppHandle, req: TurnRequest) -> Result<String, String> {
             usage: None,
             summary: None,
             summary_through: None,
+            reasoning: None,
+            server_tool_calls: None,
+            cited: None,
             finished_at: now_secs(),
         },
     )?;
@@ -1755,10 +2025,19 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let mut ev = test_events(&rec);
         let (mut content, mut frags, mut usage) = (String::new(), Vec::new(), None);
-        take_payloads(payloads, &mut content, &mut frags, &mut usage, &mut ev);
+        let failure = take_payloads(
+            payloads,
+            &mut content,
+            &mut frags,
+            &mut usage,
+            &mut ev,
+            false,
+        );
+        assert_eq!(failure, None);
         let calls = join_calls(&frags);
         let urls: Vec<&str> = calls.iter().map(|c| c.url.as_str()).collect();
         assert_eq!(urls, vec!["https://b.test/", "https://a.test/"]);
@@ -1781,11 +2060,10 @@ mod tests {
             api_key: "k".to_string(),
             model: "m".to_string(),
             extra_body: serde_json::json!({ "reasoning_effort": "low" }),
+            quick_extra_body: serde_json::Value::Null,
+            server_tools: None,
             system: "sys".to_string(),
-            messages: vec![TurnWireMessage {
-                role: "user".to_string(),
-                content: "hi".to_string(),
-            }],
+            messages: vec![user_hi()],
             prior_summary: String::new(),
             fold_text: String::new(),
             fold_through: String::new(),
@@ -1812,6 +2090,248 @@ mod tests {
         );
         assert!(plain_body(&req, &history, true)["stream"] == false);
         assert!(stream_body(&req, &history, false).get("tools").is_none());
+    }
+
+    fn deepseek_request(port: u16) -> TurnRequest {
+        TurnRequest {
+            extra_body: serde_json::json!({
+                "thinking": { "type": "enabled" },
+                "reasoning_effort": "low"
+            }),
+            quick_extra_body: serde_json::json!({ "thinking": { "type": "disabled" } }),
+            server_tools: Some(serde_json::json!([
+                { "type": "deepseek_web_search" },
+                { "type": "deepseek_read_url" }
+            ])),
+            model: "deepseek-flash".to_string(),
+            ..test_request(port)
+        }
+    }
+
+    #[test]
+    fn deepseek_bodies_send_its_web_tools_and_thinking() {
+        let req = deepseek_request(1);
+        let history = vec![wire_message("user", "hi")];
+        let stream = stream_body(&req, &history, true);
+        // Its own web tools replace fetch_url, and nothing names them.
+        assert_eq!(stream["tools"][0]["type"], "deepseek_web_search");
+        assert_eq!(stream["tools"][1]["type"], "deepseek_read_url");
+        assert_eq!(stream["tools"].as_array().map(Vec::len), Some(2));
+        assert!(stream.get("tool_choice").is_none());
+        assert_eq!(stream["thinking"]["type"], "enabled");
+        assert_eq!(stream["reasoning_effort"], "low");
+        assert_eq!(stream["stream_options"]["include_usage"], true);
+        // The plain fallback drops the tools, and a non-stream body
+        // never carries stream_options (a 400 there).
+        assert!(stream_body(&req, &history, false).get("tools").is_none());
+        assert!(plain_body(&req, &history, true)
+            .get("stream_options")
+            .is_none());
+        // Quick work (the summary fold): thinking off, no effort, no tools.
+        let quick = quick_body(&req, &history);
+        assert_eq!(quick["thinking"]["type"], "disabled");
+        assert!(quick.get("reasoning_effort").is_none());
+        assert!(quick.get("tools").is_none());
+        assert_eq!(quick["stream"], false);
+        // Older senders (no quick fields) keep the chat's.
+        let older = TurnRequest {
+            quick_extra_body: serde_json::Value::Null,
+            ..deepseek_request(1)
+        };
+        assert_eq!(quick_body(&older, &history)["reasoning_effort"], "low");
+    }
+
+    #[test]
+    fn deepseek_gets_earlier_replies_extras_back_and_others_do_not() {
+        let reply = TurnWireMessage {
+            role: "assistant".to_string(),
+            content: "answer".to_string(),
+            reasoning_content: Some("thought".to_string()),
+            server_tool_calls: Some(serde_json::json!([{ "index": 0, "calls": [] }])),
+        };
+        let to_deepseek = history_message(&reply, true);
+        assert_eq!(to_deepseek["reasoning_content"], "thought");
+        assert_eq!(to_deepseek["server_tool_calls"][0]["index"], 0);
+        let to_other = history_message(&reply, false);
+        assert!(to_other.get("reasoning_content").is_none());
+        assert!(to_other.get("server_tool_calls").is_none());
+        assert_eq!(to_other["content"], "answer");
+    }
+
+    #[test]
+    fn deepseek_errors_read_in_words() {
+        let copy = |status, body| deepseek_error_copy(status, body).unwrap_or_default();
+        assert!(copy(401, "{}").contains("didn't accept the API key"));
+        assert!(copy(402, "{}").contains("top up at platform.deepseek.com"));
+        assert!(copy(429, "{}").contains("too many requests"));
+        assert!(copy(503, "overloaded").contains("busy or down"));
+        assert!(copy(503, "no key on the server").contains("DEEPSEEK_API_KEY"));
+        assert!(copy(401, "needs-login").contains("Log in to llm.ccez.uk"));
+        assert!(copy(402, "{}").contains("HTTP 402"));
+        assert_eq!(deepseek_error_copy(418, "teapot"), None);
+        let req = deepseek_request(1);
+        assert!(matches!(
+            http_failure(&req, "stream", 429, ""),
+            AttemptEnd::Retryable(Some(ref m)) if m.contains("too many requests")
+        ));
+        assert!(matches!(
+            http_failure(&req, "stream", 402, ""),
+            AttemptEnd::Fatal(ref m) if m.contains("balance")
+        ));
+        // Other providers keep the server's own text.
+        assert!(matches!(
+            http_failure(&test_request(1), "stream", 402, "pay up"),
+            AttemptEnd::Fatal(ref m) if m == "stream failed (HTTP 402): pay up"
+        ));
+    }
+
+    #[test]
+    fn deepseek_stream_parts_fold_into_the_reply() {
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
+        };
+        let mut ev = test_events(&rec);
+        let chunk = |value: serde_json::Value| value.to_string();
+        let payloads = vec![
+            chunk(
+                serde_json::json!({ "choices": [{ "delta": { "reasoning_content": "first step " } }] }),
+            ),
+            chunk(
+                serde_json::json!({ "choices": [{ "delta": {}, "server_tool_event": { "type": "step_reasoning_done", "step": 0 } }] }),
+            ),
+            chunk(
+                serde_json::json!({ "choices": [{ "delta": {}, "server_tool_event": {
+                "type": "call_started", "step": 0,
+                "call": { "index": 0, "action": { "type": "search", "queries": ["q"] } } } }] }),
+            ),
+            chunk(
+                serde_json::json!({ "choices": [{ "delta": { "reasoning_content": "last step" } }] }),
+            ),
+            chunk(serde_json::json!({ "choices": [{ "delta": { "content": "Answer." } }] })),
+            chunk(
+                serde_json::json!({ "choices": [{ "finish_reason": "stop", "delta": {
+                "server_tool_calls": [{ "index": 0, "calls": [] }],
+                "annotations": [
+                    { "type": "url_citation", "url_citation": { "url": "https://a.test/" } },
+                    { "type": "url_citation", "url_citation": { "url": "https://a.test/" } },
+                    { "type": "junk" }
+                ] } }],
+                "usage": { "prompt_tokens": 5, "completion_tokens": 7 } }),
+            ),
+        ];
+        let (mut content, mut frags, mut usage) = (String::new(), Vec::new(), None);
+        let failure = take_payloads(
+            payloads,
+            &mut content,
+            &mut frags,
+            &mut usage,
+            &mut ev,
+            true,
+        );
+        assert_eq!(failure, None);
+        assert_eq!(content, "Answer.");
+        assert_eq!(ev.web.reasoning, "last step");
+        assert_eq!(
+            ev.web.server_tool_calls,
+            Some(serde_json::json!([{ "index": 0, "calls": [] }]))
+        );
+        assert_eq!(ev.web.cited, vec!["https://a.test/".to_string()]);
+        assert_eq!(usage.as_ref().map(|u| u.total), Some(12));
+        let lookups = rec.lookups.lock().unwrap();
+        assert_eq!(lookups.len(), 2);
+        assert_eq!(lookups[1]["type"], "call_started");
+        let event = lookup_fetch_event("t", lookups[1].clone());
+        assert_eq!(event.phase, "start");
+        assert_eq!(lookup_fetch_event("t", lookups[0].clone()).phase, "end");
+        // A failure on the last chunk ends the reply with its words.
+        let mut more = String::new();
+        let failure = take_payloads(
+            vec![chunk(
+                serde_json::json!({ "choices": [], "error": { "message": "The model failed to generate a complete response. Please retry." } }),
+            )],
+            &mut more,
+            &mut frags,
+            &mut usage,
+            &mut ev,
+            true,
+        );
+        assert!(failure
+            .unwrap_or_default()
+            .starts_with("DeepSeek stopped partway"));
+    }
+
+    #[test]
+    fn deepseek_turn_is_one_stream_with_its_sources() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let wire = [
+            serde_json::json!({ "choices": [{ "delta": {}, "server_tool_event": {
+                "type": "call_started", "step": 0,
+                "call": { "index": 0, "action": { "type": "search", "queries": ["iceland"] } } } }] }),
+            serde_json::json!({ "choices": [{ "delta": { "content": "About 400,000." } }] }),
+            serde_json::json!({ "choices": [{ "finish_reason": "stop", "delta": {
+                "server_tool_calls": [{ "index": 0, "calls": [{ "index": 0, "action": { "type": "search", "queries": ["iceland"] },
+                    "status": "completed", "sources": [{ "type": "url", "url": "https://statice.is/" }] }] }] } }] }),
+        ];
+        let body = wire
+            .iter()
+            .map(|w| format!("data: {w}\n\n"))
+            .collect::<String>()
+            + "data: [DONE]\n\n";
+        let port = run_stub(
+            vec![StubStep::Respond {
+                status: 200,
+                content_type: "text/event-stream",
+                body: body.into_bytes(),
+            }],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Err::<String, String>("never fetched".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
+        };
+        let client = reqwest_client().unwrap();
+        let req = deepseek_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _, web) => {
+                assert_eq!(content, "About 400,000.");
+                assert_eq!(
+                    web.server_tool_calls
+                        .as_ref()
+                        .map(|s| s[0]["calls"][0]["sources"][0]["url"].clone()),
+                    Some(serde_json::json!("https://statice.is/"))
+                );
+            }
+            other => panic!("expected done, got {other:?}"),
+        }
+        assert_eq!(
+            bodies.lock().unwrap().len(),
+            1,
+            "one request, no fetch rounds"
+        );
+        let sent: serde_json::Value =
+            serde_json::from_str(&bodies.lock().unwrap()[0]).unwrap_or_default();
+        assert_eq!(sent["tools"][0]["type"], "deepseek_web_search");
+        assert!(rec.fetches.lock().unwrap().is_empty());
+        assert_eq!(rec.lookups.lock().unwrap().len(), 1);
     }
 
     enum StubStep {
@@ -1954,6 +2474,7 @@ mod tests {
         fetches: Arc<Mutex<Vec<(bool, String)>>>,
         retries: Arc<Mutex<u32>>,
         retracts: Arc<Mutex<u32>>,
+        lookups: Arc<Mutex<Vec<serde_json::Value>>>,
     }
 
     fn test_request(port: u16) -> TurnRequest {
@@ -1965,11 +2486,10 @@ mod tests {
             api_key: "k".to_string(),
             model: "m".to_string(),
             extra_body: serde_json::json!({}),
+            quick_extra_body: serde_json::Value::Null,
+            server_tools: None,
             system: "sys".to_string(),
-            messages: vec![TurnWireMessage {
-                role: "user".to_string(),
-                content: "hi".to_string(),
-            }],
+            messages: vec![user_hi()],
             prior_summary: String::new(),
             fold_text: String::new(),
             fold_through: String::new(),
@@ -1981,6 +2501,7 @@ mod tests {
         let fetches = Arc::clone(&rec.fetches);
         let retries = Arc::clone(&rec.retries);
         let retracts = Arc::clone(&rec.retracts);
+        let lookups = Arc::clone(&rec.lookups);
         AttemptEvents {
             on_token: Box::new(move |token: String| {
                 tokens.lock().unwrap().push(token);
@@ -1994,7 +2515,20 @@ mod tests {
             on_fetch: Box::new(move |start: bool, url: String| {
                 fetches.lock().unwrap().push((start, url));
             }),
+            on_lookup: Box::new(move |event: serde_json::Value| {
+                lookups.lock().unwrap().push(event);
+            }),
+            web: WebExtras::default(),
             stop: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn user_hi() -> TurnWireMessage {
+        TurnWireMessage {
+            role: "user".to_string(),
+            content: "hi".to_string(),
+            reasoning_content: None,
+            server_tool_calls: None,
         }
     }
 
@@ -2011,6 +2545,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let stop = Arc::new(AtomicBool::new(false));
         let raise = Arc::clone(&stop);
@@ -2073,6 +2608,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2085,7 +2621,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "hi there"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "hi there"),
             other => panic!("expected done, got {other:?}"),
         }
         assert_eq!(*rec.tokens.lock().unwrap(), vec!["hi there"]);
@@ -2145,6 +2681,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2157,7 +2694,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "the answer"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "the answer"),
             other => panic!("expected done, got {other:?}"),
         }
         let started = rec
@@ -2205,6 +2742,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2252,6 +2790,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2264,7 +2803,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "plain answer"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "plain answer"),
             other => panic!("expected done, got {other:?}"),
         }
         assert!(rec.fetches.lock().unwrap().is_empty());
@@ -2301,6 +2840,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2313,7 +2853,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => {
+            TurnOutcome::Done(content, _, _) => {
                 assert_eq!(content, "answered from the page")
             }
             other => panic!("expected done, got {other:?}"),
@@ -2366,6 +2906,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2378,7 +2919,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "done after retry"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "done after retry"),
             other => panic!("expected done, got {other:?}"),
         }
         assert_eq!(
@@ -2478,6 +3019,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2490,7 +3032,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "hi there"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "hi there"),
             other => panic!("expected done, got {other:?}"),
         }
         let bodies = bodies.lock().unwrap();
@@ -2528,6 +3070,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2540,7 +3083,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "late hello"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "late hello"),
             other => panic!("expected done, got {other:?}"),
         }
         assert_eq!(*rec.retries.lock().unwrap(), 1);
@@ -2584,6 +3127,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -2596,7 +3140,7 @@ mod tests {
             &mut || test_events(&rec),
         ));
         match outcome {
-            TurnOutcome::Done(content, _) => assert_eq!(content, "recovered"),
+            TurnOutcome::Done(content, _, _) => assert_eq!(content, "recovered"),
             other => panic!("expected done, got {other:?}"),
         }
         assert_eq!(*rec.retries.lock().unwrap(), 1);
@@ -2635,6 +3179,7 @@ mod tests {
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
             retracts: Arc::new(Mutex::new(0)),
+            lookups: Arc::new(Mutex::new(Vec::new())),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
