@@ -80,13 +80,13 @@ mod tests {
     fn records_reads_and_remembers_deletions() {
         let path = temp_store("rw");
         assert_eq!(lookup(&path, "providers"), None);
-        record(&path, "providers", Some("{\"muse\":\"k\"}".into())).unwrap();
+        record(&path, "providers", Some("{\"deepseek\":\"k\"}".into())).unwrap();
         assert_eq!(
             lookup(&path, "providers"),
-            Some(Some("{\"muse\":\"k\"}".into()))
+            Some(Some("{\"deepseek\":\"k\"}".into()))
         );
-        record(&path, "provider:muse", None).unwrap();
-        assert_eq!(lookup(&path, "provider:muse"), Some(None));
+        record(&path, "provider:deepseek", None).unwrap();
+        assert_eq!(lookup(&path, "provider:deepseek"), Some(None));
         assert_eq!(load(&path).len(), 2);
     }
 

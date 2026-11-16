@@ -10,21 +10,21 @@ class MainActivity : TauriActivity() {
   private var web: android.webkit.WebView? = null
 
   /**
-   * ccez-keys' yes/no for the Muse key (Keyring.kt), asked once at
+   * ccez-keys' yes/no for the DeepSeek key (Keyring.kt), asked once at
    * start; a yes reloads the page so the keys are read again with it.
    */
-  private val allowMuse = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+  private val allowKey = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
     if (it.resultCode == RESULT_OK) web?.post { web?.reload() }
   }
 
-  private fun askForMuseKey() {
+  private fun askForAiKey() {
     val asked = getSharedPreferences("keyring", MODE_PRIVATE)
     if (asked.getBoolean("asked", false)) return
     Thread {
       if (Keyring.key(this) != Keyring.Answer.Approve) return@Thread
       runOnUiThread {
         asked.edit().putBoolean("asked", true).apply()
-        runCatching { allowMuse.launch(Keyring.approve()) }
+        runCatching { allowKey.launch(Keyring.approve()) }
       }
     }.start()
   }
@@ -49,7 +49,7 @@ class MainActivity : TauriActivity() {
     Tts.init(this)
     // Secrets bridge: same pattern for the Android Keystore backend.
     Secrets.init(this)
-    if (savedInstanceState == null) askForMuseKey()
+    if (savedInstanceState == null) askForAiKey()
     // Dictation bridge: system SpeechRecognizer behind dictate_start/stop.
     Dictation.init(this)
     // On-device chat bridge: ML Kit Prompt API over AICore (see OnDevice).

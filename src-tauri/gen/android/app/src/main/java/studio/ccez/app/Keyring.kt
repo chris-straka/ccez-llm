@@ -5,8 +5,8 @@ import android.content.Intent
 import android.net.Uri
 
 /**
- * The Muse key from ccez-keys, the owner's one holder of it (ccez-keys
- * docs/keyring.md). Asked each time it's needed (a call into the
+ * The DeepSeek key from ccez-keys, the owner's one holder of it (ccez-keys
+ * docs/keyring.md; its provider name `deepseek`). Asked each time it's needed (a call into the
  * keyboard, a few ms), held only in memory, so a new key there is the
  * key here at once. Copied from ccez-tube (data/Keyring.kt).
  */
@@ -22,7 +22,7 @@ object Keyring {
     }
 
     /** Off the main thread. */
-    fun key(ctx: Context, provider: String = "muse"): Answer = try {
+    fun key(ctx: Context, provider: String = "deepseek"): Answer = try {
         val b = ctx.contentResolver.call(uri, "key", provider, null)
         when (val s = b?.getString("status")) {
             "ok" -> b.getString("key")?.let { Answer.Key(it, b.getInt("version")) } ?: Answer.No("none")

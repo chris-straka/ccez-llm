@@ -73,7 +73,7 @@ object Secrets {
 
     /**
      * Stored secret, or null when missing or unreadable. The provider-key
-     * bundle gets Muse's key from ccez-keys (Keyring) when it answers;
+     * bundle gets DeepSeek's key from ccez-keys (Keyring) when it answers;
      * then the copy stored here is removed (ccez-keys holds the one key).
      */
     @JvmStatic
@@ -81,27 +81,27 @@ object Secrets {
         if (!::appContext.isInitialized) return null
         val stored = stored(service, account)
         if (account != BUNDLE) return stored
-        val muse = (Keyring.key(appContext) as? Keyring.Answer.Key)?.key ?: return stored
+        val deepseek = (Keyring.key(appContext) as? Keyring.Answer.Key)?.key ?: return stored
         val keys = bundle(stored)
-        if (keys.containsKey(MUSE)) {
-            keys.remove(MUSE)
+        if (keys.containsKey(DEEPSEEK)) {
+            keys.remove(DEEPSEEK)
             store(service, account, encode(keys))
         }
-        keys[MUSE] = muse
+        keys[DEEPSEEK] = deepseek
         return encode(keys)
     }
 
-    /** Writes [secret]; Muse's key isn't kept in the bundle while ccez-keys holds it. */
+    /** Writes [secret]; DeepSeek's key isn't kept in the bundle while ccez-keys holds it. */
     @JvmStatic
     fun set(service: String, account: String, secret: String): Boolean {
         if (account != BUNDLE || !::appContext.isInitialized) return store(service, account, secret)
         if (Keyring.key(appContext) !is Keyring.Answer.Key) return store(service, account, secret)
-        return store(service, account, encode(bundle(secret).apply { remove(MUSE) }))
+        return store(service, account, encode(bundle(secret).apply { remove(DEEPSEEK) }))
     }
 
-    /** ccez-llm's `SECRET_BUNDLE_ACCOUNT` and Muse's provider id (src/lib/secrets.ts, registry.ts). */
+    /** ccez-llm's `SECRET_BUNDLE_ACCOUNT` and DeepSeek's provider id (src/lib/secrets.ts, registry.ts). */
     private const val BUNDLE = "providers"
-    private const val MUSE = "muse"
+    private const val DEEPSEEK = "deepseek"
 
     private fun bundle(raw: String?): java.util.TreeMap<String, String> {
         val out = java.util.TreeMap<String, String>()
