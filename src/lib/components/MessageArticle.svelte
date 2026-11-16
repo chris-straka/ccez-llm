@@ -32,6 +32,8 @@ where the text sat, like the composer's promptEl pattern). -->
 	import MessageActions, {
 		type MessageActionsActions
 	} from "./MessageActions.svelte";
+	import WebSources from "./WebSources.svelte";
+	import { webSources } from "$lib/web-sources";
 
 	/** Page-owned row behaviors (built per row; closures capture msg). */
 	export interface MessageArticleActions {
@@ -182,6 +184,12 @@ where the text sat, like the composer's promptEl pattern). -->
 			: null
 	);
 	let launchImageBroken = $state(false);
+	/** What DeepSeek looked up for this reply (null: nothing). */
+	const looked = $derived(
+		msg.role === "assistant" && msg.webCalls
+			? webSources(msg.webCalls, msg.webCited ?? [])
+			: null
+	);
 	const shownLevel = $derived<CefrLevel>(launch?.level ?? "B2");
 	const metaKey = $derived(
 		launch
@@ -431,6 +439,12 @@ where the text sat, like the composer's promptEl pattern). -->
 	{/if}
 	{#if footer}
 		{@render footer()}
+	{/if}
+	{#if looked && msg.content.trim() !== ""}
+		<!-- The sources row arrives with the answer's first words (the
+		status line named each lookup until then) and fills in as
+		DeepSeek's results land. -->
+		<WebSources sources={looked} id={msg.id} />
 	{/if}
 	<!-- Sent image folds render in `SentAttachments.svelte`
 	(variant "inline"); the page keeps the models, the OCR
