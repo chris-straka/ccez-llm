@@ -29,7 +29,11 @@ bun run build:web   # == vite build; adapter-static writes ./build
 1. Dashboard → Workers & Pages → Create → Pages → connect the repo.
 2. Build configuration: framework preset **SvelteKit**, build command
    `bun run build:web` (or `npm run build:web`), output directory `build`.
-   Environment: no secrets needed — the app is BYOK, keys stay in the visitor's browser.
+   Environment: keys stay in the visitor's browser (BYOK), except the
+   Pages secret `DEEPSEEK_API_KEY`, which `functions/api/ai/deepseek`
+   adds for "DeepSeek (logged in)" behind the owner's Access login (set
+   by his setup command, `keys ai-key` in ccez-keys; never by an agent).
+   Until it is set, that route answers "no key on the server".
 3. First deploy: verify `/`, `/manifest.webmanifest`, and `index.html` fallback load.
 
 ## Custom domain (llm.ccez.uk)
