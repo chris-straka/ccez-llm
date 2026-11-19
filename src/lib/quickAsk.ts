@@ -1,6 +1,6 @@
 /**
  * The Mac's quick Ask (owner, 2026-11-19: "click and ask a quick question
- * and then have it answer back to me in a notification"), on ⌥Space
+ * and then have it answer back to me in a notification"), on ⌃⌥Space
  * (`quick_ask.rs`). The small window (`/quick-ask`) shows the thread; the
  * main window answers, the way the game line leaves model calls to it:
  * the chosen provider and key, the reply streamed back over events, the
@@ -23,6 +23,8 @@ export const QUICK_ASK_DELTA_EVENT = "quick-ask-delta";
 export const QUICK_ASK_RETRACT_EVENT = "quick-ask-retract";
 export const QUICK_ASK_DONE_EVENT = "quick-ask-done";
 export const QUICK_ASK_FAILED_EVENT = "quick-ask-failed";
+/** The shell put the window up (quick_ask.rs): the field takes the keys. */
+export const QUICK_ASK_SHOWN_EVENT = "quick-ask-shown";
 /** Chats asked from the quick Ask (`importHomeAsks` with this prefix). */
 export const QUICK_ASK_PREFIX = "quick-";
 /** A thread left this long starts over the next time the window opens. */
@@ -225,7 +227,7 @@ export async function serveQuickAsk(deps: QuickAskDeps): Promise<void> {
 			if (!ask) return;
 			void answerAsk(ask, deps, to).then(async (outcome) => {
 				// Looked at already: nothing more. Otherwise a notification
-				// says it (and ⌥Space or the Dock shows it, quick_ask.rs).
+				// says it (and ⌃⌥Space or the Dock shows it, quick_ask.rs).
 				const seen = await invoke<boolean>("quick_ask_answered").catch(
 					() => true
 				);
@@ -272,6 +274,6 @@ async function notify(title: string, body: string): Promise<void> {
 		if (!granted) granted = (await n.requestPermission()) === "granted";
 		if (granted) n.sendNotification({ title, body });
 	} catch {
-		// No notifications: ⌥Space still shows it.
+		// No notifications: ⌃⌥Space still shows it.
 	}
 }

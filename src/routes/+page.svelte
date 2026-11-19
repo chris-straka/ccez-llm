@@ -8155,7 +8155,7 @@
 	 * socket only the owner's account can open. Desktop shell only.
 	 */
 	function wireAgent(): void {
-		// The Mac's quick Ask (⌥Space): answered here, filed as a chat of its own.
+		// The Mac's quick Ask (⌃⌥Space): answered here, filed as a chat of its own.
 		void serveQuickAsk({
 			resolve: () => providerKeys.resolve(),
 			save: (chat, thread, cited) => {

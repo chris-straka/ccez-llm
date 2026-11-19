@@ -111,6 +111,7 @@ export function touchShortcuts(): ShortcutRow[] {
  * feature keeps a click equivalent.
  */
 const WEB_HIDDEN_ROWS = new Set([
+	"Quick ask",
 	"Search chats",
 	"Search filters",
 	"Find in chat",
@@ -137,7 +138,12 @@ const WEB_HIDDEN_ROWS = new Set([
 ]);
 
 /** Rows whose feature only exists on macOS (screen capture). */
-const MAC_ONLY_ROWS = new Set(["Capture window text", "Set capture area"]);
+// Window capture (capture.rs) and the quick Ask (quick_ask.rs) are macOS-only.
+const MAC_ONLY_ROWS = new Set([
+	"Capture window text",
+	"Set capture area",
+	"Quick ask"
+]);
 
 export const HOVER_GROUP = "Hovered message";
 
@@ -313,6 +319,7 @@ export function desktopShortcuts(
 		},
 		{ group: view, name: "Settings", keys: `Shift+L · ${meta},` },
 		{ group: view, name: "Summon / hide window", keys: `${shiftMeta}Space` },
+		{ group: view, name: "Quick ask", keys: "⌃⌥Space in any app" },
 		{
 			group: view,
 			name: "Send selected text here",

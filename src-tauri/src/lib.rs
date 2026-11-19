@@ -600,7 +600,7 @@ pub fn run() {
             // Summon kit: tray, single instance, global hotkey, deep links.
             #[cfg(desktop)]
             desktop::wire(_app.handle())?;
-            // The quick Ask on ⌥Space (macOS).
+            // The quick Ask on ⌃⌥Space (macOS).
             #[cfg(desktop)]
             quick_ask::build(_app.handle())?;
             // A Mac app outlives its window: the red button hides it (the

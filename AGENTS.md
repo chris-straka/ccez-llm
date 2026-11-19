@@ -27,12 +27,12 @@ TTS/OCR/dictation, page fetch, Android background turns).
   `home-asks.json`; `home_asks.rs` hands that to `importHomeAsks`
   (`chat.ts`), which files it as chat `home-<id>`. Change the message
   shape on both sides together.
-- Quick Ask (macOS): ⌥Space anywhere (`quick_ask.rs`) drops the
+- Quick Ask (macOS): ⌃⌥Space anywhere (`quick_ask.rs`) drops the
   `/quick-ask` window, Spotlight-style (made on first use, never at
   launch). The window only shows the thread; the main window answers
   (`quickAsk.ts`, `serveQuickAsk`) and files it as chat `quick-<id>`. An
   answer that lands while the window is down comes as a notification;
-  ⌥Space or the Dock shows it. No menu bar icon (the owner keeps
+  ⌃⌥Space or the Dock shows it. No menu bar icon (the owner keeps
   ccez-sketch's as the only one). The red button hides the main window on
   the Mac (it has to stay alive to answer); the Dock icon brings it back.
   `e2e/quick-ask.e2e.ts` runs the window headless with a stand-in shell

@@ -104,6 +104,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Shortcuts",
 			"Settings",
 			"Summon / hide window",
+			"Quick ask",
 			"Fullscreen",
 			"Exit fullscreen",
 			"Text size",
@@ -146,6 +147,7 @@ describe("shortcuts menu copy", () => {
 
 	it("drops browser-dead rows on the web, order kept", () => {
 		const gone = [
+			"Quick ask",
 			"Search chats",
 			"Search filters",
 			"Find in chat",
@@ -181,7 +183,7 @@ describe("shortcuts menu copy", () => {
 
 	it("uses Ctrl labels off-mac and drops the Mac-only capture rows", () => {
 		const rows = desktopShortcuts(false);
-		const macOnly = ["Capture window text", "Set capture area"];
+		const macOnly = ["Capture window text", "Set capture area", "Quick ask"];
 		expect(rows.map((r) => r.name)).toEqual(
 			MAC_NAMES.filter((n) => !macOnly.includes(n))
 		);

@@ -69,7 +69,7 @@ export default defineConfig({
 				"**/quick-lang.e2e.ts",
 				"**/music.e2e.ts",
 				"**/scroll-field.e2e.ts",
-				// The Mac's quick Ask window (⌥Space).
+				// The Mac's quick Ask window (⌃⌥Space).
 				"**/quick-ask.e2e.ts",
 				"**/lang-pills.e2e.ts",
 				"**/annotations-ux.e2e.ts",

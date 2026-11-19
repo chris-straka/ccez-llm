@@ -1,18 +1,20 @@
 //! The Mac's quick Ask (owner, 2026-11-19: "click and ask a quick question
 //! and then have it answer back to me in a notification"). It was asked
 //! as a menu bar item; the owner then kept ccez-sketch's icon as the only
-//! one up there, so it opens on a hotkey instead: ⌥Space anywhere drops a
+//! one up there, so it opens on a hotkey instead: ⌃⌥Space anywhere drops a
 //! small Spotlight-style field near the top of the screen the pointer is
 //! on (`/quick-ask`). The question goes to the main window, which answers
 //! with the chosen provider and files the thread as a chat
 //! (`src/lib/quickAsk.ts`). An answer that lands while the field is down
-//! comes as a notification; ⌥Space (or the Dock icon) shows it.
+//! comes as a notification; ⌃⌥Space (or the Dock icon) shows it.
 
 /// Webview label (and route) of the Ask window.
 pub const QUICK_ASK_LABEL: &str = "quick-ask";
 
 /// The chord, anywhere on the Mac.
-pub const QUICK_ASK_SHORTCUT: &str = "Alt+Space";
+/// Not ⌥Space: ChatGPT opens its mini window there (and Siri and ChatGPT
+/// both take a double ⌘); nothing on the owner's Mac uses this one.
+pub const QUICK_ASK_SHORTCUT: &str = "Control+Alt+Space";
 
 /// Pure: where the window goes on a screen (x, y, width, height), as
 /// Spotlight sits: centred, a fifth of the way down. Physical pixels.
@@ -36,6 +38,63 @@ mod mac {
     const HEIGHT: f64 = 56.0;
     /// An answer came while the field was down and hasn't been seen.
     static WAITING: AtomicBool = AtomicBool::new(false);
+
+    // The Ask window as Spotlight's is: a panel that takes the keyboard
+    // without making ccez-llm the active app. Activating it raised the
+    // main window over whatever the owner was in and gave it the
+    // keyboard, so the Ask lost focus and hid at once (seen on screen,
+    // 2026-11-19). tao makes an NSWindow; its class becomes this NSPanel
+    // subclass right after it is built (no ivars of its own; tao's
+    // `focusable` ivar is only read through the two methods overridden
+    // here), the way tauri-nspanel does it.
+    objc2::define_class!(
+        #[unsafe(super(
+            objc2_app_kit::NSPanel,
+            objc2_app_kit::NSWindow,
+            objc2_app_kit::NSResponder,
+            objc2_foundation::NSObject
+        ))]
+        #[thread_kind = objc2::MainThreadOnly]
+        #[name = "CcezQuickAskPanel"]
+        struct QuickAskPanel;
+
+        impl QuickAskPanel {
+            #[unsafe(method(canBecomeKeyWindow))]
+            fn can_become_key(&self) -> bool {
+                true
+            }
+
+            #[unsafe(method(canBecomeMainWindow))]
+            fn can_become_main(&self) -> bool {
+                false
+            }
+        }
+    );
+
+    /// Turn the built window into a non-activating panel (main thread).
+    fn make_panel(w: &tauri::WebviewWindow) {
+        use objc2::ClassType;
+        use objc2_app_kit::{NSPanel, NSWindowCollectionBehavior, NSWindowStyleMask};
+        let Ok(ptr) = w.ns_window() else { return };
+        if ptr.is_null() || objc2::MainThreadMarker::new().is_none() {
+            return;
+        }
+        // SAFETY: on the main thread, a live NSWindow from tao, swapped to
+        // a subclass of NSPanel (itself an NSWindow subclass) that adds no
+        // ivars, before it is first shown.
+        unsafe {
+            objc2::ffi::object_setClass(ptr.cast(), QuickAskPanel::class());
+            let panel = &*(ptr as *const NSPanel);
+            panel.setStyleMask(panel.styleMask() | NSWindowStyleMask::NonactivatingPanel);
+            panel.setFloatingPanel(true);
+            panel.setBecomesKeyOnlyIfNeeded(false);
+            panel.setHidesOnDeactivate(false);
+            panel.setCollectionBehavior(
+                NSWindowCollectionBehavior::CanJoinAllSpaces
+                    | NSWindowCollectionBehavior::FullScreenAuxiliary,
+            );
+        }
+    }
 
     pub fn install(app: &AppHandle) {
         use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -82,6 +141,7 @@ mod mac {
                 .visible_on_all_workspaces(true)
                 .build()
                 .ok()?;
+        make_panel(&w);
         let handle = w.clone();
         w.on_window_event(move |event| {
             if let tauri::WindowEvent::Focused(false) = event {
@@ -131,9 +191,20 @@ mod mac {
             let (x, y) = place_on_screen(screen, WIDTH * scale);
             let _ = w.set_position(PhysicalPosition::new(x, y));
         }
-        let _ = w.show();
+        // Shown as a panel: it takes the keyboard without activating the
+        // app (set_focus would activate it, raising the main window).
+        // `focus: false` (scripts) only puts it on screen.
         if focus {
-            let _ = w.set_focus();
+            let _ = w.show();
+            // The page focuses its field on this (its own focus events
+            // can come before it listens, on the first showing).
+            use tauri::Emitter;
+            let _ = w.emit_to(QUICK_ASK_LABEL, "quick-ask-shown", ());
+        } else if let Ok(ptr) = w.ns_window() {
+            if objc2::MainThreadMarker::new().is_some() && !ptr.is_null() {
+                // SAFETY: main thread, the live panel made above.
+                unsafe { (*(ptr as *const objc2_app_kit::NSWindow)).orderFrontRegardless() };
+            }
         }
         WAITING.store(false, Ordering::SeqCst);
     }
@@ -144,7 +215,9 @@ mod mac {
         if let Some(w) = app.get_webview_window(QUICK_ASK_LABEL) {
             if w.is_visible().unwrap_or(false) {
                 if focus {
-                    let _ = w.set_focus();
+                    let _ = w.show();
+                    use tauri::Emitter;
+                    let _ = w.emit_to(QUICK_ASK_LABEL, "quick-ask-shown", ());
                 }
                 return;
             }

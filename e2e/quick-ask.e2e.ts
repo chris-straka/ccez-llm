@@ -6,7 +6,7 @@ import {
 } from "./quick-ask-mock";
 
 /**
- * The Mac's quick Ask window (`/quick-ask`, ⌥Space), headless with a stand-in
+ * The Mac's quick Ask window (`/quick-ask`, ⌃⌥Space), headless with a stand-in
  * shell: empty it is just the field; a question goes to the main window
  * with the whole thread; the answer streams in, sources once per site;
  * the window asks to be as tall as what it shows; follow-ups, retry and
@@ -152,4 +152,13 @@ test("Esc hides; ⌘↵ opens the thread in Ccez LLM and starts over", async ({
 		payload: { chat: p.chat }
 	});
 	await expect(page.locator(".thread")).toHaveCount(0);
+});
+
+test("shown by the shell, the field takes the keys", async ({ page }) => {
+	await page.locator("body").click({ position: { x: 5, y: 5 } });
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur()
+	);
+	await pushQuickAsk(page, "quick-ask-shown", null);
+	await expect(page.locator(".field")).toBeFocused();
 });

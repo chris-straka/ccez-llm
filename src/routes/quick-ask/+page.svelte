@@ -1,4 +1,4 @@
-<!-- The quick Ask (macOS, ⌥Space anywhere): a small window near the top
+<!-- The quick Ask (macOS, ⌃⌥Space anywhere): a small window near the top
 of the screen, shaped like Spotlight. Empty, it is just the field; the window grows
 with the thread (up to a cap, then the thread scrolls). A question goes to
 the main window, which answers with the chosen provider and files the
@@ -18,6 +18,7 @@ Outside the shell the route renders a note. -->
 		QUICK_ASK_OPEN_EVENT,
 		QUICK_ASK_RESET_MS,
 		QUICK_ASK_RETRACT_EVENT,
+		QUICK_ASK_SHOWN_EVENT,
 		newAskChatId,
 		oneASite,
 		siteName,
@@ -170,9 +171,24 @@ Outside the shell the route renders a note. -->
 				: mode;
 	}
 
+	/** Up on the screen: a thread left a while starts over; the field takes the keys. */
+	function shown(): void {
+		applyTheme();
+		if (
+			!busy &&
+			turns.length > 0 &&
+			Date.now() - lastActive > QUICK_ASK_RESET_MS
+		)
+			startOver();
+		void tick().then(() => field?.focus());
+	}
+
 	onMount(() => {
 		applyTheme();
 		if (!inShell) return;
+		// The page's own focus event too: it needs no listener set up in time.
+		const onWindowFocus = (): void => shown();
+		window.addEventListener("focus", onWindowFocus);
 		let alive = true;
 		const stops: (() => void)[] = [];
 		// The window takes the panel's height: just the field when empty.
@@ -225,17 +241,11 @@ Outside the shell the route renders a note. -->
 				}))
 			);
 			// Shown again: a thread left a while starts over; the field is ready.
+			const stopShown = await listen(QUICK_ASK_SHOWN_EVENT, () => shown());
+			stops.push(stopShown);
 			const stopFocus = await getCurrentWindow().onFocusChanged(
 				({ payload }) => {
-					if (!payload) return;
-					applyTheme();
-					if (
-						!busy &&
-						turns.length > 0 &&
-						Date.now() - lastActive > QUICK_ASK_RESET_MS
-					)
-						startOver();
-					void tick().then(() => field?.focus());
+					if (payload) shown();
 				}
 			);
 			stops.push(stopFocus);
@@ -272,9 +282,10 @@ Outside the shell the route renders a note. -->
 			});
 			stops.push(stopDrive);
 		})();
-		field?.focus();
+		if (document.hasFocus()) shown();
 		return () => {
 			alive = false;
+			window.removeEventListener("focus", onWindowFocus);
 			for (const stop of stops) stop();
 		};
 	});
