@@ -343,12 +343,14 @@ export const HOME_ASK_PREFIX = "home-";
  * its first question. The service writes the whole thread each time, so
  * a thread already here takes the newer list, unless the chat has grown
  * past it here (carried on in this app). Bad entries are skipped, never
- * thrown. Returns the chats it added or changed.
+ * thrown. Returns the chats it added or changed. The Mac's menu bar Ask
+ * files its threads the same way under its own `prefix`.
  */
 export function importHomeAsks(
 	state: ChatState,
 	raw: string,
-	store?: KeyValueStore
+	store?: KeyValueStore,
+	prefix: string = HOME_ASK_PREFIX
 ): ChatId[] {
 	let parsed: unknown;
 	try {
@@ -397,7 +399,7 @@ export function importHomeAsks(
 			msgs.push(msg);
 		}
 		if (msgs.length === 0) continue;
-		const id = `${HOME_ASK_PREFIX}${ask.id}` as ChatId;
+		const id = `${prefix}${ask.id}` as ChatId;
 		const existing = state.chats.find((c) => c.id === id);
 		if (existing) {
 			if (msgs.length <= existing.messages.length) continue;

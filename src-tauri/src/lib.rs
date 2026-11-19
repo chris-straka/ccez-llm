@@ -15,6 +15,7 @@ mod coderun;
 mod dev_secrets;
 mod dict;
 mod game_line;
+mod menubar;
 // Deep-link parsing, routing and the pending-link drain serve every
 // platform (iOS/Android open URLs too); the summon kit, tray and sleep
 // guards inside stay `#[cfg(desktop)]`.
@@ -352,6 +353,22 @@ async fn drive_main_snapshot(app: tauri::AppHandle) -> Result<tauri::ipc::Respon
     browser::snapshot_of(&app, "main").await
 }
 
+/// Debug builds: another window's page (the menu bar Ask's) as a JPEG
+/// file, for `drive.ts shot --window <label>`.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+#[tauri::command]
+async fn drive_window_snapshot(
+    app: tauri::AppHandle,
+    label: String,
+    out: String,
+) -> Result<(), String> {
+    if !out.starts_with('/') || out.contains("..") {
+        return Err("bad path".into());
+    }
+    let bytes = browser::snapshot_bytes(&app, &label).await?;
+    std::fs::write(out, bytes).map_err(|e| e.to_string())
+}
+
 #[cfg(debug_assertions)]
 #[tauri::command]
 fn drive_result(id: String, value: serde_json::Value) -> Result<(), String> {
@@ -392,7 +409,7 @@ pub fn run() {
                     - tauri_plugin_window_state::StateFlags::VISIBLE
                     - tauri_plugin_window_state::StateFlags::DECORATIONS,
             )
-            .with_denylist(&["area-pick", "game-line"])
+            .with_denylist(&["area-pick", "game-line", "menubar"])
             .build(),
     );
     // Global summon chord (desktop only — the plugin crate does not
@@ -419,6 +436,8 @@ pub fn run() {
             drive_result,
             #[cfg(all(debug_assertions, target_os = "macos"))]
             drive_main_snapshot,
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            drive_window_snapshot,
             #[cfg(all(debug_assertions, desktop))]
             browser::browser_debug_eval,
             browser::browser_open,
@@ -493,6 +512,11 @@ pub fn run() {
             capture::submit_area_rect,
             capture::show_main,
             game_line::open_game_line,
+            menubar::menubar_answered,
+            menubar::menubar_hide,
+            menubar::menubar_open_main,
+            menubar::menubar_show,
+            menubar::menubar_fit,
             game_line::close_game_line,
             dictate_start,
             dictate_stop,
@@ -576,6 +600,22 @@ pub fn run() {
             // Summon kit: tray, single instance, global hotkey, deep links.
             #[cfg(desktop)]
             desktop::wire(_app.handle())?;
+            // The menu bar Ask (macOS).
+            #[cfg(desktop)]
+            menubar::build(_app.handle())?;
+            // A Mac app outlives its window: the red button hides it (the
+            // menu bar Ask needs the main window to answer), the Dock icon
+            // brings it back, Quit quits.
+            #[cfg(target_os = "macos")]
+            if let Some(window) = tauri::Manager::get_window(_app.handle(), "main") {
+                let main = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = main.hide();
+                    }
+                });
+            }
             Ok(())
         });
     // App-menu clicks, desktop only: mobile has no menu bar, and
@@ -585,6 +625,13 @@ pub fn run() {
         menu::forward(app, event.id().as_ref());
     });
     builder
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // The Dock icon with the window hidden (closed): show it.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                desktop::focus_main(_app);
+            }
+        });
 }

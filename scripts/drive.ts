@@ -15,6 +15,7 @@
  *                                            pane's active page (synchronous;
  *                                            debug builds only), print its result
  *   bun scripts/drive.ts windows             list the app's windows
+ *   --window menubar  js/click/key in the menu bar Ask window instead
  *   bun scripts/drive.ts tour [dir]          shoot a fixed set of screens
  *                                            (chat, chat list, every page
  *                                            of Settings, an open card)
@@ -31,7 +32,7 @@ import {
 	writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import process from "node:process";
 
 interface Reply {
@@ -94,18 +95,31 @@ async function send(
 	});
 }
 
+/** `--window <label>`: which window runs js/click/key (default: main). */
+const ARGS = process.argv.slice(2);
+const windowAt = ARGS.indexOf("--window");
+const TARGET = windowAt >= 0 ? (ARGS[windowAt + 1] ?? "main") : "main";
+if (windowAt >= 0) ARGS.splice(windowAt, 2);
+
 /**
  * Run `body` in the page. The bridge's execute_js waits for a reply
  * event that never reaches it, so the page is asked through an event
  * the bridge emits from Rust (`drive-js`), and answers through a
  * debug-only command that writes a temp file (lib.rs drive_result).
  */
-async function run(ws: WebSocket, body: string): Promise<unknown> {
+async function run(
+	ws: WebSocket,
+	body: string,
+	target: string = TARGET
+): Promise<unknown> {
 	const id = crypto.randomUUID();
 	const file = join(tmpdir(), "ccez-drive", `${id}.json`);
 	await send(ws, "invoke_tauri", {
 		command: "plugin:mcp-bridge|emit_event",
-		args: { eventName: "drive-js", payload: { id, script: body } }
+		args: {
+			eventName: "drive-js",
+			payload: { id, script: body, window: target }
+		}
 	});
 	for (let i = 0; i < 200; i++) {
 		if (existsSync(file)) {
@@ -219,10 +233,19 @@ async function tour(ws: WebSocket, dir: string): Promise<string[]> {
 }
 
 async function main(): Promise<void> {
-	const [cmd, ...rest] = process.argv.slice(2);
+	const [cmd, ...rest] = ARGS;
 	const ws = await connect();
 	try {
-		if (cmd === "shot") {
+		if (cmd === "shot" && TARGET !== "main") {
+			// Another window: the app writes its page there itself (JPEG).
+			const out = resolve(rest[0] ?? ".screenshots/drive.jpg");
+			await run(
+				ws,
+				`return await window.__TAURI__.core.invoke("drive_window_snapshot", { label: ${JSON.stringify(TARGET)}, out: ${JSON.stringify(out)} });`,
+				"main"
+			);
+			console.log(out);
+		} else if (cmd === "shot") {
 			const out = rest[0] ?? ".screenshots/drive.png";
 			await shot(ws, out);
 			console.log(out);

@@ -1,8 +1,8 @@
 {
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
-	"description": "Capability for the main window and the area picker",
-	"windows": ["main", "area-pick", "game-line"],
+	"description": "Capability for the main window, the area picker, the game line and the menu bar Ask",
+	"windows": ["main", "area-pick", "game-line", "menubar"],
 	"permissions": [
 		"core:default",
 		"core:window:allow-start-dragging",

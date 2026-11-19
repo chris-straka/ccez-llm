@@ -93,6 +93,7 @@
 	} from "$lib/settings";
 	import { settingsFileEdit, settingsForFile } from "$lib/settings-file";
 	import { serveAgent } from "$lib/agent";
+	import { MENUBAR_ASK_PREFIX, serveMenubarAsk } from "$lib/menubarAsk";
 	import { NotePrefetch, noteKey, wordsToPrefetch } from "$lib/note-prefetch";
 	import { paragraphForQuote } from "$lib/quote-match";
 	import { resolveProviderFor } from "$lib/providers/resolve";
@@ -8154,6 +8155,27 @@
 	 * socket only the owner's account can open. Desktop shell only.
 	 */
 	function wireAgent(): void {
+		// The Mac's menu bar Ask: answered here, filed as a chat of its own.
+		void serveMenubarAsk({
+			resolve: () => providerKeys.resolve(),
+			save: (chat, thread, cited) => {
+				// The new answer takes this turn's sources; earlier ones keep theirs.
+				const messages = thread.map((m, n) =>
+					n === thread.length - 1 && m.role === "assistant"
+						? { ...m, cited }
+						: m
+				);
+				importHomeAsks(
+					chatState,
+					JSON.stringify({
+						chats: [{ id: chat, createdAt: Date.now(), messages }]
+					}),
+					undefined,
+					MENUBAR_ASK_PREFIX
+				);
+			},
+			open: (id) => openChatById(id)
+		});
 		void serveAgent({
 			resolve: (id) =>
 				id
@@ -10386,6 +10408,17 @@
 		}
 	}
 
+	/** Bring one chat up by id (links, the menu bar's Carry on). */
+	function openChatById(chatId: string): void {
+		const exists = chatState.chats.some((c) => c.id === chatId);
+		if (!exists) return;
+		drafts.fileChat(chatState.activeChatId);
+		swapComposerDraft(chatState.activeChatId, chatId as ChatId);
+		selectChat(chatState, chatId as ChatId);
+		drafts.restoreChat(chatId);
+		enterEditMode();
+	}
+
 	async function wireDeepLinks(): Promise<void> {
 		if (!tauriBackendAvailable()) return;
 		await takeHomeAsks();
@@ -10395,15 +10428,7 @@
 					doNewChat();
 					return;
 				}
-				const open = (): void => {
-					const exists = chatState.chats.some((c) => c.id === link.chatId);
-					if (!exists) return;
-					drafts.fileChat(chatState.activeChatId);
-					swapComposerDraft(chatState.activeChatId, link.chatId as ChatId);
-					selectChat(chatState, link.chatId as ChatId);
-					drafts.restoreChat(link.chatId);
-					enterEditMode();
-				};
+				const open = (): void => openChatById(link.chatId);
 				// A thread from the home screen may still be in the file.
 				if (link.chatId.startsWith(HOME_ASK_PREFIX))
 					void takeHomeAsks().then(open);
@@ -10573,9 +10598,11 @@
 						(
 							window as unknown as { __ccezBrowser: BrowserPane }
 						).__ccezBrowser = browser;
-						return listen<{ id: string; script: string }>(
+						return listen<{ id: string; script: string; window?: string }>(
 							"drive-js",
 							({ payload }) => {
+								// Aimed at another window (drive.ts --window): theirs.
+								if (payload.window && payload.window !== "main") return;
 								void (async () => {
 									let value: unknown;
 									try {

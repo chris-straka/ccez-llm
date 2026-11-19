@@ -690,16 +690,21 @@ pub async fn snapshot_of(
     app: &tauri::AppHandle,
     label: &str,
 ) -> Result<tauri::ipc::Response, String> {
+    Ok(tauri::ipc::Response::new(snapshot_bytes(app, label).await?))
+}
+
+/// The JPEG bytes behind [`snapshot_of`].
+#[cfg(target_os = "macos")]
+pub async fn snapshot_bytes(app: &tauri::AppHandle, label: &str) -> Result<Vec<u8>, String> {
     use tauri::Manager;
     let view = app.get_webview(label).ok_or("no such tab")?;
     let (tx, rx) = tokio::sync::oneshot::channel::<Option<Vec<u8>>>();
     with_view(&view, move |webview| unsafe { mac::snapshot(webview, tx) })?;
-    let bytes = tokio::time::timeout(std::time::Duration::from_secs(2), rx)
+    tokio::time::timeout(std::time::Duration::from_secs(2), rx)
         .await
         .map_err(|_| "no snapshot".to_string())?
         .map_err(|_| "no snapshot".to_string())?
-        .ok_or("no snapshot")?;
-    Ok(tauri::ipc::Response::new(bytes))
+        .ok_or_else(|| "no snapshot".to_string())
 }
 
 #[cfg(target_os = "macos")]
