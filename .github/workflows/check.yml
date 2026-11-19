@@ -56,8 +56,11 @@ jobs:
   # that only passes on the owner's Mac fails here instead of hiding.
   # Shell-only paths (capture, OCR, native TTS) have no headless
   # runtime; their specs cover the browser degrade path instead.
+  # 24.04, not ubuntu-latest: Playwright's WebKit build links Ubuntu
+  # 24.04's ICU (libicudata.so.74), which 26.04 (ubuntu-latest since
+  # 2026-11-19) doesn't ship, so every WebKit spec failed to launch.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
