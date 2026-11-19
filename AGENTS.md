@@ -27,17 +27,17 @@ TTS/OCR/dictation, page fetch, Android background turns).
   `home-asks.json`; `home_asks.rs` hands that to `importHomeAsks`
   (`chat.ts`), which files it as chat `home-<id>`. Change the message
   shape on both sides together.
-- Menu bar Ask (macOS): `menubar.rs` puts an icon in the menu bar and
-  drops the `/menubar` window under it (made on first click, never at
+- Quick Ask (macOS): ⌥Space anywhere (`quick_ask.rs`) drops the
+  `/quick-ask` window, Spotlight-style (made on first use, never at
   launch). The window only shows the thread; the main window answers
-  (`menubarAsk.ts`, `serveMenubarAsk`) and files it as chat
-  `menubar-<id>`. An answer that lands while the window is down marks
-  the icon and sends a notification. The red button hides the main
-  window on the Mac (it has to stay alive to answer); the Dock icon
-  brings it back. `e2e/menubar-ask.e2e.ts` runs the window headless
-  with a stand-in shell (`e2e/menubar-mock.ts`): test it that way while
-  the owner is at the machine, never by opening the dev app's window on
-  their screen.
+  (`quickAsk.ts`, `serveQuickAsk`) and files it as chat `quick-<id>`. An
+  answer that lands while the window is down comes as a notification;
+  ⌥Space or the Dock shows it. No menu bar icon (the owner keeps
+  ccez-sketch's as the only one). The red button hides the main window on
+  the Mac (it has to stay alive to answer); the Dock icon brings it back.
+  `e2e/quick-ask.e2e.ts` runs the window headless with a stand-in shell
+  (`e2e/quick-ask-mock.ts`): test it that way while the owner is at the
+  machine, never by opening the dev app's window on their screen.
 - `e2e/*.e2e.ts` — Playwright, seeded via `e2e/helpers.ts`. Specs import
   `test`/`expect` from `e2e/fixtures.ts`, which fails any test that
   throws an uncaught page error; Tauri stubs need `transformCallback`
@@ -69,8 +69,8 @@ TTS/OCR/dictation, page fetch, Android background turns).
   `js`, `click`, `key`): no mouse, keyboard or focus. `tour` shoots
   a fixed review set (chat, chat list, every Settings page, a word
   card) into `.screenshots/tour/`: run it after any UI change, since
-  WebKit-only layout bugs don't show in Chromium. `--window menubar`
-  runs js/click/key/shot in the menu bar Ask window instead. To relaunch,
+  WebKit-only layout bugs don't show in Chromium. `--window quick-ask`
+  runs js/click/key/shot in the quick Ask window instead. To relaunch,
   quit it by its id `studio.ccez.app.dev` (osascript `quit`) and
   wait for it to exit: opening a running copy brings it forward.
   Debug builds turn off WKWebView occlusion, so a covered window

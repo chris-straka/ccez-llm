@@ -3,7 +3,7 @@
 //! Covers the desktop-only runtime pieces the web layer cannot reach:
 //! a summon/hide affordance (OS-global hotkey on macOS, in-app chord in
 //! the frontend), a system tray with Show/Quit on Windows/Linux only
-//! (macOS has the menu bar Ask instead, menubar.rs),
+//! (macOS has none: the quick Ask is on ⌥Space, quick_ask.rs),
 //! single-instance focus
 //! (a second launch focuses the running app instead of opening a new
 //! window), `ccez://` deep links into a chat, sleep prevention while
@@ -650,7 +650,7 @@ pub(crate) fn focus_main<R: Runtime>(app: &AppHandle<R>) {
 #[cfg(desktop)]
 pub fn wire(app: &AppHandle) -> tauri::Result<()> {
     ensure_single_instance(app);
-    // macOS gets the menu bar Ask instead (menubar.rs; owner, 2026-11-19).
+    // No menu-bar icon on macOS: the quick Ask is a chord (quick_ask.rs).
     // Windows/Linux keep the tray — quitting needs it there.
     #[cfg(not(target_os = "macos"))]
     build_tray(app)?;

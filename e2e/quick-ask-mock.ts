@@ -1,13 +1,13 @@
 import type { Page } from "@playwright/test";
 
 /**
- * A stand-in shell for the menu bar Ask window (`/menubar`): events the
- * page listens for can be pushed (`pushMenubar`), and what the page sends
- * (`emit_to`, window resizes, hide) is kept on `window.__menubar` for the
+ * A stand-in shell for the quick Ask window (`/quick-ask`): events the
+ * page listens for can be pushed (`pushQuickAsk`), and what the page sends
+ * (`emit_to`, window resizes, hide) is kept on `window.__quickAsk` for the
  * spec to read. Nothing opens on screen: the page runs in a headless
  * browser as the Mac app's Ask window would.
  */
-export async function seedMenubarShell(page: Page): Promise<void> {
+export async function seedQuickAskShell(page: Page): Promise<void> {
 	await page.addInitScript(() => {
 		const listeners: Record<string, number[]> = {};
 		const callbacks: ((payload: unknown) => void)[] = [];
@@ -18,11 +18,11 @@ export async function seedMenubarShell(page: Page): Promise<void> {
 			opened: [] as string[]
 		};
 		const w = window as unknown as Record<string, unknown>;
-		w.__menubar = kept;
+		w.__quickAsk = kept;
 		w.__TAURI_INTERNALS__ = {
 			metadata: {
-				currentWindow: { label: "menubar" },
-				currentWebview: { windowLabel: "menubar", label: "menubar" }
+				currentWindow: { label: "quick-ask" },
+				currentWebview: { windowLabel: "quick-ask", label: "quick-ask" }
 			},
 			invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
 				if (cmd === "plugin:event|listen") {
@@ -39,11 +39,11 @@ export async function seedMenubarShell(page: Page): Promise<void> {
 					});
 					return null;
 				}
-				if (cmd === "menubar_fit") {
+				if (cmd === "quick_ask_fit") {
 					kept.sizes.push({ width: 420, height: Number(args["height"]) });
 					return null;
 				}
-				if (cmd === "menubar_hide") {
+				if (cmd === "quick_ask_hide") {
 					kept.hidden++;
 					return null;
 				}
@@ -61,7 +61,7 @@ export async function seedMenubarShell(page: Page): Promise<void> {
 			},
 			unregisterCallback: (): void => {}
 		};
-		w.__pushMenubar = (event: string, payload: unknown): void => {
+		w.__pushQuickAsk = (event: string, payload: unknown): void => {
 			for (const id of listeners[event] ?? [])
 				callbacks[id]?.({ event, id, payload });
 		};
@@ -69,7 +69,7 @@ export async function seedMenubarShell(page: Page): Promise<void> {
 }
 
 /** An event to the page, as the main window would send it. */
-export async function pushMenubar(
+export async function pushQuickAsk(
 	page: Page,
 	event: string,
 	payload: unknown
@@ -78,15 +78,15 @@ export async function pushMenubar(
 		([e, p]) =>
 			(
 				window as unknown as {
-					__pushMenubar: (event: string, payload: unknown) => void;
+					__pushQuickAsk: (event: string, payload: unknown) => void;
 				}
-			).__pushMenubar(e as string, p),
+			).__pushQuickAsk(e as string, p),
 		[event, payload] as const
 	);
 }
 
 /** What the page sent and asked for so far. */
-export async function menubarKept(page: Page): Promise<{
+export async function quickAskKept(page: Page): Promise<{
 	emitted: { target: unknown; event: string; payload: unknown }[];
 	sizes: { width: number; height: number }[];
 	hidden: number;
@@ -94,7 +94,7 @@ export async function menubarKept(page: Page): Promise<{
 }> {
 	return page.evaluate(
 		() =>
-			(window as unknown as { __menubar: never }).__menubar as {
+			(window as unknown as { __quickAsk: never }).__quickAsk as {
 				emitted: { target: unknown; event: string; payload: unknown }[];
 				sizes: { width: number; height: number }[];
 				hidden: number;

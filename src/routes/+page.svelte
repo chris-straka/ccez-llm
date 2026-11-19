@@ -93,7 +93,7 @@
 	} from "$lib/settings";
 	import { settingsFileEdit, settingsForFile } from "$lib/settings-file";
 	import { serveAgent } from "$lib/agent";
-	import { MENUBAR_ASK_PREFIX, serveMenubarAsk } from "$lib/menubarAsk";
+	import { QUICK_ASK_PREFIX, serveQuickAsk } from "$lib/quickAsk";
 	import { NotePrefetch, noteKey, wordsToPrefetch } from "$lib/note-prefetch";
 	import { paragraphForQuote } from "$lib/quote-match";
 	import { resolveProviderFor } from "$lib/providers/resolve";
@@ -8155,8 +8155,8 @@
 	 * socket only the owner's account can open. Desktop shell only.
 	 */
 	function wireAgent(): void {
-		// The Mac's menu bar Ask: answered here, filed as a chat of its own.
-		void serveMenubarAsk({
+		// The Mac's quick Ask (⌥Space): answered here, filed as a chat of its own.
+		void serveQuickAsk({
 			resolve: () => providerKeys.resolve(),
 			save: (chat, thread, cited) => {
 				// The new answer takes this turn's sources; earlier ones keep theirs.
@@ -8171,7 +8171,7 @@
 						chats: [{ id: chat, createdAt: Date.now(), messages }]
 					}),
 					undefined,
-					MENUBAR_ASK_PREFIX
+					QUICK_ASK_PREFIX
 				);
 			},
 			open: (id) => openChatById(id)
@@ -10408,7 +10408,7 @@
 		}
 	}
 
-	/** Bring one chat up by id (links, the menu bar's Carry on). */
+	/** Bring one chat up by id (links, the quick Ask's Open in Ccez LLM). */
 	function openChatById(chatId: string): void {
 		const exists = chatState.chats.some((c) => c.id === chatId);
 		if (!exists) return;

@@ -15,7 +15,7 @@ mod coderun;
 mod dev_secrets;
 mod dict;
 mod game_line;
-mod menubar;
+mod quick_ask;
 // Deep-link parsing, routing and the pending-link drain serve every
 // platform (iOS/Android open URLs too); the summon kit, tray and sleep
 // guards inside stay `#[cfg(desktop)]`.
@@ -353,7 +353,7 @@ async fn drive_main_snapshot(app: tauri::AppHandle) -> Result<tauri::ipc::Respon
     browser::snapshot_of(&app, "main").await
 }
 
-/// Debug builds: another window's page (the menu bar Ask's) as a JPEG
+/// Debug builds: another window's page (the quick Ask's) as a JPEG
 /// file, for `drive.ts shot --window <label>`.
 #[cfg(all(debug_assertions, target_os = "macos"))]
 #[tauri::command]
@@ -409,7 +409,7 @@ pub fn run() {
                     - tauri_plugin_window_state::StateFlags::VISIBLE
                     - tauri_plugin_window_state::StateFlags::DECORATIONS,
             )
-            .with_denylist(&["area-pick", "game-line", "menubar"])
+            .with_denylist(&["area-pick", "game-line", "quick-ask"])
             .build(),
     );
     // Global summon chord (desktop only — the plugin crate does not
@@ -512,11 +512,11 @@ pub fn run() {
             capture::submit_area_rect,
             capture::show_main,
             game_line::open_game_line,
-            menubar::menubar_answered,
-            menubar::menubar_hide,
-            menubar::menubar_open_main,
-            menubar::menubar_show,
-            menubar::menubar_fit,
+            quick_ask::quick_ask_answered,
+            quick_ask::quick_ask_hide,
+            quick_ask::quick_ask_open_main,
+            quick_ask::quick_ask_show,
+            quick_ask::quick_ask_fit,
             game_line::close_game_line,
             dictate_start,
             dictate_stop,
@@ -600,11 +600,11 @@ pub fn run() {
             // Summon kit: tray, single instance, global hotkey, deep links.
             #[cfg(desktop)]
             desktop::wire(_app.handle())?;
-            // The menu bar Ask (macOS).
+            // The quick Ask on ⌥Space (macOS).
             #[cfg(desktop)]
-            menubar::build(_app.handle())?;
+            quick_ask::build(_app.handle())?;
             // A Mac app outlives its window: the red button hides it (the
-            // menu bar Ask needs the main window to answer), the Dock icon
+            // quick Ask needs the main window to answer), the Dock icon
             // brings it back, Quit quits.
             #[cfg(target_os = "macos")]
             if let Some(window) = tauri::Manager::get_window(_app.handle(), "main") {
@@ -628,10 +628,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {
-            // The Dock icon with the window hidden (closed): show it.
+            // The Dock icon: an unseen quick answer first, else the main
+            // window (hidden by its red button).
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = _event {
-                desktop::focus_main(_app);
+                if !quick_ask::reopen(_app) {
+                    desktop::focus_main(_app);
+                }
             }
         });
 }

@@ -343,7 +343,7 @@ export const HOME_ASK_PREFIX = "home-";
  * its first question. The service writes the whole thread each time, so
  * a thread already here takes the newer list, unless the chat has grown
  * past it here (carried on in this app). Bad entries are skipped, never
- * thrown. Returns the chats it added or changed. The Mac's menu bar Ask
+ * thrown. Returns the chats it added or changed. The Mac's quick Ask
  * files its threads the same way under its own `prefix`.
  */
 export function importHomeAsks(

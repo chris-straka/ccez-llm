@@ -1,37 +1,35 @@
 /**
- * The Mac's menu bar Ask (owner, 2026-11-19: "a menu bar item for it so I
- * can click and ask a quick question and then have it answer back to me
- * in a notification and maybe the menu bar item icon changes so I can
- * click and see its response"). The small window (`/menubar`, made by
- * `menubar.rs`) shows the thread; the main window answers, the way the
- * game line leaves model calls to it: the chosen provider and key, the
- * reply streamed back over events, the thread filed as chat
- * `menubar-<id>`. An answer the owner isn't looking at marks the menu bar
- * icon and comes as a notification.
+ * The Mac's quick Ask (owner, 2026-11-19: "click and ask a quick question
+ * and then have it answer back to me in a notification"), on ⌥Space
+ * (`quick_ask.rs`). The small window (`/quick-ask`) shows the thread; the
+ * main window answers, the way the game line leaves model calls to it:
+ * the chosen provider and key, the reply streamed back over events, the
+ * thread filed as chat `quick-<id>`. An answer the owner isn't looking at
+ * comes as a notification.
  *
- * Events: the window sends `menubar-ask` `{id, chat, messages}` (the whole
- * thread, the new question last) and `menubar-open` `{chat}`; the main
- * window answers with `menubar-delta` `{id, text}` (the next piece),
- * `menubar-retract` `{id}` (a tool round's text withdrawn), then
- * `menubar-done` `{id, text, cited}` or `menubar-failed` `{id, text}`.
+ * Events: the window sends `quick-ask` `{id, chat, messages}` (the whole
+ * thread, the new question last) and `quick-ask-open` `{chat}`; the main
+ * window answers with `quick-ask-delta` `{id, text}` (the next piece),
+ * `quick-ask-retract` `{id}` (a tool round's text withdrawn), then
+ * `quick-ask-done` `{id, text, cited}` or `quick-ask-failed` `{id, text}`.
  */
 import type { ChatMessage, ChatProvider } from "./providers/types";
 import { tauriBackendAvailable } from "./secrets";
 
-export const MENUBAR_LABEL = "menubar";
-export const MENUBAR_ASK_EVENT = "menubar-ask";
-export const MENUBAR_OPEN_EVENT = "menubar-open";
-export const MENUBAR_DELTA_EVENT = "menubar-delta";
-export const MENUBAR_RETRACT_EVENT = "menubar-retract";
-export const MENUBAR_DONE_EVENT = "menubar-done";
-export const MENUBAR_FAILED_EVENT = "menubar-failed";
-/** Chats asked from the menu bar (`importHomeAsks` with this prefix). */
-export const MENUBAR_ASK_PREFIX = "menubar-";
+export const QUICK_ASK_LABEL = "quick-ask";
+export const QUICK_ASK_EVENT = "quick-ask";
+export const QUICK_ASK_OPEN_EVENT = "quick-ask-open";
+export const QUICK_ASK_DELTA_EVENT = "quick-ask-delta";
+export const QUICK_ASK_RETRACT_EVENT = "quick-ask-retract";
+export const QUICK_ASK_DONE_EVENT = "quick-ask-done";
+export const QUICK_ASK_FAILED_EVENT = "quick-ask-failed";
+/** Chats asked from the quick Ask (`importHomeAsks` with this prefix). */
+export const QUICK_ASK_PREFIX = "quick-";
 /** A thread left this long starts over the next time the window opens. */
-export const MENUBAR_RESET_MS = 5 * 60_000;
+export const QUICK_ASK_RESET_MS = 5 * 60_000;
 
 const SYSTEM =
-	"The owner asks from the Mac's menu bar, for a quick answer: a few short sentences, plain text without markdown, in the language they ask in.";
+	"The owner asks a quick question on the Mac: a few short sentences, plain text without markdown, in the language they ask in.";
 
 export interface AskTurn {
 	role: "user" | "assistant";
@@ -40,14 +38,14 @@ export interface AskTurn {
 	cited?: string[];
 }
 
-export interface MenubarAsk {
+export interface QuickAsk {
 	id: number;
 	chat: string;
 	messages: AskTurn[];
 }
 
 /** The window's request, checked: null when anything is off. */
-export function readAsk(payload: unknown): MenubarAsk | null {
+export function readAsk(payload: unknown): QuickAsk | null {
 	const p = payload as {
 		id?: unknown;
 		chat?: unknown;
@@ -153,31 +151,31 @@ export function failureText(error: unknown): string {
 	return message.trim() || "No answer came.";
 }
 
-/** A new thread's id (the chat becomes `menubar-<id>`). */
+/** A new thread's id (the chat becomes `quick-<id>`). */
 export function newAskChatId(): string {
 	return (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`).slice(0, 36);
 }
 
-export interface MenubarDeps {
+export interface QuickAskDeps {
 	/** The chosen provider with its key; null without one. */
 	resolve: () => ChatProvider | null;
-	/** File the whole thread (answer last) as chat `menubar-<chat>`. */
+	/** File the whole thread (answer last) as chat `quick-<chat>`. */
 	save: (chat: string, thread: AskTurn[], cited: string[]) => void;
-	/** Open chat `menubar-<chat>` in this window. */
+	/** Open chat `quick-<chat>` in this window. */
 	open: (chatId: string) => void;
 }
 
 /** Answers one request; `to` sends an event to the Ask window. */
 export async function answerAsk(
-	ask: MenubarAsk,
-	deps: Pick<MenubarDeps, "resolve" | "save">,
+	ask: QuickAsk,
+	deps: Pick<QuickAskDeps, "resolve" | "save">,
 	to: (event: string, payload: unknown) => void,
 	signal?: AbortSignal
 ): Promise<{ answer: string } | { failed: string }> {
 	const provider = deps.resolve();
 	if (!provider) {
 		const failed = "No key for the chosen provider: add one in Settings.";
-		to(MENUBAR_FAILED_EVENT, { id: ask.id, text: failed });
+		to(QUICK_ASK_FAILED_EVENT, { id: ask.id, text: failed });
 		return { failed };
 	}
 	let streamed = "";
@@ -187,11 +185,11 @@ export async function answerAsk(
 			{
 				onToken: (text) => {
 					streamed += text;
-					to(MENUBAR_DELTA_EVENT, { id: ask.id, text });
+					to(QUICK_ASK_DELTA_EVENT, { id: ask.id, text });
 				},
 				onRoundRetract: () => {
 					streamed = "";
-					to(MENUBAR_RETRACT_EVENT, { id: ask.id });
+					to(QUICK_ASK_RETRACT_EVENT, { id: ask.id });
 				}
 			},
 			{ signal }
@@ -199,7 +197,7 @@ export async function answerAsk(
 		const answer = (result.content || streamed).trim();
 		if (!answer) throw new Error("No answer came.");
 		const cited = result.cited ?? [];
-		to(MENUBAR_DONE_EVENT, { id: ask.id, text: answer, cited });
+		to(QUICK_ASK_DONE_EVENT, { id: ask.id, text: answer, cited });
 		deps.save(
 			ask.chat,
 			[...ask.messages, { role: "assistant", content: answer }],
@@ -208,27 +206,27 @@ export async function answerAsk(
 		return { answer };
 	} catch (error) {
 		const failed = failureText(error);
-		to(MENUBAR_FAILED_EVENT, { id: ask.id, text: failed });
+		to(QUICK_ASK_FAILED_EVENT, { id: ask.id, text: failed });
 		return { failed };
 	}
 }
 
-/** Serves the menu bar's questions (the Mac shell's main window only). */
-export async function serveMenubarAsk(deps: MenubarDeps): Promise<void> {
+/** Serves the quick Ask's questions (the Mac shell's main window only). */
+export async function serveQuickAsk(deps: QuickAskDeps): Promise<void> {
 	if (!tauriBackendAvailable()) return;
 	try {
 		const { listen, emitTo } = await import("@tauri-apps/api/event");
 		const { invoke } = await import("@tauri-apps/api/core");
 		const to = (event: string, payload: unknown): void => {
-			void emitTo(MENUBAR_LABEL, event, payload).catch(() => undefined);
+			void emitTo(QUICK_ASK_LABEL, event, payload).catch(() => undefined);
 		};
-		await listen(MENUBAR_ASK_EVENT, (event) => {
+		await listen(QUICK_ASK_EVENT, (event) => {
 			const ask = readAsk(event.payload);
 			if (!ask) return;
 			void answerAsk(ask, deps, to).then(async (outcome) => {
-				// Looked at already: nothing more. Otherwise the icon takes
-				// its dot (menubar.rs) and a notification says it.
-				const seen = await invoke<boolean>("menubar_answered").catch(
+				// Looked at already: nothing more. Otherwise a notification
+				// says it (and ⌥Space or the Dock shows it, quick_ask.rs).
+				const seen = await invoke<boolean>("quick_ask_answered").catch(
 					() => true
 				);
 				if (seen) return;
@@ -241,12 +239,12 @@ export async function serveMenubarAsk(deps: MenubarDeps): Promise<void> {
 				);
 			});
 		});
-		await listen<{ chat?: unknown }>(MENUBAR_OPEN_EVENT, (event) => {
+		await listen<{ chat?: unknown }>(QUICK_ASK_OPEN_EVENT, (event) => {
 			const chat = event.payload?.chat;
 			if (typeof chat !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(chat))
 				return;
-			deps.open(`${MENUBAR_ASK_PREFIX}${chat}`);
-			void invoke("menubar_open_main").catch(() => undefined);
+			deps.open(`${QUICK_ASK_PREFIX}${chat}`);
+			void invoke("quick_ask_open_main").catch(() => undefined);
 		});
 	} catch {
 		// No shell events here (web, tests): nothing to serve.
@@ -274,6 +272,6 @@ async function notify(title: string, body: string): Promise<void> {
 		if (!granted) granted = (await n.requestPermission()) === "granted";
 		if (granted) n.sendNotification({ title, body });
 	} catch {
-		// No notifications: the icon's dot still says it.
+		// No notifications: ⌥Space still shows it.
 	}
 }

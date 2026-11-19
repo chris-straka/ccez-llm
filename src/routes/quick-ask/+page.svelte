@@ -1,8 +1,8 @@
-<!-- The menu bar Ask (macOS): the small window under ccez-llm's menu bar
-icon, shaped like Spotlight. Empty, it is just the field; the window grows
+<!-- The quick Ask (macOS, ⌥Space anywhere): a small window near the top
+of the screen, shaped like Spotlight. Empty, it is just the field; the window grows
 with the thread (up to a cap, then the thread scrolls). A question goes to
 the main window, which answers with the chosen provider and files the
-thread (`$lib/menubarAsk`); this route only shows the thread and sends what
+thread (`$lib/quickAsk`); this route only shows the thread and sends what
 is typed. Enter asks, ⌘Enter carries on in Ccez LLM, ⌘N starts over, Escape
 hides; a thread left five minutes starts over when the window opens again.
 Outside the shell the route renders a note. -->
@@ -11,18 +11,18 @@ Outside the shell the route renders a note. -->
 	import { onMount, tick } from "svelte";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import {
-		MENUBAR_ASK_EVENT,
-		MENUBAR_DELTA_EVENT,
-		MENUBAR_DONE_EVENT,
-		MENUBAR_FAILED_EVENT,
-		MENUBAR_OPEN_EVENT,
-		MENUBAR_RESET_MS,
-		MENUBAR_RETRACT_EVENT,
+		QUICK_ASK_EVENT,
+		QUICK_ASK_DELTA_EVENT,
+		QUICK_ASK_DONE_EVENT,
+		QUICK_ASK_FAILED_EVENT,
+		QUICK_ASK_OPEN_EVENT,
+		QUICK_ASK_RESET_MS,
+		QUICK_ASK_RETRACT_EVENT,
 		newAskChatId,
 		oneASite,
 		siteName,
 		threadFor
-	} from "$lib/menubarAsk";
+	} from "$lib/quickAsk";
 
 	interface Turn {
 		id: number;
@@ -33,7 +33,7 @@ Outside the shell the route renders a note. -->
 		done: boolean;
 	}
 
-	/** The most the window grows to (its width is menubar.rs's). */
+	/** The most the window grows to (its width is quick_ask.rs's). */
 	const MAX_HEIGHT = 520;
 
 	const inShell = tauriBackendAvailable();
@@ -63,7 +63,7 @@ Outside the shell the route renders a note. -->
 		text = "";
 		lastActive = Date.now();
 		const { emitTo } = await import("@tauri-apps/api/event");
-		await emitTo("main", MENUBAR_ASK_EVENT, {
+		await emitTo("main", QUICK_ASK_EVENT, {
 			id,
 			chat,
 			messages: threadFor(turns)
@@ -94,7 +94,7 @@ Outside the shell the route renders a note. -->
 	async function carryOn(): Promise<void> {
 		if (turns.length === 0) return;
 		const { emitTo } = await import("@tauri-apps/api/event");
-		await emitTo("main", MENUBAR_OPEN_EVENT, { chat }).catch(() => undefined);
+		await emitTo("main", QUICK_ASK_OPEN_EVENT, { chat }).catch(() => undefined);
 		startOver();
 	}
 
@@ -122,7 +122,7 @@ Outside the shell the route renders a note. -->
 
 	async function hide(): Promise<void> {
 		const { invoke } = await import("@tauri-apps/api/core");
-		await invoke("menubar_hide").catch(() => undefined);
+		await invoke("quick_ask_hide").catch(() => undefined);
 	}
 
 	function onKey(event: KeyboardEvent): void {
@@ -187,7 +187,7 @@ Outside the shell the route renders a note. -->
 			sized = h;
 			// Through the shell, which keeps the top edge under the icon.
 			void import("@tauri-apps/api/core").then(({ invoke }) =>
-				invoke("menubar_fit", { height: h }).catch(() => undefined)
+				invoke("quick_ask_fit", { height: h }).catch(() => undefined)
 			);
 		});
 		if (panel) resize.observe(panel);
@@ -203,13 +203,13 @@ Outside the shell the route renders a note. -->
 				});
 				stops.push(stop);
 			};
-			await on(MENUBAR_DELTA_EVENT, (p) =>
+			await on(QUICK_ASK_DELTA_EVENT, (p) =>
 				update(p.id, (t) => ({ ...t, a: t.a + (p.text ?? "") }))
 			);
-			await on(MENUBAR_RETRACT_EVENT, (p) =>
+			await on(QUICK_ASK_RETRACT_EVENT, (p) =>
 				update(p.id, (t) => ({ ...t, a: "" }))
 			);
-			await on(MENUBAR_DONE_EVENT, (p) =>
+			await on(QUICK_ASK_DONE_EVENT, (p) =>
 				update(p.id, (t) => ({
 					...t,
 					a: p.text ?? t.a,
@@ -217,7 +217,7 @@ Outside the shell the route renders a note. -->
 					done: true
 				}))
 			);
-			await on(MENUBAR_FAILED_EVENT, (p) =>
+			await on(QUICK_ASK_FAILED_EVENT, (p) =>
 				update(p.id, (t) => ({
 					...t,
 					failed: p.text ?? "No answer came.",
@@ -232,14 +232,14 @@ Outside the shell the route renders a note. -->
 					if (
 						!busy &&
 						turns.length > 0 &&
-						Date.now() - lastActive > MENUBAR_RESET_MS
+						Date.now() - lastActive > QUICK_ASK_RESET_MS
 					)
 						startOver();
 					void tick().then(() => field?.focus());
 				}
 			);
 			stops.push(stopFocus);
-			// Debug builds: scripts/drive.ts --window menubar runs JavaScript
+			// Debug builds: scripts/drive.ts --window quick-ask runs JavaScript
 			// here (release builds have no drive_ready, so no listener).
 			const { invoke } = await import("@tauri-apps/api/core");
 			const ready = await invoke("drive_ready").then(
@@ -252,7 +252,7 @@ Outside the shell the route renders a note. -->
 				script: string;
 				window?: string;
 			}>("drive-js", ({ payload }) => {
-				if (payload.window !== "menubar") return;
+				if (payload.window !== "quick-ask") return;
 				void (async () => {
 					let value: unknown;
 					try {
@@ -280,9 +280,9 @@ Outside the shell the route renders a note. -->
 	});
 </script>
 
-<main class="menubar-ask" bind:this={panel}>
+<main class="quick-ask" bind:this={panel}>
 	{#if !inShell}
-		<p class="note">The menu bar Ask needs the Mac app.</p>
+		<p class="note">The quick Ask needs the Mac app.</p>
 	{:else}
 		<div class="ask-row">
 			<svg class="glyph" viewBox="0 0 36 36" aria-hidden="true">
@@ -359,14 +359,14 @@ Outside the shell the route renders a note. -->
 
 <style>
 	/* The window is clear: the panel (and the Mac's frosted glass under
-	it, menubar.rs) is all there is. */
+	it, quick_ask.rs) is all there is. */
 	:global(html),
 	:global(body) {
 		background: transparent;
 		margin: 0;
 		overflow: hidden;
 	}
-	.menubar-ask {
+	.quick-ask {
 		--glass: color-mix(in srgb, var(--bg-raised) 78%, transparent);
 		box-sizing: border-box;
 		max-height: 520px;

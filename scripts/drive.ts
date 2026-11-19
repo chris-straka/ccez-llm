@@ -15,7 +15,7 @@
  *                                            pane's active page (synchronous;
  *                                            debug builds only), print its result
  *   bun scripts/drive.ts windows             list the app's windows
- *   --window menubar  js/click/key in the menu bar Ask window instead
+ *   --window quick-ask  js/click/key/shot in the quick Ask window instead
  *   bun scripts/drive.ts tour [dir]          shoot a fixed set of screens
  *                                            (chat, chat list, every page
  *                                            of Settings, an open card)

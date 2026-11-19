@@ -3,17 +3,17 @@ import {
 	answerAsk,
 	askMessages,
 	failureText,
-	MENUBAR_DELTA_EVENT,
-	MENUBAR_DONE_EVENT,
-	MENUBAR_FAILED_EVENT,
-	MENUBAR_RETRACT_EVENT,
+	QUICK_ASK_DELTA_EVENT,
+	QUICK_ASK_DONE_EVENT,
+	QUICK_ASK_FAILED_EVENT,
+	QUICK_ASK_RETRACT_EVENT,
 	notificationText,
 	oneASite,
 	readAsk,
 	siteName,
 	threadFor,
 	type AskTurn
-} from "./menubarAsk";
+} from "./quickAsk";
 import type { ChatProvider, StreamCallbacks } from "./providers/types";
 
 const ask = (q: string) => ({
@@ -22,7 +22,7 @@ const ask = (q: string) => ({
 	messages: [{ role: "user", content: q }]
 });
 
-describe("the menu bar's request", () => {
+describe("the Ask window's request", () => {
 	it("takes a whole thread ending in a question", () => {
 		expect(readAsk(ask("Quelle heure est-il à Tokyo ?"))).toEqual({
 			id: 7,
@@ -106,7 +106,7 @@ describe("the thread the window sends", () => {
 			])
 		).toEqual([{ role: "user", content: "Bonsoir ?" }]);
 	});
-	it("puts the menu bar line first for the provider", () => {
+	it("puts the quick-answer line first for the provider", () => {
 		const m = askMessages([{ role: "user", content: "Salut" }]);
 		expect(m[0]?.role).toBe("system");
 		expect(m[1]).toEqual({ role: "user", content: "Salut" });
@@ -162,9 +162,9 @@ describe("answering", () => {
 		);
 		expect(out).toEqual({ answer: "Tokyo." });
 		expect(sent.map(([e]) => e)).toEqual([
-			MENUBAR_DELTA_EVENT,
-			MENUBAR_DELTA_EVENT,
-			MENUBAR_DONE_EVENT
+			QUICK_ASK_DELTA_EVENT,
+			QUICK_ASK_DELTA_EVENT,
+			QUICK_ASK_DONE_EVENT
 		]);
 		expect(sent.at(-1)?.[1]).toEqual({
 			id: 7,
@@ -198,7 +198,7 @@ describe("answering", () => {
 			},
 			(e) => sent.push(e)
 		);
-		expect(sent).toContain(MENUBAR_RETRACT_EVENT);
+		expect(sent).toContain(QUICK_ASK_RETRACT_EVENT);
 	});
 	it("says so without a key, and saves nothing", async () => {
 		const sent: [string, unknown][] = [];
@@ -209,7 +209,7 @@ describe("answering", () => {
 			(e, p) => sent.push([e, p])
 		);
 		expect("failed" in out).toBe(true);
-		expect(sent[0]?.[0]).toBe(MENUBAR_FAILED_EVENT);
+		expect(sent[0]?.[0]).toBe(QUICK_ASK_FAILED_EVENT);
 		expect(saved).toBe(false);
 	});
 	it("turns a provider error into words", async () => {
@@ -227,7 +227,7 @@ describe("answering", () => {
 		);
 		expect(out).toEqual({ failed: "DeepSeek: 402 out of credit" });
 		expect(sent).toEqual([
-			[MENUBAR_FAILED_EVENT, { id: 7, text: "DeepSeek: 402 out of credit" }]
+			[QUICK_ASK_FAILED_EVENT, { id: 7, text: "DeepSeek: 402 out of credit" }]
 		]);
 		expect(failureText(new DOMException("x", "AbortError"))).toBe("Stopped.");
 	});
