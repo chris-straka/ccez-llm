@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	createChatState,
+	importHomeAsks,
 	activeChat,
 	abortSend,
 	newChat,
@@ -2198,5 +2199,108 @@ describe("loading chats", () => {
 		};
 		const state = createChatState(store);
 		expect(state.chats.map((c) => c.id)).toEqual(["good"]);
+	});
+});
+
+describe("questions asked from the phone's home", () => {
+	const memory = () => {
+		const data = new Map<string, string>();
+		return {
+			getItem: (k: string) => data.get(k) ?? null,
+			setItem: (k: string, v: string) => void data.set(k, v),
+			removeItem: (k: string) => void data.delete(k)
+		};
+	};
+	const thread = (id: string, msgs: Array<[string, string, string[]?]>) => ({
+		id,
+		createdAt: 1700000000000,
+		messages: msgs.map(([role, content, cited]) => ({ role, content, cited }))
+	});
+
+	it("lands each thread as its own chat, titled with its question", () => {
+		const store = memory();
+		const state = createChatState(store);
+		const raw = JSON.stringify({
+			chats: [
+				thread("a1", [
+					["user", "Qu'est-ce que « déchu » veut dire ?"],
+					["assistant", "Fallen.", ["https://fr.wiktionary.org/wiki/déchu"]]
+				])
+			]
+		});
+		expect(importHomeAsks(state, raw, store)).toEqual(["home-a1"]);
+		const chat = state.chats.find((c) => c.id === "home-a1");
+		expect(chat?.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+		expect(chat?.messages[1]?.webCited).toEqual([
+			"https://fr.wiktionary.org/wiki/déchu"
+		]);
+		expect(chat?.title).toBe("Qu'est-ce que « déchu » veut dire ?");
+		expect(chat?.createdAt).toBe(1700000000000);
+		// Saved: a fresh load sees it.
+		expect(createChatState(store).chats.some((c) => c.id === "home-a1")).toBe(
+			true
+		);
+	});
+
+	it("takes a follow-up as the newer whole thread, never shrinks one carried on here", () => {
+		const state = createChatState(memory());
+		importHomeAsks(
+			state,
+			JSON.stringify({
+				chats: [
+					thread("b", [
+						["user", "un"],
+						["assistant", "one"]
+					])
+				]
+			})
+		);
+		importHomeAsks(
+			state,
+			JSON.stringify({
+				chats: [
+					thread("b", [
+						["user", "un"],
+						["assistant", "one"],
+						["user", "deux"],
+						["assistant", "two"]
+					])
+				]
+			})
+		);
+		expect(state.chats.find((c) => c.id === "home-b")?.messages.length).toBe(4);
+		expect(
+			importHomeAsks(
+				state,
+				JSON.stringify({
+					chats: [
+						thread("b", [
+							["user", "un"],
+							["assistant", "one"]
+						])
+					]
+				})
+			)
+		).toEqual([]);
+		expect(state.chats.find((c) => c.id === "home-b")?.messages.length).toBe(4);
+	});
+
+	it("skips what isn't a thread, never throws", () => {
+		const state = createChatState(memory());
+		const before = state.chats.length;
+		expect(importHomeAsks(state, "not json")).toEqual([]);
+		expect(
+			importHomeAsks(
+				state,
+				JSON.stringify({
+					chats: [
+						{ id: "../x", messages: [] },
+						{ id: "ok", messages: [{ role: "system", content: "x" }] },
+						null
+					]
+				})
+			)
+		).toEqual([]);
+		expect(state.chats.length).toBe(before);
 	});
 });

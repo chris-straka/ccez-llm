@@ -331,6 +331,98 @@ export function ensureGameChat(state: ChatState, store?: KeyValueStore): Chat {
 	return state.chats.find((c) => c.id === chat.id) ?? chat;
 }
 
+/** Prefix of chats asked from the phone's home (`importHomeAsks`). */
+export const HOME_ASK_PREFIX = "home-";
+
+/**
+ * Exchanges asked from the phone's home screen (ccez-launcher's Ask,
+ * through AskService on Android, owner 2026-11-18), as the service saved
+ * them in `home-asks.json`: `{chats: [{id, createdAt, messages: [{role,
+ * content, cited?}]}]}`. Each thread lands as a chat of its own (id
+ * `home-<id>`, the id the launcher's "Carry on" link opens), titled with
+ * its first question. The service writes the whole thread each time, so
+ * a thread already here takes the newer list, unless the chat has grown
+ * past it here (carried on in this app). Bad entries are skipped, never
+ * thrown. Returns the chats it added or changed.
+ */
+export function importHomeAsks(
+	state: ChatState,
+	raw: string,
+	store?: KeyValueStore
+): ChatId[] {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		return [];
+	}
+	const list = (parsed as { chats?: unknown } | null)?.chats;
+	if (!Array.isArray(list)) return [];
+	const touched: ChatId[] = [];
+	for (const item of list) {
+		const ask = item as {
+			id?: unknown;
+			createdAt?: unknown;
+			messages?: unknown;
+		} | null;
+		if (
+			!ask ||
+			typeof ask.id !== "string" ||
+			!/^[A-Za-z0-9-]{1,64}$/.test(ask.id) ||
+			!Array.isArray(ask.messages)
+		)
+			continue;
+		const msgs: ChatMsg[] = [];
+		for (const m of ask.messages) {
+			const mm = m as {
+				role?: unknown;
+				content?: unknown;
+				cited?: unknown;
+			} | null;
+			if (!mm || (mm.role !== "user" && mm.role !== "assistant")) continue;
+			if (typeof mm.content !== "string" || mm.content.trim() === "") continue;
+			const msg: ChatMsg = {
+				id: newChatMsgId(),
+				role: mm.role,
+				content: mm.content,
+				usage: null,
+				error: null
+			};
+			if (mm.role === "assistant" && Array.isArray(mm.cited)) {
+				const cited = mm.cited.filter(
+					(u): u is string => typeof u === "string"
+				);
+				if (cited.length > 0) msg.webCited = cited;
+			}
+			msgs.push(msg);
+		}
+		if (msgs.length === 0) continue;
+		const id = `${HOME_ASK_PREFIX}${ask.id}` as ChatId;
+		const existing = state.chats.find((c) => c.id === id);
+		if (existing) {
+			if (msgs.length <= existing.messages.length) continue;
+			state.chats = state.chats.map((c) =>
+				c.id === id ? { ...c, messages: msgs } : c
+			);
+		} else {
+			const chat = blankChat();
+			chat.id = id;
+			if (typeof ask.createdAt === "number" && Number.isFinite(ask.createdAt))
+				chat.createdAt = ask.createdAt;
+			chat.messages = msgs;
+			const first = msgs.find((m) => m.role === "user");
+			if (first) {
+				chat.title = cleanTitle(first.content);
+				chat.titleBy = "ai";
+			}
+			state.chats = [...state.chats, chat];
+		}
+		touched.push(id);
+	}
+	if (touched.length > 0) persistChats(state, store);
+	return touched;
+}
+
 /**
  * Append an assistant message to one chat by id, replacing the
  * messages array (never pushing — proxy signals need the swap).

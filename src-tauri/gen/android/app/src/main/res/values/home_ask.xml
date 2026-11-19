@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- SHA-256 of the certificates whose apps may ask from the home screen
+    (AskService): ccez-launcher's release key. -->
+    <string-array name="home_ask_known_certs">
+        <item>0874cfb18081c6dd2849bbc847f16af9a6ca256a8562d86897ac2a496dce0864</item>
+    </string-array>
+</resources>

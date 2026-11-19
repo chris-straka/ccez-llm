@@ -55,6 +55,8 @@
 		resolveSendCompletion,
 		landingSignal,
 		replyPhase,
+		importHomeAsks,
+		HOME_ASK_PREFIX,
 		type Chat,
 		type ChatMsg,
 		type ChatId,
@@ -1627,6 +1629,7 @@
 				return;
 			}
 			drafts.resume();
+			void takeHomeAsks();
 			clearStudyBadge();
 			void dismissReplyNotificationAsync({
 				shell: tauriBackendAvailable()
@@ -1664,6 +1667,7 @@
 		untrack(() => {
 			void nativeTurns.reconcile();
 			void listenMode.resync();
+			void takeHomeAsks();
 		});
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
@@ -10365,21 +10369,45 @@
 	 * an error toast), `ccez://new` mints a chat. Cold-start links
 	 * wait in the backend drain slot; live ones arrive as events.
 	 */
+	/**
+	 * Exchanges asked from the phone's home screen (ccez-launcher's Ask,
+	 * AskService.kt) wait in a file until the window takes them into its
+	 * chats: at start, on every return, and before a "Carry on" link
+	 * opens one. Android only; elsewhere the command answers null.
+	 */
+	async function takeHomeAsks(): Promise<void> {
+		if (!tauriBackendAvailable()) return;
+		try {
+			const { invoke } = await import("@tauri-apps/api/core");
+			const raw = await invoke<string | null>("home_asks_take");
+			if (raw) importHomeAsks(chatState, raw);
+		} catch {
+			// An older shell has no such command: nothing waits.
+		}
+	}
+
 	async function wireDeepLinks(): Promise<void> {
 		if (!tauriBackendAvailable()) return;
+		await takeHomeAsks();
 		try {
 			await listenDeepLinks((link) => {
 				if (link.kind === "new-chat") {
 					doNewChat();
 					return;
 				}
-				const exists = chatState.chats.some((c) => c.id === link.chatId);
-				if (!exists) return;
-				drafts.fileChat(chatState.activeChatId);
-				swapComposerDraft(chatState.activeChatId, link.chatId as ChatId);
-				selectChat(chatState, link.chatId as ChatId);
-				drafts.restoreChat(link.chatId);
-				enterEditMode();
+				const open = (): void => {
+					const exists = chatState.chats.some((c) => c.id === link.chatId);
+					if (!exists) return;
+					drafts.fileChat(chatState.activeChatId);
+					swapComposerDraft(chatState.activeChatId, link.chatId as ChatId);
+					selectChat(chatState, link.chatId as ChatId);
+					drafts.restoreChat(link.chatId);
+					enterEditMode();
+				};
+				// A thread from the home screen may still be in the file.
+				if (link.chatId.startsWith(HOME_ASK_PREFIX))
+					void takeHomeAsks().then(open);
+				else open();
 			});
 		} catch (error) {
 			console.warn(

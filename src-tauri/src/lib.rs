@@ -25,6 +25,7 @@ mod dictate_windows;
 mod dictation;
 mod fetch;
 mod heard_macos;
+mod home_asks;
 mod keyboard;
 mod langid;
 mod listen;
@@ -448,6 +449,7 @@ pub fn run() {
             desktop::desktop_drain_pending_link,
             #[cfg(desktop)]
             settings_file::settings_file_write,
+            home_asks::home_asks_take,
             #[cfg(desktop)]
             settings_file::settings_file_watch,
             #[cfg(all(desktop, unix))]

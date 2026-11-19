@@ -19,6 +19,14 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - `src-tauri/src/` — Rust commands. `turn.rs` runs the same turn loop
   natively (Android background turns) and must mirror the TypeScript
   provider; `page_text.rs` mirrors the `tools.ts` cleaners for it.
+- Home Ask (Android): ccez-launcher binds `AskService`
+  (`gen/android/.../HomeAsk.kt`, a Messenger behind the
+  `ASK_FROM_HOME` permission: this app's key, or the launcher's
+  certificate in `res/values/home_ask.xml`). It answers with DeepSeek
+  (keyring key, else the Mac) and saves each thread to
+  `home-asks.json`; `home_asks.rs` hands that to `importHomeAsks`
+  (`chat.ts`), which files it as chat `home-<id>`. Change the message
+  shape on both sides together.
 - `e2e/*.e2e.ts` — Playwright, seeded via `e2e/helpers.ts`. Specs import
   `test`/`expect` from `e2e/fixtures.ts`, which fails any test that
   throws an uncaught page error; Tauri stubs need `transformCallback`
