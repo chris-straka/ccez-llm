@@ -120,7 +120,10 @@ jobs:
             bundle_dir: src-tauri/target/release/bundle
             android: false
           - name: android-arm64
-            os: ubuntu-latest
+            # 24.04, not ubuntu-latest: on 26.04 (2026-11-19) the system
+            # libclang makes boring-sys's bindgen emit opaque structs and
+            # boring-imp stops compiling (check.yml rust-android, same pin).
+            os: ubuntu-24.04
             rust_target: aarch64-linux-android
             tauri_target_flag: ""
             bundle_dir: src-tauri/gen/android/app/build/outputs/apk

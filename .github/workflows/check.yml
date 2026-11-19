@@ -189,8 +189,11 @@ jobs:
   # compile C for the target under `cargo check`, so the NDK install is
   # required (same revision the release leg uses); the Android platform
   # package is not — only the Gradle APK build needs that.
+  # Pinned to 24.04 with the release leg: ubuntu-latest became 26.04
+  # (2026-11-19), whose libclang breaks boring-sys's bindgen (boring-imp:
+  # "no field `id` on type `srtp_protection_profile_st`").
   rust-android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: src-tauri
