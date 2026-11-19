@@ -131,20 +131,51 @@ owns the row markup and its surfaces. -->
 	{/each}
 	{#if trailing}
 		<span class="row-rule" aria-hidden="true"></span>
-		{@render trailing()}
+		<!-- A phone puts these on their own line under the pills; an open
+		language sheet drops over them. Elsewhere the wrapper is invisible
+		to layout and they end the row. -->
+		<div class="row-end">{@render trailing()}</div>
 	{/if}
 </div>
 
 <style>
-	/* Four region menus share one row on a phone: no wrap, tighter
-	chrome. Desktop keeps the wrapping rhythm. */
+	/* Four region menus share one row on a phone, tighter chrome;
+	the ways in (News, Listen, Music) wrap onto a line of their own
+	under them, centred (owner, 2026-11-19: on one row the last two
+	didn't fit). An open sheet drops over that line (z-index 60). */
 	:global(.app[data-android]) .lang-menus {
-		flex-wrap: nowrap;
+		flex-wrap: wrap;
+		justify-content: center;
 		gap: 0.4rem;
 	}
-	/* The hero row on a phone carries the four pills plus News and
-	Listen: it takes the screen's width (a hair of margin), or the
-	ends clip off both edges at 360px. */
+	:global(.app[data-android]) .row-rule {
+		display: none;
+	}
+	.row-end {
+		display: contents;
+	}
+	:global(.app[data-android]) .row-end {
+		display: flex;
+		flex-basis: 100%;
+		justify-content: center;
+	}
+	/* Their own line has no pill beside them to stretch to: the pills'
+	height and padding, so both lines read as one set. */
+	:global(.app[data-android]) .row-end :global(.study-modes button) {
+		height: auto;
+		/* A grid button gets no text line: the pills' line height stands in. */
+		min-height: calc(0.75rem * 1.2 + 0.6rem + 2px);
+		font-size: 0.75rem;
+		line-height: normal;
+		padding: 0.3rem 0.7rem;
+	}
+	/* The emoji's own line box mustn't size the button (as the pills'). */
+	:global(.app[data-android]) .row-end :global(.study-modes button span) {
+		display: inline-block;
+		line-height: 1;
+	}
+	/* The hero row on a phone takes the screen's width (a hair of
+	margin), or the pills clip off both edges at 360px. */
 	:global(.app[data-android] .empty-state) .lang-menus {
 		width: calc(100% - 1rem);
 	}

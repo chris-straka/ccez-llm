@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "./fixtures";
 import { seedChat, setSettingValue } from "./helpers";
+import { seedMockShell } from "./mock-shell";
 
 test.use({
 	hasTouch: true,
@@ -438,10 +439,6 @@ test.describe("touch", () => {
 
 	test("region menus share one row on a phone", async ({ page }) => {
 		await seedEmpty(page);
-		const wrap = await page
-			.locator(".lang-menus")
-			.evaluate((el) => getComputedStyle(el).flexWrap);
-		expect(wrap).toBe("nowrap");
 		const buttons = page.locator(".lang-menus .lang-menu > button");
 		expect(await buttons.count()).toBe(4);
 		const boxes = [];
@@ -450,6 +447,67 @@ test.describe("touch", () => {
 		expect(ys.size).toBe(1);
 		const right = Math.max(...boxes.map((b) => (b?.x ?? 0) + (b?.width ?? 0)));
 		expect(right).toBeLessThanOrEqual(412);
+	});
+
+	/** At the S24's 360px the ways in (News, Listen) didn't fit beside
+	the four pills (owner, 2026-11-19): they take a centred line of
+	their own under them, and an open language sheet drops over it. */
+	test("the ways in wrap under the pills and an open sheet covers them", async ({
+		page
+	}) => {
+		await page.setViewportSize({ width: 360, height: 780 });
+		// The ways in need the app's shell on a phone.
+		await seedMockShell(page);
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{ id: "e2e-chat", createdAt: 1, replyLang: "fr", messages: [] }
+				])
+			);
+		});
+		await page.goto("/");
+		const ways = page.locator(".empty-state .study-modes");
+		await expect(ways).toBeVisible({ timeout: 60_000 });
+		const pills = page.locator(".lang-menus .lang-menu > button");
+		const pillBoxes = [];
+		for (let i = 0; i < 4; i++)
+			pillBoxes.push(await pills.nth(i).boundingBox());
+		expect(new Set(pillBoxes.map((b) => Math.round(b?.y ?? -1))).size).toBe(1);
+		const pillsLeft = Math.min(...pillBoxes.map((b) => b?.x ?? 0));
+		const pillsRight = Math.max(
+			...pillBoxes.map((b) => (b?.x ?? 0) + (b?.width ?? 0))
+		);
+		expect(pillsLeft).toBeGreaterThanOrEqual(0);
+		expect(pillsRight).toBeLessThanOrEqual(360);
+		const pillBottom = Math.max(
+			...pillBoxes.map((b) => (b?.y ?? 0) + (b?.height ?? 0))
+		);
+		const waysBox = await ways.boundingBox();
+		expect(waysBox).toBeTruthy();
+		expect(waysBox!.y).toBeGreaterThanOrEqual(pillBottom);
+		// Centred on the row, and inside the screen.
+		const waysMid = waysBox!.x + waysBox!.width / 2;
+		expect(
+			Math.abs(waysMid - (pillsLeft + pillsRight) / 2)
+		).toBeLessThanOrEqual(4);
+		expect(waysBox!.x + waysBox!.width).toBeLessThanOrEqual(360);
+		// The pills' height, so both lines read as one set.
+		const news = await ways.locator("button").first().boundingBox();
+		expect(
+			Math.abs((news?.height ?? 0) - (pillBoxes[0]?.height ?? 0))
+		).toBeLessThanOrEqual(3);
+		// An open sheet lies over the second line, not under or beside it.
+		await pills.nth(1).tap();
+		await expect(page.locator(".lang-list")).toBeVisible();
+		const onTop = await page.evaluate(
+			({ x, y }) =>
+				document.elementFromPoint(x, y)?.closest(".lang-list") !== null,
+			{ x: waysMid, y: waysBox!.y + waysBox!.height / 2 }
+		);
+		expect(onTop).toBe(true);
 	});
 
 	test("chats list is a left drawer covering ~3/4 width on a phone", async ({
